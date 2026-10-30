@@ -37,3 +37,4 @@ body {
 @keyframes flow-y { to { background-position: 0 10px; } }
 @keyframes flow-x { to { background-position: 10px 0; } }
 @media (prefers-reduced-motion: reduce) { .flow-line { animation: none; } }
+.flow-line-rev { animation-direction: reverse; }

@@ -1,22 +1,29 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import {
+  AppWindow,
+  ArrowLeft,
   ArrowRight,
+  BadgeCheck,
   BookOpenText,
   Building2,
   ClipboardCheck,
   Database,
-  Eye,
+  Cpu,
+  FileSearch,
   FileClock,
   KeyRound,
   Laptop,
   Network,
+  NotebookPen,
   PackageCheck,
   Puzzle,
+  Receipt,
   Server,
   ShieldCheck,
   Sparkles,
   Terminal,
+  Ticket,
   Workflow,
 } from "lucide-react";
 import { cx } from "../components/ui";
@@ -32,22 +39,40 @@ const hub = [
   { icon: PackageCheck, title: "封装", desc: "统一打包为 DSH 插件，走内置 registry" },
   { icon: ClipboardCheck, title: "审核", desc: "安装脚本、依赖、密钥泄露自动检查 + 人工审批" },
   { icon: KeyRound, title: "授权", desc: "按部门 / 角色决定谁能看到、谁能装" },
-  { icon: FileClock, title: "审计", desc: "每一次分发与安装都有记录，可一键下架" },
+  { icon: FileClock, title: "审计", desc: "每一次分发、安装与调用都有记录，可一键下架" },
+  { icon: AppWindow, title: "微应用", desc: "托管基于 DSH 运行的企业微应用，统一上架到工作台" },
 ];
 
 const runtimes = [
   { icon: Terminal, title: "DSH 核心（CLI）", desc: "研发在终端里直接调用企业能力" },
   { icon: Laptop, title: "DSH 桌面版", desc: "业务同事开箱即用，无需配置" },
+  { icon: AppWindow, title: "企业微应用", desc: "工作台里的报销助手、合同审查……由 DSH 驱动执行" },
 ];
 
-function Arrow({ label }: { label: string }) {
+function Arrow({ label, reverse }: { label: string; reverse?: boolean }) {
+  const Icon = reverse ? ArrowLeft : ArrowRight;
   return (
     <div className="flex items-center justify-center lg:flex-col lg:px-1">
-      <div className="flex flex-col items-center gap-1.5 py-2 lg:flex-row lg:py-0">
-        <span className="flow-line h-10 w-0.5 lg:h-0.5 lg:w-14" />
-        <ArrowRight size={18} className="rotate-90 text-brand-400 lg:rotate-0" />
+      <div
+        className={cx(
+          "flex items-center gap-1.5 py-2 lg:py-0",
+          reverse ? "flex-col-reverse lg:flex-row-reverse" : "flex-col lg:flex-row",
+        )}
+      >
+        <span className={cx("flow-line h-10 w-0.5 lg:h-0.5 lg:w-14", reverse && "flow-line-rev")} />
+        <Icon size={18} className="rotate-90 text-brand-400 lg:rotate-0" />
       </div>
       <span className="ml-2 text-xs whitespace-nowrap text-slate-400 lg:mt-2 lg:ml-0">{label}</span>
+    </div>
+  );
+}
+
+/** dsh-ee 与 DSH 双向赋能：能力下发、执行数据回流 */
+function BiArrow({ down, up }: { down: string; up: string }) {
+  return (
+    <div className="flex items-center justify-center gap-8 lg:flex-col lg:gap-6">
+      <Arrow label={down} />
+      <Arrow label={up} reverse />
     </div>
   );
 }
@@ -106,7 +131,7 @@ function FlowDiagram() {
         ))}
       </Column>
 
-      <Arrow label="一键安装" />
+      <BiArrow down="能力 · 微应用下发" up="审计 · Skill 回流" />
 
       <Column title="DSH 执行" tag="Runtime" className="bg-slate-900 text-slate-100">
         {runtimes.map((r) => (
@@ -127,19 +152,44 @@ function FlowDiagram() {
 
 const values = [
   {
+    icon: Cpu,
+    title: "全链路信创",
+    desc: "服务端、客户端到模型，均可部署在国产 CPU、操作系统与数据库环境，搭配 DeepSeek 等国产大模型。",
+  },
+  {
     icon: Sparkles,
     title: "让 AI 懂你的企业",
     desc: "通用模型不知道你的流程、系统和口径。把它们沉淀成插件，每个员工的 DSH 都带着同一份企业上下文。",
   },
   {
     icon: ShieldCheck,
-    title: "管得住才敢用",
-    desc: "插件安装时会执行代码。dsh-ee 在入口处审核、授权、留痕，企业作用域永不回源，杜绝依赖混淆。",
+    title: "可控",
+    desc: "私有部署、支持完全离线。插件与微应用在入口处审核、授权，企业作用域永不回源，杜绝依赖混淆。",
   },
   {
-    icon: Network,
-    title: "数据不出内网",
-    desc: "私有部署、支持完全离线。社区热门插件与 DSH 安装包经签名校验后摆渡进内网。",
+    icon: FileClock,
+    title: "可审计",
+    desc: "谁装了什么、谁调用了什么，DSH 执行记录回流到 dsh-ee，出了问题可追溯、可一键下架。",
+  },
+];
+
+const microApps = [
+  { icon: Receipt, title: "报销助手", desc: "读发票、对照报销制度、预填单据" },
+  { icon: FileSearch, title: "合同审查", desc: "按法务 Skill 逐条标注风险条款" },
+  { icon: NotebookPen, title: "周报生成", desc: "汇总工单、提交记录与会议纪要" },
+  { icon: Ticket, title: "工单分派", desc: "理解问题描述，按值班表派单" },
+];
+
+const mutual = [
+  {
+    from: "dsh-ee",
+    to: "DSH",
+    items: ["企业 Skill 与上下文", "可信的插件源与 registry", "微应用与使用策略"],
+  },
+  {
+    from: "DSH",
+    to: "dsh-ee",
+    items: ["执行引擎：微应用由它驱动", "安装与调用审计记录", "员工沉淀的新 Skill"],
   },
 ];
 
@@ -163,6 +213,7 @@ export default function Landing() {
           </Link>
           <nav className="hidden gap-6 text-sm text-slate-600 md:flex">
             <a href="#how" className="hover:text-slate-900">工作方式</a>
+            <a href="#workbench" className="hover:text-slate-900">工作台</a>
             <a href="#why" className="hover:text-slate-900">为什么</a>
             <a href="#deploy" className="hover:text-slate-900">部署</a>
           </nav>
@@ -181,7 +232,7 @@ export default function Landing() {
         <div className="pointer-events-none absolute inset-x-0 -top-40 mx-auto h-[480px] max-w-4xl rounded-full bg-brand-200/40 blur-3xl" />
         <div className="relative mx-auto max-w-6xl px-6 pt-20 pb-12 text-center">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 ring-1 ring-brand-100">
-            <Server size={13} /> DSH 企业版 · 私有部署
+            <Server size={13} /> 全链路信创 · 可控智能工作台
           </span>
           <h1 className="mx-auto mt-6 max-w-3xl text-4xl leading-tight font-bold tracking-tight text-slate-900 md:text-5xl">
             把企业的 Skill、系统与数据
@@ -189,7 +240,7 @@ export default function Landing() {
             <span className="text-brand-600">变成每位员工 DSH 里的能力</span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-500">
-            dsh-ee 是企业资产与 DSH 之间的那一层：统一封装、审核、授权、分发与审计，让 AI 在员工手边安全地执行企业自己的工作方式。
+            dsh-ee 是企业资产与 DSH 之间的那一层，也是员工的智能工作台：统一封装、审核、授权、分发与审计，并直接运行基于 DSH 的企业微应用。
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <Link
@@ -202,20 +253,66 @@ export default function Landing() {
               如何部署
             </a>
           </div>
+          <div className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-slate-500">
+            {["全链路信创", "可控", "可审计"].map((t) => (
+              <span key={t} className="inline-flex items-center gap-1.5">
+                <BadgeCheck size={16} className="text-brand-500" /> {t}
+              </span>
+            ))}
+          </div>
         </div>
       </section>
 
       <section id="how" className="mx-auto max-w-6xl scroll-mt-20 px-6 pb-20">
         <FlowDiagram />
         <p className="mt-4 text-center text-xs text-slate-400">
-          企业资产 → <span className="font-medium text-brand-600">dsh-ee</span> → DSH 执行
+          企业资产 → <span className="font-medium text-brand-600">dsh-ee</span> ⇄ DSH 执行
         </p>
+      </section>
+
+      <section id="workbench" className="mx-auto grid max-w-6xl scroll-mt-20 gap-10 px-6 pb-20 lg:grid-cols-[1.2fr_1fr]">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">智能工作台：基于 DSH 运行微应用</h2>
+          <p className="mt-3 text-slate-500">
+            在 dsh-ee 上架的微应用出现在员工工作台里：界面由 dsh-ee 提供，推理与工具调用交给本机 DSH，权限与审计由 dsh-ee 统一管理。
+          </p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            {microApps.map((a) => (
+              <div key={a.title} className="flex gap-3 rounded-xl p-4 ring-1 ring-slate-200">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                  <a.icon size={18} />
+                </span>
+                <div>
+                  <div className="text-sm font-medium text-slate-900">{a.title}</div>
+                  <div className="text-xs text-slate-500">{a.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-2xl bg-slate-50 p-6 ring-1 ring-slate-200">
+          <h3 className="font-semibold text-slate-900">DSH ⇄ dsh-ee 双向赋能</h3>
+          <div className="mt-4 space-y-4">
+            {mutual.map((m) => (
+              <div key={m.from} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+                <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
+                  {m.from} <ArrowRight size={14} className="text-brand-500" /> {m.to}
+                </div>
+                <ul className="mt-2 space-y-1 text-sm text-slate-500">
+                  {m.items.map((i) => (
+                    <li key={i}>· {i}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       <section id="why" className="scroll-mt-20 bg-slate-50 py-20">
         <div className="mx-auto max-w-6xl px-6">
           <h2 className="text-center text-2xl font-bold text-slate-900">为什么需要这一层</h2>
-          <div className="mt-10 grid gap-5 md:grid-cols-3">
+          <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {values.map((v) => (
               <div key={v.title} className="rounded-2xl bg-white p-6 ring-1 ring-slate-200">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
@@ -265,7 +362,7 @@ export default function Landing() {
             {[
               [Network, "支持完全离线"],
               [KeyRound, "本地账号 / LDAP / OIDC"],
-              [Eye, "评分、上游、分发均可开关"],
+              [Cpu, "信创环境适配"],
               [ShieldCheck, "安装包 sha256 校验"],
             ].map(([Icon, label]) => {
               const I = Icon as typeof Puzzle;
@@ -281,7 +378,7 @@ export default function Landing() {
 
       <section className="px-6 pb-20">
         <div className="mx-auto max-w-6xl rounded-3xl bg-gradient-to-br from-brand-600 to-brand-900 px-8 py-14 text-center text-white">
-          <h2 className="text-2xl font-bold md:text-3xl">让企业知识，成为 AI 的默认能力</h2>
+          <h2 className="text-2xl font-bold md:text-3xl">全链路信创 · 可控 · 可审计的智能工作台</h2>
           <p className="mx-auto mt-3 max-w-xl text-brand-100">原型全部为模拟数据，可随意点击体验员工门户与管理后台。</p>
           <div className="mt-8 flex justify-center gap-3">
             <Link to="/market" className="rounded-xl bg-white px-5 py-3 font-medium text-brand-700 hover:bg-brand-50">
