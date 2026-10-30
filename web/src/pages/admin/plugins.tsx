@@ -33,7 +33,7 @@ export default function AdminPlugins() {
       </div>
       <Card className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="border-b border-slate-100 text-left text-xs text-slate-400">
+          <thead className="border-b border-neutral-100 text-left text-xs text-neutral-500">
             <tr>
               <th className="px-4 py-2.5 font-normal">插件</th>
               <th className="px-4 py-2.5 font-normal">来源</th>
@@ -47,25 +47,25 @@ export default function AdminPlugins() {
               <th className="px-4 py-2.5" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-neutral-100">
             {list.map((p) => (
-              <tr key={p.name} className="hover:bg-slate-50">
+              <tr key={p.name} className="hover:bg-neutral-50">
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-2.5">
                     <PluginIcon name={p.name} icon={p.icon} size={28} />
                     <div className="min-w-0">
-                      <div className="max-w-56 truncate font-medium text-slate-800">{p.title}</div>
-                      <div className="max-w-56 truncate font-mono text-xs text-slate-400">{p.name}</div>
+                      <div className="max-w-56 truncate font-medium text-neutral-800">{p.title}</div>
+                      <div className="max-w-56 truncate font-mono text-xs text-neutral-500">{p.name}</div>
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-2.5 text-slate-500">{p.origin === "internal" ? p.department : "上游"}</td>
-                <td className="px-4 py-2.5 text-slate-500">{categories[p.category]}</td>
-                <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{p.version}</td>
+                <td className="px-4 py-2.5 text-neutral-500">{p.origin === "internal" ? p.department : "上游"}</td>
+                <td className="px-4 py-2.5 text-neutral-500">{categories[p.category]}</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-neutral-600">{p.version}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{p.installs}</td>
-                {scoring.upstream && <td className="px-4 py-2.5 text-right tabular-nums text-slate-600">{p.score ?? "—"}</td>}
+                {scoring.upstream && <td className="px-4 py-2.5 text-right tabular-nums text-neutral-600">{p.score ?? "—"}</td>}
                 {scoring.rating && <td className="px-4 py-2.5">{p.rating !== undefined ? <Rating value={p.rating} /> : "—"}</td>}
-                <td className="px-4 py-2.5 text-slate-500">{formatKb(p.sizeKb)}</td>
+                <td className="px-4 py-2.5 text-neutral-500">{formatKb(p.sizeKb)}</td>
                 <td className="px-4 py-2.5">{statusBadge[p.status]}</td>
                 <td className="px-4 py-2.5 text-right">
                   {p.status === "approved" && (

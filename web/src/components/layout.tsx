@@ -1,151 +1,160 @@
-import { NavLink, Outlet, Link } from "react-router";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, Link, useLocation } from "react-router";
 import {
+  AppWindow,
   Boxes,
   ClipboardCheck,
   CloudDownload,
   Download,
+  Gauge,
   LayoutDashboard,
+  Menu,
   Puzzle,
   Settings as SettingsIcon,
-  ShieldCheck,
+  Terminal,
   Upload,
-  Wrench,
+  X,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { cx } from "./ui";
-
-function Logo({ to }: { to: string }) {
-  const { orgName } = useStore().settings;
-  return (
-    <Link to={to} className="flex items-center gap-2">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-white">
-        <Puzzle size={18} />
-      </span>
-      <span className="leading-tight">
-        <span className="block text-sm font-semibold text-slate-900">{orgName} · DSH 插件市场</span>
-        <span className="block text-[11px] text-slate-400">dsh-ee</span>
-      </span>
-    </Link>
-  );
-}
 
 function Toast() {
   const { toast } = useStore();
   if (!toast) return null;
   return (
-    <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm text-white shadow-lg">
+    <div
+      role="status"
+      className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md bg-neutral-900 px-4 py-2.5 text-sm text-white shadow-lg"
+    >
       {toast}
     </div>
   );
 }
 
-export function PortalLayout() {
-  const { settings } = useStore();
-  const nav = [
-    { to: "/market", label: "插件市场", end: true },
-    ...(settings.distribution.enabled ? [{ to: "/dsh", label: "下载 DSH", end: false }] : []),
-    { to: "/setup", label: "接入指南", end: false },
-    { to: "/publish", label: "分享插件", end: false },
-  ];
+interface NavItem {
+  to: string;
+  label: string;
+  icon: typeof Puzzle;
+  end?: boolean;
+  count?: number;
+  off?: boolean;
+}
+
+function NavGroup({ label, items, onNavigate }: { label: string; items: NavItem[]; onNavigate: () => void }) {
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-8 px-6">
-          <Logo to="/" />
-          <nav className="flex gap-1">
-            {nav.map((n) => (
-              <NavLink
-                key={n.to}
-                to={n.to}
-                end={n.end}
-                className={({ isActive }) =>
-                  cx(
-                    "rounded-lg px-3 py-2 text-sm transition",
-                    isActive ? "bg-brand-50 font-medium text-brand-700" : "text-slate-600 hover:bg-slate-100",
-                  )
-                }
-              >
-                {n.label}
-              </NavLink>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-3 text-sm">
-            <Link to="/admin" className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100">
-              <Wrench size={15} /> 管理后台
-            </Link>
-            <span className="flex items-center gap-2 rounded-full bg-slate-100 py-1 pr-3 pl-1">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-500 text-xs text-white">张</span>
-              zhang.wei
-              <span className="text-xs text-slate-400">· 研发效能部</span>
-            </span>
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        <Outlet />
-      </main>
-      <footer className="border-t border-slate-200 py-6 text-center text-xs text-slate-400">
-        dsh-ee 原型 · 部署于 {settings.baseUrl} · 上游数据来自 dshfind.com
-      </footer>
-      <Toast />
+    <div>
+      <div className="px-3 pb-1.5 text-xs text-neutral-500">{label}</div>
+      <nav className="flex flex-col gap-0.5">
+        {items.map((n) => (
+          <NavLink
+            key={n.to}
+            to={n.to}
+            end={n.end}
+            onClick={onNavigate}
+            className={({ isActive }) =>
+              cx(
+                "flex h-8 items-center gap-2.5 rounded-md px-3 text-sm transition-colors",
+                isActive ? "bg-neutral-200/70 text-neutral-900" : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900",
+              )
+            }
+          >
+            <n.icon size={16} strokeWidth={1.6} className="text-neutral-500" />
+            {n.label}
+            {n.off && <span className="text-xs text-neutral-500">已关闭</span>}
+            {!!n.count && (
+              <span className="ml-auto rounded bg-red-50 px-1.5 text-xs leading-5 text-red-800 tabular-nums">{n.count}</span>
+            )}
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 }
 
-export function AdminLayout() {
+function Sidebar({ onNavigate }: { onNavigate: () => void }) {
   const { plugins, settings } = useStore();
   const pending = plugins.filter((p) => p.status === "pending").length;
-  const nav = [
-    { to: "/admin", label: "概览", icon: LayoutDashboard, end: true },
-    { to: "/admin/plugins", label: "插件管理", icon: Boxes },
-    { to: "/admin/review", label: "审核队列", icon: ClipboardCheck, badge: pending },
+  const workbench: NavItem[] = [
+    { to: "/overview", label: "总览", icon: Gauge },
+    { to: "/apps", label: "微应用", icon: AppWindow },
+    { to: "/market", label: "能力市场", icon: Puzzle },
+    ...(settings.distribution.enabled ? [{ to: "/dsh", label: "下载 DSH", icon: Download }] : []),
+    { to: "/setup", label: "接入指南", icon: Terminal },
+    { to: "/publish", label: "分享能力", icon: Upload },
+  ];
+  const admin: NavItem[] = [
+    { to: "/admin", label: "运营数据", icon: LayoutDashboard, end: true },
+    { to: "/admin/plugins", label: "能力管理", icon: Boxes },
+    { to: "/admin/review", label: "待审核", icon: ClipboardCheck, count: pending },
     { to: "/admin/upstream", label: "上游预载", icon: CloudDownload },
     { to: "/admin/distribution", label: "DSH 分发", icon: Download, off: !settings.distribution.enabled },
     { to: "/admin/settings", label: "系统设置", icon: SettingsIcon },
   ];
   return (
-    <div className="flex min-h-screen">
-      <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white px-3 py-4">
-        <div className="px-2 pb-4">
-          <Logo to="/admin" />
-        </div>
-        <div className="mb-2 flex items-center gap-1.5 px-3 text-xs font-medium text-slate-400">
-          <ShieldCheck size={13} /> 管理后台
-        </div>
-        <nav className="flex flex-col gap-0.5">
-          {nav.map((n) => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              end={n.end}
-              className={({ isActive }) =>
-                cx(
-                  "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition",
-                  isActive ? "bg-brand-50 font-medium text-brand-700" : "text-slate-600 hover:bg-slate-100",
-                )
-              }
-            >
-              <n.icon size={16} />
-              {n.label}
-              {n.off && <span className="text-xs text-slate-400">（已关闭）</span>}
-              {!!n.badge && (
-                <span className="ml-auto rounded-full bg-red-500 px-1.5 text-xs leading-5 text-white">{n.badge}</span>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="mt-auto space-y-1 border-t border-slate-100 pt-3">
-          <Link to="/market" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
-            <Puzzle size={16} /> 返回员工门户
-          </Link>
-          <Link to="/publish" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
-            <Upload size={16} /> 分享插件
-          </Link>
-        </div>
+    <div className="flex h-full flex-col px-3 py-4">
+      <Link to="/" className="flex items-center gap-2.5 px-3 pb-5" onClick={onNavigate}>
+        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-500 text-white">
+          <Puzzle size={16} />
+        </span>
+        <span className="leading-tight">
+          <span className="block text-sm font-semibold text-neutral-900">dsh-ee</span>
+          <span className="block text-xs text-neutral-600">{settings.orgName}</span>
+        </span>
+      </Link>
+      <div className="flex flex-col gap-6">
+        <NavGroup label="工作台" items={workbench} onNavigate={onNavigate} />
+        <NavGroup label="管理" items={admin} onNavigate={onNavigate} />
+      </div>
+      <div className="mt-auto flex items-center gap-2.5 px-3 pt-4 text-sm">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-200 text-xs text-neutral-700">张</span>
+        <span className="leading-tight">
+          <span className="block text-neutral-900">zhang.wei</span>
+          <span className="block text-xs text-neutral-600">研发效能部 · 管理员</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** 工作台与管理后台共用的外壳：左侧导航，窄屏收起为顶栏 + 抽屉。 */
+export function AppLayout() {
+  const { settings } = useStore();
+  const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+  useEffect(() => window.scrollTo(0, 0), [pathname]);
+
+  return (
+    <div className="min-h-screen bg-neutral-50 lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-r border-neutral-200/80 lg:block">
+        <Sidebar onNavigate={() => {}} />
       </aside>
-      <main className="min-w-0 flex-1 px-8 py-8">
-        <Outlet />
-      </main>
+
+      <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-neutral-200/80 bg-neutral-50 px-4 lg:hidden">
+        <button
+          type="button"
+          aria-label={open ? "关闭导航" : "打开导航"}
+          onClick={() => setOpen((v) => !v)}
+          className="-ml-1 rounded-md p-1.5 text-neutral-700 hover:bg-neutral-100"
+        >
+          {open ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        <span className="text-sm font-semibold text-neutral-900">dsh-ee</span>
+        <span className="text-sm text-neutral-600">{settings.orgName}</span>
+      </header>
+      {open && (
+        <div className="fixed inset-x-0 top-12 bottom-0 z-20 overflow-y-auto bg-neutral-50 lg:hidden">
+          <Sidebar onNavigate={() => setOpen(false)} />
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1">
+        <main className="mx-auto max-w-[1240px] px-4 py-6 sm:px-8 lg:py-8">
+          <Outlet />
+        </main>
+        <footer className="mx-auto max-w-[1240px] px-4 pb-8 text-xs text-neutral-500 sm:px-8">
+          dsh-ee 原型 · 部署于 {settings.baseUrl} · 全部为模拟数据 · 上游插件取自 dshfind.com
+        </footer>
+      </div>
       <Toast />
     </div>
   );

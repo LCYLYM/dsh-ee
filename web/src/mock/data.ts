@@ -6,7 +6,7 @@
  * 包名与版本号接入真实后端前需按上游 deepseek-harness 核实。
  */
 import upstream from "./upstream.json";
-import type { DshRelease, Plugin, ScanItem } from "../lib/types";
+import type { AuditEvent, DshRelease, MicroApp, Plugin, PluginKind, ScanItem } from "../lib/types";
 
 export const categories: Record<string, string> = Object.fromEntries(
   Object.entries(upstream.categories).map(([id, c]) => [id, c.title.zh]),
@@ -18,6 +18,7 @@ const now = Math.floor(Date.UTC(2026, 9, 26) / 1000);
 const internal: Plugin[] = [
   {
     name: "@acme/dsh-gitlab-review",
+    kind: "skill" as const,
     title: "GitLab MR 评审助手",
     description: "对接公司自建 GitLab：拉取 MR diff、按团队规范逐条评审并回帖，支持只读模式。",
     author: "zhang.wei",
@@ -30,6 +31,7 @@ const internal: Plugin[] = [
   },
   {
     name: "@acme/dsh-wiki-memory",
+    kind: "knowledge" as const,
     title: "Confluence 知识记忆",
     description: "把指定空间的 Confluence 页面切片入库，作为 Agent 的长期记忆检索源，权限随原页面。",
     author: "li.na",
@@ -42,6 +44,7 @@ const internal: Plugin[] = [
   },
   {
     name: "@acme/dsh-feishu-notify",
+    kind: "connector" as const,
     title: "飞书通知通道",
     description: "任务完成、需要确认或出错时推送到飞书群或个人，带一键回到会话的链接。",
     author: "wang.chao",
@@ -54,6 +57,7 @@ const internal: Plugin[] = [
   },
   {
     name: "@acme/dsh-sso-llm",
+    kind: "connector" as const,
     title: "内部大模型网关适配",
     description: "通过公司 SSO 认证接入内部模型网关，按部门配额计费，替代直连外部 API。",
     author: "chen.yu",
@@ -66,6 +70,7 @@ const internal: Plugin[] = [
   },
   {
     name: "@acme/dsh-acme-theme",
+    kind: "plugin" as const,
     title: "ACME 品牌主题",
     description: "公司 VI 配色与字体的 DSH 皮肤，支持深浅色。",
     author: "zhao.min",
@@ -77,7 +82,60 @@ const internal: Plugin[] = [
     ratingCount: 12,
   },
   {
+    name: "@acme/skill-expense-policy",
+    kind: "skill" as const,
+    title: "报销制度 Skill",
+    description: "财务部维护的差旅与报销制度：标准、票据要求与审批链，供报销助手逐条核对。",
+    author: "he.jing",
+    department: "财务部",
+    category: "agent",
+    version: "2.0.1",
+    installs: 1534,
+    rating: 4.5,
+    ratingCount: 120,
+  },
+  {
+    name: "@acme/skill-contract-review",
+    kind: "skill" as const,
+    title: "合同审查清单",
+    description: "法务部的合同审查要点：付款、违约、知识产权、保密条款的风险等级与标准表述。",
+    author: "qian.yi",
+    department: "法务部",
+    category: "agent",
+    version: "1.2.0",
+    installs: 287,
+    rating: 4.6,
+    ratingCount: 23,
+  },
+  {
+    name: "@acme/conn-crm",
+    kind: "connector" as const,
+    title: "CRM 只读连接器",
+    description: "按员工身份只读查询 CRM 的客户、商机与续约记录，字段级脱敏随 CRM 权限。",
+    author: "lin.feng",
+    department: "销售运营部",
+    category: "tools",
+    version: "1.1.4",
+    installs: 534,
+    rating: 4.3,
+    ratingCount: 41,
+  },
+  {
+    name: "@acme/kb-metrics",
+    kind: "knowledge" as const,
+    title: "指标口径知识包",
+    description: "数据中台发布的 240 个经营指标口径、取数表与负责人，回答「这个数怎么算」。",
+    author: "xu.ran",
+    department: "数据中台",
+    category: "memory",
+    version: "3.0.0",
+    installs: 776,
+    rating: 4.7,
+    ratingCount: 65,
+  },
+  {
     name: "@acme/dsh-jira-sync",
+    kind: "connector" as const,
     title: "Jira 任务同步",
     description: "把 Agent 的目标拆解同步为 Jira 子任务，并回写进度。",
     author: "sun.hao",
@@ -91,6 +149,7 @@ const internal: Plugin[] = [
   },
   {
     name: "@acme/dsh-db-inspector",
+    kind: "connector" as const,
     title: "只读数据库巡检",
     description: "连接测试环境数据库做只读巡检，输出慢查询与索引建议。",
     author: "zhou.lei",
@@ -127,6 +186,110 @@ const upstreamPlugins: Plugin[] = (upstream.plugins as Plugin[]).map((p, i) => (
 }));
 
 export const initialPlugins: Plugin[] = [...internal, ...upstreamPlugins];
+
+export const kindLabels: Record<PluginKind, string> = {
+  skill: "Skill",
+  connector: "系统连接器",
+  knowledge: "知识包",
+  plugin: "通用插件",
+};
+
+/** 上游社区插件一律算通用插件；内部插件没标形态时按分类推断。 */
+export function kindOf(p: Plugin): PluginKind {
+  if (p.kind) return p.kind;
+  if (p.origin === "upstream") return "plugin";
+  if (p.category === "memory") return "knowledge";
+  if (p.category === "channel" || p.category === "tools") return "connector";
+  return "plugin";
+}
+
+export const microApps: MicroApp[] = [
+  {
+    id: "expense",
+    title: "报销助手",
+    description: "拍照或拖入发票，对照报销制度检查标准与票据，预填费控单据。",
+    department: "财务部",
+    owner: "he.jing",
+    uses: ["@acme/skill-expense-policy", "@acme/dsh-feishu-notify"],
+    runs: 2316,
+    status: "online",
+    updatedAt: "2026-10-21",
+  },
+  {
+    id: "metrics-qa",
+    title: "经营数据问答",
+    description: "用口语问经营数据，按指标口径取数，回答附带口径说明与负责人。",
+    department: "数据中台",
+    owner: "xu.ran",
+    uses: ["@acme/kb-metrics", "@acme/conn-crm"],
+    runs: 1489,
+    status: "online",
+    updatedAt: "2026-10-24",
+  },
+  {
+    id: "mr-review",
+    title: "MR 评审",
+    description: "在 GitLab MR 页面一键评审，按团队规范逐条回帖。",
+    department: "研发效能部",
+    owner: "zhang.wei",
+    uses: ["@acme/dsh-gitlab-review", "@acme/dsh-wiki-memory"],
+    runs: 1102,
+    status: "online",
+    updatedAt: "2026-10-18",
+  },
+  {
+    id: "contract",
+    title: "合同审查",
+    description: "上传合同，按法务清单标注风险条款并给出替换表述。",
+    department: "法务部",
+    owner: "qian.yi",
+    uses: ["@acme/skill-contract-review"],
+    runs: 412,
+    status: "online",
+    updatedAt: "2026-10-12",
+  },
+  {
+    id: "renewal",
+    title: "续约提醒",
+    description: "每周一汇总 30 天内到期的客户与续约风险，推送给客户经理。",
+    department: "销售运营部",
+    owner: "lin.feng",
+    uses: ["@acme/conn-crm", "@acme/dsh-feishu-notify"],
+    runs: 168,
+    status: "beta",
+    updatedAt: "2026-10-25",
+  },
+];
+
+/** 员工终端操作系统分布（来自 DSH 客户端上报），信创系统单独标出。 */
+export const clientPlatforms = [
+  { os: "统信 UOS", count: 412, xinchuang: true },
+  { os: "银河麒麟", count: 236, xinchuang: true },
+  { os: "Windows", count: 598, xinchuang: false },
+  { os: "macOS", count: 187, xinchuang: false },
+  { os: "其他 Linux", count: 64, xinchuang: false },
+];
+
+export const auditLog: AuditEvent[] = [
+  { at: "18:02", user: "he.jing", department: "财务部", action: "run", target: "报销助手", client: "桌面版 1.8.3 · 统信 UOS" },
+  { at: "17:56", user: "sun.hao", department: "项目管理办公室", action: "publish", target: "@acme/dsh-jira-sync 0.1.0", client: "DSH 0.2.0 · macOS" },
+  { at: "17:41", user: "lu.yang", department: "销售二部", action: "run", target: "经营数据问答", client: "桌面版 1.8.3 · 银河麒麟" },
+  { at: "17:20", user: "admin", department: "信息中心", action: "approve", target: "@acme/kb-metrics 3.0.0", client: "管理后台" },
+  { at: "16:58", user: "zhou.lei", department: "DBA 组", action: "install", target: "@acme/conn-crm 1.1.4", client: "DSH 0.2.0 · 统信 UOS" },
+  { at: "16:31", user: "zhang.wei", department: "研发效能部", action: "run", target: "MR 评审", client: "DSH 0.2.0 · Windows" },
+  { at: "15:47", user: "admin", department: "信息中心", action: "yank", target: "some-plugin 0.4.1", client: "管理后台" },
+];
+
+export const auditLabels: Record<AuditEvent["action"], string> = {
+  run: "运行",
+  install: "安装",
+  publish: "提交",
+  approve: "审核通过",
+  yank: "下架",
+};
+
+/** 近 14 天 DSH 执行企业能力的次数（微应用运行 + Skill / 连接器调用）。 */
+export const execTrend = [1120, 1284, 1310, 1402, 1536, 402, 318, 1488, 1622, 1590, 1701, 1785, 512, 436];
 
 /** 预载候选：已入库的（已上架的上游插件）加上游还没同步进来的。 */
 export const preloadCandidates = [

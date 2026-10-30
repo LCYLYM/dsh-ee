@@ -23,8 +23,8 @@ export default function Setup() {
       <Card className="mb-6 flex items-center gap-4 p-5">
         <KeyRound size={20} className="text-brand-500" />
         <div className="flex-1 text-sm">
-          <div className="font-medium text-slate-800">你的个人安装令牌</div>
-          <div className="text-slate-500">命令里已带上令牌，用于安装审计与按部门可见的插件。请勿外传。</div>
+          <div className="font-medium text-neutral-800">你的个人安装令牌</div>
+          <div className="text-neutral-500">命令里已带上令牌，用于安装审计与按部门可见的插件。请勿外传。</div>
         </div>
         <Button variant="secondary" size="sm" onClick={() => notify("已重新生成令牌，旧令牌立即失效")}>
           重新生成
@@ -60,17 +60,17 @@ export default function Setup() {
         {mode === "manual" && (
           <div className="space-y-5">
             <Step n={1} title="在 DSH 中添加插件索引源">
-              <p className="mb-2 text-sm text-slate-500">DSH 插件页 → Discover → 添加索引源，填入：</p>
+              <p className="mb-2 text-sm text-neutral-500">DSH 插件页 → Discover → 添加索引源，填入：</p>
               <CopyBox text={indexUrl} />
             </Step>
             <Step n={2} title="让 pnpm 从内网 registry 安装">
-              <p className="mb-2 text-sm text-slate-500">写入用户目录的 ~/.npmrc（Windows 为 %USERPROFILE%\.npmrc）：</p>
+              <p className="mb-2 text-sm text-neutral-500">写入用户目录的 ~/.npmrc（Windows 为 %USERPROFILE%\.npmrc）：</p>
               <CopyBox
                 text={`registry=${registry}\n${registryKey}:_authToken=ee_tok_••••••••\n${settings.scope}:registry=${registry}`}
               />
             </Step>
             <Step n={3} title="信任企业 CA 证书（内网使用自签证书时）">
-              <p className="mb-2 text-sm text-slate-500">下载证书后，让 DSH 与 pnpm 都信任它：</p>
+              <p className="mb-2 text-sm text-neutral-500">下载证书后，让 DSH 与 pnpm 都信任它：</p>
               <CopyBox
                 text={`curl -fsSLo ~/.dsh-ee-ca.pem ${host}/ca.pem\necho "cafile=$HOME/.dsh-ee-ca.pem" >> ~/.npmrc\nexport NODE_EXTRA_CA_CERTS=$HOME/.dsh-ee-ca.pem   # 写进 shell 配置文件`}
               />
@@ -95,8 +95,8 @@ export default function Setup() {
 
 function ScriptExplain() {
   return (
-    <Card className="p-5 text-sm text-slate-600">
-      <div className="mb-2 font-medium text-slate-800">脚本会做这些事（可在执行前打开链接审阅）：</div>
+    <Card className="p-5 text-sm text-neutral-600">
+      <div className="mb-2 font-medium text-neutral-800">脚本会做这些事（可在执行前打开链接审阅）：</div>
       <ol className="list-decimal space-y-1 pl-5">
         <li>下载企业 CA 证书，配置 NODE_EXTRA_CA_CERTS 与 pnpm cafile</li>
         <li>在 ~/.npmrc 写入内网 registry 地址与你的安装令牌</li>
@@ -114,7 +114,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
         {n}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="mb-2 font-medium text-slate-800">{title}</div>
+        <div className="mb-2 font-medium text-neutral-800">{title}</div>
         {children}
       </div>
     </div>

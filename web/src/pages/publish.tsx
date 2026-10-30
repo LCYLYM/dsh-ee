@@ -78,9 +78,9 @@ export default function Publish() {
           <Card className="mt-4 p-6">
             {way === "cli" && (
               <div className="space-y-4">
-                <p className="text-sm text-slate-600">已按「接入指南」配置过 ~/.npmrc 的话，在插件目录直接发布：</p>
+                <p className="text-sm text-neutral-600">已按「接入指南」配置过 ~/.npmrc 的话，在插件目录直接发布：</p>
                 <CopyBox text={`pnpm build\npnpm publish --registry ${settings.baseUrl}/npm/`} />
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-neutral-500">
                   发布后不会立即可装：包会先经过自动检查（dsh.bundle 声明、安装脚本、依赖漏洞、License、密钥泄露），再由管理员审核。
                   包名不在 {settings.scope}/ 下会被直接拒绝，防止与公网 npm 包重名导致依赖混淆。
                 </p>
@@ -93,14 +93,14 @@ export default function Publish() {
                   <label
                     className={cx(
                       "flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-6 py-8 text-center transition",
-                      form.file ? "border-brand-300 bg-brand-50" : "border-slate-200 hover:border-brand-300",
+                      form.file ? "border-brand-300 bg-brand-50" : "border-neutral-200 hover:border-brand-300",
                     )}
                   >
                     <UploadCloud size={28} className="text-brand-500" />
-                    <span className="mt-2 text-sm font-medium text-slate-700">
+                    <span className="mt-2 text-sm font-medium text-neutral-700">
                       {form.file || "选择 pnpm pack 打出的 .tgz 文件"}
                     </span>
-                    <span className="mt-1 text-xs text-slate-400">包名与版本会从 package.json 自动读取</span>
+                    <span className="mt-1 text-xs text-neutral-500">包名与版本会从 package.json 自动读取</span>
                     <input
                       type="file"
                       accept=".tgz"
@@ -162,22 +162,22 @@ export default function Publish() {
         </div>
 
         <Card className="h-fit">
-          <div className="border-b border-slate-100 px-5 py-3 font-medium text-slate-800">我的提交</div>
+          <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">我的提交</div>
           {mine.length === 0 ? (
-            <div className="p-5 text-sm text-slate-500">还没有提交过插件。</div>
+            <div className="p-5 text-sm text-neutral-500">还没有提交过插件。</div>
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-neutral-100">
               {mine.map((p) => (
                 <li key={p.name} className="flex items-center gap-3 px-5 py-3 text-sm">
                   <div className="min-w-0 flex-1">
                     {p.status === "approved" ? (
-                      <Link to={pluginPath(p.name)} className="font-medium text-slate-800 hover:text-brand-600">
+                      <Link to={pluginPath(p.name)} className="font-medium text-neutral-800 hover:text-brand-600">
                         {p.title}
                       </Link>
                     ) : (
-                      <div className="font-medium text-slate-800">{p.title}</div>
+                      <div className="font-medium text-neutral-800">{p.title}</div>
                     )}
-                    <div className="font-mono text-xs text-slate-400">
+                    <div className="font-mono text-xs text-neutral-500">
                       {p.name}@{p.version}
                     </div>
                   </div>
@@ -197,7 +197,7 @@ function RequestForm() {
   const [name, setName] = useState("");
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-neutral-600">
         在 dshfind.com 或 npm 上看到好用的插件、但企业市场里还没有？提交包名，管理员审核后会把它连同依赖一起同步进内网。
       </p>
       <Field label="npm 包名或 dshfind 链接">

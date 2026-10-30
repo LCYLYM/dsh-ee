@@ -12,8 +12,8 @@ function ReleaseTable({ product, title }: { product: DshRelease["product"]; titl
   const rows = releases.filter((r) => r.product === product);
   return (
     <Card>
-      <div className="flex items-center border-b border-slate-100 px-5 py-3">
-        <span className="font-medium text-slate-800">{title}</span>
+      <div className="flex items-center border-b border-neutral-100 px-5 py-3">
+        <span className="font-medium text-neutral-800">{title}</span>
         <div className="ml-auto flex gap-2">
           <Button variant="secondary" size="sm" onClick={() => notify("已检查官方渠道：发现 0.2.1-alpha.5，已加入同步队列（原型）")}>
             <RefreshCw size={14} /> 检查官方新版本
@@ -24,7 +24,7 @@ function ReleaseTable({ product, title }: { product: DshRelease["product"]; titl
         </div>
       </div>
       <table className="w-full text-sm">
-        <thead className="text-left text-xs text-slate-400">
+        <thead className="text-left text-xs text-neutral-500">
           <tr>
             <th className="px-5 py-2 font-normal">发行版 / 版本</th>
             <th className="px-5 py-2 font-normal">渠道</th>
@@ -34,7 +34,7 @@ function ReleaseTable({ product, title }: { product: DshRelease["product"]; titl
             <th className="px-5 py-2 font-normal">企业推荐</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-neutral-100">
           {rows.map((r) => {
             const hidden =
               (r.channel === "alpha" && !settings.distribution.allowAlpha) ||
@@ -42,17 +42,17 @@ function ReleaseTable({ product, title }: { product: DshRelease["product"]; titl
             return (
               <tr key={r.distro + r.version}>
                 <td className="px-5 py-3">
-                  <div className="font-medium text-slate-800">
+                  <div className="font-medium text-neutral-800">
                     {r.distro} <span className="font-mono">{r.version}</span>
                   </div>
-                  <div className="text-xs text-slate-400">
+                  <div className="text-xs text-neutral-500">
                     {r.notes}
                     {hidden && <span className="ml-1 text-amber-600">· 按当前设置员工看不到</span>}
                   </div>
                 </td>
                 <td className="px-5 py-3">{channelBadge(r.channel)}</td>
-                <td className="px-5 py-3 text-slate-500">{r.releasedAt}</td>
-                <td className="px-5 py-3 text-xs text-slate-500">
+                <td className="px-5 py-3 text-neutral-500">{r.releasedAt}</td>
+                <td className="px-5 py-3 text-xs text-neutral-500">
                   {r.artifacts.length} 个 · {(r.artifacts.reduce((a, x) => a + x.sizeMb, 0) / 1024).toFixed(2)} GB
                 </td>
                 <td className="px-5 py-3">
@@ -100,8 +100,8 @@ export default function AdminDistribution() {
       <div className="space-y-6">
         <ReleaseTable product="core" title="DSH 核心（CLI）" />
         <ReleaseTable product="desktop" title="桌面版" />
-        <Card className="p-5 text-sm text-slate-600">
-          <div className="mb-1 font-medium text-slate-800">企业预配置安装包（规划中）</div>
+        <Card className="p-5 text-sm text-neutral-600">
+          <div className="mb-1 font-medium text-neutral-800">企业预配置安装包（规划中）</div>
           把企业插件索引源、内网 registry 与 CA 证书预先写进安装包，员工装完就能直接用企业市场，不必再跑接入脚本。
           需要确认 DSH 是否支持安装时读取预置配置。
         </Card>

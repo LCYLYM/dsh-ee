@@ -3,8 +3,10 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
 import "./index.css";
 import { StoreProvider } from "./lib/store";
-import { AdminLayout, PortalLayout } from "./components/layout";
+import { AppLayout } from "./components/layout";
 import Landing from "./pages/landing";
+import Overview from "./pages/overview";
+import Apps from "./pages/apps";
 import Market from "./pages/market";
 import PluginDetail from "./pages/plugin-detail";
 import DshDownload from "./pages/dsh-download";
@@ -23,20 +25,20 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <Routes>
           <Route index element={<Landing />} />
-          <Route element={<PortalLayout />}>
+          <Route element={<AppLayout />}>
+            <Route path="overview" element={<Overview />} />
+            <Route path="apps" element={<Apps />} />
             <Route path="market" element={<Market />} />
             <Route path="plugins/:name" element={<PluginDetail />} />
             <Route path="dsh" element={<DshDownload />} />
             <Route path="setup" element={<Setup />} />
             <Route path="publish" element={<Publish />} />
-          </Route>
-          <Route path="admin" element={<AdminLayout />}>
-            <Route index element={<AdminOverview />} />
-            <Route path="plugins" element={<AdminPlugins />} />
-            <Route path="review" element={<AdminReview />} />
-            <Route path="upstream" element={<AdminUpstream />} />
-            <Route path="distribution" element={<AdminDistribution />} />
-            <Route path="settings" element={<AdminSettings />} />
+            <Route path="admin" element={<AdminOverview />} />
+            <Route path="admin/plugins" element={<AdminPlugins />} />
+            <Route path="admin/review" element={<AdminReview />} />
+            <Route path="admin/upstream" element={<AdminUpstream />} />
+            <Route path="admin/distribution" element={<AdminDistribution />} />
+            <Route path="admin/settings" element={<AdminSettings />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -30,30 +30,30 @@ export default function AdminReview() {
     <div>
       <PageHeader title="审核队列" desc="员工提交的内部插件与上游新版本都在这里。自动检查有警告的需要人工确认后才能通过。" />
       {queue.length === 0 ? (
-        <Card className="p-12 text-center text-sm text-slate-500">队列已清空 🎉</Card>
+        <Card className="p-12 text-center text-sm text-neutral-500">队列已清空 🎉</Card>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-          <Card className="h-fit divide-y divide-slate-100">
+          <Card className="h-fit divide-y divide-neutral-100">
             {queue.map((p) => {
               const warns = scanFor(p).filter((s) => s.level !== "pass").length;
               return (
                 <button
                   key={p.name}
                   onClick={() => setSelected(p.name)}
-                  className={cx("flex w-full gap-3 px-4 py-3 text-left", current?.name === p.name ? "bg-brand-50" : "hover:bg-slate-50")}
+                  className={cx("flex w-full gap-3 px-4 py-3 text-left", current?.name === p.name ? "bg-neutral-100" : "hover:bg-neutral-50")}
                 >
                   <PluginIcon name={p.name} icon={p.icon} size={32} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-slate-800">{p.title}</div>
-                    <div className="truncate font-mono text-xs text-slate-400">
+                    <div className="truncate text-sm font-medium text-neutral-800">{p.title}</div>
+                    <div className="truncate font-mono text-xs text-neutral-500">
                       {p.name}@{p.version}
                     </div>
                     <div className="mt-1 flex gap-1.5">
-                      {p.origin === "internal" ? <Badge tone="violet">内部提交</Badge> : <Badge>上游新版本</Badge>}
+                      {p.origin === "internal" ? <Badge tone="brand">内部提交</Badge> : <Badge>上游新版本</Badge>}
                       {warns > 0 && <Badge tone="amber">{warns} 项警告</Badge>}
                     </div>
                   </div>
-                  <span className="text-xs whitespace-nowrap text-slate-400">{ago(p.submittedAt)}</span>
+                  <span className="text-xs whitespace-nowrap text-neutral-500">{ago(p.submittedAt)}</span>
                 </button>
               );
             })}
@@ -64,8 +64,8 @@ export default function AdminReview() {
               <div className="flex gap-4">
                 <PluginIcon name={current.name} icon={current.icon} size={52} />
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900">{current.title}</h2>
-                  <div className="font-mono text-sm text-slate-400">
+                  <h2 className="text-xl font-semibold text-neutral-900">{current.title}</h2>
+                  <div className="font-mono text-sm text-neutral-500">
                     {current.name}@{current.version}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
@@ -80,21 +80,21 @@ export default function AdminReview() {
                   </div>
                 </div>
               </div>
-              <p className="mt-4 text-sm text-slate-600">{current.description}</p>
+              <p className="mt-4 text-sm text-neutral-600">{current.description}</p>
 
-              <h3 className="mt-6 mb-2 text-sm font-semibold text-slate-800">自动检查</h3>
-              <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100">
+              <h3 className="mt-6 mb-2 text-sm font-semibold text-neutral-800">自动检查</h3>
+              <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-100">
                 {scanFor(current).map((s) => (
                   <li key={s.label} className="flex items-start gap-3 px-4 py-2.5 text-sm">
                     {s.level === "pass" && <CheckCircle2 size={17} className="mt-0.5 text-emerald-500" />}
                     {s.level === "warn" && <AlertTriangle size={17} className="mt-0.5 text-amber-500" />}
                     {s.level === "fail" && <XCircle size={17} className="mt-0.5 text-red-500" />}
-                    <span className="w-28 shrink-0 font-medium text-slate-700">{s.label}</span>
-                    <span className="text-slate-500">{s.detail}</span>
+                    <span className="w-28 shrink-0 font-medium text-neutral-700">{s.label}</span>
+                    <span className="text-neutral-500">{s.detail}</span>
                   </li>
                 ))}
               </ul>
-              <div className="mt-3 text-xs text-slate-500">
+              <div className="mt-3 text-xs text-neutral-500">
                 依赖闭包 {current.depCount} 个包 · {formatKb(current.sizeKb)}
               </div>
 

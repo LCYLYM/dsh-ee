@@ -6,6 +6,12 @@ export type PluginStatus = "pending" | "approved" | "rejected" | "yanked";
 
 export type Visibility = "company" | "department" | "private";
 
+/**
+ * 能力形态：企业资产封装成插件后的几种样子。
+ * skill 流程与规范 / connector 信息系统连接器 / knowledge 数据与上下文知识包 / plugin 通用插件（含上游社区插件）。
+ */
+export type PluginKind = "skill" | "connector" | "knowledge" | "plugin";
+
 export interface Plugin {
   name: string;
   title: string;
@@ -15,6 +21,7 @@ export interface Plugin {
   homepage: string | null;
   repository: string | null;
   category: string;
+  kind?: PluginKind;
   featured: boolean;
   stars: number;
   /** dshfind 上游评分 0-100；内部插件没有。 */
@@ -97,4 +104,31 @@ export interface Settings {
     allowCommunityDesktop: boolean;
   };
   auth: "local" | "ldap" | "oidc";
+}
+
+/** 基于 DSH 运行的企业微应用：界面由 dsh-ee 托管，推理与工具调用交给员工本机 DSH。 */
+export interface MicroApp {
+  id: string;
+  title: string;
+  description: string;
+  department: string;
+  owner: string;
+  /** 依赖的企业能力（插件包名），打开微应用时由 DSH 按需安装。 */
+  uses: string[];
+  /** 近 14 天运行次数。 */
+  runs: number;
+  status: "online" | "beta";
+  updatedAt: string;
+}
+
+export type AuditAction = "run" | "install" | "publish" | "approve" | "yank";
+
+export interface AuditEvent {
+  at: string;
+  user: string;
+  department: string;
+  action: AuditAction;
+  target: string;
+  /** 执行端：DSH 版本与操作系统。 */
+  client: string;
 }

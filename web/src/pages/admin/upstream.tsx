@@ -76,7 +76,7 @@ function Online() {
     <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
       <div className="space-y-4">
         <Card className="space-y-4 p-5">
-          <div className="font-medium text-slate-800">挑选规则</div>
+          <div className="font-medium text-neutral-800">挑选规则</div>
           <Field label="排序依据" hint={!scoring.upstream ? "评分已在系统设置中关闭" : undefined}>
             <Segmented
               value={rankBy}
@@ -103,7 +103,7 @@ function Online() {
                   onClick={() => setCats((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]))}
                   className={cx(
                     "rounded-md border px-2 py-1 text-xs",
-                    cats.includes(id) ? "border-brand-300 bg-brand-50 text-brand-700" : "border-slate-200 text-slate-600",
+                    cats.includes(id) ? "border-brand-300 bg-brand-50 text-brand-700" : "border-neutral-200 text-neutral-600",
                   )}
                 >
                   {label}
@@ -112,48 +112,48 @@ function Online() {
             </div>
           </Field>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-700">只要离线可装的</span>
+            <span className="text-neutral-700">只要离线可装的</span>
             <Toggle checked={offlineOnly} onChange={setOfflineOnly} />
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-700">隐藏已入库的</span>
+            <span className="text-neutral-700">隐藏已入库的</span>
             <Toggle checked={hideMirrored} onChange={setHideMirrored} />
           </div>
         </Card>
 
         <Card className="space-y-2 p-5 text-sm">
-          <div className="font-medium text-slate-800">上游配置</div>
-          <div className="flex justify-between text-slate-600">
+          <div className="font-medium text-neutral-800">上游配置</div>
+          <div className="flex justify-between text-neutral-600">
             <span>插件目录</span>
             <span>{settings.upstream.dshfindFeed ? "dshfind.com" : "未启用"}</span>
           </div>
-          <div className="flex justify-between text-slate-600">
+          <div className="flex justify-between text-neutral-600">
             <span>npm 源</span>
             <span>{settings.upstream.registry === "custom" ? settings.upstream.customRegistry || "自定义" : settings.upstream.registry}</span>
           </div>
-          <div className="flex justify-between text-slate-600">
+          <div className="flex justify-between text-neutral-600">
             <span>新版本</span>
             <span>{{ auto: "自动同步", review: "同步后审核", off: "不同步" }[settings.upstream.autoSync]}</span>
           </div>
-          <p className="pt-1 text-xs text-slate-400">同时会镜像企业推荐 DSH 版本对应的 @deepseek-ai/dsh-* 核心包，满足插件的 peer 依赖。</p>
+          <p className="pt-1 text-xs text-neutral-500">同时会镜像企业推荐 DSH 版本对应的 @deepseek-ai/dsh-* 核心包，满足插件的 peer 依赖。</p>
         </Card>
       </div>
 
       <div className="space-y-4">
         <Card className="flex flex-wrap items-center gap-4 p-4">
           <div className="text-sm">
-            <span className="font-medium text-slate-800">
+            <span className="font-medium text-neutral-800">
               将同步 {selected.length} 个插件{picked.size ? "（手动勾选）" : "（未入库的全部）"}
             </span>
-            <span className="ml-2 text-slate-500">
+            <span className="ml-2 text-neutral-500">
               依赖闭包约 {totalDeps} 个包 · {formatKb(totalKb)}
             </span>
           </div>
           <div className="ml-auto">
             {syncing !== null && syncing < 100 ? (
-              <div className="flex w-56 items-center gap-2 text-sm text-slate-600">
+              <div className="flex w-56 items-center gap-2 text-sm text-neutral-600">
                 <Loader2 size={16} className="animate-spin" />
-                <div className="h-2 flex-1 rounded-full bg-slate-100">
+                <div className="h-2 flex-1 rounded-full bg-neutral-100">
                   <div className="h-2 rounded-full bg-brand-500 transition-all" style={{ width: `${syncing}%` }} />
                 </div>
                 {syncing}%
@@ -168,7 +168,7 @@ function Online() {
 
         <Card className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-100 text-left text-xs text-slate-400">
+            <thead className="border-b border-neutral-100 text-left text-xs text-neutral-500">
               <tr>
                 <th className="w-10 px-4 py-2.5" />
                 <th className="px-4 py-2.5 font-normal">插件</th>
@@ -179,9 +179,9 @@ function Online() {
                 <th className="px-4 py-2.5 font-normal">状态</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-neutral-100">
               {ranked.filter((c) => !hideMirrored || !c.mirrored).map((c) => (
-                <tr key={c.name} className={cx(c.mirrored && "text-slate-400")}>
+                <tr key={c.name} className={cx(c.mirrored && "text-neutral-500")}>
                   <td className="px-4 py-2">
                     <input
                       type="checkbox"
@@ -193,7 +193,7 @@ function Online() {
                   </td>
                   <td className="px-4 py-2">
                     <div className="font-medium">{c.title}</div>
-                    <div className="font-mono text-xs text-slate-400">{c.name}</div>
+                    <div className="font-mono text-xs text-neutral-500">{c.name}</div>
                   </td>
                   <td className="px-4 py-2">{categories[c.category]}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{c.stars.toLocaleString()}</td>
@@ -236,15 +236,15 @@ function Offline() {
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="p-6">
-          <div className="mb-1 flex items-center gap-2 font-medium text-slate-800">
+          <div className="mb-1 flex items-center gap-2 font-medium text-neutral-800">
             <PackageOpen size={18} /> 导入离线种子包
           </div>
-          <p className="mb-4 text-sm text-slate-500">
+          <p className="mb-4 text-sm text-neutral-500">
             dshfind 每月发布签名的种子包（热门插件加依赖闭包加元数据）；也可以导入 DMZ 区 ee 实例导出的增量包。
           </p>
-          <label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-slate-200 px-6 py-8 text-center hover:border-brand-300">
+          <label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-neutral-200 px-6 py-8 text-center hover:border-brand-300">
             <FileArchive size={28} className="text-brand-500" />
-            <span className="mt-2 text-sm font-medium text-slate-700">{file || "选择 .tar.zst 文件，或拷贝到服务器 /data/import 目录"}</span>
+            <span className="mt-2 text-sm font-medium text-neutral-700">{file || "选择 .tar.zst 文件，或拷贝到服务器 /data/import 目录"}</span>
             <input type="file" accept=".zst,.tar" className="hidden" onChange={(e) => setFile(e.target.files?.[0]?.name ?? "")} />
           </label>
           <Button className="mt-4" disabled={!file || (step > 0 && step <= steps.length)} onClick={() => setStep(1)}>
@@ -259,9 +259,9 @@ function Offline() {
                   ) : step === i + 1 ? (
                     <Loader2 size={16} className="animate-spin text-brand-500" />
                   ) : (
-                    <span className="h-4 w-4 rounded-full border border-slate-300" />
+                    <span className="h-4 w-4 rounded-full border border-neutral-300" />
                   )}
-                  <span className={step > i ? "text-slate-700" : "text-slate-400"}>{s}</span>
+                  <span className={step > i ? "text-neutral-700" : "text-neutral-500"}>{s}</span>
                 </li>
               ))}
             </ul>
@@ -269,14 +269,14 @@ function Offline() {
         </Card>
 
         <Card className="p-6">
-          <div className="mb-1 flex items-center gap-2 font-medium text-slate-800">
+          <div className="mb-1 flex items-center gap-2 font-medium text-neutral-800">
             <ShieldCheck size={18} /> 导出增量包（摆渡用）
           </div>
-          <p className="mb-4 text-sm text-slate-500">在能联网的 DMZ 实例上，把某个时间点之后新入库的插件导出，拷进隔离网实例导入。</p>
+          <p className="mb-4 text-sm text-neutral-500">在能联网的 DMZ 实例上，把某个时间点之后新入库的插件导出，拷进隔离网实例导入。</p>
           <Field label="导出自">
             <input type="date" defaultValue="2026-10-03" className={inputCls} />
           </Field>
-          <label className="mt-3 flex items-center gap-2 text-sm text-slate-600">
+          <label className="mt-3 flex items-center gap-2 text-sm text-neutral-600">
             <input type="checkbox" defaultChecked className="accent-brand-500" /> 包含 DSH 本体与桌面版安装包
           </label>
           <Button variant="secondary" className="mt-4" onClick={() => notify("正在生成 dmz-delta-2026-10-26.tar.zst（原型）")}>
@@ -286,9 +286,9 @@ function Offline() {
       </div>
 
       <Card>
-        <div className="border-b border-slate-100 px-5 py-3 font-medium text-slate-800">导入记录</div>
+        <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">导入记录</div>
         <table className="w-full text-sm">
-          <thead className="text-left text-xs text-slate-400">
+          <thead className="text-left text-xs text-neutral-500">
             <tr>
               <th className="px-5 py-2 font-normal">文件</th>
               <th className="px-5 py-2 font-normal">签名</th>
@@ -298,14 +298,14 @@ function Offline() {
               <th className="px-5 py-2 font-normal">结果</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-neutral-100">
             {offlineImports.map((r) => (
               <tr key={r.file}>
                 <td className="px-5 py-2.5 font-mono text-xs">{r.file}</td>
-                <td className="px-5 py-2.5 text-xs text-slate-500">{r.signedBy}</td>
+                <td className="px-5 py-2.5 text-xs text-neutral-500">{r.signedBy}</td>
                 <td className="px-5 py-2.5">{r.plugins}</td>
                 <td className="px-5 py-2.5">{r.sizeGb} GB</td>
-                <td className="px-5 py-2.5 text-slate-500">{r.importedAt}</td>
+                <td className="px-5 py-2.5 text-neutral-500">{r.importedAt}</td>
                 <td className="px-5 py-2.5 text-emerald-600">{r.result}</td>
               </tr>
             ))}

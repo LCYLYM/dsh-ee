@@ -16,12 +16,14 @@ pnpm dev        # http://localhost:5173
 | 路径 | 页面 |
 |---|---|
 | `/` | 落地页（定位、架构图、智能工作台） |
-| `/market` | 员工门户 · 插件市场 |
+| `/overview` | 总览（全链路 dashboard） |
+| `/apps` | 微应用 |
+| `/market` | 能力市场 |
 | `/plugins/:name` | 插件详情（安装命令、安全检查、员工评分） |
 | `/dsh` | 下载 DSH 核心 / 桌面版 |
 | `/setup` | 接入企业插件源 |
 | `/publish` | 分享插件 / 申请引入社区插件 |
-| `/admin` | 管理后台 · 概览 |
+| `/admin` | 运营数据 |
 | `/admin/plugins` | 插件管理（下架 / 恢复） |
 | `/admin/review` | 审核队列 |
 | `/admin/upstream` | 上游预载（在线同步 / 离线导入） |

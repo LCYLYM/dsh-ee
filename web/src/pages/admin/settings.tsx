@@ -7,8 +7,8 @@ function Section({ title, desc, children }: { title: string; desc?: string; chil
   return (
     <Card className="p-6">
       <div className="mb-5">
-        <h2 className="font-semibold text-slate-900">{title}</h2>
-        {desc && <p className="mt-0.5 text-sm text-slate-500">{desc}</p>}
+        <h2 className="font-semibold text-neutral-900">{title}</h2>
+        {desc && <p className="mt-0.5 text-sm text-neutral-500">{desc}</p>}
       </div>
       <div className="space-y-5">{children}</div>
     </Card>
@@ -31,8 +31,8 @@ function Row({
   return (
     <div className={cx("flex items-start justify-between gap-6", disabled && "opacity-50")}>
       <div>
-        <div className="text-sm font-medium text-slate-800">{label}</div>
-        {desc && <div className="mt-0.5 text-xs text-slate-500">{desc}</div>}
+        <div className="text-sm font-medium text-neutral-800">{label}</div>
+        {desc && <div className="mt-0.5 text-xs text-neutral-500">{desc}</div>}
       </div>
       <Toggle checked={checked} onChange={onChange} disabled={disabled} />
     </div>
@@ -84,7 +84,7 @@ export default function AdminSettings() {
             checked={s.scoring.enabled}
             onChange={(v) => set("scoring", { enabled: v })}
           />
-          <div className="space-y-5 border-l-2 border-slate-100 pl-5">
+          <div className="space-y-5 border-l-2 border-neutral-100 pl-5">
             <Row
               label="显示 dshfind 上游评分"
               desc="来自 dshfind.com 的综合评分（0-100），只有上游插件有。"
@@ -224,7 +224,7 @@ export default function AdminSettings() {
               { value: "oidc", label: "OIDC SSO" },
             ]}
           />
-          <p className="text-xs text-slate-500">网页登录走所选方式；pnpm 安装使用员工在「接入指南」页生成的个人令牌。</p>
+          <p className="text-xs text-neutral-500">网页登录走所选方式；pnpm 安装使用员工在「接入指南」页生成的个人令牌。</p>
         </Section>
       </div>
     </div>
