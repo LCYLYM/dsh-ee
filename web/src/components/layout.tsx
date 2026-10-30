@@ -42,7 +42,7 @@ function Toast() {
 export function PortalLayout() {
   const { settings } = useStore();
   const nav = [
-    { to: "/", label: "插件市场", end: true },
+    { to: "/market", label: "插件市场", end: true },
     ...(settings.distribution.enabled ? [{ to: "/dsh", label: "下载 DSH", end: false }] : []),
     { to: "/setup", label: "接入指南", end: false },
     { to: "/publish", label: "分享插件", end: false },
@@ -135,7 +135,7 @@ export function AdminLayout() {
           ))}
         </nav>
         <div className="mt-auto space-y-1 border-t border-slate-100 pt-3">
-          <Link to="/" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
+          <Link to="/market" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
             <Puzzle size={16} /> 返回员工门户
           </Link>
           <Link to="/publish" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">

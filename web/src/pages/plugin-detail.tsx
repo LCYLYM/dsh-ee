@@ -16,7 +16,7 @@ export default function PluginDetail() {
     return (
       <Card className="p-12 text-center">
         <p className="text-slate-600">插件不存在，或尚未通过审核。</p>
-        <Link to="/" className="mt-4 inline-block text-sm text-brand-600 hover:underline">
+        <Link to="/market" className="mt-4 inline-block text-sm text-brand-600 hover:underline">
           返回插件市场
         </Link>
       </Card>
@@ -28,7 +28,7 @@ export default function PluginDetail() {
 
   return (
     <div>
-      <Link to="/" className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
+      <Link to="/market" className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
         <ArrowLeft size={14} /> 插件市场
       </Link>
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">

@@ -20,3 +20,20 @@ body {
   @apply bg-slate-50 text-slate-800 antialiased;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
 }
+
+/* 落地页流程图的流动虚线 */
+.flow-line {
+  background-image: linear-gradient(to bottom, var(--color-brand-400) 50%, transparent 50%);
+  background-size: 2px 10px;
+  animation: flow-y 0.8s linear infinite;
+}
+@media (min-width: 64rem) {
+  .flow-line {
+    background-image: linear-gradient(to right, var(--color-brand-400) 50%, transparent 50%);
+    background-size: 10px 2px;
+    animation-name: flow-x;
+  }
+}
+@keyframes flow-y { to { background-position: 0 10px; } }
+@keyframes flow-x { to { background-position: 10px 0; } }
+@media (prefers-reduced-motion: reduce) { .flow-line { animation: none; } }

@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from "react-router";
 import "./index.css";
 import { StoreProvider } from "./lib/store";
 import { AdminLayout, PortalLayout } from "./components/layout";
+import Landing from "./pages/landing";
 import Market from "./pages/market";
 import PluginDetail from "./pages/plugin-detail";
 import DshDownload from "./pages/dsh-download";
@@ -21,8 +22,9 @@ createRoot(document.getElementById("root")!).render(
     <StoreProvider>
       <BrowserRouter>
         <Routes>
+          <Route index element={<Landing />} />
           <Route element={<PortalLayout />}>
-            <Route index element={<Market />} />
+            <Route path="market" element={<Market />} />
             <Route path="plugins/:name" element={<PluginDetail />} />
             <Route path="dsh" element={<DshDownload />} />
             <Route path="setup" element={<Setup />} />
