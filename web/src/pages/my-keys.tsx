@@ -4,21 +4,24 @@ import { useAction, useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
 import { ErrorNote, KeyStateBadge, LoadState, ModelsCell, TokensCell } from "../components/api-ui";
 import { Button, Card, CardHeader, CopyBox, Field, inputCls, PageHeader } from "../components/ui";
+import { useTranslation } from "react-i18next";
 
 function IssuedCard({ issued, onClose }: { issued: { plain: string; k: ApiKey }; onClose: () => void }) {
+  const { t } = useTranslation();
   return (
     <Card className="mb-4 p-5">
-      <h2 className="text-base font-medium text-neutral-900">已创建「{issued.k.name}」</h2>
-      <p className="mt-1 mb-3 text-sm text-neutral-700">完整的 key 只显示这一次，关闭后无法再查看。请复制到 DSH 或客户端的配置里。</p>
+      <h2 className="text-base font-medium text-neutral-900">{t("keys.issued.title", { name: issued.k.name })}</h2>
+      <p className="mt-1 mb-3 text-sm text-neutral-700">{t("keys.issued.hint")}</p>
       <CopyBox text={issued.plain} />
       <Button variant="secondary" size="sm" className="mt-3" onClick={onClose}>
-        我已保存，关闭
+        {t("keys.issued.close")}
       </Button>
     </Card>
   );
 }
 
 function QuotaCard({ quota }: { quota: MyQuota }) {
+  const { t } = useTranslation();
   const limit = quota.monthly_token_limit;
   const remaining = limit === null ? null : Math.max(0, limit - quota.month_tokens);
   const expired = !!quota.expires_at && new Date(quota.expires_at) <= new Date();
@@ -26,21 +29,21 @@ function QuotaCard({ quota }: { quota: MyQuota }) {
     <Card className="mb-4 p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-base font-medium text-neutral-900">本月额度</h2>
-          <p className="mt-1 text-sm text-neutral-700">额度按账号共享，账号下的所有 key 都从这一份里扣；每月 1 日（UTC）重置。</p>
+          <h2 className="text-base font-medium text-neutral-900">{t("keys.quotaCard.title")}</h2>
+          <p className="mt-1 text-sm text-neutral-700">{t("keys.quotaCard.desc")}</p>
         </div>
         <div className="text-right">
           <div className="text-2xl font-semibold tabular-nums text-neutral-900">
-            {limit === null ? "不限" : limit === 0 ? "未分配" : formatTokens(remaining ?? 0)}
+            {limit === null ? t("keys.quotaCard.unlimited") : limit === 0 ? t("keys.quotaCard.unassigned") : formatTokens(remaining ?? 0)}
           </div>
-          <div className="text-xs text-neutral-600">{limit === null ? "不限额" : limit === 0 ? "等待管理员分配" : "本月剩余 token"}</div>
+          <div className="text-xs text-neutral-600">{limit === null ? t("keys.quotaCard.unlimitedLabel") : limit === 0 ? t("keys.quotaCard.waiting") : t("keys.quotaCard.remaining")}</div>
         </div>
       </div>
 
       {limit !== null && limit > 0 && (
         <div className="mt-5 max-w-xl">
           <div className="flex items-baseline justify-between text-sm text-neutral-700">
-            <span>已用 {formatTokens(quota.month_tokens)}</span>
+            <span>{t("keys.quotaCard.used", { value: formatTokens(quota.month_tokens) })}</span>
             <span className="tabular-nums">{Math.round(Math.min(100, (quota.month_tokens / limit) * 100))}%</span>
           </div>
           <div className="mt-1.5 h-2 rounded-full bg-neutral-100">
@@ -62,21 +65,21 @@ function QuotaCard({ quota }: { quota: MyQuota }) {
 
       <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <dt className="text-xs text-neutral-600">本月已用</dt>
+          <dt className="text-xs text-neutral-600">{t("keys.quotaCard.monthUsed")}</dt>
           <dd className="mt-0.5 tabular-nums text-neutral-900">{formatTokens(quota.month_tokens)}</dd>
         </div>
         <div>
-          <dt className="text-xs text-neutral-600">月度额度</dt>
-          <dd className="mt-0.5 text-neutral-900">{limit === null ? "不限额" : limit === 0 ? "未分配" : formatTokens(limit)}</dd>
+          <dt className="text-xs text-neutral-600">{t("keys.quotaCard.monthlyQuota")}</dt>
+          <dd className="mt-0.5 text-neutral-900">{limit === null ? t("keys.quotaCard.unlimitedLabel") : limit === 0 ? t("keys.quotaCard.unassigned") : formatTokens(limit)}</dd>
         </div>
         <div>
-          <dt className="text-xs text-neutral-600">允许的模型</dt>
+          <dt className="text-xs text-neutral-600">{t("keys.quotaCard.allowedModels")}</dt>
           <dd className="mt-0.5">
             <ModelsCell models={quota.allowed_models} />
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-neutral-600">有效 key</dt>
+          <dt className="text-xs text-neutral-600">{t("keys.quotaCard.activeKeys")}</dt>
           <dd className="mt-0.5 tabular-nums text-neutral-900">
             {quota.active_keys} / {quota.max_keys}
           </dd>
@@ -85,17 +88,17 @@ function QuotaCard({ quota }: { quota: MyQuota }) {
 
       {limit === 0 && (
         <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          管理员还没有给你分配额度。现在可以先创建 key，但分配额度之前调用会返回 429。请联系管理员在「额度分配」里设置。
+          {t("keys.quotaCard.unassignedNote")}
         </p>
       )}
       {limit !== null && limit > 0 && quota.month_tokens >= limit && (
-        <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">本月额度已用完，下个月 1 日（UTC）恢复；如需提前追加，请联系管理员。</p>
+        <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{t("keys.quotaCard.exhaustedNote")}</p>
       )}
       {expired && (
-        <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">额度已于 {formatTime(quota.expires_at)} 过期，调用会被拒绝，请联系管理员续期。</p>
+        <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{t("keys.quotaCard.expiredNote", { time: formatTime(quota.expires_at) })}</p>
       )}
       {quota.expires_at && !expired && (
-        <p className="mt-4 text-xs text-neutral-600">额度有效期至 {formatTime(quota.expires_at)}。</p>
+        <p className="mt-4 text-xs text-neutral-600">{t("keys.quotaCard.validUntil", { time: formatTime(quota.expires_at) })}</p>
       )}
     </Card>
   );
@@ -112,6 +115,7 @@ function CreateKeyForm({
   onCreated: (plain: string, k: ApiKey) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [expires, setExpires] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -135,24 +139,24 @@ function CreateKeyForm({
 
   return (
     <Card className="mb-4">
-      <CardHeader title="新建 API key" />
+      <CardHeader title={t("keys.create.title")} />
       <form onSubmit={submit} className="space-y-4 px-5 pb-5">
-        {maxed && <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">已达到有效 key 数量上限（{max} 个），请先吊销不用的 key。</p>}
+        {maxed && <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">{t("keys.create.maxed", { max })}</p>}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="名称" hint="便于辨认用途，例如「我的 DSH」或「本地脚本」">
-            <input className={inputCls} required value={name} onChange={(e) => setName(e.target.value)} placeholder="我的 DSH" />
+          <Field label={t("keys.create.name")} hint={t("keys.create.nameHint")}>
+            <input className={inputCls} required value={name} onChange={(e) => setName(e.target.value)} placeholder={t("keys.create.namePlaceholder")} />
           </Field>
-          <Field label="过期日期" hint="留空表示长期有效">
+          <Field label={t("keys.create.expires")} hint={t("keys.create.expiresHint")}>
             <input className={inputCls} type="date" value={expires} onChange={(e) => setExpires(e.target.value)} />
           </Field>
         </div>
         <ErrorNote>{error}</ErrorNote>
         <div className="flex gap-2">
           <Button type="submit" disabled={busy || maxed || !name.trim()}>
-            {busy ? "创建中…" : "创建 key"}
+            {busy ? t("common.creating") : t("keys.create.submit")}
           </Button>
           <Button type="button" variant="secondary" onClick={onCancel}>
-            取消
+            {t("common.cancel")}
           </Button>
         </div>
       </form>
@@ -161,6 +165,7 @@ function CreateKeyForm({
 }
 
 export default function MyKeys() {
+  const { t } = useTranslation();
   const { notify } = useStore();
   const { data, error, loading, reload } = useApi(api.myKeys);
   const { busy, run } = useAction();
@@ -174,10 +179,10 @@ export default function MyKeys() {
   const maxed = !!quota && quota.active_keys >= quota.max_keys;
 
   const revoke = async (id: number, name: string) => {
-    if (!window.confirm(`吊销「${name}」后，用它的客户端会立即无法调用，确定吗？`)) return;
+    if (!window.confirm(t("keys.page.revokeConfirm", { name }))) return;
     const r = await run(() => api.revokeMyKey(id));
     if (r.ok) {
-      notify(`已吊销「${name}」`);
+      notify(t("keys.page.revoked", { name }));
       reload();
     } else notify(r.error);
   };
@@ -185,8 +190,8 @@ export default function MyKeys() {
   return (
     <div>
       <PageHeader
-        title="额度与 API key"
-        desc="管理员给账号分配月度额度，额度由账号下所有 key 共享；key 由你自助创建，随时可以吊销。"
+        title={t("keys.page.title")}
+        desc={t("keys.page.desc")}
         actions={
           <Button
             size="sm"
@@ -195,7 +200,7 @@ export default function MyKeys() {
               setIssued(null);
             }}
           >
-            {creating ? "收起" : "新建 key"}
+            {creating ? t("common.close") : t("keys.page.newKey")}
           </Button>
         }
       />
@@ -218,21 +223,21 @@ export default function MyKeys() {
 
       <Card>
         <CardHeader
-          title="我的 key"
-          aside={quota ? `${activeKeys} 个有效 · 最多 ${quota.max_keys} 个` : undefined}
+          title={t("keys.page.myKeys")}
+          aside={quota ? t("keys.page.activeOf", { active: activeKeys, max: quota.max_keys }) : undefined}
         />
         <LoadState loading={loading && !data} error={error} onRetry={reload}>
           {keys.length === 0 ? (
-            <p className="px-5 pb-6 text-sm text-neutral-600">还没有 key。点右上角「新建 key」创建，额度用完后调用会暂停。</p>
+            <p className="px-5 pb-6 text-sm text-neutral-600">{t("keys.page.empty")}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-xs text-neutral-600">
                   <tr>
-                    <th className="px-5 py-2 font-normal">名称</th>
-                    <th className="px-5 py-2 text-right font-normal">本 key 用量</th>
-                    <th className="px-5 py-2 text-right font-normal">最近使用</th>
-                    <th className="px-5 py-2 font-normal">状态</th>
+                    <th className="px-5 py-2 font-normal">{t("keys.page.colName")}</th>
+                    <th className="px-5 py-2 text-right font-normal">{t("keys.page.colUsage")}</th>
+                    <th className="px-5 py-2 text-right font-normal">{t("keys.page.colLastUsed")}</th>
+                    <th className="px-5 py-2 font-normal">{t("keys.page.colState")}</th>
                     <th className="px-5 py-2" />
                   </tr>
                 </thead>
@@ -242,7 +247,7 @@ export default function MyKeys() {
                       <td className="px-5 py-3">
                         <div className="text-neutral-900">{k.name}</div>
                         <div className="font-mono text-xs text-neutral-600">{k.prefix}…</div>
-                        {k.expires_at && <div className="text-xs text-neutral-600">{formatTime(k.expires_at)} 过期</div>}
+                        {k.expires_at && <div className="text-xs text-neutral-600">{t("keys.page.expiresAt", { time: formatTime(k.expires_at) })}</div>}
                       </td>
                       <td className="px-5 py-3 text-right">
                         <TokensCell tokens={k.month_tokens} />
@@ -259,7 +264,7 @@ export default function MyKeys() {
                             onClick={() => revoke(k.id, k.name)}
                             className="text-sm text-neutral-600 hover:text-red-700 disabled:opacity-50"
                           >
-                            吊销
+                            {t("keys.page.revoke")}
                           </button>
                         )}
                       </td>
@@ -273,15 +278,15 @@ export default function MyKeys() {
       </Card>
 
       <Card className="mt-4 p-5">
-        <h2 className="text-base font-medium text-neutral-900">怎么用</h2>
+        <h2 className="text-base font-medium text-neutral-900">{t("keys.page.howTo")}</h2>
         <p className="mt-1 text-sm text-neutral-700">
-          dsh-ee 提供 OpenAI 兼容接口。把客户端的地址指向下面的 base URL，key 填你创建的 sk-ee- 开头的 key 即可；额度会自动从账号里扣。
+          {t("keys.page.howToDesc")}
         </p>
         <div className="mt-4 space-y-4">
-          <CopyBox label="环境变量" text={`export OPENAI_BASE_URL=${baseUrl}\nexport OPENAI_API_KEY=sk-ee-你的key`} />
+          <CopyBox label={t("keys.page.envVars")} text={`export OPENAI_BASE_URL=${baseUrl}\nexport OPENAI_API_KEY=sk-ee-${t("keys.page.yourKey")}`} />
           <CopyBox
             label="curl"
-            text={`curl ${baseUrl}/chat/completions \\\n  -H "Authorization: Bearer $OPENAI_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"deepseek-chat","messages":[{"role":"user","content":"你好"}]}'`}
+            text={`curl ${baseUrl}/chat/completions \\\n  -H "Authorization: Bearer $OPENAI_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"deepseek-chat","messages":[{"role":"user","content":"${t("keys.page.hello")}"}]}'`}
           />
         </div>
       </Card>

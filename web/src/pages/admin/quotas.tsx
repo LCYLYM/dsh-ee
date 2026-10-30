@@ -4,6 +4,7 @@ import { useStore } from "../../lib/store";
 import { useAction, useApi } from "../../lib/use-api";
 import { ErrorNote, LoadState, ModelsCell, QuotaBar } from "../../components/api-ui";
 import { Badge, Button, Card, CardHeader, cx, Field, inputBase, inputCls, PageHeader } from "../../components/ui";
+import { useTranslation } from "react-i18next";
 
 /** ISO 时间转本地日期输入框的 YYYY-MM-DD。 */
 function toDateInput(iso: string | null) {
@@ -18,6 +19,7 @@ function quotaExpired(u: User) {
 }
 
 function QuotaEditor({ user, models, onSaved, onCancel }: { user: User; models: string[]; onSaved: () => void; onCancel: () => void }) {
+  const { t } = useTranslation();
   const { notify } = useStore();
   const [limitWan, setLimitWan] = useState(user.monthly_token_limit === null ? "" : String(user.monthly_token_limit / 10_000));
   const [allowed, setAllowed] = useState<string[]>(user.allowed_models ?? []);
@@ -29,7 +31,7 @@ function QuotaEditor({ user, models, onSaved, onCancel }: { user: User; models: 
     e.preventDefault();
     setError(null);
     const limit = limitWan.trim() === "" ? null : Math.round(Number(limitWan) * 10_000);
-    if (limit !== null && (!Number.isFinite(limit) || limit < 0)) return setError("额度必须是 0 或正数；留空表示不限额");
+    if (limit !== null && (!Number.isFinite(limit) || limit < 0)) return setError(t("quotas.invalid"));
     const r = await run(() =>
       api.updateUserQuota(user.id, {
         monthly_token_limit: limit,
@@ -40,29 +42,29 @@ function QuotaEditor({ user, models, onSaved, onCancel }: { user: User; models: 
       }),
     );
     if (!r.ok) return setError(r.error);
-    notify(`已更新 ${user.username} 的额度`);
+    notify(t("quotas.updated", { name: user.username }));
     onSaved();
   };
 
   return (
     <form onSubmit={submit} className="space-y-4 rounded-md bg-neutral-50 p-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="每月额度（万 token）" hint="留空 = 不限额；填 0 = 停用；按 UTC 自然月重置">
+        <Field label={t("quotas.monthly")} hint={t("quotas.monthlyHint")}>
           <input
             className={inputCls}
             inputMode="decimal"
             value={limitWan}
             onChange={(e) => setLimitWan(e.target.value)}
-            placeholder="例如 200；留空不限额"
+            placeholder={t("quotas.monthlyPlaceholder")}
           />
         </Field>
-        <Field label="额度有效期" hint="留空 = 长期有效">
+        <Field label={t("quotas.expiry")} hint={t("quotas.expiryHint")}>
           <input className={inputCls} type="date" value={expires} onChange={(e) => setExpires(e.target.value)} />
         </Field>
       </div>
       {models.length > 0 && (
         <fieldset>
-          <legend className="mb-1.5 text-sm font-medium text-neutral-700">允许的模型</legend>
+          <legend className="mb-1.5 text-sm font-medium text-neutral-700">{t("quotas.allowedModels")}</legend>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             {models.map((m) => (
               <label key={m} className="flex items-center gap-2 text-sm text-neutral-800">
@@ -76,22 +78,22 @@ function QuotaEditor({ user, models, onSaved, onCancel }: { user: User; models: 
               </label>
             ))}
           </div>
-          <p className="mt-1 text-xs text-neutral-600">都不勾选表示允许全部模型，包括以后新增的。</p>
+          <p className="mt-1 text-xs text-neutral-600">{t("quotas.allModelsNote")}</p>
         </fieldset>
       )}
       <ErrorNote>{error}</ErrorNote>
       <div className="flex flex-wrap gap-2">
         <Button type="submit" size="sm" disabled={busy}>
-          {busy ? "保存中…" : "保存额度"}
+          {busy ? t("common.saving") : t("quotas.save")}
         </Button>
         <Button type="button" size="sm" variant="secondary" onClick={() => setLimitWan("")}>
-          设为不限额
+          {t("quotas.setUnlimited")}
         </Button>
         <Button type="button" size="sm" variant="secondary" onClick={() => setLimitWan("0")}>
-          停用（0）
+          {t("quotas.suspend")}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
-          取消
+          {t("common.cancel")}
         </Button>
       </div>
     </form>
@@ -99,6 +101,7 @@ function QuotaEditor({ user, models, onSaved, onCancel }: { user: User; models: 
 }
 
 export default function AdminQuotas() {
+  const { t } = useTranslation();
   const { data: users, error, loading, reload } = useApi(api.users);
   const { data: providers } = useApi(api.providers);
   const [editing, setEditing] = useState<number | null>(null);
@@ -118,43 +121,43 @@ export default function AdminQuotas() {
   return (
     <div>
       <PageHeader
-        title="额度分配"
-        desc="给员工分配每月 token 额度、允许的模型和有效期。额度按账号共享，员工在「额度与 API key」里自助创建 key 调用。"
+        title={t("quotas.title")}
+        desc={t("quotas.desc")}
         actions={
           <Button size="sm" variant="secondary" onClick={reload} disabled={loading}>
-            刷新
+            {t("quotas.refresh")}
           </Button>
         }
       />
 
       <Card>
         <CardHeader
-          title="全部用户"
-          aside={users ? `${users.length} 人 · ${assigned} 人已分配 · 本月共用 ${totalUsed.toLocaleString()} token` : undefined}
+          title={t("quotas.allUsers")}
+          aside={users ? t("quotas.summary", { users: users.length, assigned, tokens: totalUsed.toLocaleString() }) : undefined}
         />
         <div className="flex flex-wrap items-center gap-3 px-5 pb-3">
           <input
-            aria-label="搜索用户"
+            aria-label={t("quotas.searchLabel")}
             className={cx(inputBase, "w-full sm:w-64")}
-            placeholder="搜索员工、显示名或部门"
+            placeholder={t("quotas.searchPlaceholder")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
         <LoadState loading={loading && !users} error={error} onRetry={reload}>
           {list.length === 0 ? (
-            <p className="px-5 pb-6 text-sm text-neutral-600">{users?.length ? "没有符合条件的用户。" : "还没有用户。"}</p>
+            <p className="px-5 pb-6 text-sm text-neutral-600">{users?.length ? t("quotas.noMatch") : t("quotas.noUsers")}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-xs text-neutral-600">
                   <tr>
-                    <th className="px-5 py-2 font-normal">员工</th>
-                    <th className="px-5 py-2 font-normal">部门</th>
-                    <th className="px-5 py-2 text-right font-normal">本月已用 / 额度</th>
-                    <th className="px-5 py-2 font-normal">允许模型</th>
-                    <th className="px-5 py-2 font-normal">额度有效期</th>
-                    <th className="px-5 py-2 font-normal">状态</th>
+                    <th className="px-5 py-2 font-normal">{t("quotas.colEmployee")}</th>
+                    <th className="px-5 py-2 font-normal">{t("quotas.colDepartment")}</th>
+                    <th className="px-5 py-2 text-right font-normal">{t("quotas.colUsage")}</th>
+                    <th className="px-5 py-2 font-normal">{t("quotas.colModels")}</th>
+                    <th className="px-5 py-2 font-normal">{t("quotas.colExpiry")}</th>
+                    <th className="px-5 py-2 font-normal">{t("quotas.colStatus")}</th>
                     <th className="px-5 py-2" />
                   </tr>
                 </thead>
@@ -177,11 +180,11 @@ export default function AdminQuotas() {
                           {u.quota_expires_at ? (
                             <span className={quotaExpired(u) ? "text-red-700" : "text-neutral-700"}>{formatTime(u.quota_expires_at)}</span>
                           ) : (
-                            <span className="text-neutral-600">长期有效</span>
+                            <span className="text-neutral-600">{t("quotas.noExpiry")}</span>
                           )}
                         </td>
                         <td className="px-5 py-3">
-                          {u.disabled ? <Badge>已禁用</Badge> : <Badge tone="green">正常</Badge>}
+                          {u.disabled ? <Badge>{t("quotas.disabled")}</Badge> : <Badge tone="green">{t("quotas.active")}</Badge>}
                         </td>
                         <td className="px-5 py-3 text-right">
                           <button
@@ -189,7 +192,7 @@ export default function AdminQuotas() {
                             onClick={() => setEditing((v) => (v === u.id ? null : u.id))}
                             className="text-sm whitespace-nowrap text-neutral-700 hover:text-neutral-900"
                           >
-                            {editing === u.id ? "收起" : "调整额度"}
+                            {editing === u.id ? t("common.close") : t("quotas.adjust")}
                           </button>
                         </td>
                       </tr>

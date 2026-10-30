@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { UploadCloud } from "lucide-react";
-import { categories } from "../mock/data";
+import { categoryIds, categoryLabel } from "../mock/data";
 import { useStore } from "../lib/store";
 import type { Plugin, Visibility } from "../lib/types";
 import { statusBadge } from "../components/status";
 import { pluginPath } from "../components/plugin-card";
 import { Button, Card, CopyBox, cx, Field, inputCls, PageHeader, Segmented } from "../components/ui";
+import { useTranslation } from "react-i18next";
 
 const ME = "zhang.wei";
 
 
 export default function Publish() {
+  const { t } = useTranslation();
   const { settings, plugins, addPlugin, notify } = useStore();
   const [way, setWay] = useState<"cli" | "web" | "request">("web");
   const [form, setForm] = useState({
@@ -54,15 +56,15 @@ export default function Publish() {
       visibility: form.visibility,
     };
     addPlugin(p);
-    notify("已提交，自动检查完成后进入审核队列");
+    notify(t("publish.submitted"));
     setForm({ ...form, name: `${settings.scope}/`, title: "", description: "", file: "" });
   };
 
   return (
     <div>
       <PageHeader
-        title="分享插件"
-        desc={`把你写的 DSH 插件分享给同事。内部插件必须使用 ${settings.scope}/ 作用域，审核通过后出现在市场里。`}
+        title={t("publish.title")}
+        desc={t("publish.desc", { scope: settings.scope })}
       />
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <div>
@@ -70,19 +72,18 @@ export default function Publish() {
             value={way}
             onChange={setWay}
             options={[
-              { value: "web", label: "网页上传" },
-              { value: "cli", label: "命令行发布" },
-              { value: "request", label: "申请引入社区插件" },
+              { value: "web", label: t("publish.web") },
+              { value: "cli", label: t("publish.cli") },
+              { value: "request", label: t("publish.request") },
             ]}
           />
           <Card className="mt-4 p-6">
             {way === "cli" && (
               <div className="space-y-4">
-                <p className="text-sm text-neutral-600">已按「接入指南」配置过 ~/.npmrc 的话，在插件目录直接发布：</p>
+                <p className="text-sm text-neutral-600">{t("publish.cliDesc")}</p>
                 <CopyBox text={`pnpm build\npnpm publish --registry ${settings.baseUrl}/npm/`} />
                 <p className="text-sm text-neutral-500">
-                  发布后不会立即可装：包会先经过自动检查（dsh.bundle 声明、安装脚本、依赖漏洞、License、密钥泄露），再由管理员审核。
-                  包名不在 {settings.scope}/ 下会被直接拒绝，防止与公网 npm 包重名导致依赖混淆。
+                  {t("publish.cliNote", { scope: settings.scope })}
                 </p>
               </div>
             )}
@@ -98,9 +99,9 @@ export default function Publish() {
                   >
                     <UploadCloud size={28} className="text-brand-500" />
                     <span className="mt-2 text-sm font-medium text-neutral-700">
-                      {form.file || "选择 pnpm pack 打出的 .tgz 文件"}
+                      {form.file || t("publish.chooseFile")}
                     </span>
-                    <span className="mt-1 text-xs text-neutral-500">包名与版本会从 package.json 自动读取</span>
+                    <span className="mt-1 text-xs text-neutral-500">{t("publish.fileHint")}</span>
                     <input
                       type="file"
                       accept=".tgz"
@@ -109,26 +110,26 @@ export default function Publish() {
                     />
                   </label>
                 </div>
-                <Field label="包名" hint={scopeOk ? undefined : <span className="text-red-500">必须以 {settings.scope}/ 开头</span>}>
+                <Field label={t("publish.packageName")} hint={scopeOk ? undefined : <span className="text-red-500">{t("publish.mustStartWith", { scope: settings.scope })}</span>}>
                   <input className={cx(inputCls, "font-mono")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                 </Field>
-                <Field label="版本">
+                <Field label={t("publish.version")}>
                   <input className={cx(inputCls, "font-mono")} value={form.version} onChange={(e) => setForm({ ...form, version: e.target.value })} />
                 </Field>
-                <Field label="显示名称">
-                  <input className={inputCls} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="例如：GitLab MR 评审助手" />
+                <Field label={t("publish.displayName")}>
+                  <input className={inputCls} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={t("publish.displayNamePlaceholder")} />
                 </Field>
-                <Field label="分类">
+                <Field label={t("publish.category")}>
                   <select className={inputCls} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                    {Object.entries(categories).map(([id, label]) => (
+                    {categoryIds.map((id) => (
                       <option key={id} value={id}>
-                        {label}
+                        {categoryLabel(id)}
                       </option>
                     ))}
                   </select>
                 </Field>
                 <div className="sm:col-span-2">
-                  <Field label="简介">
+                  <Field label={t("publish.summary")}>
                     <textarea
                       className={cx(inputCls, "h-20 py-2")}
                       value={form.description}
@@ -137,21 +138,21 @@ export default function Publish() {
                   </Field>
                 </div>
                 <div className="sm:col-span-2">
-                  <Field label="可见范围">
+                  <Field label={t("publish.visibility")}>
                     <Segmented
                       value={form.visibility}
                       onChange={(v) => setForm({ ...form, visibility: v })}
                       options={[
-                        { value: "company", label: "全公司" },
-                        { value: "department", label: "仅本部门" },
-                        { value: "private", label: "仅自己（测试）" },
+                        { value: "company", label: t("publish.visCompany") },
+                        { value: "department", label: t("publish.visDepartment") },
+                        { value: "private", label: t("publish.visPrivate") },
                       ]}
                     />
                   </Field>
                 </div>
                 <div className="sm:col-span-2">
                   <Button disabled={!canSubmit} onClick={submit}>
-                    提交审核
+                    {t("publish.submit")}
                   </Button>
                 </div>
               </div>
@@ -162,9 +163,9 @@ export default function Publish() {
         </div>
 
         <Card className="h-fit">
-          <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">我的提交</div>
+          <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">{t("publish.mine")}</div>
           {mine.length === 0 ? (
-            <div className="p-5 text-sm text-neutral-500">还没有提交过插件。</div>
+            <div className="p-5 text-sm text-neutral-500">{t("publish.noneYet")}</div>
           ) : (
             <ul className="divide-y divide-neutral-100">
               {mine.map((p) => (
@@ -193,27 +194,28 @@ export default function Publish() {
 }
 
 function RequestForm() {
+  const { t } = useTranslation();
   const { notify } = useStore();
   const [name, setName] = useState("");
   return (
     <div className="space-y-4">
       <p className="text-sm text-neutral-600">
-        在 dshfind.com 或 npm 上看到好用的插件、但企业市场里还没有？提交包名，管理员审核后会把它连同依赖一起同步进内网。
+        {t("publish.requestIntro")}
       </p>
-      <Field label="npm 包名或 dshfind 链接">
+      <Field label={t("publish.requestName")}>
         <input className={cx(inputCls, "font-mono")} value={name} onChange={(e) => setName(e.target.value)} placeholder="dsh-context" />
       </Field>
-      <Field label="用途说明">
-        <textarea className={cx(inputCls, "h-20 py-2")} placeholder="团队里打算怎么用它" />
+      <Field label={t("publish.requestReason")}>
+        <textarea className={cx(inputCls, "h-20 py-2")} placeholder={t("publish.requestReasonPlaceholder")} />
       </Field>
       <Button
         disabled={!name.trim()}
         onClick={() => {
-          notify(`已提交引入申请：${name}`);
+          notify(t("publish.requestSent", { name }));
           setName("");
         }}
       >
-        提交申请
+        {t("publish.requestSubmit")}
       </Button>
     </div>
   );

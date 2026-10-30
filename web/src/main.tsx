@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import "./index.css";
+import "./i18n";
 import { StoreProvider } from "./lib/store";
 import { AuthProvider, RequireAuth } from "./lib/auth";
 import { MenuProvider, useMenus } from "./lib/menus";
@@ -12,6 +13,7 @@ import Landing from "./pages/landing";
 import Login from "./pages/login";
 import Account from "./pages/account";
 import PluginDetail from "./pages/plugin-detail";
+import { useTranslation } from "react-i18next";
 
 function Status({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
@@ -25,15 +27,17 @@ function Status({ title, children }: { title: string; children?: React.ReactNode
 /** 登录后的落点：进入当前用户菜单里的第一个页面。 */
 function Start() {
   const { homePath, loading } = useMenus();
-  if (loading) return <Status title="加载中…" />;
-  if (!homePath) return <Status title="还没有可访问的页面">请联系管理员为你的账号分配角色。</Status>;
+  const { t } = useTranslation();
+  if (loading) return <Status title={t("common.loading")} />;
+  if (!homePath) return <Status title={t("shell.noPages")}>{t("shell.noPagesHint")}</Status>;
   return <Navigate to={homePath} replace />;
 }
 
 function NotFound() {
   const { loading } = useMenus();
-  if (loading) return <Status title="加载中…" />;
-  return <Status title="页面不存在，或你没有访问权限">如果这个页面刚被改过路由，请从左侧菜单重新进入。</Status>;
+  const { t } = useTranslation();
+  if (loading) return <Status title={t("common.loading")} />;
+  return <Status title={t("shell.notFound")}>{t("shell.notFoundHint")}</Status>;
 }
 
 /** 路由来自后端菜单：页面的路由、名称、访问权限都可在「菜单与页面」里在线修改。 */

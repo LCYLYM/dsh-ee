@@ -4,8 +4,10 @@ import { useStore } from "../../lib/store";
 import { Card, CardHeader, formatKb, PageHeader, Stat, StatStrip } from "../../components/ui";
 import { DailyBars } from "../../components/charts";
 import { PageLink } from "../../lib/menus";
+import { useTranslation } from "react-i18next";
 
 export default function AdminOverview() {
+  const { t } = useTranslation();
   const { plugins, releases, settings } = useStore();
   const approved = plugins.filter((p) => p.status === "approved");
   const pending = plugins.filter((p) => p.status === "pending");
@@ -16,29 +18,29 @@ export default function AdminOverview() {
 
   return (
     <div>
-      <PageHeader title="运营数据" desc={`${settings.orgName} · ${settings.baseUrl}`} />
+      <PageHeader title={t("stats.title")} desc={`${settings.orgName} · ${settings.baseUrl}`} />
       <StatStrip>
-        <Stat label="已上架插件" value={approved.length} hint={`内部 ${internal} · 上游 ${approved.length - internal}`} />
+        <Stat label={t("stats.publishedPlugins")} value={approved.length} hint={t("stats.publishedHint", { internal, upstream: approved.length - internal })} />
         <Stat
-          label="待审核"
+          label={t("stats.pending")}
           value={pending.length}
-          hint={<PageLink page="admin-review" className="font-medium text-neutral-900 hover:underline">去处理 →</PageLink>}
+          hint={<PageLink page="admin-review" className="font-medium text-neutral-900 hover:underline">{t("stats.handle")}</PageLink>}
         />
-        <Stat label="近 14 天安装" value={installTrend.reduce((a, b) => a + b, 0).toLocaleString()} hint="来自 registry 下载日志" />
+        <Stat label={t("stats.installs14")} value={installTrend.reduce((a, b) => a + b, 0).toLocaleString()} hint={t("stats.installsHint")} />
         <Stat
-          label="存储占用"
+          label={t("stats.storage")}
           value={formatKb(storageKb)}
-          hint={settings.distribution.enabled ? `另有 DSH 安装包 ${(mirroredPkgs / 1024).toFixed(1)} GB` : "插件与依赖闭包"}
+          hint={settings.distribution.enabled ? t("stats.storageWithDsh", { gb: (mirroredPkgs / 1024).toFixed(1) }) : t("stats.storagePlugins")}
         />
       </StatStrip>
 
       <div className="mt-4 grid gap-6 xl:grid-cols-[1fr_380px]">
         <Card className="p-5">
-          <div className="mb-6 font-medium text-neutral-900">近 14 天每日安装次数</div>
-          <DailyBars values={installTrend} unit="次安装" />
+          <div className="mb-6 font-medium text-neutral-900">{t("stats.dailyInstalls")}</div>
+          <DailyBars values={installTrend} unit={t("stats.installsUnit")} />
         </Card>
         <Card>
-          <CardHeader title="最近动态" />
+          <CardHeader title={t("stats.recent")} />
           <ul className="divide-y divide-neutral-100">
             {activity.map((a) => (
               <li key={a.text} className="px-5 py-2.5 text-sm">
@@ -51,13 +53,13 @@ export default function AdminOverview() {
       </div>
 
       <Card className="mt-4">
-        <CardHeader title="企业内安装最多" />
+        <CardHeader title={t("stats.topInstalls")} />
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="px-5 py-2 font-normal">插件</th>
-              <th className="px-5 py-2 font-normal">来源</th>
-              <th className="px-5 py-2 text-right font-normal">安装次数</th>
+              <th className="px-5 py-2 font-normal">{t("stats.colPlugin")}</th>
+              <th className="px-5 py-2 font-normal">{t("stats.colSource")}</th>
+              <th className="px-5 py-2 text-right font-normal">{t("stats.colInstalls")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
@@ -67,7 +69,7 @@ export default function AdminOverview() {
                   <div className="font-medium text-neutral-800">{p.title}</div>
                   <div className="font-mono text-xs text-neutral-500">{p.name}</div>
                 </td>
-                <td className="px-5 py-2.5 text-neutral-500">{p.origin === "internal" ? `内部 · ${p.department}` : "上游"}</td>
+                <td className="px-5 py-2.5 text-neutral-500">{p.origin === "internal" ? t("stats.internalDept", { department: p.department }) : t("stats.upstream")}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums text-neutral-700">{p.installs.toLocaleString()}</td>
               </tr>
             ))}

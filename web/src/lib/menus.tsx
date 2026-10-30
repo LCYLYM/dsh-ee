@@ -6,7 +6,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { Link, type LinkProps } from "react-router";
 import { api, type Menu } from "./api";
 import { useAuth } from "./auth";
-import { PAGE_META } from "./page-meta";
+import { PAGE_META, type PageKey } from "./page-meta";
+import { useTranslation } from "react-i18next";
 
 export interface MenuNode extends Menu {
   children: Menu[];
@@ -86,6 +87,20 @@ export function useMenus() {
   if (!m) throw new Error("useMenus must be used inside MenuProvider");
   return m;
 }
+
+/**
+ * 菜单标题：还是默认值的页面与分组按当前语言显示；管理员改过的标题原样显示。
+ */
+export function useMenuTitle() {
+  const { t } = useTranslation();
+  return (m: Pick<Menu, "kind" | "title" | "page_key">) => {
+    if (m.kind === "page" && PAGE_META[m.page_key]?.title === m.title) return t(`pages.${m.page_key as PageKey}`);
+    if (m.kind === "group" && m.title in DEFAULT_GROUPS) return t(`menuGroups.${m.title as keyof typeof DEFAULT_GROUPS}`);
+    return m.title;
+  };
+}
+
+const DEFAULT_GROUPS = { 工作台: 1, 账号与模型: 1, 管理: 1 };
 
 /** 按 page_key 链接站内页面；suffix 用于带查询参数等，例如 "?tab=x"。 */
 export function PageLink({ page, suffix = "", ...rest }: Omit<LinkProps, "to"> & { page: string; suffix?: string }) {

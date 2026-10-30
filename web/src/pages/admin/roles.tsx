@@ -4,7 +4,9 @@ import { useAuth } from "../../lib/auth";
 import { useStore } from "../../lib/store";
 import { useAction, useApi } from "../../lib/use-api";
 import { ErrorNote, LoadState } from "../../components/api-ui";
+import { useLabels } from "../../lib/labels";
 import { Badge, Button, Card, CardHeader, cx, Field, inputCls, PageHeader } from "../../components/ui";
+import { useTranslation } from "react-i18next";
 
 function groupPermissions(ps: Permission[]) {
   const groups: { name: string; items: Permission[] }[] = [];
@@ -29,6 +31,8 @@ function PermissionGrid({
   disabled?: boolean;
   grantable: (code: string) => boolean;
 }) {
+  const { t } = useTranslation();
+  const L = useLabels();
   return (
     <div className="space-y-5">
       {groupPermissions(permissions).map((g) => {
@@ -37,7 +41,7 @@ function PermissionGrid({
         return (
           <fieldset key={g.name}>
             <legend className="mb-2 flex w-full items-center gap-3 text-sm font-medium text-neutral-900">
-              {g.name}
+              {L.group(g.name)}
               {!disabled && (
                 <button
                   type="button"
@@ -46,7 +50,7 @@ function PermissionGrid({
                     onChange(all ? value.filter((c) => !codes.includes(c)) : [...new Set([...value, ...codes.filter(grantable)])])
                   }
                 >
-                  {all ? "全不选" : "全选"}
+                  {all ? t("roles.selectNone") : t("roles.selectAll")}
                 </button>
               )}
             </legend>
@@ -63,9 +67,9 @@ function PermissionGrid({
                       onChange={(e) => onChange(e.target.checked ? [...value, p.code] : value.filter((c) => c !== p.code))}
                     />
                     <span className="min-w-0">
-                      <span className="text-neutral-900">{p.name}</span>
+                      <span className="text-neutral-900">{L.perm(p)}</span>
                       <span className="ml-1.5 font-mono text-xs text-neutral-500">{p.code}</span>
-                      {p.description && <span className="block text-xs text-neutral-600">{p.description}</span>}
+                      {p.description && <span className="block text-xs text-neutral-600">{L.permDesc(p)}</span>}
                     </span>
                   </label>
                 );
@@ -79,6 +83,8 @@ function PermissionGrid({
 }
 
 function RoleEditor({ role, permissions, onSaved, onDeleted }: { role: Role; permissions: Permission[]; onSaved: () => void; onDeleted: () => void }) {
+  const { t } = useTranslation();
+  const L = useLabels();
   const { user, refresh } = useAuth();
   const { notify } = useStore();
   const [name, setName] = useState(role.name);
@@ -101,16 +107,16 @@ function RoleEditor({ role, permissions, onSaved, onDeleted }: { role: Role; per
       api.updateRole(role.id, { name, description, ...(role.is_super ? {} : { permissions: perms }) }),
     );
     if (!r.ok) return setError(r.error);
-    notify(`已保存「${name}」`);
+    notify(t("roles.saved", { name }));
     onSaved();
     if (user?.roles?.some((x) => x.id === role.id)) await refresh();
   };
 
   const remove = async () => {
-    if (!window.confirm(`删除角色「${role.name}」？${role.user_count} 位用户会失去这个角色的权限。`)) return;
+    if (!window.confirm(t("roles.deleteConfirm", { name: L.role(role), count: role.user_count }))) return;
     const r = await run(() => api.deleteRole(role.id));
     if (!r.ok) return setError(r.error);
-    notify(`已删除「${role.name}」`);
+    notify(t("roles.deleted", { name: L.role(role) }));
     onDeleted();
   };
 
@@ -118,32 +124,46 @@ function RoleEditor({ role, permissions, onSaved, onDeleted }: { role: Role; per
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-4">
         <div>
-          <h2 className="text-base font-medium text-neutral-900">{role.name}</h2>
+          <h2 className="text-base font-medium text-neutral-900">{L.role(role)}</h2>
           <div className="font-mono text-xs text-neutral-500">{role.code}</div>
         </div>
         <div className="flex gap-2">
           {!role.builtin && (
             <Button variant="danger" size="sm" disabled={busy} onClick={remove}>
-              删除
+              {t("common.delete")}
             </Button>
           )}
           <Button size="sm" disabled={busy || !name.trim()} onClick={save}>
-            {busy ? "保存中…" : "保存"}
+            {busy ? t("common.saving") : t("common.save")}
           </Button>
         </div>
       </div>
       <div className="space-y-5 px-5 py-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="名称">
-            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} />
-          </Field>
-          <Field label="说明">
-            <input className={inputCls} value={description} onChange={(e) => setDescription(e.target.value)} />
-          </Field>
+          {role.builtin ? (
+            <>
+              {/* 内置角色是系统角色：名称与说明按当前语言显示，不在这里改 */}
+              <Field label={t("roles.name")}>
+                <div className="py-2 text-sm text-neutral-900">{L.role(role)}</div>
+              </Field>
+              <Field label={t("roles.description")}>
+                <div className="py-2 text-sm text-neutral-700">{L.roleDesc(role)}</div>
+              </Field>
+            </>
+          ) : (
+            <>
+              <Field label={t("roles.name")}>
+                <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} />
+              </Field>
+              <Field label={t("roles.description")}>
+                <input className={inputCls} value={description} onChange={(e) => setDescription(e.target.value)} />
+              </Field>
+            </>
+          )}
         </div>
         {role.is_super ? (
           <p className="rounded-md bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
-            超级管理员自动拥有全部权限，包括以后新增的权限点，不需要单独勾选。
+            {t("roles.superNote")}
           </p>
         ) : (
           <PermissionGrid permissions={permissions} value={perms} onChange={setPerms} grantable={grantable} />
@@ -155,6 +175,7 @@ function RoleEditor({ role, permissions, onSaved, onDeleted }: { role: Role; per
 }
 
 function CreateRole({ permissions, onCreated }: { permissions: Permission[]; onCreated: (r: Role) => void }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -173,16 +194,16 @@ function CreateRole({ permissions, onCreated }: { permissions: Permission[]; onC
 
   return (
     <Card>
-      <CardHeader title="新建角色" />
+      <CardHeader title={t("roles.newRole")} />
       <form onSubmit={submit} className="space-y-5 px-5 pb-5">
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="名称">
-            <input className={inputCls} required value={name} onChange={(e) => setName(e.target.value)} placeholder="额度管理员" />
+          <Field label={t("roles.name")}>
+            <input className={inputCls} required value={name} onChange={(e) => setName(e.target.value)} placeholder={t("roles.namePlaceholder")} />
           </Field>
-          <Field label="代码" hint="小写字母开头，建好后不能改">
+          <Field label={t("roles.code")} hint={t("roles.codeHint")}>
             <input className={cx(inputCls, "font-mono")} required value={code} onChange={(e) => setCode(e.target.value)} placeholder="quota-admin" />
           </Field>
-          <Field label="说明">
+          <Field label={t("roles.description")}>
             <input className={inputCls} value={description} onChange={(e) => setDescription(e.target.value)} />
           </Field>
         </div>
@@ -194,7 +215,7 @@ function CreateRole({ permissions, onCreated }: { permissions: Permission[]; onC
         />
         <ErrorNote>{error}</ErrorNote>
         <Button type="submit" disabled={busy || !code || !name}>
-          {busy ? "创建中…" : "创建角色"}
+          {busy ? t("common.creating") : t("roles.create")}
         </Button>
       </form>
     </Card>
@@ -202,8 +223,10 @@ function CreateRole({ permissions, onCreated }: { permissions: Permission[]; onC
 }
 
 function CustomPermissions({ permissions, onChange }: { permissions: Permission[]; onChange: () => void }) {
+  const { t } = useTranslation();
+  const L = useLabels();
   const { notify } = useStore();
-  const [f, setF] = useState({ code: "", name: "", group: "自定义", description: "" });
+  const [f, setF] = useState({ code: "", name: "", group: t("roles.customGroup"), description: "" });
   const [error, setError] = useState<string | null>(null);
   const { busy, run } = useAction();
   const custom = permissions.filter((p) => !p.builtin);
@@ -213,23 +236,23 @@ function CustomPermissions({ permissions, onChange }: { permissions: Permission[
     setError(null);
     const r = await run(() => api.createPermission({ ...f, code: f.code.trim() }));
     if (!r.ok) return setError(r.error);
-    notify(`已新增权限点 ${f.code}`);
+    notify(t("roles.permAdded", { code: f.code }));
     setF({ code: "", name: "", group: f.group, description: "" });
     onChange();
   };
 
   const remove = async (p: Permission) => {
-    if (!window.confirm(`删除权限点 ${p.code}？角色上的这项授权会一并移除。`)) return;
+    if (!window.confirm(t("roles.permDeleteConfirm", { code: p.code }))) return;
     const r = await run(() => api.deletePermission(p.code));
-    notify(r.ok ? `已删除 ${p.code}` : r.error);
+    notify(r.ok ? t("roles.permDeleted", { code: p.code }) : r.error);
     if (r.ok) onChange();
   };
 
   return (
     <Card>
-      <CardHeader title="自定义权限点" aside={`${custom.length} 个`} />
+      <CardHeader title={t("roles.customPerms")} aside={t("roles.customCount", { count: custom.length })} />
       <p className="px-5 pb-3 text-sm text-neutral-600">
-        内置权限点随版本更新；给还没有后端的新页面控制访问时，可以在这里先建一个，再到「菜单与页面」把它设为页面的访问权限。
+        {t("roles.customDesc")}
       </p>
       {custom.length > 0 && (
         <ul className="px-5">
@@ -237,26 +260,26 @@ function CustomPermissions({ permissions, onChange }: { permissions: Permission[
             <li key={p.code} className="flex items-center gap-3 border-t border-neutral-100 py-2.5 text-sm">
               <span className="font-mono text-neutral-900">{p.code}</span>
               <span className="text-neutral-700">{p.name}</span>
-              <span className="text-neutral-500">{p.group}</span>
+              <span className="text-neutral-500">{L.group(p.group)}</span>
               <button type="button" disabled={busy} onClick={() => remove(p)} className="ml-auto text-neutral-600 hover:text-red-700 disabled:opacity-50">
-                删除
+                {t("common.delete")}
               </button>
             </li>
           ))}
         </ul>
       )}
       <form onSubmit={submit} className="grid gap-3 border-t border-neutral-100 px-5 py-4 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
-        <Field label="代码">
+        <Field label={t("roles.code")}>
           <input className={cx(inputCls, "font-mono")} required value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} placeholder="reports.view" />
         </Field>
-        <Field label="名称">
-          <input className={inputCls} required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="查看报表" />
+        <Field label={t("roles.name")}>
+          <input className={inputCls} required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder={t("roles.permNamePlaceholder")} />
         </Field>
-        <Field label="分组">
+        <Field label={t("roles.group")}>
           <input className={inputCls} value={f.group} onChange={(e) => setF({ ...f, group: e.target.value })} />
         </Field>
         <Button type="submit" disabled={busy || !f.code || !f.name}>
-          新增
+          {t("roles.add")}
         </Button>
         <div className="sm:col-span-4">
           <ErrorNote>{error}</ErrorNote>
@@ -267,6 +290,8 @@ function CustomPermissions({ permissions, onChange }: { permissions: Permission[
 }
 
 export default function AdminRoles() {
+  const { t } = useTranslation();
+  const L = useLabels();
   const roles = useApi(api.roles);
   const perms = useApi(api.permissions);
   const [chosen, setSelected] = useState<number | "new" | null>(null);
@@ -278,11 +303,11 @@ export default function AdminRoles() {
   return (
     <div>
       <PageHeader
-        title="角色与权限"
-        desc="角色是一组权限点；用户可以有多个角色，权限取并集。改动对已登录用户立即生效。"
+        title={t("roles.title")}
+        desc={t("roles.desc")}
         actions={
           <Button size="sm" onClick={() => setSelected("new")}>
-            新建角色
+            {t("roles.newRole")}
           </Button>
         }
       />
@@ -301,11 +326,11 @@ export default function AdminRoles() {
                     )}
                   >
                     <div className="flex items-center gap-2 text-sm text-neutral-900">
-                      {r.name}
-                      {r.is_super ? <Badge tone="brand">全部权限</Badge> : r.builtin && <Badge>内置</Badge>}
+                      {L.role(r)}
+                      {r.is_super ? <Badge tone="brand">{t("users.allPermissions")}</Badge> : r.builtin && <Badge>{t("roles.builtinBadge")}</Badge>}
                     </div>
                     <div className="mt-0.5 text-xs text-neutral-600">
-                      {r.user_count} 人 · {r.is_super ? "全部" : `${r.permissions.length} 项`}权限
+                      {t("roles.summary", { users: r.user_count, perms: r.is_super ? t("roles.allPerms") : t("roles.permCount", { count: r.permissions.length }) })}
                     </div>
                   </button>
                 </li>

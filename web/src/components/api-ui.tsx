@@ -2,19 +2,21 @@
 import type { ReactNode } from "react";
 import { formatTokens, keyState, type ApiKey } from "../lib/api";
 import { Badge, Button, cx } from "./ui";
+import { useTranslation } from "react-i18next";
 
 export function LoadState({ loading, error, onRetry, children }: { loading: boolean; error: string | null; onRetry: () => void; children: ReactNode }) {
+  const { t } = useTranslation();
   if (error) {
     return (
       <div className="flex flex-wrap items-center gap-3 px-5 py-8 text-sm text-red-800">
-        <span>加载失败：{error}</span>
+        <span>{t("common.loadFailed", { error })}</span>
         <Button variant="secondary" size="sm" onClick={onRetry}>
-          重试
+          {t("common.retry")}
         </Button>
       </div>
     );
   }
-  if (loading) return <div className="px-5 py-8 text-sm text-neutral-600">加载中…</div>;
+  if (loading) return <div className="px-5 py-8 text-sm text-neutral-600">{t("common.loading")}</div>;
   return children;
 }
 
@@ -28,10 +30,11 @@ export function ErrorNote({ children }: { children: ReactNode }) {
 }
 
 export function KeyStateBadge({ k }: { k: ApiKey }) {
+  const { t } = useTranslation();
   const s = keyState(k);
-  if (s === "revoked") return <Badge>已吊销</Badge>;
-  if (s === "expired") return <Badge tone="amber">已过期</Badge>;
-  return <Badge tone="green">有效</Badge>;
+  if (s === "revoked") return <Badge>{t("keys.state.revoked")}</Badge>;
+  if (s === "expired") return <Badge tone="amber">{t("keys.state.expired")}</Badge>;
+  return <Badge tone="green">{t("keys.state.active")}</Badge>;
 }
 
 /** 单个 key 的本月用量（额度按用户共享，所以这里不显示上限）。 */
@@ -41,14 +44,15 @@ export function TokensCell({ tokens }: { tokens: number }) {
 
 /** 用户级额度条：null = 不限额，0 = 未分配，>0 = 本月上限。 */
 export function QuotaBar({ used, limit }: { used: number; limit: number | null }) {
+  const { t } = useTranslation();
   if (limit === 0) {
-    return <Badge tone="amber">未分配</Badge>;
+    return <Badge tone="amber">{t("keys.quota.unassigned")}</Badge>;
   }
   if (limit === null) {
     return (
       <span className="tabular-nums">
         {formatTokens(used)}
-        <span className="text-neutral-500"> / 不限</span>
+        <span className="text-neutral-500"> / {t("common.unlimited")}</span>
       </span>
     );
   }
@@ -66,12 +70,13 @@ export function QuotaBar({ used, limit }: { used: number; limit: number | null }
           style={{ width: `${pct}%` }}
         />
       </div>
-      {over && <div className="mt-0.5 text-right text-xs text-red-700">已用完</div>}
+      {over && <div className="mt-0.5 text-right text-xs text-red-700">{t("keys.quota.exhausted")}</div>}
     </div>
   );
 }
 
 export function ModelsCell({ models }: { models: string[] | null }) {
-  if (!models || models.length === 0) return <span className="text-neutral-600">全部模型</span>;
-  return <span className="text-neutral-800">{models.join("、")}</span>;
+  const { t } = useTranslation();
+  if (!models || models.length === 0) return <span className="text-neutral-600">{t("common.allModels")}</span>;
+  return <span className="text-neutral-800">{models.join(", ")}</span>;
 }

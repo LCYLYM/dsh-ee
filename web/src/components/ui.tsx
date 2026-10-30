@@ -1,5 +1,6 @@
 import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { Check, Copy, Star } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export function cx(...xs: (string | false | null | undefined)[]) {
   return xs.filter(Boolean).join(" ");
@@ -105,13 +106,15 @@ export function Segmented<T extends string>({
 
 export function CopyBox({ text, label }: { text: string; label?: string }) {
   const [done, setDone] = useState(false);
+  const { t } = useTranslation();
   return (
     <div className="group relative rounded-md bg-neutral-900 text-neutral-100">
       {label && <div className="border-b border-white/10 px-4 py-1.5 text-xs text-neutral-500">{label}</div>}
       <pre className="overflow-x-auto px-4 py-3 pr-12 font-mono text-[13px] leading-relaxed">{text}</pre>
       <button
         type="button"
-        title="复制"
+        title={t("common.copy")}
+        aria-label={t("common.copy")}
         onClick={() => {
           void navigator.clipboard?.writeText(text);
           setDone(true);
@@ -153,8 +156,9 @@ export function PluginIcon({ name, icon, size = 40 }: { name: string; icon: stri
 }
 
 export function ScoreBadge({ score }: { score: number }) {
+  const { t } = useTranslation();
   const tone = score >= 80 ? "green" : score >= 60 ? "brand" : "amber";
-  return <Badge tone={tone}>评分 {score}</Badge>;
+  return <Badge tone={tone}>{t("plugin.score", { score })}</Badge>;
 }
 
 export function Rating({ value, count }: { value: number; count?: number }) {

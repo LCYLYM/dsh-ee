@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { Download, Search, Terminal } from "lucide-react";
-import { categories, kindLabels, kindOf } from "../mock/data";
+import { categoryIds, categoryLabel, kindOf } from "../mock/data";
 import type { PluginKind } from "../lib/types";
 import { useScoring, useStore } from "../lib/store";
 import { PluginCard } from "../components/plugin-card";
 import { Card, cx, inputBase, PageHeader, Segmented } from "../components/ui";
 import { PageLink } from "../lib/menus";
+import { Trans, useTranslation } from "react-i18next";
 
 const kindOrder: PluginKind[] = ["skill", "connector", "knowledge", "plugin"];
 
@@ -14,6 +15,7 @@ type Sort = "installs" | "score" | "rating" | "recent" | "stars";
 type Origin = "all" | "internal" | "upstream";
 
 export default function Market() {
+  const { t } = useTranslation();
   const { plugins, settings, releases } = useStore();
   const scoring = useScoring();
   const [q, setQ] = useState("");
@@ -49,26 +51,26 @@ export default function Market() {
   const internalCount = visible.filter((p) => p.origin === "internal").length;
   const recommendedCore = releases.find((r) => r.product === "core" && r.recommended);
   const sortOptions: { value: Sort; label: string }[] = [
-    { value: "installs", label: "企业内热门" },
-    ...(scoring.upstream ? [{ value: "score" as const, label: "dshfind 评分" }] : []),
-    ...(scoring.rating ? [{ value: "rating" as const, label: "员工评分" }] : []),
-    { value: "recent", label: "最近更新" },
+    { value: "installs", label: t("market.sortInstalls") },
+    ...(scoring.upstream ? [{ value: "score" as const, label: t("market.sortScore") }] : []),
+    ...(scoring.rating ? [{ value: "rating" as const, label: t("market.sortRating") }] : []),
+    { value: "recent", label: t("market.sortRecent") },
     { value: "stars", label: "GitHub Star" },
   ];
 
   return (
     <div>
       <PageHeader
-        title="能力市场"
-        desc={`${visible.length} 项已审核能力，其中 ${internalCount} 项由同事分享；全部存放在内网，离线也能装。`}
+        title={t("market.title")}
+        desc={t("market.desc", { count: visible.length, internal: internalCount })}
         actions={
           <>
             <PageLink page="setup" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-800 hover:bg-neutral-50">
-              <Terminal size={15} /> 接入指南
+              <Terminal size={15} /> {t("market.setupGuide")}
             </PageLink>
             {settings.distribution.enabled && recommendedCore && (
               <PageLink page="dsh-download" className="inline-flex h-9 items-center gap-1.5 rounded-md bg-neutral-900 px-3 text-sm text-white hover:bg-neutral-700">
-                <Download size={15} /> 下载 DSH {recommendedCore.version}
+                <Download size={15} /> {t("market.downloadDsh", { version: recommendedCore.version })}
               </PageLink>
             )}
           </>
@@ -81,8 +83,8 @@ export default function Market() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="搜索名称、用途或作者"
-            aria-label="搜索能力"
+            placeholder={t("market.searchPlaceholder")}
+            aria-label={t("market.searchLabel")}
             className={cx(inputBase, "w-full pl-9")}
           />
         </div>
@@ -90,42 +92,38 @@ export default function Market() {
           value={kind}
           onChange={setKind}
           options={[
-            { value: "all", label: "全部" },
-            ...kindOrder.map((k) => ({ value: k, label: kindLabels[k] })),
+            { value: "all", label: t("market.all") },
+            ...kindOrder.map((k) => ({ value: k, label: t(`kinds.${k}`) })),
           ]}
         />
         <div className="flex gap-2 sm:ml-auto">
-          <select aria-label="来源" value={origin} onChange={(e) => setOrigin(e.target.value as Origin)} className={cx(inputBase, "w-32")}>
-            <option value="all">全部来源</option>
-            <option value="internal">企业内部</option>
-            <option value="upstream">社区精选</option>
+          <select aria-label={t("market.source")} value={origin} onChange={(e) => setOrigin(e.target.value as Origin)} className={cx(inputBase, "w-32")}>
+            <option value="all">{t("market.allSources")}</option>
+            <option value="internal">{t("market.internal")}</option>
+            <option value="upstream">{t("market.community")}</option>
           </select>
-          <select aria-label="分类" value={cat} onChange={(e) => setCat(e.target.value)} className={cx(inputBase, "w-32")}>
-            <option value="">全部分类</option>
-            {Object.entries(categories).map(([id, label]) => (
+          <select aria-label={t("market.category")} value={cat} onChange={(e) => setCat(e.target.value)} className={cx(inputBase, "w-32")}>
+            <option value="">{t("market.allCategories")}</option>
+            {categoryIds.map((id) => (
               <option key={id} value={id}>
-                {label}
+                {categoryLabel(id)}
               </option>
             ))}
           </select>
-          <select aria-label="排序" value={sort} onChange={(e) => setSort(e.target.value as Sort)} className={cx(inputBase, "w-36")}>
+          <select aria-label={t("market.sort")} value={sort} onChange={(e) => setSort(e.target.value as Sort)} className={cx(inputBase, "w-36")}>
             {sortOptions.map((o) => (
               <option key={o.value} value={o.value}>
-                按{o.label}
+                {t("market.sortBy", { label: o.label })}
               </option>
             ))}
           </select>
         </div>
       </div>
 
-      <div className="mb-3 text-sm text-neutral-600">{list.length} 项</div>
+      <div className="mb-3 text-sm text-neutral-600">{t("market.count", { count: list.length })}</div>
       {list.length === 0 ? (
         <Card className="p-12 text-center text-sm text-neutral-600">
-          没有找到匹配的能力。需要的不在这里？可以
-          <PageLink page="publish" className="font-medium text-neutral-900 hover:underline">
-            申请引入或自己分享一个
-          </PageLink>
-          。
+          <Trans i18nKey="market.empty" components={{ link: <PageLink page="publish" className="font-medium text-neutral-900 hover:underline" /> }} />
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

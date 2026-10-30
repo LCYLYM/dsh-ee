@@ -4,6 +4,7 @@ import { useStore } from "../../lib/store";
 import type { Settings } from "../../lib/types";
 import { Button, Card, cx, Field, inputBase, inputCls, PageHeader, Segmented, Toggle } from "../../components/ui";
 import { PageLink } from "../../lib/menus";
+import { Trans, useTranslation } from "react-i18next";
 
 function Section({ title, desc, children }: { title: string; desc?: string; children: ReactNode }) {
   return (
@@ -42,6 +43,7 @@ function Row({
 }
 
 export default function AdminSettings() {
+  const { t } = useTranslation();
   const { settings: s, updateSettings, resetSettings, notify } = useStore();
   const set = <K extends keyof Settings>(key: K, patch: Partial<Settings[K]> | Settings[K]) =>
     updateSettings((cur) => ({
@@ -52,60 +54,60 @@ export default function AdminSettings() {
   return (
     <div className="max-w-3xl">
       <PageHeader
-        title="系统设置"
-        desc="修改即时生效（原型中保存在浏览器本地）。"
+        title={t("settingsAdmin.title")}
+        desc={t("settingsAdmin.desc")}
         actions={
           <Button
             variant="secondary"
             size="sm"
             onClick={() => {
               resetSettings();
-              notify("已恢复默认设置");
+              notify(t("settingsAdmin.resetDone"));
             }}
           >
-            恢复默认
+            {t("settingsAdmin.reset")}
           </Button>
         }
       />
       <div className="space-y-6">
-        <Section title="基本信息">
+        <Section title={t("settingsAdmin.basics")}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="企业名称">
+            <Field label={t("settingsAdmin.orgName")}>
               <input className={inputCls} value={s.orgName} onChange={(e) => set("orgName", e.target.value)} />
             </Field>
-            <Field label="访问地址">
+            <Field label={t("settingsAdmin.baseUrl")}>
               <input className={cx(inputCls, "font-mono")} value={s.baseUrl} onChange={(e) => set("baseUrl", e.target.value)} />
             </Field>
           </div>
-          <Field label="内部主作用域" hint="内部发布必须使用此作用域，且永不回源公网 npm。更多作用域与路由规则见「npm 源」。">
+          <Field label={t("settingsAdmin.mainScope")} hint={t("settingsAdmin.mainScopeHint")}>
             <input className={cx(inputBase, "w-48 font-mono")} value={s.scope} onChange={(e) => set("scope", e.target.value)} />
           </Field>
         </Section>
 
-        <Section title="评分" desc="关闭后，门户与后台不再显示任何评分，也不能按评分排序或用评分门槛挑选预载插件。">
+        <Section title={t("settingsAdmin.scoring")} desc={t("settingsAdmin.scoringDesc")}>
           <Row
-            label="启用评分"
-            desc="总开关。有的企业不希望评分影响选择，或者内部插件不便公开打分。"
+            label={t("settingsAdmin.enableScoring")}
+            desc={t("settingsAdmin.enableScoringDesc")}
             checked={s.scoring.enabled}
             onChange={(v) => set("scoring", { enabled: v })}
           />
           <div className="space-y-5 border-l-2 border-neutral-100 pl-5">
             <Row
-              label="显示 dshfind 上游评分"
-              desc="来自 dshfind.com 的综合评分（0-100），只有上游插件有。"
+              label={t("settingsAdmin.showUpstreamScore")}
+              desc={t("settingsAdmin.showUpstreamScoreDesc")}
               checked={s.scoring.showUpstreamScore}
               disabled={!s.scoring.enabled}
               onChange={(v) => set("scoring", { showUpstreamScore: v })}
             />
             <Row
-              label="允许员工打分"
-              desc="1-5 星，只在企业内可见。"
+              label={t("settingsAdmin.allowRating")}
+              desc={t("settingsAdmin.allowRatingDesc")}
               checked={s.scoring.allowEmployeeRating}
               disabled={!s.scoring.enabled}
               onChange={(v) => set("scoring", { allowEmployeeRating: v })}
             />
             <div className={cx(!(s.scoring.enabled && s.scoring.showUpstreamScore) && "pointer-events-none opacity-50")}>
-              <Field label={`预载默认最低评分：${s.scoring.minPreloadScore}`}>
+              <Field label={t("settingsAdmin.minPreload", { n: s.scoring.minPreloadScore })}>
                 <input
                   type="range"
                   min={0}
@@ -120,98 +122,94 @@ export default function AdminSettings() {
           </div>
         </Section>
 
-        <Section title="收录策略">
+        <Section title={t("settingsAdmin.admission")}>
           <Field
-            label="放行模式"
+            label={t("settingsAdmin.admissionMode")}
             hint={
               s.admissionMode === "allowlist"
-                ? "员工只能安装审核通过的插件；上游新插件需先引入并审核。"
-                : "registry 会按需回源上游，员工可安装任何社区插件；黑名单中的除外。"
+                ? t("settingsAdmin.allowlistHint")
+                : t("settingsAdmin.openHint")
             }
           >
             <Segmented
               value={s.admissionMode}
               onChange={(v) => set("admissionMode", v)}
               options={[
-                { value: "allowlist", label: "白名单（推荐）" },
-                { value: "open", label: "开放 + 黑名单" },
+                { value: "allowlist", label: t("settingsAdmin.allowlist") },
+                { value: "open", label: t("settingsAdmin.open") },
               ]}
             />
           </Field>
         </Section>
 
-        <Section title="上游">
-          <Field label="网络环境">
+        <Section title={t("settingsAdmin.upstream")}>
+          <Field label={t("settingsAdmin.network")}>
             <Segmented
               value={s.upstream.mode}
               onChange={(v) => set("upstream", { mode: v })}
               options={[
-                { value: "online", label: "可联网（在线同步）" },
-                { value: "offline", label: "隔离网（离线导入）" },
+                { value: "online", label: t("settingsAdmin.online") },
+                { value: "offline", label: t("settingsAdmin.offline") },
               ]}
             />
           </Field>
           <Row
-            label="订阅 dshfind 插件目录"
-            desc="获取收录、分类、评分、风险标记等元数据，用于挑选预载插件。"
+            label={t("settingsAdmin.feed")}
+            desc={t("settingsAdmin.feedDesc")}
             checked={s.upstream.dshfindFeed}
             disabled={s.upstream.mode === "offline"}
             onChange={(v) => set("upstream", { dshfindFeed: v })}
           />
           <p className="text-sm text-neutral-600">
-            npm 上游源与回源策略在
-            <PageLink page="admin-registry" className="mx-1 font-medium text-neutral-900 hover:underline">
-              npm 源
-            </PageLink>
-            页设置。
+            <Trans i18nKey="settingsAdmin.registryNote" components={{ link: <PageLink page="admin-registry" className="mx-1 font-medium text-neutral-900 hover:underline" /> }} />
           </p>
-          <Field label="已入库插件出新版本时">
+          <Field label={t("settingsAdmin.newVersion")}>
             <Segmented
               value={s.upstream.autoSync}
               onChange={(v) => set("upstream", { autoSync: v })}
               options={[
-                { value: "review", label: "同步后审核" },
-                { value: "auto", label: "自动上架" },
-                { value: "off", label: "不同步" },
+                { value: "review", label: t("settingsAdmin.syncReview") },
+                { value: "auto", label: t("settingsAdmin.autoPublish") },
+                { value: "off", label: t("settingsAdmin.noSync") },
               ]}
             />
           </Field>
         </Section>
 
-        <Section title="DSH 本体分发">
+        <Section title={t("settingsAdmin.distribution")}>
           <Row
-            label="在门户提供 DSH 下载"
-            desc="员工可从内网下载 DSH 核心与桌面版安装包。"
+            label={t("settingsAdmin.offerDownload")}
+            desc={t("settingsAdmin.offerDownloadDesc")}
             checked={s.distribution.enabled}
             onChange={(v) => set("distribution", { enabled: v })}
           />
           <Row
-            label="向员工展示预览版"
-            desc="alpha / rc 版本。"
+            label={t("settingsAdmin.showPreview")}
+            desc={t("settingsAdmin.showPreviewDesc")}
             checked={s.distribution.allowAlpha}
             disabled={!s.distribution.enabled}
             onChange={(v) => set("distribution", { allowAlpha: v })}
           />
           <Row
-            label="允许分发社区桌面端"
-            desc="除官方桌面版外，也分发审核过的社区桌面端。"
+            label={t("settingsAdmin.communityDesktop")}
+            desc={t("settingsAdmin.communityDesktopDesc")}
             checked={s.distribution.allowCommunityDesktop}
             disabled={!s.distribution.enabled}
             onChange={(v) => set("distribution", { allowCommunityDesktop: v })}
           />
         </Section>
 
-        <Section title="登录与认证">
+        <Section title={t("settingsAdmin.auth")}>
           <Segmented
             value={s.auth}
             onChange={(v) => set("auth", v)}
             options={[
-              { value: "local", label: "本地账号" },
+              { value: "local", label: t("settingsAdmin.localAccounts") },
               { value: "ldap", label: "LDAP / AD" },
               { value: "oidc", label: "OIDC SSO" },
             ]}
           />
-          <p className="text-xs text-neutral-500">网页登录走所选方式；pnpm 安装使用员工在「接入指南」页生成的个人令牌。</p>
+          <p className="text-xs text-neutral-500">{t("settingsAdmin.authNote")}</p>
         </Section>
       </div>
     </div>

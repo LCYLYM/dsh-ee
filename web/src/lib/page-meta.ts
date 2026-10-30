@@ -12,7 +12,7 @@ export interface PageMeta {
   description: string;
 }
 
-export const PAGE_META: Record<string, PageMeta> = {
+const META = {
   workbench: { title: "我的工作台", defaultPath: "/workbench", description: "个人指标、我的微应用、已装能力" },
   apps: { title: "微应用", defaultPath: "/apps", description: "基于 DSH 运行的企业微应用" },
   market: { title: "能力市场", defaultPath: "/market", description: "浏览与安装企业能力（模拟数据）" },
@@ -34,6 +34,9 @@ export const PAGE_META: Record<string, PageMeta> = {
   "admin-upstream": { title: "上游预载", defaultPath: "/admin/upstream", description: "在线同步与离线导入（模拟数据）" },
   "admin-distribution": { title: "DSH 分发", defaultPath: "/admin/distribution", description: "DSH 本体分发（模拟数据）" },
   "admin-settings": { title: "系统设置", defaultPath: "/admin/settings", description: "全局设置（模拟数据）" },
-};
+} satisfies Record<string, PageMeta>;
 
-export type PageKey = keyof typeof PAGE_META;
+export type PageKey = keyof typeof META;
+
+/** 按任意字符串取页面信息（菜单里的 page_key 来自数据库，可能不在目录里）。 */
+export const PAGE_META: Record<string, PageMeta> = META;

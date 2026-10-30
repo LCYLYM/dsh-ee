@@ -5,6 +5,7 @@ import { useStore } from "../lib/store";
 import type { Artifact, DshRelease } from "../lib/types";
 import { Badge, Button, Card, CopyBox, cx, PageHeader, Segmented } from "../components/ui";
 import { PageLink } from "../lib/menus";
+import { useTranslation } from "react-i18next";
 
 const osLabel: Record<Artifact["os"], string> = { windows: "Windows", macos: "macOS", linux: "Linux" };
 
@@ -21,10 +22,14 @@ function OsIcon({ os }: { os: Artifact["os"] }) {
   return <Terminal size={18} />;
 }
 
-const channelBadge = (c: DshRelease["channel"]) =>
-  c === "stable" ? <Badge tone="green">稳定版</Badge> : c === "alpha" ? <Badge tone="amber">预览版</Badge> : <Badge>旧版</Badge>;
+function ChannelBadge({ c }: { c: DshRelease["channel"] }) {
+  const { t } = useTranslation();
+  return c === "stable" ? <Badge tone="green">{t("download.stable")}</Badge> : c === "alpha" ? <Badge tone="amber">{t("download.alpha")}</Badge> : <Badge>{t("download.legacy")}</Badge>;
+}
+const channelBadge = (c: DshRelease["channel"]) => <ChannelBadge c={c} />;
 
 function ArtifactList({ r, os }: { r: DshRelease; os: Artifact["os"] }) {
+  const { t } = useTranslation();
   const { notify, settings } = useStore();
   const sorted = [...r.artifacts].sort((a, b) => Number(b.os === os) - Number(a.os === os));
   return (
@@ -37,7 +42,7 @@ function ArtifactList({ r, os }: { r: DshRelease; os: Artifact["os"] }) {
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium text-neutral-800">
               {osLabel[a.os]} · {a.arch}
-              {a.os === os && <span className="ml-2 text-xs font-normal text-brand-600">你的系统</span>}
+              {a.os === os && <span className="ml-2 text-xs font-normal text-brand-600">{t("download.yourOs")}</span>}
             </div>
             <div className="truncate font-mono text-xs text-neutral-500" title={`sha256 ${a.sha256}`}>
               {a.file} · {a.sizeMb} MB · sha256 {a.sha256.slice(0, 16)}…
@@ -46,9 +51,9 @@ function ArtifactList({ r, os }: { r: DshRelease; os: Artifact["os"] }) {
           <Button
             size="sm"
             variant={a.os === os ? "primary" : "secondary"}
-            onClick={() => notify(`开始下载 ${settings.baseUrl}/dl/${a.file}（原型）`)}
+            onClick={() => notify(t("download.starting", { url: `${settings.baseUrl}/dl/${a.file}` }))}
           >
-            <Download size={14} /> 下载
+            <Download size={14} /> {t("download.download")}
           </Button>
         </div>
       ))}
@@ -57,6 +62,7 @@ function ArtifactList({ r, os }: { r: DshRelease; os: Artifact["os"] }) {
 }
 
 export default function DshDownload() {
+  const { t } = useTranslation();
   const { releases, settings } = useStore();
   const [product, setProduct] = useState<DshRelease["product"]>("core");
   const os = detectOs();
@@ -73,22 +79,22 @@ export default function DshDownload() {
 
   if (!settings.distribution.enabled) {
     return (
-      <Card className="p-12 text-center text-sm text-neutral-500">管理员未开启 DSH 本体分发，请联系 IT 获取安装包。</Card>
+      <Card className="p-12 text-center text-sm text-neutral-500">{t("download.disabled")}</Card>
     );
   }
 
   return (
     <div>
       <PageHeader
-        title="下载 DSH"
-        desc="从企业内网下载 DeepSeek Harness 本体与桌面版。安装包由管理员从官方渠道同步并校验，企业推荐版与插件市场的兼容性检查一致。"
+        title={t("download.title")}
+        desc={t("download.desc")}
         actions={
           <Segmented
             value={product}
             onChange={setProduct}
             options={[
-              { value: "core", label: "DSH 核心（CLI）" },
-              { value: "desktop", label: "桌面版" },
+              { value: "core", label: t("download.core") },
+              { value: "desktop", label: t("download.desktop") },
             ]}
           />
         }
@@ -103,11 +109,11 @@ export default function DshDownload() {
                   <span className="text-lg font-semibold text-neutral-900">
                     {r.distro} {r.version}
                   </span>
-                  <Badge tone="brand">企业推荐</Badge>
+                  <Badge tone="brand">{t("download.recommended")}</Badge>
                   {channelBadge(r.channel)}
                 </div>
                 <div className="mt-0.5 text-sm text-neutral-500">
-                  {r.releasedAt} 发布 · {r.notes}
+                  {t("download.released", { date: r.releasedAt, notes: r.notes })}
                 </div>
               </div>
             </div>
@@ -116,32 +122,32 @@ export default function DshDownload() {
         ))}
 
         {recommended.length === 0 && (
-          <Card className="p-8 text-center text-sm text-neutral-500">管理员还没有为这一项设置企业推荐版本。</Card>
+          <Card className="p-8 text-center text-sm text-neutral-500">{t("download.noRecommended")}</Card>
         )}
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Card className="p-5">
             <h2 className="mb-3 flex items-center gap-2 font-semibold text-neutral-900">
-              <Terminal size={17} /> 安装后接入企业插件源
+              <Terminal size={17} /> {t("download.connectTitle")}
             </h2>
-            <p className="mb-3 text-sm text-neutral-500">一条命令写好插件索引源、内网 registry 与企业 CA 证书：</p>
+            <p className="mb-3 text-sm text-neutral-500">{t("download.connectDesc")}</p>
             <CopyBox text={`curl -fsSL ${settings.baseUrl}/setup.sh | sh`} />
             <PageLink page="setup" className="mt-3 inline-block text-sm text-brand-600 hover:underline">
-              查看 Windows 与手动配置方式 →
+              {t("download.otherWays")}
             </PageLink>
           </Card>
           <Card className="p-5">
             <h2 className="mb-3 flex items-center gap-2 font-semibold text-neutral-900">
-              <ShieldCheck size={17} /> 校验安装包
+              <ShieldCheck size={17} /> {t("download.verifyTitle")}
             </h2>
-            <p className="mb-3 text-sm text-neutral-500">安装包与官方发布的 sha256 一致才会被同步进内网。下载后可自行核对：</p>
+            <p className="mb-3 text-sm text-neutral-500">{t("download.verifyDesc")}</p>
             <CopyBox
               text={
                 os === "windows"
-                  ? "Get-FileHash .\\<文件名> -Algorithm SHA256"
+                  ? `Get-FileHash .\\${t("download.fileName")} -Algorithm SHA256`
                   : os === "macos"
-                    ? "shasum -a 256 <文件名>"
-                    : "sha256sum <文件名>"
+                    ? `shasum -a 256 ${t("download.fileName")}`
+                    : `sha256sum ${t("download.fileName")}`
               }
             />
           </Card>
@@ -149,7 +155,7 @@ export default function DshDownload() {
 
         {others.length > 0 && (
           <div>
-            <h2 className="mb-3 font-semibold text-neutral-900">其他版本</h2>
+            <h2 className="mb-3 font-semibold text-neutral-900">{t("download.otherVersions")}</h2>
             <div className="space-y-4">
               {others.map((r) => (
                 <details key={r.distro + r.version} className="group rounded-xl border border-neutral-200 bg-white">

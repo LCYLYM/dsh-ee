@@ -6,11 +6,19 @@
  * 包名与版本号接入真实后端前需按上游 deepseek-harness 核实。
  */
 import upstream from "./upstream.json";
+import { isZh } from "../i18n";
 import type { AuditEvent, DshRelease, MicroApp, Plugin, PluginKind, RegistryToken, ScanItem } from "../lib/types";
 
-export const categories: Record<string, string> = Object.fromEntries(
-  Object.entries(upstream.categories).map(([id, c]) => [id, c.title.zh]),
-);
+const categoryTitles: Record<string, { title: { zh: string; en: string } }> = upstream.categories;
+
+/** 分类 id 列表（上游数据自带中英文名称）。 */
+export const categoryIds = Object.keys(categoryTitles);
+
+/** 按当前界面语言取分类名。 */
+export function categoryLabel(id: string): string | undefined {
+  const c = categoryTitles[id];
+  return c && (isZh() ? c.title.zh : c.title.en);
+}
 
 const day = 86400;
 const now = Math.floor(Date.UTC(2026, 9, 26) / 1000);

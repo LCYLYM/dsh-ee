@@ -1,4 +1,5 @@
 /** 与 server/ 对接的接口层。类型与 server/internal/store 的 JSON 字段一一对应。 */
+import i18n from "../i18n";
 
 export interface RoleRef {
   id: number;
@@ -155,7 +156,7 @@ async function request<T>(method: string, path: string, body?: unknown, opts: { 
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(0, "连不上服务端，请确认 dsh-ee server 已启动");
+    throw new ApiError(0, i18n.t("api.unreachable"));
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();
@@ -169,7 +170,7 @@ async function request<T>(method: string, path: string, body?: unknown, opts: { 
     if (res.status === 401 && !opts.silent401) onUnauthorized?.();
     const msg =
       (data as { error?: string } | null)?.error ??
-      (res.status >= 500 ? "服务端出错或未启动" : `请求失败（${res.status}）`);
+      (res.status >= 500 ? i18n.t("api.serverError") : i18n.t("api.requestFailed", { status: res.status }));
     throw new ApiError(res.status, msg);
   }
   return data as T;

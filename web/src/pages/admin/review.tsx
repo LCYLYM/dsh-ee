@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
-import { categories, scanFor } from "../../mock/data";
+import { categoryLabel, scanFor } from "../../mock/data";
+import i18n from "../../i18n";
 import { useScoring, useStore } from "../../lib/store";
 import { Badge, Button, Card, cx, formatKb, inputCls, PageHeader, PluginIcon, ScoreBadge } from "../../components/ui";
+import { useTranslation } from "react-i18next";
 
 function ago(ts?: number) {
   if (!ts) return "";
   const h = Math.max(1, Math.round((Date.now() / 1000 - ts) / 3600));
-  return h < 24 ? `${h} 小时前` : `${Math.round(h / 24)} 天前`;
+  return h < 24 ? i18n.t("review.hoursAgo", { n: h }) : i18n.t("review.daysAgo", { n: Math.round(h / 24) });
 }
 
 export default function AdminReview() {
+  const { t } = useTranslation();
   const { plugins, setStatus, notify } = useStore();
   const scoring = useScoring();
   const queue = plugins.filter((p) => p.status === "pending");
@@ -21,16 +24,16 @@ export default function AdminReview() {
   const decide = (approve: boolean) => {
     if (!current) return;
     setStatus(current.name, approve ? "approved" : "rejected");
-    notify(approve ? `已通过：${current.name} 已上架` : `已驳回：${current.name}`);
+    notify(approve ? t("review.approvedMsg", { name: current.name }) : t("review.rejectedMsg", { name: current.name }));
     setSelected(null);
     setReason("");
   };
 
   return (
     <div>
-      <PageHeader title="审核队列" desc="员工提交的内部插件与上游新版本都在这里。自动检查有警告的需要人工确认后才能通过。" />
+      <PageHeader title={t("review.title")} desc={t("review.desc")} />
       {queue.length === 0 ? (
-        <Card className="p-12 text-center text-sm text-neutral-500">队列已清空 🎉</Card>
+        <Card className="p-12 text-center text-sm text-neutral-500">{t("review.empty")}</Card>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
           <Card className="h-fit divide-y divide-neutral-100">
@@ -49,8 +52,8 @@ export default function AdminReview() {
                       {p.name}@{p.version}
                     </div>
                     <div className="mt-1 flex gap-1.5">
-                      {p.origin === "internal" ? <Badge tone="brand">内部提交</Badge> : <Badge>上游新版本</Badge>}
-                      {warns > 0 && <Badge tone="amber">{warns} 项警告</Badge>}
+                      {p.origin === "internal" ? <Badge tone="brand">{t("review.internalSubmission")}</Badge> : <Badge>{t("review.upstreamVersion")}</Badge>}
+                      {warns > 0 && <Badge tone="amber">{t("review.warnings", { count: warns })}</Badge>}
                     </div>
                   </div>
                   <span className="text-xs whitespace-nowrap text-neutral-500">{ago(p.submittedAt)}</span>
@@ -69,12 +72,12 @@ export default function AdminReview() {
                     {current.name}@{current.version}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    <Badge>{categories[current.category]}</Badge>
+                    <Badge>{categoryLabel(current.category)}</Badge>
                     <Badge>
-                      {current.origin === "internal" ? `${current.author} · ${current.department}` : `作者 ${current.author}`}
+                      {current.origin === "internal" ? `${current.author} · ${current.department}` : t("review.author", { name: current.author })}
                     </Badge>
                     {current.visibility && current.visibility !== "company" && (
-                      <Badge tone="brand">{current.visibility === "department" ? "仅本部门" : "仅自己"}</Badge>
+                      <Badge tone="brand">{current.visibility === "department" ? t("review.deptOnly") : t("review.selfOnly")}</Badge>
                     )}
                     {scoring.upstream && current.score !== null && <ScoreBadge score={current.score} />}
                   </div>
@@ -82,7 +85,7 @@ export default function AdminReview() {
               </div>
               <p className="mt-4 text-sm text-neutral-600">{current.description}</p>
 
-              <h3 className="mt-6 mb-2 text-sm font-semibold text-neutral-800">自动检查</h3>
+              <h3 className="mt-6 mb-2 text-sm font-semibold text-neutral-800">{t("review.autoChecks")}</h3>
               <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-100">
                 {scanFor(current).map((s) => (
                   <li key={s.label} className="flex items-start gap-3 px-4 py-2.5 text-sm">
@@ -95,20 +98,20 @@ export default function AdminReview() {
                 ))}
               </ul>
               <div className="mt-3 text-xs text-neutral-500">
-                依赖闭包 {current.depCount} 个包 · {formatKb(current.sizeKb)}
+                {t("review.deps", { count: current.depCount, size: formatKb(current.sizeKb) })}
               </div>
 
               <div className="mt-6">
                 <textarea
                   className={cx(inputCls, "h-20 py-2")}
-                  placeholder="审核意见（驳回时必填，会通知提交人）"
+                  placeholder={t("review.commentPlaceholder")}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                 />
                 <div className="mt-3 flex gap-2">
-                  <Button onClick={() => decide(true)}>通过并上架</Button>
+                  <Button onClick={() => decide(true)}>{t("review.approve")}</Button>
                   <Button variant="danger" disabled={!reason.trim()} onClick={() => decide(false)}>
-                    驳回
+                    {t("review.reject")}
                   </Button>
                 </div>
               </div>

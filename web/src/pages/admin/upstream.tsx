@@ -1,26 +1,28 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, FileArchive, Loader2, PackageOpen, ShieldCheck, WifiOff } from "lucide-react";
-import { categories, offlineImports, preloadCandidates } from "../../mock/data";
+import { categoryIds, categoryLabel, offlineImports, preloadCandidates } from "../../mock/data";
 import { useScoring, useStore } from "../../lib/store";
 import { Badge, Button, Card, cx, Field, formatKb, inputCls, PageHeader, Segmented, Toggle } from "../../components/ui";
+import { useTranslation } from "react-i18next";
 
 type RankBy = "stars" | "score";
 
 export default function AdminUpstream() {
+  const { t } = useTranslation();
   const { settings } = useStore();
   const [tab, setTab] = useState<"online" | "offline">(settings.upstream.mode);
   return (
     <div>
       <PageHeader
-        title="上游预载"
-        desc="把社区热门插件连同完整依赖闭包同步进内网。员工安装时只访问内网 registry。"
+        title={t("upstreamAdmin.title")}
+        desc={t("upstreamAdmin.desc")}
         actions={
           <Segmented
             value={tab}
             onChange={setTab}
             options={[
-              { value: "online", label: "在线同步" },
-              { value: "offline", label: "离线导入" },
+              { value: "online", label: t("upstreamAdmin.online") },
+              { value: "offline", label: t("upstreamAdmin.offline") },
             ]}
           />
         }
@@ -31,6 +33,7 @@ export default function AdminUpstream() {
 }
 
 function Online() {
+  const { t } = useTranslation();
   const { settings, notify } = useStore();
   const scoring = useScoring();
   const [rankByPref, setRankBy] = useState<RankBy>("score");
@@ -56,13 +59,13 @@ function Online() {
 
   useEffect(() => {
     if (syncing === null || syncing >= 100) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       const next = Math.min(100, syncing + 7);
       setSyncing(next);
-      if (next === 100) notify(`同步完成：${selected.length} 个插件已入库，进入审核队列`);
+      if (next === 100) notify(t("upstreamAdmin.synced", { count: selected.length }));
     }, 120);
-    return () => clearTimeout(t);
-  }, [syncing, selected.length, notify]);
+    return () => clearTimeout(timer);
+  }, [syncing, selected.length, notify, t]);
 
   const toggle = (name: string) =>
     setPicked((s) => {
@@ -76,28 +79,28 @@ function Online() {
     <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
       <div className="space-y-4">
         <Card className="space-y-4 p-5">
-          <div className="font-medium text-neutral-800">挑选规则</div>
-          <Field label="排序依据" hint={!scoring.upstream ? "评分已在系统设置中关闭" : undefined}>
+          <div className="font-medium text-neutral-800">{t("upstreamAdmin.rules")}</div>
+          <Field label={t("upstreamAdmin.rankBy")} hint={!scoring.upstream ? t("upstreamAdmin.scoringOff") : undefined}>
             <Segmented
               value={rankBy}
               onChange={setRankBy}
               options={[
                 { value: "stars", label: "GitHub Star" },
-                ...(scoring.upstream ? [{ value: "score" as const, label: "dshfind 评分" }] : []),
+                ...(scoring.upstream ? [{ value: "score" as const, label: t("upstreamAdmin.dshfindScore") }] : []),
               ]}
             />
           </Field>
-          <Field label={`取前 ${topN} 个`}>
+          <Field label={t("upstreamAdmin.topN", { n: topN })}>
             <input type="range" min={10} max={140} step={10} value={topN} onChange={(e) => setTopN(+e.target.value)} className="w-full accent-brand-500" />
           </Field>
           {scoring.upstream && (
-            <Field label={`最低评分 ${minScore}`}>
+            <Field label={t("upstreamAdmin.minScore", { n: minScore })}>
               <input type="range" min={0} max={90} step={5} value={minScore} onChange={(e) => setMinScore(+e.target.value)} className="w-full accent-brand-500" />
             </Field>
           )}
-          <Field label="分类（不选 = 全部）">
+          <Field label={t("upstreamAdmin.categories")}>
             <div className="flex flex-wrap gap-1.5">
-              {Object.entries(categories).map(([id, label]) => (
+              {categoryIds.map((id) => (
                 <button
                   key={id}
                   onClick={() => setCats((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]))}
@@ -106,36 +109,36 @@ function Online() {
                     cats.includes(id) ? "border-brand-300 bg-brand-50 text-brand-700" : "border-neutral-200 text-neutral-600",
                   )}
                 >
-                  {label}
+                  {categoryLabel(id)}
                 </button>
               ))}
             </div>
           </Field>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-neutral-700">只要离线可装的</span>
+            <span className="text-neutral-700">{t("upstreamAdmin.offlineOnly")}</span>
             <Toggle checked={offlineOnly} onChange={setOfflineOnly} />
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-neutral-700">隐藏已入库的</span>
+            <span className="text-neutral-700">{t("upstreamAdmin.hideMirrored")}</span>
             <Toggle checked={hideMirrored} onChange={setHideMirrored} />
           </div>
         </Card>
 
         <Card className="space-y-2 p-5 text-sm">
-          <div className="font-medium text-neutral-800">上游配置</div>
+          <div className="font-medium text-neutral-800">{t("upstreamAdmin.config")}</div>
           <div className="flex justify-between text-neutral-600">
-            <span>插件目录</span>
-            <span>{settings.upstream.dshfindFeed ? "dshfind.com" : "未启用"}</span>
+            <span>{t("upstreamAdmin.catalog")}</span>
+            <span>{settings.upstream.dshfindFeed ? "dshfind.com" : t("upstreamAdmin.notEnabled")}</span>
           </div>
           <div className="flex justify-between text-neutral-600">
-            <span>npm 源</span>
-            <span>{settings.upstream.registry === "custom" ? settings.upstream.customRegistry || "自定义" : settings.upstream.registry}</span>
+            <span>{t("upstreamAdmin.npmSource")}</span>
+            <span>{settings.upstream.registry === "custom" ? settings.upstream.customRegistry || t("upstreamAdmin.custom") : settings.upstream.registry}</span>
           </div>
           <div className="flex justify-between text-neutral-600">
-            <span>新版本</span>
-            <span>{{ auto: "自动同步", review: "同步后审核", off: "不同步" }[settings.upstream.autoSync]}</span>
+            <span>{t("upstreamAdmin.newVersions")}</span>
+            <span>{{ auto: t("upstreamAdmin.syncAuto"), review: t("upstreamAdmin.syncReview"), off: t("upstreamAdmin.syncOff") }[settings.upstream.autoSync]}</span>
           </div>
-          <p className="pt-1 text-xs text-neutral-500">同时会镜像企业推荐 DSH 版本对应的 @deepseek-ai/dsh-* 核心包，满足插件的 peer 依赖。</p>
+          <p className="pt-1 text-xs text-neutral-500">{t("upstreamAdmin.coreMirrorNote")}</p>
         </Card>
       </div>
 
@@ -143,10 +146,11 @@ function Online() {
         <Card className="flex flex-wrap items-center gap-4 p-4">
           <div className="text-sm">
             <span className="font-medium text-neutral-800">
-              将同步 {selected.length} 个插件{picked.size ? "（手动勾选）" : "（未入库的全部）"}
+              {t("upstreamAdmin.willSync", { count: selected.length })}
+              {picked.size ? t("upstreamAdmin.manual") : t("upstreamAdmin.allUnmirrored")}
             </span>
             <span className="ml-2 text-neutral-500">
-              依赖闭包约 {totalDeps} 个包 · {formatKb(totalKb)}
+              {t("upstreamAdmin.depsEstimate", { count: totalDeps, size: formatKb(totalKb) })}
             </span>
           </div>
           <div className="ml-auto">
@@ -160,7 +164,7 @@ function Online() {
               </div>
             ) : (
               <Button disabled={!selected.length} onClick={() => setSyncing(0)}>
-                开始同步
+                {t("upstreamAdmin.startSync")}
               </Button>
             )}
           </div>
@@ -171,12 +175,12 @@ function Online() {
             <thead className="border-b border-neutral-100 text-left text-xs text-neutral-500">
               <tr>
                 <th className="w-10 px-4 py-2.5" />
-                <th className="px-4 py-2.5 font-normal">插件</th>
-                <th className="px-4 py-2.5 font-normal">分类</th>
+                <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colPlugin")}</th>
+                <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colCategory")}</th>
                 <th className="px-4 py-2.5 text-right font-normal">Star</th>
-                {scoring.upstream && <th className="px-4 py-2.5 text-right font-normal">评分</th>}
-                <th className="px-4 py-2.5 font-normal">依赖闭包</th>
-                <th className="px-4 py-2.5 font-normal">状态</th>
+                {scoring.upstream && <th className="px-4 py-2.5 text-right font-normal">{t("upstreamAdmin.colScore")}</th>}
+                <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colDeps")}</th>
+                <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colStatus")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
@@ -195,18 +199,18 @@ function Online() {
                     <div className="font-medium">{c.title}</div>
                     <div className="font-mono text-xs text-neutral-500">{c.name}</div>
                   </td>
-                  <td className="px-4 py-2">{categories[c.category]}</td>
+                  <td className="px-4 py-2">{categoryLabel(c.category)}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{c.stars.toLocaleString()}</td>
                   {scoring.upstream && <td className="px-4 py-2 text-right tabular-nums">{c.score ?? "—"}</td>}
                   <td className="px-4 py-2 text-xs">
-                    {c.depCount} 个 · {formatKb(c.sizeKb)}
+                    {t("upstreamAdmin.depsValue", { count: c.depCount, size: formatKb(c.sizeKb) })}
                     {!c.offlineReady && (
                       <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600">
-                        <WifiOff size={11} /> 需外网
+                        <WifiOff size={11} /> {t("upstreamAdmin.needsInternet")}
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-2">{c.mirrored ? <Badge tone="green">已入库</Badge> : <Badge>未入库</Badge>}</td>
+                  <td className="px-4 py-2">{c.mirrored ? <Badge tone="green">{t("upstreamAdmin.mirrored")}</Badge> : <Badge>{t("upstreamAdmin.notMirrored")}</Badge>}</td>
                 </tr>
               ))}
             </tbody>
@@ -218,37 +222,38 @@ function Online() {
 }
 
 function Offline() {
+  const { t } = useTranslation();
   const { notify } = useStore();
   const [file, setFile] = useState("");
   const [step, setStep] = useState(0);
-  const steps = ["校验签名（dshfind.com ed25519 公钥）", "校验每个包的 integrity", "解包并写入 registry 存储", "生成待审清单"];
+  const steps = [t("upstreamAdmin.stepSignature"), t("upstreamAdmin.stepIntegrity"), t("upstreamAdmin.stepUnpack"), t("upstreamAdmin.stepManifest")];
 
   useEffect(() => {
     if (step === 0 || step > steps.length) return;
-    const t = setTimeout(() => setStep((s) => s + 1), 700);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setStep((s) => s + 1), 700);
+    return () => clearTimeout(timer);
   }, [step, steps.length]);
   useEffect(() => {
-    if (step === steps.length + 1) notify("导入完成：新增 21，更新 64，已进入审核队列");
-  }, [step, steps.length, notify]);
+    if (step === steps.length + 1) notify(t("upstreamAdmin.imported"));
+  }, [step, steps.length, notify, t]);
 
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="p-6">
           <div className="mb-1 flex items-center gap-2 font-medium text-neutral-800">
-            <PackageOpen size={18} /> 导入离线种子包
+            <PackageOpen size={18} /> {t("upstreamAdmin.importSeed")}
           </div>
           <p className="mb-4 text-sm text-neutral-500">
-            dshfind 每月发布签名的种子包（热门插件加依赖闭包加元数据）；也可以导入 DMZ 区 ee 实例导出的增量包。
+            {t("upstreamAdmin.importDesc")}
           </p>
           <label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-neutral-200 px-6 py-8 text-center hover:border-brand-300">
             <FileArchive size={28} className="text-brand-500" />
-            <span className="mt-2 text-sm font-medium text-neutral-700">{file || "选择 .tar.zst 文件，或拷贝到服务器 /data/import 目录"}</span>
+            <span className="mt-2 text-sm font-medium text-neutral-700">{file || t("upstreamAdmin.chooseFile")}</span>
             <input type="file" accept=".zst,.tar" className="hidden" onChange={(e) => setFile(e.target.files?.[0]?.name ?? "")} />
           </label>
           <Button className="mt-4" disabled={!file || (step > 0 && step <= steps.length)} onClick={() => setStep(1)}>
-            开始导入
+            {t("upstreamAdmin.startImport")}
           </Button>
           {step > 0 && (
             <ul className="mt-4 space-y-2 text-sm">
@@ -270,32 +275,32 @@ function Offline() {
 
         <Card className="p-6">
           <div className="mb-1 flex items-center gap-2 font-medium text-neutral-800">
-            <ShieldCheck size={18} /> 导出增量包（摆渡用）
+            <ShieldCheck size={18} /> {t("upstreamAdmin.exportDelta")}
           </div>
-          <p className="mb-4 text-sm text-neutral-500">在能联网的 DMZ 实例上，把某个时间点之后新入库的插件导出，拷进隔离网实例导入。</p>
-          <Field label="导出自">
+          <p className="mb-4 text-sm text-neutral-500">{t("upstreamAdmin.exportDesc")}</p>
+          <Field label={t("upstreamAdmin.exportSince")}>
             <input type="date" defaultValue="2026-10-03" className={inputCls} />
           </Field>
           <label className="mt-3 flex items-center gap-2 text-sm text-neutral-600">
-            <input type="checkbox" defaultChecked className="accent-brand-500" /> 包含 DSH 本体与桌面版安装包
+            <input type="checkbox" defaultChecked className="accent-brand-500" /> {t("upstreamAdmin.includeDsh")}
           </label>
-          <Button variant="secondary" className="mt-4" onClick={() => notify("正在生成 dmz-delta-2026-10-26.tar.zst（原型）")}>
-            生成增量包
+          <Button variant="secondary" className="mt-4" onClick={() => notify(t("upstreamAdmin.generating"))}>
+            {t("upstreamAdmin.generate")}
           </Button>
         </Card>
       </div>
 
       <Card>
-        <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">导入记录</div>
+        <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">{t("upstreamAdmin.history")}</div>
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-neutral-500">
             <tr>
-              <th className="px-5 py-2 font-normal">文件</th>
-              <th className="px-5 py-2 font-normal">签名</th>
-              <th className="px-5 py-2 font-normal">插件数</th>
-              <th className="px-5 py-2 font-normal">大小</th>
-              <th className="px-5 py-2 font-normal">导入时间</th>
-              <th className="px-5 py-2 font-normal">结果</th>
+              <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colFile")}</th>
+              <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colSignature")}</th>
+              <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colPlugins")}</th>
+              <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colSize")}</th>
+              <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colImportedAt")}</th>
+              <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colResult")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">

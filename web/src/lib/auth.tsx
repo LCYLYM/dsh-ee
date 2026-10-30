@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
 import { api, ApiError, setUnauthorizedHandler, type Me } from "./api";
+import { useTranslation } from "react-i18next";
 
 interface Auth {
   user: Me | null;
@@ -84,8 +85,9 @@ export function useAuth() {
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading, loggedOut } = useAuth();
   const loc = useLocation();
+  const { t } = useTranslation();
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-neutral-50 text-sm text-neutral-600">正在确认登录状态…</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-neutral-50 text-sm text-neutral-600">{t("shell.loadingAuth")}</div>;
   }
   if (!user) {
     if (loggedOut) return <Navigate to="/login" replace />;

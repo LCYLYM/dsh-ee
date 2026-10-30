@@ -3,6 +3,8 @@ import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
 import { Puzzle } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { Button, inputCls } from "../components/ui";
+import { LangSwitch } from "../components/lang-switch";
+import { useTranslation } from "react-i18next";
 
 /** 只允许站内相对路径，防止 next 参数被拿来做开放重定向。 */
 function safeNext(raw: string | null) {
@@ -10,6 +12,7 @@ function safeNext(raw: string | null) {
 }
 
 export default function Login() {
+  const { t } = useTranslation();
   const { user, loading, error: bootError, login } = useAuth();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -44,11 +47,11 @@ export default function Login() {
         <span className="text-lg font-semibold text-neutral-900">dsh-ee</span>
       </Link>
       <form onSubmit={submit} className="w-full max-w-sm rounded-lg border border-neutral-200/80 bg-white p-6">
-        <h1 className="text-xl font-semibold text-neutral-900">登录工作台</h1>
-        <p className="mt-1 text-sm text-neutral-600">使用管理员为你开通的账号。</p>
+        <h1 className="text-xl font-semibold text-neutral-900">{t("login.title")}</h1>
+        <p className="mt-1 text-sm text-neutral-600">{t("login.subtitle")}</p>
         <div className="mt-6 space-y-4">
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-neutral-800">用户名</span>
+            <span className="mb-1.5 block text-sm font-medium text-neutral-800">{t("login.username")}</span>
             <input
               className={inputCls}
               autoComplete="username"
@@ -59,7 +62,7 @@ export default function Login() {
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-neutral-800">密码</span>
+            <span className="mb-1.5 block text-sm font-medium text-neutral-800">{t("login.password")}</span>
             <input
               className={inputCls}
               type="password"
@@ -76,10 +79,11 @@ export default function Login() {
           </p>
         )}
         <Button type="submit" className="mt-6 w-full" disabled={busy || !username || !password}>
-          {busy ? "登录中…" : "登录"}
+          {busy ? t("login.submitting") : t("login.submit")}
         </Button>
       </form>
-      <p className="mt-6 text-xs text-neutral-500">忘记密码请联系管理员重置。</p>
+      <p className="mt-6 text-xs text-neutral-500">{t("login.forgot")}</p>
+      <LangSwitch className="mt-3" />
     </div>
   );
 }

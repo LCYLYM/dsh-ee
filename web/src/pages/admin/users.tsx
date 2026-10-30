@@ -4,25 +4,29 @@ import { useAuth } from "../../lib/auth";
 import { useStore } from "../../lib/store";
 import { useAction, useApi } from "../../lib/use-api";
 import { PageLink } from "../../lib/menus";
+import { useLabels } from "../../lib/labels";
 import { ErrorNote, LoadState } from "../../components/api-ui";
 import { Badge, Button, Card, CardHeader, cx, Field, inputBase, inputCls, PageHeader } from "../../components/ui";
+import { useTranslation } from "react-i18next";
 
 const emptyForm = { username: "", password: "", display_name: "", department: "" };
 
 /** 角色多选；超级管理员角色单独标出。 */
 function RolePicker({ roles, value, onChange }: { roles: Role[]; value: number[]; onChange: (ids: number[]) => void }) {
+  const { t } = useTranslation();
+  const L = useLabels();
   return (
     <div className="flex flex-wrap gap-x-5 gap-y-2">
       {roles.map((r) => (
-        <label key={r.id} className="flex items-center gap-2 text-sm text-neutral-800" title={r.description}>
+        <label key={r.id} className="flex items-center gap-2 text-sm text-neutral-800" title={L.roleDesc(r)}>
           <input
             type="checkbox"
             className="h-4 w-4 accent-neutral-900"
             checked={value.includes(r.id)}
             onChange={(e) => onChange(e.target.checked ? [...value, r.id] : value.filter((x) => x !== r.id))}
           />
-          {r.name}
-          {r.is_super && <span className="text-xs text-neutral-500">全部权限</span>}
+          {L.role(r)}
+          {r.is_super && <span className="text-xs text-neutral-500">{t("users.allPermissions")}</span>}
         </label>
       ))}
     </div>
@@ -30,6 +34,7 @@ function RolePicker({ roles, value, onChange }: { roles: Role[]; value: number[]
 }
 
 function CreateUser({ roles, onCreated }: { roles: Role[] | null; onCreated: (u: User) => void }) {
+  const { t } = useTranslation();
   const [f, setF] = useState(emptyForm);
   const defaultRoles = roles?.filter((r) => r.code === "member").map((r) => r.id) ?? [];
   const [roleIds, setRoleIds] = useState<number[] | null>(null);
@@ -51,36 +56,38 @@ function CreateUser({ roles, onCreated }: { roles: Role[] | null; onCreated: (u:
   return (
     <form onSubmit={submit} className="space-y-4 px-5 pb-5">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="用户名" hint="小写字母、数字和 . _ -，用于登录">
+        <Field label={t("users.username")} hint={t("users.usernameHint")}>
           <input className={inputCls} required value={f.username} onChange={(e) => set({ username: e.target.value })} placeholder="zhang.wei" />
         </Field>
-        <Field label="初始密码" hint="至少 10 个字符，请线下告知员工并让其登录后修改">
+        <Field label={t("users.initialPassword")} hint={t("users.initialPasswordHint")}>
           <input className={inputCls} type="text" autoComplete="off" required value={f.password} onChange={(e) => set({ password: e.target.value })} />
         </Field>
-        <Field label="显示名">
-          <input className={inputCls} value={f.display_name} onChange={(e) => set({ display_name: e.target.value })} placeholder="张伟" />
+        <Field label={t("users.displayName")}>
+          <input className={inputCls} value={f.display_name} onChange={(e) => set({ display_name: e.target.value })} placeholder={t("users.displayNamePlaceholder")} />
         </Field>
-        <Field label="部门">
-          <input className={inputCls} value={f.department} onChange={(e) => set({ department: e.target.value })} placeholder="研发效能部" />
+        <Field label={t("users.department")}>
+          <input className={inputCls} value={f.department} onChange={(e) => set({ department: e.target.value })} placeholder={t("users.departmentPlaceholder")} />
         </Field>
       </div>
       {roles ? (
         <fieldset>
-          <legend className="mb-1.5 text-sm font-medium text-neutral-700">角色</legend>
+          <legend className="mb-1.5 text-sm font-medium text-neutral-700">{t("users.roles")}</legend>
           <RolePicker roles={roles} value={roleIds ?? defaultRoles} onChange={setRoleIds} />
         </fieldset>
       ) : (
-        <p className="text-sm text-neutral-600">新用户会获得默认的「员工」角色。</p>
+        <p className="text-sm text-neutral-600">{t("users.defaultRoleNote")}</p>
       )}
       <ErrorNote>{error}</ErrorNote>
       <Button type="submit" disabled={busy || !f.username || !f.password}>
-        {busy ? "创建中…" : "创建用户"}
+        {busy ? t("common.creating") : t("users.create")}
       </Button>
     </form>
   );
 }
 
 export default function AdminUsers() {
+  const { t } = useTranslation();
+  const L = useLabels();
   const { user: me, can, refresh } = useAuth();
   const { notify } = useStore();
   const { data: users, error, loading, reload } = useApi(api.users);
@@ -102,7 +109,7 @@ export default function AdminUsers() {
 
   const saveRoles = async (u: User, ids: number[]) => {
     const r = await run(() => api.setUserRoles(u.id, ids));
-    notify(r.ok ? `已更新 ${u.username} 的角色` : r.error);
+    notify(r.ok ? t("users.rolesUpdated", { name: u.username }) : r.error);
     if (r.ok) {
       setRolesFor(null);
       reload();
@@ -114,12 +121,12 @@ export default function AdminUsers() {
   return (
     <div>
       <PageHeader
-        title="用户"
-        desc="本地账号。禁用或重置密码后，该用户在所有设备上立即下线；角色决定能看到哪些页面、能做哪些操作。"
+        title={t("users.title")}
+        desc={t("users.desc")}
         actions={
           canManage && (
             <Button size="sm" onClick={() => setCreating((v) => !v)}>
-              {creating ? "收起" : "新建用户"}
+              {creating ? t("common.close") : t("users.newUser")}
             </Button>
           )
         }
@@ -127,11 +134,11 @@ export default function AdminUsers() {
 
       {creating && (
         <Card className="mb-4">
-          <CardHeader title="新建用户" />
+          <CardHeader title={t("users.newUser")} />
           <CreateUser
             roles={roles.data}
             onCreated={(u) => {
-              notify(`已创建 ${u.username}`);
+              notify(t("users.created", { name: u.username }));
               setCreating(false);
               reload();
             }}
@@ -141,15 +148,15 @@ export default function AdminUsers() {
 
       <Card>
         <CardHeader
-          title="全部用户"
+          title={t("users.all")}
           aside={
             <>
-              {users ? `${users.length} 人` : ""}
+              {users ? t("users.count", { count: users.length }) : ""}
               {canRoles && (
                 <>
                   {" · "}
                   <PageLink page="admin-roles" className="font-medium text-neutral-900 hover:underline">
-                    管理角色
+                    {t("users.manageRoles")}
                   </PageLink>
                 </>
               )}
@@ -161,11 +168,11 @@ export default function AdminUsers() {
             <table className="w-full text-sm">
               <thead className="text-left text-xs text-neutral-600">
                 <tr>
-                  <th className="px-5 py-2 font-normal">用户</th>
-                  <th className="px-5 py-2 font-normal">部门</th>
-                  <th className="px-5 py-2 font-normal">角色</th>
-                  <th className="px-5 py-2 text-right font-normal">创建于</th>
-                  <th className="px-5 py-2 font-normal">状态</th>
+                  <th className="px-5 py-2 font-normal">{t("users.colUser")}</th>
+                  <th className="px-5 py-2 font-normal">{t("users.colDepartment")}</th>
+                  <th className="px-5 py-2 font-normal">{t("users.colRoles")}</th>
+                  <th className="px-5 py-2 text-right font-normal">{t("users.colCreated")}</th>
+                  <th className="px-5 py-2 font-normal">{t("users.colStatus")}</th>
                   <th className="px-5 py-2" />
                 </tr>
               </thead>
@@ -178,7 +185,7 @@ export default function AdminUsers() {
                       <td className="px-5 py-3">
                         <div className={u.disabled ? "" : "text-neutral-900"}>
                           {u.display_name || u.username}
-                          {self && <span className="ml-1.5 text-xs text-neutral-500">（你）</span>}
+                          {self && <span className="ml-1.5 text-xs text-neutral-500">{t("users.you")}</span>}
                         </div>
                         <div className="text-xs text-neutral-600">{u.username}</div>
                         {resetFor === u.id && (
@@ -186,25 +193,25 @@ export default function AdminUsers() {
                             className="mt-2 flex flex-wrap gap-2"
                             onSubmit={async (e) => {
                               e.preventDefault();
-                              if (await patch(u, { password: newPw }, `已重置 ${u.username} 的密码`)) {
+                              if (await patch(u, { password: newPw }, t("users.passwordReset", { name: u.username }))) {
                                 setResetFor(null);
                                 setNewPw("");
                               }
                             }}
                           >
                             <input
-                              aria-label="新密码"
+                              aria-label={t("users.newPassword")}
                               className={cx(inputBase, "h-8 w-48")}
-                              placeholder="新密码，至少 10 个字符"
+                              placeholder={t("users.newPasswordPlaceholder")}
                               autoComplete="off"
                               value={newPw}
                               onChange={(e) => setNewPw(e.target.value)}
                             />
                             <Button size="sm" type="submit" disabled={busy || !newPw}>
-                              确认重置
+                              {t("users.confirmReset")}
                             </Button>
                             <Button size="sm" variant="ghost" type="button" onClick={() => setResetFor(null)}>
-                              取消
+                              {t("common.cancel")}
                             </Button>
                           </form>
                         )}
@@ -213,10 +220,10 @@ export default function AdminUsers() {
                             <RolePicker roles={roles.data} value={rolesFor.ids} onChange={(ids) => setRolesFor({ id: u.id, ids })} />
                             <div className="flex gap-2">
                               <Button size="sm" disabled={busy} onClick={() => saveRoles(u, rolesFor.ids)}>
-                                保存角色
+                                {t("users.saveRoles")}
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => setRolesFor(null)}>
-                                取消
+                                {t("common.cancel")}
                               </Button>
                             </div>
                           </div>
@@ -225,16 +232,16 @@ export default function AdminUsers() {
                       <td className="px-5 py-3">{u.department || "—"}</td>
                       <td className="px-5 py-3">
                         <div className="flex flex-wrap gap-1">
-                          {userRoles.length === 0 && <span className="text-neutral-500">未分配</span>}
+                          {userRoles.length === 0 && <span className="text-neutral-500">{t("users.unassigned")}</span>}
                           {userRoles.map((r) => (
                             <Badge key={r.id} tone={r.is_super ? "brand" : "slate"}>
-                              {r.name}
+                              {L.role(r)}
                             </Badge>
                           ))}
                         </div>
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums">{formatTime(u.created_at)}</td>
-                      <td className="px-5 py-3">{u.disabled ? <Badge>已禁用</Badge> : <Badge tone="green">正常</Badge>}</td>
+                      <td className="px-5 py-3">{u.disabled ? <Badge>{t("users.disabled")}</Badge> : <Badge tone="green">{t("users.active")}</Badge>}</td>
                       <td className="px-5 py-3">
                         <div className="flex justify-end gap-3 text-sm whitespace-nowrap">
                           {canRoles && (
@@ -244,7 +251,7 @@ export default function AdminUsers() {
                               disabled={busy || !roles.data}
                               onClick={() => setRolesFor({ id: u.id, ids: userRoles.map((r) => r.id) })}
                             >
-                              角色
+                              {t("users.rolesAction")}
                             </button>
                           )}
                           {canManage && (
@@ -257,7 +264,7 @@ export default function AdminUsers() {
                                 setNewPw("");
                               }}
                             >
-                              重置密码
+                              {t("users.resetPassword")}
                             </button>
                           )}
                           {canManage && !self && (
@@ -266,11 +273,11 @@ export default function AdminUsers() {
                               className={cx("disabled:opacity-50", u.disabled ? "text-neutral-700 hover:text-neutral-900" : "text-neutral-600 hover:text-red-700")}
                               disabled={busy}
                               onClick={() => {
-                                if (!u.disabled && !window.confirm(`禁用 ${u.username}？该用户会立即下线，已创建的 key 与额度都会失效。`)) return;
-                                void patch(u, { disabled: !u.disabled }, u.disabled ? `已启用 ${u.username}` : `已禁用 ${u.username}`);
+                                if (!u.disabled && !window.confirm(t("users.disableConfirm", { name: u.username }))) return;
+                                void patch(u, { disabled: !u.disabled }, u.disabled ? t("users.enabledMsg", { name: u.username }) : t("users.disabledMsg", { name: u.username }));
                               }}
                             >
-                              {u.disabled ? "启用" : "禁用"}
+                              {u.disabled ? t("users.enable") : t("users.disable")}
                             </button>
                           )}
                         </div>
