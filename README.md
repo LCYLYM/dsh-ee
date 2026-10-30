@@ -3,19 +3,27 @@
 企业私有部署的 DSH 插件市场：一键部署、热门插件在线 / 离线预载、员工内部分享插件、内网分发 DSH 本体与桌面版。
 
 - 设计稿：[docs/design.md](./docs/design.md)
-- 前端原型：[web/](./web)（Vite + React + Tailwind，全部为模拟数据，无后端）
+- 前端：[web/](./web)（Vite + React + Tailwind；登录、账号、模型服务与 API key 已接服务端，其余页面仍是模拟数据）
+- 服务端：[server/](./server)（Go；用户登录、企业 API key 二次分发、OpenAI 兼容网关；OceanBase / TiDB）
 
-## 运行原型
+## 运行
+
+前端通过 Vite 代理把 `/api`、`/v1` 转发到 `http://127.0.0.1:8080`，所以先按 [server/README.md](./server/README.md) 启动服务端，再：
 
 ```bash
 cd web
 pnpm install
-pnpm dev        # http://localhost:5173
+pnpm dev        # http://localhost:5188
 ```
+
+除落地页外，所有页面都需要登录；账号用服务端首次启动时创建的管理员。
 
 | 路径 | 页面 |
 |---|---|
 | `/` | 落地页（定位、架构图、智能工作台） |
+| `/login` | 登录（接真实后端） |
+| `/keys` | 我的 API key（接真实后端） |
+| `/account` | 账号与修改密码（接真实后端） |
 | `/workbench` | 我的工作台（本机接入状态、我的微应用、已装能力、部门在用、我分享的） |
 | `/apps` | 微应用 |
 | `/market` | 能力市场 |
@@ -24,6 +32,9 @@ pnpm dev        # http://localhost:5173
 | `/setup` | 接入企业插件源 |
 | `/publish` | 分享插件 / 申请引入社区插件 |
 | `/admin` | 管理总览（全链路 dashboard、审计日志） |
+| `/admin/users` | 用户管理（接真实后端） |
+| `/admin/providers` | 模型服务：企业上游 key（接真实后端） |
+| `/admin/keys` | API key 分发（接真实后端） |
 | `/admin/stats` | 运营数据（安装趋势、存储） |
 | `/admin/registry` | npm 源（路由规则、上游与回源、客户端 .npmrc、访问令牌） |
 | `/admin/plugins` | 插件管理（下架 / 恢复） |

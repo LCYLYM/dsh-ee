@@ -7,6 +7,10 @@ import {
   CloudDownload,
   Download,
   Gauge,
+  KeyRound,
+  LogOut,
+  Bot,
+  Users,
   House,
   LayoutDashboard,
   Menu,
@@ -18,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { useStore } from "../lib/store";
+import { useAuth } from "../lib/auth";
 import { cx } from "./ui";
 
 function Toast() {
@@ -75,6 +80,8 @@ function NavGroup({ label, items, onNavigate }: { label: string; items: NavItem[
 
 function Sidebar({ onNavigate }: { onNavigate: () => void }) {
   const { plugins, settings } = useStore();
+  const { user, logout } = useAuth();
+  const isAdmin = user?.role === "admin";
   const pending = plugins.filter((p) => p.status === "pending").length;
   const workbench: NavItem[] = [
     { to: "/workbench", label: "我的工作台", icon: House },
@@ -83,6 +90,7 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
     ...(settings.distribution.enabled ? [{ to: "/dsh", label: "下载 DSH", icon: Download }] : []),
     { to: "/setup", label: "接入指南", icon: Terminal },
     { to: "/publish", label: "分享能力", icon: Upload },
+    { to: "/keys", label: "我的 API key", icon: KeyRound },
   ];
   const admin: NavItem[] = [
     { to: "/admin", label: "总览", icon: Gauge, end: true },
@@ -94,8 +102,13 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
     { to: "/admin/distribution", label: "DSH 分发", icon: Download, off: !settings.distribution.enabled },
     { to: "/admin/settings", label: "系统设置", icon: SettingsIcon },
   ];
+  const access: NavItem[] = [
+    { to: "/admin/users", label: "用户", icon: Users },
+    { to: "/admin/providers", label: "模型服务", icon: Bot },
+    { to: "/admin/keys", label: "API key 分发", icon: KeyRound },
+  ];
   return (
-    <div className="flex h-full flex-col px-3 py-4">
+    <div className="flex min-h-full flex-col px-3 py-4">
       <Link to="/" className="flex items-center gap-2.5 px-3 pb-5" onClick={onNavigate}>
         <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-500 text-white">
           <Puzzle size={16} />
@@ -107,15 +120,37 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
       </Link>
       <div className="flex flex-col gap-6">
         <NavGroup label="工作台" items={workbench} onNavigate={onNavigate} />
-        <NavGroup label="管理" items={admin} onNavigate={onNavigate} />
+        {isAdmin && <NavGroup label="账号与模型" items={access} onNavigate={onNavigate} />}
+        {isAdmin && <NavGroup label="管理" items={admin} onNavigate={onNavigate} />}
       </div>
-      <div className="mt-auto flex items-center gap-2.5 px-3 pt-4 text-sm">
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-200 text-xs text-neutral-700">张</span>
-        <span className="leading-tight">
-          <span className="block text-neutral-900">zhang.wei</span>
-          <span className="block text-xs text-neutral-600">研发效能部 · 管理员</span>
-        </span>
-      </div>
+      {user && (
+        <div className="mt-auto flex items-center gap-1 pt-4">
+          <Link
+            to="/account"
+            onClick={onNavigate}
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 py-1.5 text-sm hover:bg-neutral-100"
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-xs text-neutral-700">
+              {(user.display_name || user.username).slice(0, 1).toUpperCase()}
+            </span>
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-neutral-900">{user.display_name || user.username}</span>
+              <span className="block truncate text-xs text-neutral-600">
+                {[user.department, user.role === "admin" ? "管理员" : "员工"].filter(Boolean).join(" · ")}
+              </span>
+            </span>
+          </Link>
+          <button
+            type="button"
+            aria-label="退出登录"
+            title="退出登录"
+            onClick={() => void logout()}
+            className="rounded-md p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -132,7 +167,7 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-neutral-50 lg:flex">
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-r border-neutral-200/80 lg:block">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 overflow-y-auto border-r border-neutral-200/80 lg:block">
         <Sidebar onNavigate={() => {}} />
       </aside>
 
@@ -159,7 +194,7 @@ export function AppLayout() {
           <Outlet />
         </main>
         <footer className="mx-auto max-w-[1240px] px-4 pb-8 text-xs text-neutral-500 sm:px-8">
-          dsh-ee 原型 · 部署于 {settings.baseUrl} · 全部为模拟数据 · 上游插件取自 dshfind.com
+          dsh-ee 原型 · 账号、模型服务与 API key 已接真实后端，其余页面为模拟数据 · 上游插件取自 dshfind.com
         </footer>
       </div>
       <Toast />

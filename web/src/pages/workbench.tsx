@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { ArrowRight, Play } from "lucide-react";
 import { kindLabels, kindOf, me, microApps } from "../mock/data";
 import { useStore } from "../lib/store";
+import { useAuth } from "../lib/auth";
 import { pluginPath } from "../components/plugin-card";
 import { Badge, Button, Card, CardHeader, PageHeader, PluginIcon } from "../components/ui";
 import { statusBadge } from "../components/status";
@@ -19,6 +20,7 @@ function StatusCell({ label, value, note }: { label: string; value: React.ReactN
 
 export default function Workbench() {
   const { plugins, releases, settings, notify } = useStore();
+  const { user } = useAuth();
   const byName = (n: string) => plugins.find((p) => p.name === n);
   const core = releases.find((r) => r.product === "core" && r.recommended);
   const outdated = core && core.version !== me.dshVersion;
@@ -45,7 +47,7 @@ export default function Workbench() {
 
   return (
     <div>
-      <PageHeader title="我的工作台" desc={`${me.user} · ${me.department}`} />
+      <PageHeader title="我的工作台" desc={[user?.display_name || user?.username, user?.department].filter(Boolean).join(" · ")} />
 
       <Card className="grid divide-neutral-200/80 max-md:divide-y md:grid-cols-3 md:divide-x">
         <StatusCell

@@ -1,10 +1,17 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router";
 import "./index.css";
 import { StoreProvider } from "./lib/store";
+import { AuthProvider, RequireAdmin, RequireAuth } from "./lib/auth";
 import { AppLayout } from "./components/layout";
 import Landing from "./pages/landing";
+import Login from "./pages/login";
+import MyKeys from "./pages/my-keys";
+import Account from "./pages/account";
+import AdminUsers from "./pages/admin/users";
+import AdminProviders from "./pages/admin/providers";
+import AdminKeys from "./pages/admin/keys";
 import Workbench from "./pages/workbench";
 import Apps from "./pages/apps";
 import Market from "./pages/market";
@@ -24,10 +31,18 @@ import AdminSettings from "./pages/admin/settings";
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <StoreProvider>
+      <AuthProvider>
       <BrowserRouter>
         <Routes>
           <Route index element={<Landing />} />
-          <Route element={<AppLayout />}>
+          <Route path="login" element={<Login />} />
+          <Route
+            element={
+              <RequireAuth>
+                <AppLayout />
+              </RequireAuth>
+            }
+          >
             <Route path="workbench" element={<Workbench />} />
             <Route path="overview" element={<Navigate to="/workbench" replace />} />
             <Route path="apps" element={<Apps />} />
@@ -36,6 +51,15 @@ createRoot(document.getElementById("root")!).render(
             <Route path="dsh" element={<DshDownload />} />
             <Route path="setup" element={<Setup />} />
             <Route path="publish" element={<Publish />} />
+            <Route path="keys" element={<MyKeys />} />
+            <Route path="account" element={<Account />} />
+            <Route
+              element={
+                <RequireAdmin>
+                  <Outlet />
+                </RequireAdmin>
+              }
+            >
             <Route path="admin" element={<AdminDashboard />} />
             <Route path="admin/stats" element={<AdminStats />} />
             <Route path="admin/registry" element={<AdminRegistry />} />
@@ -44,9 +68,14 @@ createRoot(document.getElementById("root")!).render(
             <Route path="admin/upstream" element={<AdminUpstream />} />
             <Route path="admin/distribution" element={<AdminDistribution />} />
             <Route path="admin/settings" element={<AdminSettings />} />
+            <Route path="admin/users" element={<AdminUsers />} />
+            <Route path="admin/providers" element={<AdminProviders />} />
+            <Route path="admin/keys" element={<AdminKeys />} />
+            </Route>
           </Route>
         </Routes>
       </BrowserRouter>
+      </AuthProvider>
     </StoreProvider>
   </StrictMode>,
 );
