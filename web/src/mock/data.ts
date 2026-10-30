@@ -6,7 +6,7 @@
  * 包名与版本号接入真实后端前需按上游 deepseek-harness 核实。
  */
 import upstream from "./upstream.json";
-import type { AuditEvent, DshRelease, MicroApp, Plugin, PluginKind, ScanItem } from "../lib/types";
+import type { AuditEvent, DshRelease, MicroApp, Plugin, PluginKind, RegistryToken, ScanItem } from "../lib/types";
 
 export const categories: Record<string, string> = Object.fromEntries(
   Object.entries(upstream.categories).map(([id, c]) => [id, c.title.zh]),
@@ -132,6 +132,19 @@ const internal: Plugin[] = [
     installs: 776,
     rating: 4.7,
     ratingCount: 65,
+  },
+  {
+    name: "@acme/skill-oncall-runbook",
+    kind: "skill" as const,
+    title: "值班排障手册",
+    description: "研发效能部的线上排障 SOP：告警分级、常见故障的定位步骤与回滚流程。",
+    author: "zhang.wei",
+    department: "研发效能部",
+    category: "agent",
+    version: "0.1.0",
+    installs: 0,
+    status: "pending" as const,
+    submittedAt: now - 5 * 3600,
   },
   {
     name: "@acme/dsh-jira-sync",
@@ -424,3 +437,38 @@ export const activity = [
 ];
 
 export const installTrend = [212, 248, 231, 296, 340, 188, 160, 305, 362, 351, 398, 420, 230, 205];
+
+
+/** registry 访问令牌：员工个人令牌由接入脚本自动生成，这里只列管理员建的服务令牌与部分个人令牌。 */
+export const initialTokens: RegistryToken[] = [
+  { id: "ci-gitlab", name: "GitLab CI 发布", owner: "zhang.wei", access: "publish", createdAt: "2026-08-12", lastUsed: "今天 17:56" },
+  { id: "dmz-sync", name: "DMZ 增量摆渡", owner: "admin", access: "read", createdAt: "2026-09-01", lastUsed: "2026-10-18" },
+  { id: "data-ci", name: "数据中台发布", owner: "xu.ran", access: "publish", createdAt: "2026-09-20", lastUsed: "2026-10-24" },
+  { id: "old-jenkins", name: "Jenkins（旧）", owner: "admin", access: "read", createdAt: "2026-03-02", lastUsed: "2026-06-30" },
+];
+
+/** 当前登录员工的视角（个人工作台）。 */
+export const me = {
+  user: "zhang.wei",
+  department: "研发效能部",
+  /** 本机 DSH 核心版本（客户端上报）。 */
+  dshVersion: "0.1.1-rc.2",
+  lastSeen: "今天 09:40",
+  tokenExpires: "2027-01-26",
+  /** 固定在工作台的微应用与最近使用时间。 */
+  apps: [
+    { id: "mr-review", lastUsed: "今天 16:31" },
+    { id: "metrics-qa", lastUsed: "昨天" },
+    { id: "expense", lastUsed: "10-21" },
+  ],
+  /** 本机已安装的能力及版本；落后于市场版本的会提示更新。 */
+  installed: [
+    { name: "@acme/dsh-gitlab-review", version: "1.4.0" },
+    { name: "@acme/dsh-wiki-memory", version: "0.9.0" },
+    { name: "@acme/dsh-feishu-notify", version: "2.1.1" },
+    { name: "@acme/kb-metrics", version: "2.4.0" },
+    { name: "@deepseek-harness-tui/dsh-tui", version: "0.16.1" },
+  ],
+  /** 本部门同事装得最多、我还没装的。 */
+  teamPicks: ["@acme/dsh-sso-llm", "dsh-context", "@acme/skill-contract-review"],
+};

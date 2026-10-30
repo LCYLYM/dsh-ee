@@ -1,11 +1,11 @@
 import { Link } from "react-router";
 import { ArrowRight } from "lucide-react";
-import { auditLabels, auditLog, clientPlatforms, execTrend, kindLabels, kindOf, microApps } from "../mock/data";
-import { useStore } from "../lib/store";
-import type { AuditEvent, PluginKind } from "../lib/types";
-import { BarList, DailyBars } from "../components/charts";
-import { pluginPath } from "../components/plugin-card";
-import { Badge, Card, CardHeader, PageHeader } from "../components/ui";
+import { auditLabels, auditLog, clientPlatforms, execTrend, kindLabels, kindOf, microApps } from "../../mock/data";
+import { useStore } from "../../lib/store";
+import type { AuditEvent, PluginKind } from "../../lib/types";
+import { BarList, DailyBars } from "../../components/charts";
+import { pluginPath } from "../../components/plugin-card";
+import { Badge, Card, CardHeader, PageHeader } from "../../components/ui";
 
 const kindOrder: PluginKind[] = ["skill", "connector", "knowledge", "plugin"];
 
@@ -57,7 +57,7 @@ function KeyValue({ rows }: { rows: [string, React.ReactNode][] }) {
   );
 }
 
-export default function Overview() {
+export default function AdminDashboard() {
   const { plugins, releases, settings } = useStore();
   const approved = plugins.filter((p) => p.status === "approved");
   const pending = plugins.filter((p) => p.status === "pending");

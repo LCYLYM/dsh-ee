@@ -277,7 +277,7 @@ export default function Landing() {
             <a href="#deploy" className="hover:text-neutral-900">部署</a>
           </nav>
           <Link
-            to="/overview"
+            to="/workbench"
             className="ml-auto bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700 active:translate-y-px"
           >
             进入工作台
@@ -299,7 +299,7 @@ export default function Landing() {
               </p>
               <div className="mt-6 flex items-center gap-6">
                 <Link
-                  to="/overview"
+                  to="/workbench"
                   className="inline-flex items-center gap-2 bg-brand-600 px-5 py-3 font-medium text-white transition hover:bg-brand-700 active:translate-y-px"
                 >
                   进入工作台 <ArrowRight size={16} />
@@ -409,7 +409,7 @@ export default function Landing() {
           <div className="flex flex-wrap items-end justify-between gap-8">
             <p className="max-w-xl text-2xl leading-snug font-semibold">让企业知识成为每位员工 DSH 的默认能力。</p>
             <Link
-              to="/overview"
+              to="/workbench"
               className="inline-flex items-center gap-2 bg-white px-5 py-3 font-medium text-brand-700 transition hover:bg-brand-50 active:translate-y-px"
             >
               进入工作台 <ArrowRight size={16} />

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router";
 import { useStore } from "../../lib/store";
 import type { Settings } from "../../lib/types";
 import { Button, Card, cx, Field, inputBase, inputCls, PageHeader, Segmented, Toggle } from "../../components/ui";
@@ -75,6 +76,9 @@ export default function AdminSettings() {
               <input className={cx(inputCls, "font-mono")} value={s.baseUrl} onChange={(e) => set("baseUrl", e.target.value)} />
             </Field>
           </div>
+          <Field label="内部主作用域" hint="内部发布必须使用此作用域，且永不回源公网 npm。更多作用域与路由规则见「npm 源」。">
+            <input className={cx(inputBase, "w-48 font-mono")} value={s.scope} onChange={(e) => set("scope", e.target.value)} />
+          </Field>
         </Section>
 
         <Section title="评分" desc="关闭后，门户与后台不再显示任何评分，也不能按评分排序或用评分门槛挑选预载插件。">
@@ -133,9 +137,6 @@ export default function AdminSettings() {
               ]}
             />
           </Field>
-          <Field label="内部插件作用域" hint="内部发布必须使用此作用域，且该作用域永不回源公网 npm，防止依赖混淆攻击。">
-            <input className={cx(inputBase, "w-48 font-mono")} value={s.scope} onChange={(e) => set("scope", e.target.value)} />
-          </Field>
         </Section>
 
         <Section title="上游">
@@ -156,28 +157,13 @@ export default function AdminSettings() {
             disabled={s.upstream.mode === "offline"}
             onChange={(v) => set("upstream", { dshfindFeed: v })}
           />
-          <Field label="npm 上游源">
-            <div className="flex gap-3">
-              <select
-                className={cx(inputBase, "w-48")}
-                value={s.upstream.registry}
-                disabled={s.upstream.mode === "offline"}
-                onChange={(e) => set("upstream", { registry: e.target.value as Settings["upstream"]["registry"] })}
-              >
-                <option value="npmmirror">npmmirror（国内）</option>
-                <option value="npmjs">registry.npmjs.org</option>
-                <option value="custom">自定义（如企业 Nexus）</option>
-              </select>
-              {s.upstream.registry === "custom" && (
-                <input
-                  className={cx(inputCls, "font-mono")}
-                  placeholder="https://nexus.acme.internal/repository/npm/"
-                  value={s.upstream.customRegistry}
-                  onChange={(e) => set("upstream", { customRegistry: e.target.value })}
-                />
-              )}
-            </div>
-          </Field>
+          <p className="text-sm text-neutral-600">
+            npm 上游源与回源策略在
+            <Link to="/admin/registry" className="mx-1 font-medium text-neutral-900 hover:underline">
+              npm 源
+            </Link>
+            页设置。
+          </p>
           <Field label="已入库插件出新版本时">
             <Segmented
               value={s.upstream.autoSync}

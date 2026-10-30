@@ -104,6 +104,23 @@ export interface Settings {
     allowCommunityDesktop: boolean;
   };
   auth: "local" | "ldap" | "oidc";
+  registry: {
+    /** 企业作用域之外的包：按需回源上游并缓存，或只提供已预载 / 已审核的包。 */
+    proxyMode: "cache" | "preloaded";
+    /** 主作用域（scope）之外的其它内部作用域，同样永不回源。 */
+    extraScopes: string[];
+    /** 安装（读取）也要求令牌；关闭后只有发布需要令牌。 */
+    requireToken: boolean;
+  };
+}
+
+export interface RegistryToken {
+  id: string;
+  name: string;
+  owner: string;
+  access: "read" | "publish";
+  createdAt: string;
+  lastUsed: string;
 }
 
 /** 基于 DSH 运行的企业微应用：界面由 dsh-ee 托管，推理与工具调用交给员工本机 DSH。 */

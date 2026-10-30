@@ -7,9 +7,11 @@ import {
   CloudDownload,
   Download,
   Gauge,
+  House,
   LayoutDashboard,
   Menu,
   Puzzle,
+  Server,
   Settings as SettingsIcon,
   Terminal,
   Upload,
@@ -75,7 +77,7 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
   const { plugins, settings } = useStore();
   const pending = plugins.filter((p) => p.status === "pending").length;
   const workbench: NavItem[] = [
-    { to: "/overview", label: "总览", icon: Gauge },
+    { to: "/workbench", label: "我的工作台", icon: House },
     { to: "/apps", label: "微应用", icon: AppWindow },
     { to: "/market", label: "能力市场", icon: Puzzle },
     ...(settings.distribution.enabled ? [{ to: "/dsh", label: "下载 DSH", icon: Download }] : []),
@@ -83,9 +85,11 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
     { to: "/publish", label: "分享能力", icon: Upload },
   ];
   const admin: NavItem[] = [
-    { to: "/admin", label: "运营数据", icon: LayoutDashboard, end: true },
+    { to: "/admin", label: "总览", icon: Gauge, end: true },
+    { to: "/admin/stats", label: "运营数据", icon: LayoutDashboard },
     { to: "/admin/plugins", label: "能力管理", icon: Boxes },
     { to: "/admin/review", label: "待审核", icon: ClipboardCheck, count: pending },
+    { to: "/admin/registry", label: "npm 源", icon: Server },
     { to: "/admin/upstream", label: "上游预载", icon: CloudDownload },
     { to: "/admin/distribution", label: "DSH 分发", icon: Download, off: !settings.distribution.enabled },
     { to: "/admin/settings", label: "系统设置", icon: SettingsIcon },

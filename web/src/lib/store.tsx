@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { initialPlugins, initialReleases } from "../mock/data";
-import type { DshRelease, Plugin, PluginStatus, Settings } from "./types";
+import { initialPlugins, initialReleases, initialTokens } from "../mock/data";
+import type { DshRelease, Plugin, PluginStatus, RegistryToken, Settings } from "./types";
 
 export const defaultSettings: Settings = {
   orgName: "ACME 科技",
@@ -26,6 +26,11 @@ export const defaultSettings: Settings = {
     allowCommunityDesktop: true,
   },
   auth: "ldap",
+  registry: {
+    proxyMode: "preloaded",
+    extraScopes: ["@acme-data"],
+    requireToken: true,
+  },
 };
 
 const SETTINGS_KEY = "dsh-ee:settings";
@@ -42,6 +47,7 @@ function loadSettings(): Settings {
       scoring: { ...defaultSettings.scoring, ...saved.scoring },
       upstream: { ...defaultSettings.upstream, ...saved.upstream },
       distribution: { ...defaultSettings.distribution, ...saved.distribution },
+      registry: { ...defaultSettings.registry, ...saved.registry },
     };
   } catch {
     return defaultSettings;
@@ -58,6 +64,9 @@ interface Store {
   releases: DshRelease[];
   setRecommended: (product: DshRelease["product"], distro: string, version: string) => void;
   toggleMirrored: (distro: string, version: string) => void;
+  tokens: RegistryToken[];
+  createToken: (name: string, access: RegistryToken["access"]) => string;
+  revokeToken: (id: string) => void;
   toast: string | null;
   notify: (msg: string) => void;
 }
@@ -68,6 +77,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>(loadSettings);
   const [plugins, setPlugins] = useState<Plugin[]>(initialPlugins);
   const [releases, setReleases] = useState<DshRelease[]>(initialReleases);
+  const [tokens, setTokens] = useState<RegistryToken[]>(initialTokens);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -101,6 +111,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setReleases((rs) =>
         rs.map((r) => (r.distro === distro && r.version === version ? { ...r, mirrored: !r.mirrored } : r)),
       ),
+    tokens,
+    createToken: (name, access) => {
+      const id = Math.random().toString(36).slice(2, 10);
+      setTokens((ts) => [{ id, name, owner: "zhang.wei", access, createdAt: "2026-10-26", lastUsed: "从未" }, ...ts]);
+      // 原型：明文令牌只在创建时展示一次
+      return `ee_${access === "publish" ? "pub" : "tok"}_${id}${Math.random().toString(36).slice(2, 14)}`;
+    },
+    revokeToken: (id) => setTokens((ts) => ts.filter((t) => t.id !== id)),
     toast,
     notify: setToast,
   };
