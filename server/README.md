@@ -9,6 +9,20 @@ Go 写的 dsh-ee 服务端。目前实现：
 
 数据库走 MySQL 协议：**OceanBase（MySQL 模式）** 与 **TiDB** 通用。所有 SQL 都在 `internal/store`，以后接其它方言只改这一层。
 
+## 权限（RBAC）
+
+- **权限点**写在代码里（`internal/rbac`），每次启动同步进数据库；新权限点第一次出现时自动授予它声明的默认角色。管理员也可以建自定义权限点，给还没有后端的页面控制访问。
+- **角色**存在数据库，可随时增删改；用户可以有多个角色，权限取并集。内置「超级管理员」自动拥有全部权限（包括以后新增的），内置「员工」是新用户的默认角色。
+- **菜单 / 页面**存在 `menus` 表：标题、路由、图标、分组、排序、是否显示、访问所需权限都能在线改。前端只认 `page_key` 对应的组件，路由按菜单动态生成。
+- 每个接口都在后端按权限点校验，菜单只决定显示。权限改动对已登录用户立即生效（每个请求现查）。
+- 防提权：非超级管理员只能授予自己拥有的权限，不能修改或禁用权限比自己大的用户；最后一个启用中的超级管理员不能被取消或禁用。
+
+## 大模型接入
+
+- 上游一律走 OpenAI 兼容接口（DeepSeek、通义千问、智谱、豆包、Kimi、硅基流动、OpenAI、Ollama、vLLM 等都提供），网关按原始 JSON 透传，不经 SDK 二次序列化，厂商扩展字段（如 `reasoning_content`）原样保留。
+- 模型单独成表：员工调用时写**对外名称**，转发时换成**上游模型名**。同一个对外名称可以挂在多个上游上，按上游优先级依次尝试，连不上、429、5xx 时自动切到下一条（开始向客户端写响应后不再切换）。
+- 「检查连接」请求上游 `/models`；上游不提供该接口时，用一个已配置的模型发一次 `max_tokens=1` 的对话验证。结果会存下来显示在管理端。
+
 ## 本地开发
 
 需要 Go 1.27+ 和一个 TiDB 或 OceanBase。
@@ -58,16 +72,29 @@ OceanBase 单机最低也要几 GB 内存，本地机器紧张时先用 TiDB 调
 |---|---|---|
 | POST | `/api/auth/login` | `{username, password}` |
 | POST | `/api/auth/logout` | |
-| GET | `/api/auth/me` | 当前用户 |
+| GET | `/api/auth/me` | 当前用户、角色、有效权限点、是否超级管理员 |
+| GET | `/api/me/menus` | 当前用户能访问的菜单（已按权限过滤，含隐藏页面） |
 | POST | `/api/auth/password` | `{old_password, new_password}`，成功后所有会话失效 |
 | GET | `/api/me/keys` | 我的 key、本月用量与额度 |
 | POST | `/api/me/keys` | 自助创建 `{name, expires_at?}`，明文只返回这一次 |
 | DELETE | `/api/me/keys/{id}` | 吊销自己的 key |
-| GET / POST | `/api/admin/users` | 用户列表 / 新建 `{username, password, display_name, department, role, monthly_token_limit?}`，不传额度默认 `0`（未分配） |
-| PATCH | `/api/admin/users/{id}` | `{display_name, department, role, disabled, password}` 任选 |
+| GET / POST | `/api/admin/users` | 用户列表（含角色） / 新建 `{username, password, display_name, department, role_ids?, monthly_token_limit?}`；不传 `role_ids` 给默认的「员工」角色，不传额度默认 `0`（未分配） |
+| PATCH | `/api/admin/users/{id}` | `{display_name, department, disabled, password}` 任选 |
+| PUT | `/api/admin/users/{id}/roles` | `{role_ids}` 整体替换用户的角色 |
+| GET / POST | `/api/admin/permissions` | 权限点列表 / 新建自定义权限点 `{code, name, group, description}` |
+| DELETE | `/api/admin/permissions/{code}` | 删除自定义权限点（仍被菜单引用时拒绝） |
+| GET / POST | `/api/admin/roles` | 角色列表（含权限与人数） / 新建 `{code, name, description, permissions[]}` |
+| PATCH / DELETE | `/api/admin/roles/{id}` | 修改 `{name, description, permissions}` / 删除（内置角色不能删） |
+| GET / POST | `/api/admin/menus` | 全部菜单 / 新建 `{kind, title, path, page_key, icon, permission, parent_id, sort, visible}` |
+| PATCH / DELETE | `/api/admin/menus/{id}` | 修改 / 删除（分组下有子项时拒绝） |
+| PUT | `/api/admin/menus/order` | `{items: [{id, parent_id, sort}]}` 调整排序与分组 |
+| POST | `/api/admin/menus/reset` | 恢复默认菜单 |
 | PATCH | `/api/admin/users/{id}/quota` | `{monthly_token_limit, allowed_models, quota_expires_at}` 整份替换；显式 `null` 表示不限额 / 全部模型 / 永不过期 |
-| GET / POST | `/api/admin/providers` | 上游列表 / 新建 `{name, base_url, api_key, models[]}`；不返回明文 key |
-| PATCH / DELETE | `/api/admin/providers/{id}` | 修改 / 删除 |
+| GET / POST | `/api/admin/providers` | 上游列表 / 新建 `{name, vendor, base_url, api_key, priority, models?[]}`；不返回明文 key |
+| PATCH / DELETE | `/api/admin/providers/{id}` | 修改 `{vendor, base_url, api_key, priority, enabled}` / 删除（连同模型） |
+| POST | `/api/admin/providers/{id}/check` | 检查连接，返回上游提供的模型列表 |
+| GET / POST | `/api/admin/models` | 全部模型 / 批量添加 `{provider_id, items: [{upstream_model, name?, display_name?}]}`，重名的跳过 |
+| PATCH / DELETE | `/api/admin/models/{id}` | 修改 `{name, upstream_model, display_name, enabled}` / 删除 |
 | GET / POST | `/api/admin/keys` | 全部 key / 代发 `{user_id, name, expires_at?}`，明文只返回这一次 |
 | DELETE | `/api/admin/keys/{id}` | 吊销 |
 | GET | `/v1/models` | `Authorization: Bearer sk-ee-…` |

@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/hikariming/dsh-ee/server/internal/rbac"
 	"github.com/hikariming/dsh-ee/server/internal/secret"
 	"github.com/hikariming/dsh-ee/server/internal/store"
 )
@@ -57,24 +58,55 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/auth/me", s.requireUser(http.HandlerFunc(s.handleMe)))
 	mux.Handle("POST /api/auth/password", s.requireUser(http.HandlerFunc(s.handleChangePassword)))
 
-	// 员工：额度、查看并自助创建 / 吊销自己的 key
-	mux.Handle("GET /api/me/keys", s.requireUser(http.HandlerFunc(s.handleMyKeys)))
-	mux.Handle("POST /api/me/keys", s.requireUser(http.HandlerFunc(s.handleCreateMyKey)))
-	mux.Handle("DELETE /api/me/keys/{id}", s.requireUser(http.HandlerFunc(s.handleRevokeMyKey)))
+	// 登录即可；每个接口按权限点校验，菜单只是前端的展示配置
+	user := func(h http.HandlerFunc) http.Handler { return s.requireUser(h) }
+	perm := func(h http.HandlerFunc, codes ...string) http.Handler {
+		return s.requireUser(s.requirePerm(codes...)(h))
+	}
+	mux.Handle("GET /api/me/menus", user(s.handleMyMenus))
 
-	// 管理员
-	admin := func(h http.HandlerFunc) http.Handler { return s.requireUser(s.requireAdmin(h)) }
-	mux.Handle("GET /api/admin/users", admin(s.handleListUsers))
-	mux.Handle("POST /api/admin/users", admin(s.handleCreateUser))
-	mux.Handle("PATCH /api/admin/users/{id}", admin(s.handleUpdateUser))
-	mux.Handle("PATCH /api/admin/users/{id}/quota", admin(s.handleUpdateUserQuota))
-	mux.Handle("GET /api/admin/providers", admin(s.handleListProviders))
-	mux.Handle("POST /api/admin/providers", admin(s.handleCreateProvider))
-	mux.Handle("PATCH /api/admin/providers/{id}", admin(s.handleUpdateProvider))
-	mux.Handle("DELETE /api/admin/providers/{id}", admin(s.handleDeleteProvider))
-	mux.Handle("GET /api/admin/keys", admin(s.handleListKeys))
-	mux.Handle("POST /api/admin/keys", admin(s.handleIssueKey))
-	mux.Handle("DELETE /api/admin/keys/{id}", admin(s.handleRevokeKey))
+	// 员工：额度、查看并自助创建 / 吊销自己的 key
+	mux.Handle("GET /api/me/keys", perm(s.handleMyKeys, rbac.KeysSelf))
+	mux.Handle("POST /api/me/keys", perm(s.handleCreateMyKey, rbac.KeysSelf))
+	mux.Handle("DELETE /api/me/keys/{id}", perm(s.handleRevokeMyKey, rbac.KeysSelf))
+
+	// 用户（分配额度、分发 key、分配角色的页面也需要列出用户）
+	mux.Handle("GET /api/admin/users", perm(s.handleListUsers, rbac.UsersView, rbac.UsersManage, rbac.QuotasManage, rbac.KeysManage, rbac.RolesManage))
+	mux.Handle("POST /api/admin/users", perm(s.handleCreateUser, rbac.UsersManage))
+	mux.Handle("PATCH /api/admin/users/{id}", perm(s.handleUpdateUser, rbac.UsersManage))
+	mux.Handle("PUT /api/admin/users/{id}/roles", perm(s.handleSetUserRoles, rbac.RolesManage))
+	mux.Handle("PATCH /api/admin/users/{id}/quota", perm(s.handleUpdateUserQuota, rbac.QuotasManage))
+
+	// 角色与权限点
+	mux.Handle("GET /api/admin/permissions", perm(s.handleListPermissions, rbac.RolesManage, rbac.MenusManage))
+	mux.Handle("POST /api/admin/permissions", perm(s.handleCreatePermission, rbac.RolesManage))
+	mux.Handle("DELETE /api/admin/permissions/{code}", perm(s.handleDeletePermission, rbac.RolesManage))
+	mux.Handle("GET /api/admin/roles", perm(s.handleListRoles, rbac.RolesManage, rbac.UsersManage))
+	mux.Handle("POST /api/admin/roles", perm(s.handleCreateRole, rbac.RolesManage))
+	mux.Handle("PATCH /api/admin/roles/{id}", perm(s.handleUpdateRole, rbac.RolesManage))
+	mux.Handle("DELETE /api/admin/roles/{id}", perm(s.handleDeleteRole, rbac.RolesManage))
+
+	// 菜单与页面
+	mux.Handle("GET /api/admin/menus", perm(s.handleListMenus, rbac.MenusManage))
+	mux.Handle("POST /api/admin/menus", perm(s.handleCreateMenu, rbac.MenusManage))
+	mux.Handle("PUT /api/admin/menus/order", perm(s.handleReorderMenus, rbac.MenusManage))
+	mux.Handle("POST /api/admin/menus/reset", perm(s.handleResetMenus, rbac.MenusManage))
+	mux.Handle("PATCH /api/admin/menus/{id}", perm(s.handleUpdateMenu, rbac.MenusManage))
+	mux.Handle("DELETE /api/admin/menus/{id}", perm(s.handleDeleteMenu, rbac.MenusManage))
+
+	// 模型接入与 key
+	mux.Handle("GET /api/admin/providers", perm(s.handleListProviders, rbac.ProvidersManage, rbac.QuotasManage, rbac.KeysManage))
+	mux.Handle("POST /api/admin/providers", perm(s.handleCreateProvider, rbac.ProvidersManage))
+	mux.Handle("PATCH /api/admin/providers/{id}", perm(s.handleUpdateProvider, rbac.ProvidersManage))
+	mux.Handle("DELETE /api/admin/providers/{id}", perm(s.handleDeleteProvider, rbac.ProvidersManage))
+	mux.Handle("POST /api/admin/providers/{id}/check", perm(s.handleCheckProvider, rbac.ProvidersManage))
+	mux.Handle("GET /api/admin/models", perm(s.handleListModels, rbac.ProvidersManage, rbac.QuotasManage, rbac.KeysManage))
+	mux.Handle("POST /api/admin/models", perm(s.handleCreateModels, rbac.ProvidersManage))
+	mux.Handle("PATCH /api/admin/models/{id}", perm(s.handleUpdateModel, rbac.ProvidersManage))
+	mux.Handle("DELETE /api/admin/models/{id}", perm(s.handleDeleteModel, rbac.ProvidersManage))
+	mux.Handle("GET /api/admin/keys", perm(s.handleListKeys, rbac.KeysManage))
+	mux.Handle("POST /api/admin/keys", perm(s.handleIssueKey, rbac.KeysManage))
+	mux.Handle("DELETE /api/admin/keys/{id}", perm(s.handleRevokeKey, rbac.KeysManage))
 
 	// OpenAI 兼容网关，用个人 key 鉴权
 	mux.HandleFunc("GET /v1/models", s.handleModels)
@@ -160,13 +192,24 @@ func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 
 type ctxKey struct{}
 
-func withUser(ctx context.Context, u *store.User) context.Context {
-	return context.WithValue(ctx, ctxKey{}, u)
+type principal struct {
+	user   *store.User
+	access *rbac.Access
+}
+
+func withUser(ctx context.Context, u *store.User, a *rbac.Access) context.Context {
+	return context.WithValue(ctx, ctxKey{}, principal{u, a})
 }
 
 func currentUser(r *http.Request) *store.User {
-	u, _ := r.Context().Value(ctxKey{}).(*store.User)
-	return u
+	p, _ := r.Context().Value(ctxKey{}).(principal)
+	return p.user
+}
+
+// currentAccess 在未登录时返回 nil，Has 对 nil 一律为 false。
+func currentAccess(r *http.Request) *rbac.Access {
+	p, _ := r.Context().Value(ctxKey{}).(principal)
+	return p.access
 }
 
 func notFound(err error) bool { return errors.Is(err, store.ErrNotFound) }

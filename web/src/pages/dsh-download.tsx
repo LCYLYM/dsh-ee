@@ -4,6 +4,7 @@ import { Apple, Download, Monitor, ShieldCheck, Terminal } from "lucide-react";
 import { useStore } from "../lib/store";
 import type { Artifact, DshRelease } from "../lib/types";
 import { Badge, Button, Card, CopyBox, cx, PageHeader, Segmented } from "../components/ui";
+import { PageLink } from "../lib/menus";
 
 const osLabel: Record<Artifact["os"], string> = { windows: "Windows", macos: "macOS", linux: "Linux" };
 
@@ -125,9 +126,9 @@ export default function DshDownload() {
             </h2>
             <p className="mb-3 text-sm text-neutral-500">一条命令写好插件索引源、内网 registry 与企业 CA 证书：</p>
             <CopyBox text={`curl -fsSL ${settings.baseUrl}/setup.sh | sh`} />
-            <Link to="/setup" className="mt-3 inline-block text-sm text-brand-600 hover:underline">
+            <PageLink page="setup" className="mt-3 inline-block text-sm text-brand-600 hover:underline">
               查看 Windows 与手动配置方式 →
-            </Link>
+            </PageLink>
           </Card>
           <Card className="p-5">
             <h2 className="mb-3 flex items-center gap-2 font-semibold text-neutral-900">

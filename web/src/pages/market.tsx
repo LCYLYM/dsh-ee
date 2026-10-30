@@ -6,6 +6,7 @@ import type { PluginKind } from "../lib/types";
 import { useScoring, useStore } from "../lib/store";
 import { PluginCard } from "../components/plugin-card";
 import { Card, cx, inputBase, PageHeader, Segmented } from "../components/ui";
+import { PageLink } from "../lib/menus";
 
 const kindOrder: PluginKind[] = ["skill", "connector", "knowledge", "plugin"];
 
@@ -62,13 +63,13 @@ export default function Market() {
         desc={`${visible.length} 项已审核能力，其中 ${internalCount} 项由同事分享；全部存放在内网，离线也能装。`}
         actions={
           <>
-            <Link to="/setup" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-800 hover:bg-neutral-50">
+            <PageLink page="setup" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-800 hover:bg-neutral-50">
               <Terminal size={15} /> 接入指南
-            </Link>
+            </PageLink>
             {settings.distribution.enabled && recommendedCore && (
-              <Link to="/dsh" className="inline-flex h-9 items-center gap-1.5 rounded-md bg-neutral-900 px-3 text-sm text-white hover:bg-neutral-700">
+              <PageLink page="dsh-download" className="inline-flex h-9 items-center gap-1.5 rounded-md bg-neutral-900 px-3 text-sm text-white hover:bg-neutral-700">
                 <Download size={15} /> 下载 DSH {recommendedCore.version}
-              </Link>
+              </PageLink>
             )}
           </>
         }
@@ -121,9 +122,9 @@ export default function Market() {
       {list.length === 0 ? (
         <Card className="p-12 text-center text-sm text-neutral-600">
           没有找到匹配的能力。需要的不在这里？可以
-          <Link to="/publish" className="font-medium text-neutral-900 hover:underline">
+          <PageLink page="publish" className="font-medium text-neutral-900 hover:underline">
             申请引入或自己分享一个
-          </Link>
+          </PageLink>
           。
         </Card>
       ) : (

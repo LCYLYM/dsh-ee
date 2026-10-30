@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -10,6 +12,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/hikariming/dsh-ee/server/internal/rbac"
 	"github.com/hikariming/dsh-ee/server/internal/secret"
 	"github.com/hikariming/dsh-ee/server/internal/store"
 )
@@ -44,8 +47,22 @@ const (
 	errLongPassword validationError = "密码不能超过 72 字节"
 )
 
-// Bootstrap 在用户表为空时创建第一个管理员。
+// Bootstrap 在每次启动时调用：同步代码里的权限点目录，菜单为空时写入默认菜单，
+// 用户表为空且给了密码时创建第一个超级管理员。返回是否创建了管理员。
 func Bootstrap(ctx context.Context, st *store.Store, username, password string) (created bool, err error) {
+	if err := st.SyncPermissions(ctx, rbac.Catalog); err != nil {
+		return false, fmt.Errorf("同步权限点: %w", err)
+	}
+	if err := st.ImportLegacyProviderModels(ctx); err != nil {
+		return false, fmt.Errorf("导入旧的模型配置: %w", err)
+	}
+	if n, err := st.CountMenus(ctx); err != nil {
+		return false, err
+	} else if n == 0 {
+		if err := st.ResetMenus(ctx, rbac.DefaultMenus); err != nil {
+			return false, fmt.Errorf("写入默认菜单: %w", err)
+		}
+	}
 	n, err := st.CountUsers(ctx)
 	if err != nil || n > 0 {
 		return false, err
@@ -57,8 +74,15 @@ func Bootstrap(ctx context.Context, st *store.Store, username, password string) 
 	if err != nil {
 		return false, err
 	}
-	u := &store.User{Username: username, DisplayName: "管理员", Role: store.RoleAdmin, PasswordHash: hash}
+	super, err := st.GetRoleByCode(ctx, rbac.RoleSuper)
+	if err != nil {
+		return false, fmt.Errorf("找不到超级管理员角色: %w", err)
+	}
+	u := &store.User{Username: username, DisplayName: "管理员", PasswordHash: hash}
 	if err := st.CreateUser(ctx, u); err != nil {
+		return false, err
+	}
+	if err := st.SetUserRoles(ctx, u.ID, []int64{super.ID}); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -183,8 +207,38 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// meResponse 是当前用户、角色与有效权限；前端据此决定显示什么，后端每个接口仍会自行校验。
+type meResponse struct {
+	*store.User
+	IsSuper     bool     `json:"is_super"`
+	Permissions []string `json:"permissions"`
+}
+
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, currentUser(r))
+	u, a := currentUser(r), currentAccess(r)
+	refs, err := s.store.UserRoleRefs(r.Context())
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	u.Roles = nonNil(refs[u.ID])
+	perms := []string{}
+	if a.Super {
+		all, err := s.store.ListPermissions(r.Context())
+		if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		for _, p := range all {
+			perms = append(perms, p.Code)
+		}
+	} else {
+		for c := range a.Perms {
+			perms = append(perms, c)
+		}
+		slices.Sort(perms)
+	}
+	writeJSON(w, http.StatusOK, meResponse{User: u, IsSuper: a.Super, Permissions: perms})
 }
 
 type changePasswordReq struct {
@@ -237,16 +291,25 @@ func (s *Server) requireUser(next http.Handler) http.Handler {
 			s.internalErr(w, r, err)
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(withUser(r.Context(), u)))
+		// 每个请求现查权限，角色或权限改动立即生效
+		a, err := s.store.UserAccess(r.Context(), u.ID)
+		if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(withUser(r.Context(), u, a)))
 	})
 }
 
-func (s *Server) requireAdmin(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if u := currentUser(r); u == nil || u.Role != store.RoleAdmin {
-			writeErr(w, http.StatusForbidden, "需要管理员权限")
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+// requirePerm 要求拥有任一权限点（超级管理员总是通过）。须套在 requireUser 里面。
+func (s *Server) requirePerm(codes ...string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !currentAccess(r).Has(codes...) {
+				writeErr(w, http.StatusForbidden, "没有权限执行这个操作")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }

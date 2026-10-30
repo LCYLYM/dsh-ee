@@ -6,7 +6,7 @@ import { Button, inputCls } from "../components/ui";
 
 /** 只允许站内相对路径，防止 next 参数被拿来做开放重定向。 */
 function safeNext(raw: string | null) {
-  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/workbench";
+  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/start";
 }
 
 export default function Login() {

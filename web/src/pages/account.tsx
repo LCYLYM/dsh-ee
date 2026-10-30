@@ -51,7 +51,7 @@ export default function Account() {
           <dt className="text-neutral-600">部门</dt>
           <dd className="text-neutral-900">{user.department || "—"}</dd>
           <dt className="text-neutral-600">角色</dt>
-          <dd className="text-neutral-900">{user.role === "admin" ? "管理员" : "员工"}</dd>
+          <dd className="text-neutral-900">{(user.roles ?? []).map((r) => r.name).join("、") || "未分配角色"}</dd>
         </dl>
       </Card>
 

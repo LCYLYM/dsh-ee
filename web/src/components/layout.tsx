@@ -1,29 +1,11 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, Link, useLocation } from "react-router";
-import {
-  AppWindow,
-  Boxes,
-  ClipboardCheck,
-  CloudDownload,
-  Download,
-  Gauge,
-  KeyRound,
-  LogOut,
-  Bot,
-  Users,
-  House,
-  LayoutDashboard,
-  Menu,
-  Puzzle,
-  Server,
-  Settings as SettingsIcon,
-  Terminal,
-  Upload,
-  Wallet,
-  X,
-} from "lucide-react";
+import { ExternalLink, LogOut, Menu as MenuGlyph, Puzzle, X } from "lucide-react";
 import { useStore } from "../lib/store";
 import { useAuth } from "../lib/auth";
+import { useMenus } from "../lib/menus";
+import { MenuIcon } from "../lib/icons";
+import type { Menu } from "../lib/api";
 import { cx } from "./ui";
 
 function Toast() {
@@ -39,76 +21,60 @@ function Toast() {
   );
 }
 
-interface NavItem {
-  to: string;
-  label: string;
-  icon: typeof Puzzle;
-  end?: boolean;
-  count?: number;
-  off?: boolean;
+/** 个别页面在侧边栏上的附加状态（计数、已关闭、按设置隐藏），按 page_key 挂接。 */
+function useNavExtras() {
+  const { plugins, settings } = useStore();
+  const pending = plugins.filter((p) => p.status === "pending").length;
+  return (pageKey: string): { count?: number; off?: boolean; hidden?: boolean } => {
+    switch (pageKey) {
+      case "admin-review":
+        return { count: pending };
+      case "admin-distribution":
+        return { off: !settings.distribution.enabled };
+      case "dsh-download":
+        return { hidden: !settings.distribution.enabled };
+      default:
+        return {};
+    }
+  };
 }
 
-function NavGroup({ label, items, onNavigate }: { label: string; items: NavItem[]; onNavigate: () => void }) {
+function NavEntry({ m, onNavigate }: { m: Menu; onNavigate: () => void }) {
+  const extras = useNavExtras()(m.page_key);
+  if (extras.hidden) return null;
+  const cls = "flex h-8 items-center gap-2.5 rounded-md px-3 text-sm transition-colors";
+  if (m.kind === "link") {
+    return (
+      <a href={m.path} target="_blank" rel="noreferrer" onClick={onNavigate} className={cx(cls, "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900")}>
+        <MenuIcon name={m.icon || "ExternalLink"} className="text-neutral-500" />
+        {m.title}
+        <ExternalLink size={12} className="ml-auto text-neutral-400" />
+      </a>
+    );
+  }
   return (
-    <div>
-      <div className="px-3 pb-1.5 text-xs text-neutral-500">{label}</div>
-      <nav className="flex flex-col gap-0.5">
-        {items.map((n) => (
-          <NavLink
-            key={n.to}
-            to={n.to}
-            end={n.end}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              cx(
-                "flex h-8 items-center gap-2.5 rounded-md px-3 text-sm transition-colors",
-                isActive ? "bg-neutral-200/70 text-neutral-900" : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900",
-              )
-            }
-          >
-            <n.icon size={16} strokeWidth={1.6} className="text-neutral-500" />
-            {n.label}
-            {n.off && <span className="text-xs text-neutral-500">已关闭</span>}
-            {!!n.count && (
-              <span className="ml-auto rounded bg-red-50 px-1.5 text-xs leading-5 text-red-800 tabular-nums">{n.count}</span>
-            )}
-          </NavLink>
-        ))}
-      </nav>
-    </div>
+    <NavLink
+      to={m.path}
+      end
+      onClick={onNavigate}
+      className={({ isActive }) =>
+        cx(cls, isActive ? "bg-neutral-200/70 text-neutral-900" : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900")
+      }
+    >
+      <MenuIcon name={m.icon} className="text-neutral-500" />
+      <span className="truncate">{m.title}</span>
+      {extras.off && <span className="text-xs text-neutral-500">已关闭</span>}
+      {!!extras.count && (
+        <span className="ml-auto rounded bg-red-50 px-1.5 text-xs leading-5 text-red-800 tabular-nums">{extras.count}</span>
+      )}
+    </NavLink>
   );
 }
 
 function Sidebar({ onNavigate }: { onNavigate: () => void }) {
-  const { plugins, settings } = useStore();
+  const { settings } = useStore();
   const { user, logout } = useAuth();
-  const isAdmin = user?.role === "admin";
-  const pending = plugins.filter((p) => p.status === "pending").length;
-  const workbench: NavItem[] = [
-    { to: "/workbench", label: "我的工作台", icon: House },
-    { to: "/apps", label: "微应用", icon: AppWindow },
-    { to: "/market", label: "能力市场", icon: Puzzle },
-    ...(settings.distribution.enabled ? [{ to: "/dsh", label: "下载 DSH", icon: Download }] : []),
-    { to: "/setup", label: "接入指南", icon: Terminal },
-    { to: "/publish", label: "分享能力", icon: Upload },
-    { to: "/keys", label: "额度与 API key", icon: KeyRound },
-  ];
-  const admin: NavItem[] = [
-    { to: "/admin", label: "总览", icon: Gauge, end: true },
-    { to: "/admin/stats", label: "运营数据", icon: LayoutDashboard },
-    { to: "/admin/plugins", label: "能力管理", icon: Boxes },
-    { to: "/admin/review", label: "待审核", icon: ClipboardCheck, count: pending },
-    { to: "/admin/registry", label: "npm 源", icon: Server },
-    { to: "/admin/upstream", label: "上游预载", icon: CloudDownload },
-    { to: "/admin/distribution", label: "DSH 分发", icon: Download, off: !settings.distribution.enabled },
-    { to: "/admin/settings", label: "系统设置", icon: SettingsIcon },
-  ];
-  const access: NavItem[] = [
-    { to: "/admin/users", label: "用户", icon: Users },
-    { to: "/admin/quotas", label: "额度分配", icon: Wallet },
-    { to: "/admin/providers", label: "模型服务", icon: Bot },
-    { to: "/admin/keys", label: "API key", icon: KeyRound },
-  ];
+  const { tree, loading, error, reload } = useMenus();
   return (
     <div className="flex min-h-full flex-col px-3 py-4">
       <Link to="/" className="flex items-center gap-2.5 px-3 pb-5" onClick={onNavigate}>
@@ -121,9 +87,32 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
         </span>
       </Link>
       <div className="flex flex-col gap-6">
-        <NavGroup label="工作台" items={workbench} onNavigate={onNavigate} />
-        {isAdmin && <NavGroup label="账号与模型" items={access} onNavigate={onNavigate} />}
-        {isAdmin && <NavGroup label="管理" items={admin} onNavigate={onNavigate} />}
+        {loading && <div className="px-3 text-sm text-neutral-500">加载菜单…</div>}
+        {error && (
+          <button type="button" onClick={() => void reload()} className="px-3 text-left text-sm text-red-700 hover:underline">
+            菜单加载失败，点此重试
+          </button>
+        )}
+        {tree.map((n) =>
+          n.kind === "group" ? (
+            n.visible && n.children.some((c) => c.visible) ? (
+              <div key={n.id}>
+                <div className="px-3 pb-1.5 text-xs text-neutral-500">{n.title}</div>
+                <nav className="flex flex-col gap-0.5">
+                  {n.children
+                    .filter((c) => c.visible)
+                    .map((c) => (
+                      <NavEntry key={`${c.id}-${c.page_key}`} m={c} onNavigate={onNavigate} />
+                    ))}
+                </nav>
+              </div>
+            ) : null
+          ) : n.visible ? (
+            <nav key={n.id} className="flex flex-col">
+              <NavEntry key={`${n.id}-${n.page_key}`} m={n} onNavigate={onNavigate} />
+            </nav>
+          ) : null,
+        )}
       </div>
       {user && (
         <div className="mt-auto flex items-center gap-1 pt-4">
@@ -138,7 +127,7 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
             <span className="min-w-0 leading-tight">
               <span className="block truncate text-neutral-900">{user.display_name || user.username}</span>
               <span className="block truncate text-xs text-neutral-600">
-                {[user.department, user.role === "admin" ? "管理员" : "员工"].filter(Boolean).join(" · ")}
+                {[user.department, (user.roles ?? []).map((r) => r.name).join("、")].filter(Boolean).join(" · ")}
               </span>
             </span>
           </Link>
@@ -180,7 +169,7 @@ export function AppLayout() {
           onClick={() => setOpen((v) => !v)}
           className="-ml-1 rounded-md p-1.5 text-neutral-700 hover:bg-neutral-100"
         >
-          {open ? <X size={20} /> : <Menu size={20} />}
+          {open ? <X size={20} /> : <MenuGlyph size={20} />}
         </button>
         <span className="text-sm font-semibold text-neutral-900">dsh-ee</span>
         <span className="text-sm text-neutral-600">{settings.orgName}</span>

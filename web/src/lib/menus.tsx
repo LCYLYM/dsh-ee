@@ -1,0 +1,94 @@
+/**
+ * 当前用户可访问的菜单（来自后端，已按权限过滤）。路由、侧边栏和站内链接都从这里取，
+ * 所以管理员改了页面的路由或名称，全站链接会跟着变。
+ */
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Link, type LinkProps } from "react-router";
+import { api, type Menu } from "./api";
+import { useAuth } from "./auth";
+import { PAGE_META } from "./page-meta";
+
+export interface MenuNode extends Menu {
+  children: Menu[];
+}
+
+interface Menus {
+  menus: Menu[];
+  /** 顶层项（分组带 children）。 */
+  tree: MenuNode[];
+  loading: boolean;
+  error: string | null;
+  reload: () => Promise<void>;
+  /** page_key 当前配置的路由；菜单里没有时回退到默认路由。 */
+  pathOf: (pageKey: string) => string;
+  /** 登录后默认进入的页面：第一个可见页面。 */
+  homePath: string | null;
+}
+
+const Ctx = createContext<Menus | null>(null);
+
+const bySort = (a: Menu, b: Menu) => a.sort - b.sort || a.id - b.id;
+
+export function buildTree(menus: Menu[]): MenuNode[] {
+  const top = menus.filter((m) => m.parent_id === null).sort(bySort);
+  return top.map((m) => ({ ...m, children: menus.filter((c) => c.parent_id === m.id).sort(bySort) }));
+}
+
+export function MenuProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const [menus, setMenus] = useState<Menu[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    try {
+      setMenus(await api.myMenus());
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 换了登录用户（或角色权限刷新后 user 对象变化）就重新拉菜单
+  useEffect(() => {
+    if (!user) {
+      setMenus([]);
+      setLoading(true);
+      return;
+    }
+    void reload();
+  }, [user, reload]);
+
+  const value = useMemo<Menus>(() => {
+    const tree = buildTree(menus);
+    const pages = menus.filter((m) => m.kind === "page");
+    const byKey = new Map<string, string>();
+    for (const m of [...pages].sort(bySort)) if (!byKey.has(m.page_key)) byKey.set(m.page_key, m.path);
+    const flatVisible = tree.flatMap((n) => (n.kind === "group" ? n.children : [n])).filter((m) => m.kind === "page" && m.visible);
+    return {
+      menus,
+      tree,
+      loading,
+      error,
+      reload,
+      pathOf: (key) => byKey.get(key) ?? PAGE_META[key]?.defaultPath ?? "/",
+      homePath: flatVisible[0]?.path ?? null,
+    };
+  }, [menus, loading, error, reload]);
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+export function useMenus() {
+  const m = useContext(Ctx);
+  if (!m) throw new Error("useMenus must be used inside MenuProvider");
+  return m;
+}
+
+/** 按 page_key 链接站内页面；suffix 用于带查询参数等，例如 "?tab=x"。 */
+export function PageLink({ page, suffix = "", ...rest }: Omit<LinkProps, "to"> & { page: string; suffix?: string }) {
+  const { pathOf } = useMenus();
+  return <Link to={pathOf(page) + suffix} {...rest} />;
+}

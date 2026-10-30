@@ -6,6 +6,7 @@ import type { AuditEvent, PluginKind } from "../../lib/types";
 import { BarList, DailyBars } from "../../components/charts";
 import { pluginPath } from "../../components/plugin-card";
 import { Badge, Card, CardHeader, PageHeader } from "../../components/ui";
+import { PageLink } from "../../lib/menus";
 
 const kindOrder: PluginKind[] = ["skill", "connector", "knowledge", "plugin"];
 
@@ -94,9 +95,9 @@ export default function AdminDashboard() {
           lead={String(pending.length)}
           unit="项待审核"
           note={
-            <Link to="/admin/review" className="inline-flex items-center gap-1 font-medium text-neutral-900 hover:underline">
+            <PageLink page="admin-review" className="inline-flex items-center gap-1 font-medium text-neutral-900 hover:underline">
               去审核 <ArrowRight size={14} />
-            </Link>
+            </PageLink>
           }
         >
           <KeyValue
@@ -162,9 +163,9 @@ export default function AdminDashboard() {
           <CardHeader
             title="微应用"
             aside={
-              <Link to="/apps" className="font-medium text-neutral-900 hover:underline">
+              <PageLink page="apps" className="font-medium text-neutral-900 hover:underline">
                 全部 {microApps.length} 个
-              </Link>
+              </PageLink>
             }
           />
           <div className="overflow-x-auto">
@@ -207,9 +208,9 @@ export default function AdminDashboard() {
           <CardHeader
             title="等待审核"
             aside={
-              <Link to="/admin/review" className="font-medium text-neutral-900 hover:underline">
+              <PageLink page="admin-review" className="font-medium text-neutral-900 hover:underline">
                 共 {pending.length} 项
-              </Link>
+              </PageLink>
             }
           />
           <ul className="px-5 pb-3">

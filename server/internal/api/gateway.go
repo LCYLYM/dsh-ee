@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hikariming/dsh-ee/server/internal/rbac"
 	"github.com/hikariming/dsh-ee/server/internal/secret"
 	"github.com/hikariming/dsh-ee/server/internal/store"
 )
@@ -44,6 +45,15 @@ func (s *Server) authKey(w http.ResponseWriter, r *http.Request) (*store.APIKey,
 		writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "internal_error", "服务器内部错误")
 		return nil, nil, false
 	}
+	// 权限随角色实时生效：撤掉「调用大模型」后，已发出去的 key 立即不能用
+	if acc, err := s.store.UserAccess(r.Context(), k.UserID); err != nil {
+		s.log.Error("gateway access", "user", k.UserID, "err", err)
+		writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "internal_error", "服务器内部错误")
+		return nil, nil, false
+	} else if !acc.Has(rbac.LLMUse) {
+		writeOpenAIErr(w, http.StatusForbidden, "permission_error", "permission_denied", "你的账号没有调用大模型的权限，请联系管理员")
+		return nil, nil, false
+	}
 	if quota.QuotaExpiresAt != nil && !quota.QuotaExpiresAt.After(time.Now()) {
 		writeOpenAIErr(w, http.StatusForbidden, "permission_error", "quota_expired", "额度已过期，请联系管理员")
 		return nil, nil, false
@@ -64,9 +74,9 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ps, err := s.store.ListProviders(r.Context(), true)
+	ms, err := s.store.PublicModels(r.Context())
 	if err != nil {
-		s.log.Error("list providers", "err", err)
+		s.log.Error("list models", "err", err)
 		writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "internal_error", "服务器内部错误")
 		return
 	}
@@ -75,14 +85,10 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 		Object  string `json:"object"`
 		OwnedBy string `json:"owned_by"`
 	}
-	seen := map[string]bool{}
 	data := []model{}
-	for _, p := range ps {
-		for _, m := range p.Models {
-			if !seen[m] && modelAllowed(k, quota, m) {
-				seen[m] = true
-				data = append(data, model{ID: m, Object: "model", OwnedBy: p.Name})
-			}
+	for _, m := range ms {
+		if modelAllowed(k, quota, m.Name) {
+			data = append(data, model{ID: m.Name, Object: "model", OwnedBy: m.OwnedBy})
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": data})
@@ -139,20 +145,14 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	p, err := s.pickProvider(r.Context(), model)
-	if notFound(err) {
-		writeOpenAIErr(w, http.StatusNotFound, "invalid_request_error", "model_not_found", "没有可用的上游提供模型 "+model)
-		return
-	}
+	cands, err := s.store.ModelCandidates(r.Context(), model)
 	if err != nil {
-		s.log.Error("pick provider", "err", err)
+		s.log.Error("model candidates", "err", err)
 		writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "internal_error", "服务器内部错误")
 		return
 	}
-	upstreamKey, err := s.box.Open(p.APIKeyEnc)
-	if err != nil {
-		s.log.Error("decrypt provider key", "provider", p.Name, "err", err)
-		writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "provider_misconfigured", "上游配置有误，请联系管理员")
+	if len(cands) == 0 {
+		writeOpenAIErr(w, http.StatusNotFound, "invalid_request_error", "model_not_found", "没有可用的上游提供模型 "+model)
 		return
 	}
 
@@ -166,30 +166,60 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		opts["include_usage"] = true
 		body["stream_options"] = opts
 	}
-	out, err := json.Marshal(body)
-	if err != nil {
-		writeOpenAIErr(w, http.StatusBadRequest, "invalid_request_error", "invalid_json", "请求体无法转发")
-		return
-	}
 
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, p.BaseURL+"/chat/completions", bytes.NewReader(out))
-	if err != nil {
-		s.log.Error("build upstream request", "err", err)
-		writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "internal_error", "服务器内部错误")
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+string(upstreamKey))
-	if stream {
-		req.Header.Set("Accept", "text/event-stream")
-	}
-
-	resp, err := s.upstream.Do(req)
-	if err != nil {
-		s.log.Warn("upstream request failed", "provider", p.Name, "err", err)
-		s.recordUsage(r.Context(), k, p, model, tokenUsage{}, http.StatusBadGateway, start)
-		writeOpenAIErr(w, http.StatusBadGateway, "server_error", "upstream_unreachable", "上游服务不可达")
-		return
+	// 按优先级逐个尝试：连不上、429、5xx 时换下一条线路；一旦开始给客户端写响应就不再切换。
+	var resp *http.Response
+	var p *store.Provider
+	for i, c := range cands {
+		last := i == len(cands)-1
+		p = c.Provider
+		upstreamKey, err := s.box.Open(p.APIKeyEnc)
+		if err != nil {
+			s.log.Error("decrypt provider key", "provider", p.Name, "err", err)
+			if last {
+				writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "provider_misconfigured", "上游配置有误，请联系管理员")
+				return
+			}
+			continue
+		}
+		body["model"] = c.UpstreamModel
+		out, err := json.Marshal(body)
+		if err != nil {
+			writeOpenAIErr(w, http.StatusBadRequest, "invalid_request_error", "invalid_json", "请求体无法转发")
+			return
+		}
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, p.BaseURL+"/chat/completions", bytes.NewReader(out))
+		if err != nil {
+			s.log.Error("build upstream request", "err", err)
+			writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "internal_error", "服务器内部错误")
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+string(upstreamKey))
+		if stream {
+			req.Header.Set("Accept", "text/event-stream")
+		}
+		resp, err = s.upstream.Do(req)
+		if err != nil {
+			s.log.Warn("upstream request failed", "provider", p.Name, "err", err)
+			s.recordUsage(r.Context(), k, p, model, tokenUsage{}, http.StatusBadGateway, start)
+			if r.Context().Err() != nil {
+				return // 客户端已断开
+			}
+			if last {
+				writeOpenAIErr(w, http.StatusBadGateway, "server_error", "upstream_unreachable", "上游服务不可达")
+				return
+			}
+			continue
+		}
+		if !last && (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500) {
+			s.log.Warn("upstream failover", "provider", p.Name, "status", resp.StatusCode)
+			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+			resp.Body.Close()
+			s.recordUsage(r.Context(), k, p, model, tokenUsage{}, resp.StatusCode, start)
+			continue
+		}
+		break
 	}
 	defer resp.Body.Close()
 
@@ -256,20 +286,6 @@ func relaySSE(w http.ResponseWriter, body io.Reader) tokenUsage {
 			return usage
 		}
 	}
-}
-
-// pickProvider 选第一个启用且提供该模型的上游（按 id 顺序）。
-func (s *Server) pickProvider(ctx context.Context, model string) (*store.Provider, error) {
-	ps, err := s.store.ListProviders(ctx, true)
-	if err != nil {
-		return nil, err
-	}
-	for _, p := range ps {
-		if slices.Contains(p.Models, model) {
-			return p, nil
-		}
-	}
-	return nil, store.ErrNotFound
 }
 
 // recordUsage 在响应写完后记账；客户端提前断开也要记，所以脱离请求的取消信号。

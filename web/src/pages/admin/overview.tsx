@@ -3,6 +3,7 @@ import { activity, installTrend } from "../../mock/data";
 import { useStore } from "../../lib/store";
 import { Card, CardHeader, formatKb, PageHeader, Stat, StatStrip } from "../../components/ui";
 import { DailyBars } from "../../components/charts";
+import { PageLink } from "../../lib/menus";
 
 export default function AdminOverview() {
   const { plugins, releases, settings } = useStore();
@@ -21,7 +22,7 @@ export default function AdminOverview() {
         <Stat
           label="待审核"
           value={pending.length}
-          hint={<Link to="/admin/review" className="font-medium text-neutral-900 hover:underline">去处理 →</Link>}
+          hint={<PageLink page="admin-review" className="font-medium text-neutral-900 hover:underline">去处理 →</PageLink>}
         />
         <Stat label="近 14 天安装" value={installTrend.reduce((a, b) => a + b, 0).toLocaleString()} hint="来自 registry 下载日志" />
         <Stat

@@ -3,11 +3,11 @@ package api
 import (
 	"errors"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/hikariming/dsh-ee/server/internal/rbac"
 	"github.com/hikariming/dsh-ee/server/internal/secret"
 	"github.com/hikariming/dsh-ee/server/internal/store"
 )
@@ -22,15 +22,24 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	refs, err := s.store.UserRoleRefs(r.Context())
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	for _, u := range users {
+		u.Roles = nonNil(refs[u.ID])
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"users": nonNil(users)})
 }
 
 type createUserReq struct {
-	Username          string        `json:"username"`
-	Password          string        `json:"password"`
-	DisplayName       string        `json:"display_name"`
-	Department        string        `json:"department"`
-	Role              string        `json:"role"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	DisplayName string `json:"display_name"`
+	Department  string `json:"department"`
+	// 不传时给默认的「员工」角色；传 [] 表示不分配任何角色。
+	RoleIDs           *[]int64      `json:"role_ids"`
 	MonthlyTokenLimit nullableInt64 `json:"monthly_token_limit"`
 }
 
@@ -44,12 +53,30 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "用户名只能包含小写字母、数字和 . _ -，2 到 64 个字符")
 		return
 	}
-	if req.Role == "" {
-		req.Role = store.RoleMember
+	var roleIDs []int64
+	if req.RoleIDs != nil {
+		roleIDs = *req.RoleIDs
+	} else {
+		member, err := s.store.GetRoleByCode(r.Context(), rbac.RoleMember)
+		if err != nil && !notFound(err) {
+			s.internalErr(w, r, err)
+			return
+		}
+		if member != nil {
+			roleIDs = []int64{member.ID}
+		}
 	}
-	if req.Role != store.RoleMember && req.Role != store.RoleAdmin {
-		writeErr(w, http.StatusBadRequest, "role 只能是 member 或 admin")
+	// 分配角色属于「管理角色」的权限；只有用户管理权限时只能用默认角色
+	if req.RoleIDs != nil && !currentAccess(r).Has(rbac.RolesManage) {
+		writeErr(w, http.StatusForbidden, "分配角色需要「管理角色与权限」权限")
 		return
+	}
+	// 默认角色是系统约定，不算「授予」；显式指定的角色要过防提权检查
+	if req.RoleIDs != nil {
+		if msg, ok := s.checkGrantable(r, roleIDs); !ok {
+			writeErr(w, http.StatusForbidden, msg)
+			return
+		}
 	}
 	hash, err := HashPassword(req.Password)
 	if err != nil {
@@ -71,7 +98,6 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		Username:          req.Username,
 		DisplayName:       strings.TrimSpace(req.DisplayName),
 		Department:        strings.TrimSpace(req.Department),
-		Role:              req.Role,
 		PasswordHash:      hash,
 		MonthlyTokenLimit: &limit,
 	}
@@ -86,13 +112,16 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	if err := s.store.SetUserRoles(r.Context(), u.ID, dedupe(roleIDs)); err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
 	writeJSON(w, http.StatusCreated, u)
 }
 
 type updateUserReq struct {
 	DisplayName *string `json:"display_name"`
 	Department  *string `json:"department"`
-	Role        *string `json:"role"`
 	Disabled    *bool   `json:"disabled"`
 	Password    *string `json:"password"`
 }
@@ -107,15 +136,30 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me := currentUser(r)
-	if id == me.ID && ((req.Disabled != nil && *req.Disabled) || (req.Role != nil && *req.Role != store.RoleAdmin)) {
-		writeErr(w, http.StatusBadRequest, "不能禁用自己或取消自己的管理员身份")
+	if id == me.ID && req.Disabled != nil && *req.Disabled {
+		writeErr(w, http.StatusBadRequest, "不能禁用自己")
 		return
 	}
-	if req.Role != nil && *req.Role != store.RoleMember && *req.Role != store.RoleAdmin {
-		writeErr(w, http.StatusBadRequest, "role 只能是 member 或 admin")
+	target, err := s.store.UserAccess(r.Context(), id)
+	if err != nil {
+		s.internalErr(w, r, err)
 		return
 	}
-	p := store.UserPatch{DisplayName: req.DisplayName, Department: req.Department, Role: req.Role, Disabled: req.Disabled}
+	// 不能动权限比自己大的人，否则禁用或重置密码就能变相夺权
+	if (req.Disabled != nil || req.Password != nil) && !outranks(currentAccess(r), target) {
+		writeErr(w, http.StatusForbidden, "不能禁用或重置权限比自己大的用户")
+		return
+	}
+	if target.Super && req.Disabled != nil && *req.Disabled {
+		if n, err := s.store.CountSuperUsers(r.Context(), id); err != nil {
+			s.internalErr(w, r, err)
+			return
+		} else if n == 0 {
+			writeErr(w, http.StatusBadRequest, "这是最后一个启用中的超级管理员，不能禁用")
+			return
+		}
+	}
+	p := store.UserPatch{DisplayName: req.DisplayName, Department: req.Department, Disabled: req.Disabled}
 	if req.Password != nil {
 		hash, err := HashPassword(*req.Password)
 		if err != nil {
@@ -145,160 +189,6 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, u)
-}
-
-// ---- 上游模型服务 ----
-
-func (s *Server) handleListProviders(w http.ResponseWriter, r *http.Request) {
-	ps, err := s.store.ListProviders(r.Context(), false)
-	if err != nil {
-		s.internalErr(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"providers": nonNil(ps)})
-}
-
-type providerReq struct {
-	Name    string   `json:"name"`
-	BaseURL string   `json:"base_url"`
-	APIKey  string   `json:"api_key"`
-	Models  []string `json:"models"`
-	Enabled *bool    `json:"enabled"`
-}
-
-func validBaseURL(raw string) (string, bool) {
-	u, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.RawQuery != "" || u.Fragment != "" {
-		return "", false
-	}
-	return strings.TrimRight(u.String(), "/"), true
-}
-
-func cleanModels(ms []string) []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, m := range ms {
-		m = strings.TrimSpace(m)
-		if m != "" && !seen[m] {
-			seen[m] = true
-			out = append(out, m)
-		}
-	}
-	return out
-}
-
-func (s *Server) handleCreateProvider(w http.ResponseWriter, r *http.Request) {
-	var req providerReq
-	if !readJSON(w, r, &req) {
-		return
-	}
-	base, ok := validBaseURL(req.BaseURL)
-	if !ok {
-		writeErr(w, http.StatusBadRequest, "base_url 必须是 http(s) 地址，例如 https://api.deepseek.com")
-		return
-	}
-	req.Name = strings.TrimSpace(req.Name)
-	models := cleanModels(req.Models)
-	if req.Name == "" || req.APIKey == "" || len(models) == 0 {
-		writeErr(w, http.StatusBadRequest, "name、api_key、models 不能为空")
-		return
-	}
-	enc, err := s.box.Seal([]byte(req.APIKey))
-	if err != nil {
-		s.internalErr(w, r, err)
-		return
-	}
-	p := &store.Provider{Name: req.Name, BaseURL: base, APIKeyEnc: enc, APIKeyHint: secret.Hint(req.APIKey), Models: models, Enabled: true}
-	if req.Enabled != nil {
-		p.Enabled = *req.Enabled
-	}
-	if err := s.store.CreateProvider(r.Context(), p); err != nil {
-		if errors.Is(err, store.ErrDuplicate) {
-			writeErr(w, http.StatusConflict, "名称已存在")
-			return
-		}
-		s.internalErr(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, p)
-}
-
-type updateProviderReq struct {
-	BaseURL *string  `json:"base_url"`
-	APIKey  *string  `json:"api_key"`
-	Models  []string `json:"models"`
-	Enabled *bool    `json:"enabled"`
-}
-
-func (s *Server) handleUpdateProvider(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r)
-	if !ok {
-		return
-	}
-	var req updateProviderReq
-	if !readJSON(w, r, &req) {
-		return
-	}
-	var p store.ProviderPatch
-	if req.BaseURL != nil {
-		base, ok := validBaseURL(*req.BaseURL)
-		if !ok {
-			writeErr(w, http.StatusBadRequest, "base_url 必须是 http(s) 地址")
-			return
-		}
-		p.BaseURL = &base
-	}
-	if req.APIKey != nil {
-		if *req.APIKey == "" {
-			writeErr(w, http.StatusBadRequest, "api_key 不能为空")
-			return
-		}
-		enc, err := s.box.Seal([]byte(*req.APIKey))
-		if err != nil {
-			s.internalErr(w, r, err)
-			return
-		}
-		hint := secret.Hint(*req.APIKey)
-		p.APIKeyEnc, p.APIKeyHint = enc, &hint
-	}
-	if req.Models != nil {
-		p.Models = cleanModels(req.Models)
-		if len(p.Models) == 0 {
-			writeErr(w, http.StatusBadRequest, "models 不能为空")
-			return
-		}
-	}
-	p.Enabled = req.Enabled
-	if err := s.store.UpdateProvider(r.Context(), id, p); err != nil {
-		if notFound(err) {
-			writeErr(w, http.StatusNotFound, "上游不存在")
-			return
-		}
-		s.internalErr(w, r, err)
-		return
-	}
-	pr, err := s.store.GetProvider(r.Context(), id)
-	if err != nil {
-		s.internalErr(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, pr)
-}
-
-func (s *Server) handleDeleteProvider(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r)
-	if !ok {
-		return
-	}
-	if err := s.store.DeleteProvider(r.Context(), id); err != nil {
-		if notFound(err) {
-			writeErr(w, http.StatusNotFound, "上游不存在")
-			return
-		}
-		s.internalErr(w, r, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
 }
 
 // ---- 代发 key（员工也可以在自己的「我的 API key」里自助创建）----

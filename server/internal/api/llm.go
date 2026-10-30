@@ -1,0 +1,495 @@
+package api
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"regexp"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/hikariming/dsh-ee/server/internal/secret"
+	"github.com/hikariming/dsh-ee/server/internal/store"
+)
+
+var (
+	vendorRe    = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
+	modelNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$`)
+)
+
+func validBaseURL(raw string) (string, bool) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.RawQuery != "" || u.Fragment != "" {
+		return "", false
+	}
+	return strings.TrimRight(u.String(), "/"), true
+}
+
+func cleanModels(ms []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, m := range ms {
+		m = strings.TrimSpace(m)
+		if m != "" && !seen[m] {
+			seen[m] = true
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// ---- 上游 ----
+
+func (s *Server) handleListProviders(w http.ResponseWriter, r *http.Request) {
+	ps, err := s.store.ListProviders(r.Context(), false)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"providers": nonNil(ps)})
+}
+
+type providerReq struct {
+	Name     string `json:"name"`
+	Vendor   string `json:"vendor"`
+	BaseURL  string `json:"base_url"`
+	APIKey   string `json:"api_key"`
+	Priority *int   `json:"priority"`
+	Enabled  *bool  `json:"enabled"`
+	// 可选：顺手建几个对外名与上游名相同的模型
+	Models []string `json:"models"`
+}
+
+func (s *Server) handleCreateProvider(w http.ResponseWriter, r *http.Request) {
+	var req providerReq
+	if !readJSON(w, r, &req) {
+		return
+	}
+	base, ok := validBaseURL(req.BaseURL)
+	if !ok {
+		writeErr(w, http.StatusBadRequest, "base_url 必须是 http(s) 地址，例如 https://api.deepseek.com")
+		return
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Name == "" || len([]rune(req.Name)) > 64 || req.APIKey == "" {
+		writeErr(w, http.StatusBadRequest, "name（不超过 64 个字符）和 api_key 不能为空")
+		return
+	}
+	if req.Vendor == "" {
+		req.Vendor = "custom"
+	}
+	if !vendorRe.MatchString(req.Vendor) {
+		writeErr(w, http.StatusBadRequest, "vendor 只能包含小写字母、数字和 -")
+		return
+	}
+	models := cleanModels(req.Models)
+	for _, m := range models {
+		if !modelNameRe.MatchString(m) {
+			writeErr(w, http.StatusBadRequest, "模型名不合法："+m)
+			return
+		}
+	}
+	enc, err := s.box.Seal([]byte(req.APIKey))
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	p := &store.Provider{Name: req.Name, Vendor: req.Vendor, BaseURL: base, APIKeyEnc: enc, APIKeyHint: secret.Hint(req.APIKey), Priority: 100, Enabled: true}
+	if req.Priority != nil {
+		p.Priority = *req.Priority
+	}
+	if req.Enabled != nil {
+		p.Enabled = *req.Enabled
+	}
+	if err := s.store.CreateProvider(r.Context(), p); err != nil {
+		if errors.Is(err, store.ErrDuplicate) {
+			writeErr(w, http.StatusConflict, "名称已存在")
+			return
+		}
+		s.internalErr(w, r, err)
+		return
+	}
+	if len(models) > 0 {
+		if err := s.store.SyncProviderModels(r.Context(), p.ID, models); err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+	}
+	created, err := s.store.GetProvider(r.Context(), p.ID)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, created)
+}
+
+type updateProviderReq struct {
+	Vendor   *string  `json:"vendor"`
+	BaseURL  *string  `json:"base_url"`
+	APIKey   *string  `json:"api_key"`
+	Priority *int     `json:"priority"`
+	Enabled  *bool    `json:"enabled"`
+	Models   []string `json:"models"` // 兼容旧接口：整体替换为同名模型
+}
+
+func (s *Server) handleUpdateProvider(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var req updateProviderReq
+	if !readJSON(w, r, &req) {
+		return
+	}
+	p := store.ProviderPatch{Priority: req.Priority, Enabled: req.Enabled}
+	if req.Vendor != nil {
+		if !vendorRe.MatchString(*req.Vendor) {
+			writeErr(w, http.StatusBadRequest, "vendor 只能包含小写字母、数字和 -")
+			return
+		}
+		p.Vendor = req.Vendor
+	}
+	if req.BaseURL != nil {
+		base, ok := validBaseURL(*req.BaseURL)
+		if !ok {
+			writeErr(w, http.StatusBadRequest, "base_url 必须是 http(s) 地址")
+			return
+		}
+		p.BaseURL = &base
+	}
+	if req.APIKey != nil {
+		if *req.APIKey == "" {
+			writeErr(w, http.StatusBadRequest, "api_key 不能为空")
+			return
+		}
+		enc, err := s.box.Seal([]byte(*req.APIKey))
+		if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		hint := secret.Hint(*req.APIKey)
+		p.APIKeyEnc, p.APIKeyHint = enc, &hint
+	}
+	if err := s.store.UpdateProvider(r.Context(), id, p); err != nil {
+		if notFound(err) {
+			writeErr(w, http.StatusNotFound, "上游不存在")
+			return
+		}
+		s.internalErr(w, r, err)
+		return
+	}
+	if req.Models != nil {
+		ms := cleanModels(req.Models)
+		if len(ms) == 0 {
+			writeErr(w, http.StatusBadRequest, "models 不能为空")
+			return
+		}
+		if err := s.store.SyncProviderModels(r.Context(), id, ms); err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+	}
+	pr, err := s.store.GetProvider(r.Context(), id)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, pr)
+}
+
+func (s *Server) handleDeleteProvider(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if err := s.store.DeleteProvider(r.Context(), id); err != nil {
+		if notFound(err) {
+			writeErr(w, http.StatusNotFound, "上游不存在")
+			return
+		}
+		s.internalErr(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ---- 连通性检查 ----
+
+type checkResult struct {
+	OK        bool     `json:"ok"`
+	Status    int      `json:"status"`
+	LatencyMS int64    `json:"latency_ms"`
+	Message   string   `json:"message"`
+	Models    []string `json:"models"`
+}
+
+// checkProvider 先请求 {base}/models；上游不提供这个接口（404/405）时，
+// 用一个已配置的模型发一次 max_tokens=1 的对话做验证。
+func (s *Server) checkProvider(ctx context.Context, p *store.Provider, fallbackModel string) checkResult {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	key, err := s.box.Open(p.APIKeyEnc)
+	if err != nil {
+		return checkResult{Message: "企业 key 解密失败，请重新填写"}
+	}
+	start := time.Now()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, p.BaseURL+"/models", nil)
+	req.Header.Set("Authorization", "Bearer "+string(key))
+	resp, err := s.upstream.Do(req)
+	res := checkResult{Models: []string{}}
+	if err != nil {
+		res.Message = "连不上上游：" + shortErr(err)
+		return res
+	}
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	resp.Body.Close()
+	res.Status = resp.StatusCode
+	res.LatencyMS = time.Since(start).Milliseconds()
+
+	switch {
+	case resp.StatusCode == http.StatusOK:
+		var list struct {
+			Data []struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(body, &list) == nil {
+			for _, m := range list.Data {
+				if m.ID != "" {
+					res.Models = append(res.Models, m.ID)
+				}
+			}
+		}
+		sort.Strings(res.Models)
+		res.OK = true
+		res.Message = fmt.Sprintf("连接正常，上游提供 %d 个模型", len(res.Models))
+	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
+		res.Message = "鉴权失败：企业 key 无效或没有权限"
+	case (resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed) && fallbackModel != "":
+		return s.checkByChat(ctx, p, key, fallbackModel)
+	default:
+		res.Message = fmt.Sprintf("上游返回 HTTP %d：%s", resp.StatusCode, snippet(body))
+	}
+	return res
+}
+
+func (s *Server) checkByChat(ctx context.Context, p *store.Provider, key []byte, model string) checkResult {
+	start := time.Now()
+	payload, _ := json.Marshal(map[string]any{
+		"model": model, "max_tokens": 1, "messages": []map[string]string{{"role": "user", "content": "ping"}},
+	})
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, p.BaseURL+"/chat/completions", bytes.NewReader(payload))
+	req.Header.Set("Authorization", "Bearer "+string(key))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := s.upstream.Do(req)
+	res := checkResult{Models: []string{}}
+	if err != nil {
+		res.Message = "连不上上游：" + shortErr(err)
+		return res
+	}
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	resp.Body.Close()
+	res.Status, res.LatencyMS = resp.StatusCode, time.Since(start).Milliseconds()
+	if resp.StatusCode == http.StatusOK {
+		res.OK = true
+		res.Message = "上游没有模型列表接口，已用 " + model + " 做了一次最小对话验证"
+	} else {
+		res.Message = fmt.Sprintf("用 %s 验证失败，HTTP %d：%s", model, resp.StatusCode, snippet(body))
+	}
+	return res
+}
+
+func snippet(b []byte) string {
+	s := strings.TrimSpace(string(b))
+	if len([]rune(s)) > 160 {
+		s = string([]rune(s)[:160]) + "…"
+	}
+	if s == "" {
+		return "（无响应内容）"
+	}
+	return s
+}
+
+func shortErr(err error) string {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		err = ue.Err
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "超时"
+	}
+	return err.Error()
+}
+
+func (s *Server) handleCheckProvider(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	p, err := s.store.GetProvider(r.Context(), id)
+	if notFound(err) {
+		writeErr(w, http.StatusNotFound, "上游不存在")
+		return
+	}
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	fallback := ""
+	models, err := s.store.ListModels(r.Context())
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	for _, m := range models {
+		if m.ProviderID == id {
+			fallback = m.UpstreamModel
+			break
+		}
+	}
+	res := s.checkProvider(r.Context(), p, fallback)
+	if err := s.store.SetProviderCheck(r.Context(), id, res.OK, res.Message); err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+// ---- 模型 ----
+
+func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
+	ms, err := s.store.ListModels(r.Context())
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"models": nonNil(ms)})
+}
+
+type createModelsReq struct {
+	ProviderID int64 `json:"provider_id"`
+	// 批量添加：每项的对外名为空时与上游名相同
+	Items []struct {
+		UpstreamModel string `json:"upstream_model"`
+		Name          string `json:"name"`
+		DisplayName   string `json:"display_name"`
+	} `json:"items"`
+}
+
+func (s *Server) handleCreateModels(w http.ResponseWriter, r *http.Request) {
+	var req createModelsReq
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if _, err := s.store.GetProvider(r.Context(), req.ProviderID); err != nil {
+		if notFound(err) {
+			writeErr(w, http.StatusBadRequest, "上游不存在")
+			return
+		}
+		s.internalErr(w, r, err)
+		return
+	}
+	if len(req.Items) == 0 || len(req.Items) > 500 {
+		writeErr(w, http.StatusBadRequest, "一次添加 1 到 500 个模型")
+		return
+	}
+	var created []*store.Model
+	var skipped []string
+	for _, it := range req.Items {
+		m := &store.Model{
+			ProviderID:    req.ProviderID,
+			UpstreamModel: strings.TrimSpace(it.UpstreamModel),
+			Name:          strings.TrimSpace(it.Name),
+			DisplayName:   strings.TrimSpace(it.DisplayName),
+			Enabled:       true,
+		}
+		if m.Name == "" {
+			m.Name = m.UpstreamModel
+		}
+		if !modelNameRe.MatchString(m.UpstreamModel) || !modelNameRe.MatchString(m.Name) {
+			writeErr(w, http.StatusBadRequest, "模型名不合法："+m.UpstreamModel)
+			return
+		}
+		if err := s.store.CreateModel(r.Context(), m); err != nil {
+			if errors.Is(err, store.ErrDuplicate) {
+				skipped = append(skipped, m.Name)
+				continue
+			}
+			s.internalErr(w, r, err)
+			return
+		}
+		created = append(created, m)
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"created": nonNil(created), "skipped": nonNil(skipped)})
+}
+
+type updateModelReq struct {
+	Name          *string `json:"name"`
+	UpstreamModel *string `json:"upstream_model"`
+	DisplayName   *string `json:"display_name"`
+	Enabled       *bool   `json:"enabled"`
+}
+
+func (s *Server) handleUpdateModel(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var req updateModelReq
+	if !readJSON(w, r, &req) {
+		return
+	}
+	for _, v := range []*string{req.Name, req.UpstreamModel} {
+		if v != nil {
+			*v = strings.TrimSpace(*v)
+			if !modelNameRe.MatchString(*v) {
+				writeErr(w, http.StatusBadRequest, "模型名不合法："+*v)
+				return
+			}
+		}
+	}
+	if req.DisplayName != nil {
+		d := strings.TrimSpace(*req.DisplayName)
+		req.DisplayName = &d
+	}
+	err := s.store.UpdateModel(r.Context(), id, store.ModelPatch{Name: req.Name, UpstreamModel: req.UpstreamModel, DisplayName: req.DisplayName, Enabled: req.Enabled})
+	switch {
+	case notFound(err):
+		writeErr(w, http.StatusNotFound, "模型不存在")
+		return
+	case errors.Is(err, store.ErrDuplicate):
+		writeErr(w, http.StatusConflict, "这个上游已有同名的对外模型")
+		return
+	case err != nil:
+		s.internalErr(w, r, err)
+		return
+	}
+	m, err := s.store.GetModel(r.Context(), id)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, m)
+}
+
+func (s *Server) handleDeleteModel(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if err := s.store.DeleteModel(r.Context(), id); err != nil {
+		if notFound(err) {
+			writeErr(w, http.StatusNotFound, "模型不存在")
+			return
+		}
+		s.internalErr(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

@@ -1,0 +1,48 @@
+/** page_key → 页面组件。路由由后端菜单决定，这里只负责「这个 key 渲染哪个组件」。 */
+import type { ComponentType } from "react";
+import Workbench from "./workbench";
+import Apps from "./apps";
+import Market from "./market";
+import DshDownload from "./dsh-download";
+import Setup from "./setup";
+import Publish from "./publish";
+import MyKeys from "./my-keys";
+import AdminUsers from "./admin/users";
+import AdminRoles from "./admin/roles";
+import AdminMenus from "./admin/menus";
+import AdminProviders from "./admin/providers";
+import AdminQuotas from "./admin/quotas";
+import AdminKeys from "./admin/keys";
+import AdminDashboard from "./admin/dashboard";
+import AdminStats from "./admin/overview";
+import AdminPlugins from "./admin/plugins";
+import AdminReview from "./admin/review";
+import AdminRegistry from "./admin/registry";
+import AdminUpstream from "./admin/upstream";
+import AdminDistribution from "./admin/distribution";
+import AdminSettings from "./admin/settings";
+import type { PageKey } from "../lib/page-meta";
+
+export const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
+  workbench: Workbench,
+  apps: Apps,
+  market: Market,
+  "dsh-download": DshDownload,
+  setup: Setup,
+  publish: Publish,
+  "my-keys": MyKeys,
+  "admin-users": AdminUsers,
+  "admin-roles": AdminRoles,
+  "admin-menus": AdminMenus,
+  "admin-providers": AdminProviders,
+  "admin-quotas": AdminQuotas,
+  "admin-keys": AdminKeys,
+  "admin-dashboard": AdminDashboard,
+  "admin-stats": AdminStats,
+  "admin-plugins": AdminPlugins,
+  "admin-review": AdminReview,
+  "admin-registry": AdminRegistry,
+  "admin-upstream": AdminUpstream,
+  "admin-distribution": AdminDistribution,
+  "admin-settings": AdminSettings,
+};

@@ -8,6 +8,7 @@ import { useApi } from "../lib/use-api";
 import { pluginPath } from "../components/plugin-card";
 import { Badge, Button, Card, CardHeader, PageHeader, PluginIcon, Stat } from "../components/ui";
 import { statusBadge } from "../components/status";
+import { PageLink } from "../lib/menus";
 
 /** 指标值还没拿到（加载中 / 接口失败）时显示的内容。 */
 const noValue = "—";
@@ -79,9 +80,9 @@ export default function Workbench() {
           <CardHeader
             title="我的微应用"
             aside={
-              <Link to="/apps" className="font-medium text-neutral-900 hover:underline">
+              <PageLink page="apps" className="font-medium text-neutral-900 hover:underline">
                 浏览全部 {microApps.length} 个
-              </Link>
+              </PageLink>
             }
           />
           <ul className="px-5 pb-2">
@@ -126,12 +127,12 @@ export default function Workbench() {
             ))}
           </ul>
           <div className="px-5 pb-5">
-            <Link
-              to="/publish"
+            <PageLink
+              page="publish"
               className="flex h-9 items-center justify-center rounded-md border border-neutral-300 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
             >
               分享新能力
-            </Link>
+            </PageLink>
           </div>
         </Card>
       </div>

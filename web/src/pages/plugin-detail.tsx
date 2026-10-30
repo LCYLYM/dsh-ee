@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, ExternalLink, Star, 
 import { categories, scanFor } from "../mock/data";
 import { useScoring, useStore } from "../lib/store";
 import { Badge, Button, Card, CopyBox, formatDate, formatKb, PluginIcon, Rating, ScoreBadge } from "../components/ui";
+import { PageLink } from "../lib/menus";
 
 export default function PluginDetail() {
   const name = decodeURIComponent(useParams().name ?? "");
@@ -16,9 +17,9 @@ export default function PluginDetail() {
     return (
       <Card className="p-12 text-center">
         <p className="text-neutral-600">插件不存在，或尚未通过审核。</p>
-        <Link to="/market" className="mt-4 inline-block text-sm text-brand-600 hover:underline">
+        <PageLink page="market" className="mt-4 inline-block text-sm text-brand-600 hover:underline">
           返回插件市场
-        </Link>
+        </PageLink>
       </Card>
     );
   }
@@ -28,9 +29,9 @@ export default function PluginDetail() {
 
   return (
     <div>
-      <Link to="/market" className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-800">
+      <PageLink page="market" className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-800">
         <ArrowLeft size={14} /> 插件市场
-      </Link>
+      </PageLink>
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="space-y-6">
           <Card className="p-6">
@@ -66,9 +67,9 @@ export default function PluginDetail() {
               <CopyBox label="在 DSH 中执行（已接入企业源时）" text={`dsh plugin add ${p.name}`} />
               <p className="text-sm text-neutral-500">
                 也可以在 DSH 插件页 → Discover 里搜索「{p.title}」一键安装。还没接入企业源？看
-                <Link to="/setup" className="text-brand-600 hover:underline">
+                <PageLink page="setup" className="text-brand-600 hover:underline">
                   接入指南
-                </Link>
+                </PageLink>
                 。
               </p>
               {core && (

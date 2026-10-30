@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { useStore } from "../../lib/store";
 import type { Settings } from "../../lib/types";
 import { Button, Card, cx, Field, inputBase, inputCls, PageHeader, Segmented, Toggle } from "../../components/ui";
+import { PageLink } from "../../lib/menus";
 
 function Section({ title, desc, children }: { title: string; desc?: string; children: ReactNode }) {
   return (
@@ -159,9 +160,9 @@ export default function AdminSettings() {
           />
           <p className="text-sm text-neutral-600">
             npm 上游源与回源策略在
-            <Link to="/admin/registry" className="mx-1 font-medium text-neutral-900 hover:underline">
+            <PageLink page="admin-registry" className="mx-1 font-medium text-neutral-900 hover:underline">
               npm 源
-            </Link>
+            </PageLink>
             页设置。
           </p>
           <Field label="已入库插件出新版本时">

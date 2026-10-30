@@ -11,11 +11,6 @@ import (
 	"github.com/go-sql-driver/mysql"
 )
 
-const (
-	RoleAdmin  = "admin"
-	RoleMember = "member"
-)
-
 var ErrDuplicate = errors.New("duplicate")
 
 type User struct {
@@ -23,7 +18,6 @@ type User struct {
 	Username    string    `json:"username"`
 	DisplayName string    `json:"display_name"`
 	Department  string    `json:"department"`
-	Role        string    `json:"role"`
 	Disabled    bool      `json:"disabled"`
 	CreatedAt   time.Time `json:"created_at"`
 	// 额度挂在用户上，同一用户的全部 key 共享。
@@ -32,14 +26,16 @@ type User struct {
 	AllowedModels     []string   `json:"allowed_models"`
 	QuotaExpiresAt    *time.Time `json:"quota_expires_at"`
 	// 本月（UTC）已用 token，列表查询时填充。
-	MonthTokens  int64  `json:"month_tokens"`
-	PasswordHash string `json:"-"`
+	MonthTokens int64 `json:"month_tokens"`
+	// 角色摘要，列表与 me 接口填充。
+	Roles        []RoleRef `json:"roles"`
+	PasswordHash string    `json:"-"`
 }
 
 // userColumns 让同一份列清单能同时用于单表查询和带别名的 JOIN。
 func userColumns(alias string) string {
 	cols := []string{
-		"id", "username", "display_name", "department", "role", "disabled", "created_at",
+		"id", "username", "display_name", "department", "disabled", "created_at",
 		"password_hash", "monthly_token_limit", "allowed_models", "quota_expires_at",
 	}
 	if alias != "" {
@@ -56,7 +52,7 @@ func scanUser(row interface{ Scan(...any) error }, extra ...any) (*User, error) 
 	var models sql.NullString
 	var expires sql.NullTime
 	dest := []any{
-		&u.ID, &u.Username, &u.DisplayName, &u.Department, &u.Role, &u.Disabled, &u.CreatedAt,
+		&u.ID, &u.Username, &u.DisplayName, &u.Department, &u.Disabled, &u.CreatedAt,
 		&u.PasswordHash, &limit, &models, &expires,
 	}
 	err := row.Scan(append(dest, extra...)...)
@@ -96,9 +92,9 @@ func (s *Store) CountUsers(ctx context.Context) (int, error) {
 func (s *Store) CreateUser(ctx context.Context, u *User) error {
 	t := now()
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO users (username, display_name, department, password_hash, role, disabled, created_at, updated_at, monthly_token_limit)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.Username, u.DisplayName, u.Department, u.PasswordHash, u.Role, u.Disabled, t, t, u.MonthlyTokenLimit)
+		`INSERT INTO users (username, display_name, department, password_hash, disabled, created_at, updated_at, monthly_token_limit)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.Username, u.DisplayName, u.Department, u.PasswordHash, u.Disabled, t, t, u.MonthlyTokenLimit)
 	if isDuplicate(err) {
 		return ErrDuplicate
 	}
@@ -144,7 +140,6 @@ func (s *Store) ListUsers(ctx context.Context) ([]*User, error) {
 type UserPatch struct {
 	DisplayName  *string
 	Department   *string
-	Role         *string
 	Disabled     *bool
 	PasswordHash *string
 }
@@ -161,9 +156,6 @@ func (s *Store) UpdateUser(ctx context.Context, id int64, p UserPatch) error {
 	}
 	if p.Department != nil {
 		add("department", *p.Department)
-	}
-	if p.Role != nil {
-		add("role", *p.Role)
 	}
 	if p.Disabled != nil {
 		add("disabled", *p.Disabled)

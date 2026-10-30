@@ -70,7 +70,7 @@ export function Toggle({
         checked ? "bg-brand-500" : "bg-neutral-300",
       )}
     >
-      <span className={cx("inline-block h-5 w-5 rounded-full bg-white shadow transition", checked ? "tranneutral-x-5" : "tranneutral-x-0.5")} />
+      <span className={cx("inline-block h-5 w-5 rounded-full bg-white shadow transition", checked ? "translate-x-5" : "translate-x-0.5")} />
     </button>
   );
 }

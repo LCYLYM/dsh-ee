@@ -3,6 +3,7 @@ import { RefreshCw, Upload } from "lucide-react";
 import { useStore } from "../../lib/store";
 import type { DshRelease } from "../../lib/types";
 import { Badge, Button, Card, PageHeader, Toggle } from "../../components/ui";
+import { PageLink } from "../../lib/menus";
 
 const channelBadge = (c: DshRelease["channel"]) =>
   c === "stable" ? <Badge tone="green">稳定版</Badge> : c === "alpha" ? <Badge tone="amber">预览版</Badge> : <Badge>旧版</Badge>;
@@ -91,9 +92,9 @@ export default function AdminDistribution() {
       {!settings.distribution.enabled && (
         <Card className="mb-6 border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           DSH 分发当前已关闭，员工门户不显示下载入口。可在
-          <Link to="/admin/settings" className="mx-1 underline">
+          <PageLink page="admin-settings" className="mx-1 underline">
             系统设置
-          </Link>
+          </PageLink>
           中开启。
         </Card>
       )}
