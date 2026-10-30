@@ -121,7 +121,10 @@ export function AppLayout() {
   const { settings } = useStore();
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  // 用块体：新版浏览器的 scrollTo 会返回 Promise，被当成 effect 的清理函数会报错
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-neutral-50 lg:flex">
