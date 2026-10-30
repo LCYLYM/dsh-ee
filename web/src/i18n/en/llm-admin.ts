@@ -40,6 +40,7 @@ export default {
     filterLabel: "Filter models",
     nothingToImport: "Nothing to import.",
     importN: "Import {{n}}",
+    importAction: "Import",
     modelSaved: "Saved {{name}}",
     modelDeleteConfirm: "Delete the model {{name}}? Employees will no longer be able to call it through this upstream.",
     modelDeleted: "Deleted {{name}}",

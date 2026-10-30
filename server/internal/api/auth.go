@@ -182,7 +182,18 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Secure:   s.opts.CookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
-	writeJSON(w, http.StatusOK, u)
+	// 登录响应与 /api/auth/me 保持一致（带角色与权限），前端登录后可以直接按权限渲染。
+	a, err := s.store.UserAccess(r.Context(), u.ID)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	payload, err := s.mePayload(r.Context(), u, a)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, payload)
 }
 
 // login 验证密码并处理限流、审计与错误响应；失败时已写好响应，返回 false。via 是 web / npm。
@@ -231,20 +242,18 @@ type meResponse struct {
 	Permissions []string `json:"permissions"`
 }
 
-func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
-	u, a := currentUser(r), currentAccess(r)
-	refs, err := s.store.UserRoleRefs(r.Context())
+// mePayload 组装「当前用户 + 角色 + 有效权限」，登录与 /api/auth/me 共用。
+func (s *Server) mePayload(ctx context.Context, u *store.User, a *rbac.Access) (*meResponse, error) {
+	refs, err := s.store.UserRoleRefs(ctx)
 	if err != nil {
-		s.internalErr(w, r, err)
-		return
+		return nil, err
 	}
 	u.Roles = nonNil(refs[u.ID])
 	perms := []string{}
 	if a.Super {
-		all, err := s.store.ListPermissions(r.Context())
+		all, err := s.store.ListPermissions(ctx)
 		if err != nil {
-			s.internalErr(w, r, err)
-			return
+			return nil, err
 		}
 		for _, p := range all {
 			perms = append(perms, p.Code)
@@ -255,7 +264,16 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		}
 		slices.Sort(perms)
 	}
-	writeJSON(w, http.StatusOK, meResponse{User: u, IsSuper: a.Super, Permissions: perms})
+	return &meResponse{User: u, IsSuper: a.Super, Permissions: perms}, nil
+}
+
+func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
+	payload, err := s.mePayload(r.Context(), currentUser(r), currentAccess(r))
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, payload)
 }
 
 type changePasswordReq struct {

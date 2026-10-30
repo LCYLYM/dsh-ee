@@ -78,6 +78,16 @@ func TestRBAC(t *testing.T) {
 	}
 	admin := login("admin", "admin-password-123")
 
+	// 登录响应本身就带角色与权限（与 /api/auth/me 同构），前端登录后不必再等一次 /me
+	{
+		c := newClient(t, ts.URL)
+		code, body := c.do("POST", "/api/auth/login", map[string]string{"username": "admin", "password": "admin-password-123"}, nil)
+		expect(t, "登录响应", code, 200, body)
+		if m := decode[meResp](t, body); !m.IsSuper || len(m.Roles) != 1 || m.Roles[0].Code != "admin" || len(m.Permissions) == 0 {
+			t.Fatalf("登录响应应带角色与权限：%s", body)
+		}
+	}
+
 	// 超级管理员拥有全部权限与全部菜单
 	_, body := admin.do("GET", "/api/auth/me", nil, nil)
 	me := decode[meResp](t, body)

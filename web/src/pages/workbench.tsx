@@ -48,7 +48,6 @@ export default function Workbench() {
   const quota = myKeys?.quota;
   const byName = (n: string) => plugins.find((p) => p.name === n);
 
-
   const copyInstall = (name: string) => {
     void navigator.clipboard?.writeText(`dsh plugin add ${name}`);
     notify(t("workbench.copiedInstall", { name }));

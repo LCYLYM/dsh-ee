@@ -170,7 +170,7 @@ function ImportPicker({ result, existing, onImport, onClose, busy }: { result: C
       </div>
       <div className="flex gap-2">
         <Button size="sm" disabled={busy || picked.length === 0} onClick={() => onImport(picked)}>
-          {t("providers.importN", { n: picked.length || "" })}
+          {picked.length ? t("providers.importN", { n: picked.length }) : t("providers.importAction")}
         </Button>
         <Button size="sm" variant="ghost" onClick={onClose}>
           {t("common.close")}

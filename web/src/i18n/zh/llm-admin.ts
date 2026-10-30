@@ -38,6 +38,7 @@ export default {
     filterLabel: "筛选模型",
     nothingToImport: "没有可导入的模型。",
     importN: "导入 {{n}} 个",
+    importAction: "导入",
     modelSaved: "已保存 {{name}}",
     modelDeleteConfirm: "删除模型 {{name}}？员工将不能再通过这个上游调用它。",
     modelDeleted: "已删除 {{name}}",
