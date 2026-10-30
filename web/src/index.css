@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* 与 dshfind 同一套 DeepSeek 品牌色板 */
+@theme {
+  --color-brand-50: #eef3ff;
+  --color-brand-100: #e0e9ff;
+  --color-brand-200: #c7d5fe;
+  --color-brand-300: #a5b8fc;
+  --color-brand-400: #7e94fa;
+  --color-brand-500: #4d6bfe;
+  --color-brand-600: #3b5bdb;
+  --color-brand-700: #3549b8;
+  --color-brand-800: #2d3a8f;
+  --color-brand-900: #232e69;
+  --color-brand-950: #141a3d;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+}
+
+body {
+  @apply bg-slate-50 text-slate-800 antialiased;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+}

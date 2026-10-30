@@ -1,0 +1,126 @@
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { initialPlugins, initialReleases } from "../mock/data";
+import type { DshRelease, Plugin, PluginStatus, Settings } from "./types";
+
+export const defaultSettings: Settings = {
+  orgName: "ACME 科技",
+  baseUrl: "https://dsh.acme.internal",
+  scope: "@acme",
+  admissionMode: "allowlist",
+  scoring: {
+    enabled: true,
+    showUpstreamScore: true,
+    allowEmployeeRating: true,
+    minPreloadScore: 60,
+  },
+  upstream: {
+    mode: "online",
+    dshfindFeed: true,
+    registry: "npmmirror",
+    customRegistry: "",
+    autoSync: "review",
+  },
+  distribution: {
+    enabled: true,
+    allowAlpha: false,
+    allowCommunityDesktop: true,
+  },
+  auth: "ldap",
+};
+
+const SETTINGS_KEY = "dsh-ee:settings";
+
+function loadSettings(): Settings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return defaultSettings;
+    const saved = JSON.parse(raw) as Partial<Settings>;
+    // 逐段合并：原型迭代中新增的字段不会因为旧存档缺失而变成 undefined
+    return {
+      ...defaultSettings,
+      ...saved,
+      scoring: { ...defaultSettings.scoring, ...saved.scoring },
+      upstream: { ...defaultSettings.upstream, ...saved.upstream },
+      distribution: { ...defaultSettings.distribution, ...saved.distribution },
+    };
+  } catch {
+    return defaultSettings;
+  }
+}
+
+interface Store {
+  settings: Settings;
+  updateSettings: (patch: (s: Settings) => Settings) => void;
+  resetSettings: () => void;
+  plugins: Plugin[];
+  setStatus: (name: string, status: PluginStatus) => void;
+  addPlugin: (p: Plugin) => void;
+  releases: DshRelease[];
+  setRecommended: (product: DshRelease["product"], distro: string, version: string) => void;
+  toggleMirrored: (distro: string, version: string) => void;
+  toast: string | null;
+  notify: (msg: string) => void;
+}
+
+const Ctx = createContext<Store | null>(null);
+
+export function StoreProvider({ children }: { children: ReactNode }) {
+  const [settings, setSettings] = useState<Settings>(loadSettings);
+  const [plugins, setPlugins] = useState<Plugin[]>(initialPlugins);
+  const [releases, setReleases] = useState<DshRelease[]>(initialReleases);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }, [settings]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2400);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const store: Store = {
+    settings,
+    updateSettings: (patch) => setSettings((s) => patch(s)),
+    resetSettings: () => setSettings(defaultSettings),
+    plugins,
+    setStatus: (name, status) =>
+      setPlugins((ps) => ps.map((p) => (p.name === name ? { ...p, status } : p))),
+    addPlugin: (p) => setPlugins((ps) => [p, ...ps.filter((x) => x.name !== p.name)]),
+    releases,
+    setRecommended: (product, distro, version) =>
+      setReleases((rs) =>
+        rs.map((r) =>
+          r.product !== product || (product === "desktop" && r.distro !== distro)
+            ? r
+            : { ...r, recommended: r.version === version },
+        ),
+      ),
+    toggleMirrored: (distro, version) =>
+      setReleases((rs) =>
+        rs.map((r) => (r.distro === distro && r.version === version ? { ...r, mirrored: !r.mirrored } : r)),
+      ),
+    toast,
+    notify: setToast,
+  };
+
+  return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
+}
+
+export function useStore() {
+  const s = useContext(Ctx);
+  if (!s) throw new Error("useStore must be used inside StoreProvider");
+  return s;
+}
+
+/** 评分相关 UI 统一走这里判断，避免各页面各自读开关读出不一致。 */
+export function useScoring() {
+  const { scoring } = useStore().settings;
+  return {
+    upstream: scoring.enabled && scoring.showUpstreamScore,
+    rating: scoring.enabled && scoring.allowEmployeeRating,
+    any: scoring.enabled && (scoring.showUpstreamScore || scoring.allowEmployeeRating),
+    minPreloadScore: scoring.minPreloadScore,
+  };
+}
