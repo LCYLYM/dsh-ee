@@ -44,6 +44,24 @@ E2E_BASE=http://127.0.0.1:8080 ADMIN_PW=… make e2e      # 或 cd e2e && node r
 
 除落地页外，所有页面都需要登录；账号用服务端首次启动时创建的管理员。
 
+### 演示数据
+
+服务端起来后，可以补一份可直接演示的数据（角色、员工、额度、上游模型与 key）：
+
+```bash
+cd server
+set -a; . ./.env.local; set +a
+DSH_EE_SEED_ADMIN_PASSWORD='你的管理员密码' go run ./cmd/seed
+```
+
+- 管理员：使用 `admin` 账号写入，所以需要它的密码（也可用 `DSH_EE_SEED_ADMIN_PASSWORD` 显式指定）。
+- 角色：「审核员」（看总览 + 审核能力）、「运维」（再加 npm 源与上游预载）。
+- 员工：`zhang.wei` / `li.na` / `sun.hao` / `chen.yu` / `zhou.lei` / `wang.fang`，初始密码默认 `dsh-ee-demo-2026`，可用 `DSH_EE_SEED_USER_PASSWORD` 覆盖；其中 `wang.fang` 故意不分配额度，用来演示 429。
+- 上游：「DeepSeek（官方）」与「内部模型网关」，`deepseek-chat` 同时挂在两个上游上，用于演示故障转移。
+- key：每个演示员工一个「我的 DSH」，明文只在第一次创建时打印。
+
+重复执行是幂等的：角色 / 用户 / 上游 / key 已存在时不会重建，额度与角色会对齐回演示值。上游 key 默认是占位值（`sk-demo-*`），连接检查会失败；接真实上游时用 `DSH_EE_SEED_DEEPSEEK_KEY` / `DSH_EE_SEED_GATEWAY_KEY` 传进去。
+
 ### UI 组件
 
 基础交互组件来自 [shadcn/ui](https://ui.shadcn.com)（Radix），源码在 `web/src/components/shadcn/`，主题变量映射到项目原有的中性灰与品牌蓝（`web/src/index.css`）。新增组件：`cd web && pnpm dlx shadcn@latest add <组件名>`（`components.json` 已把输出目录指向 `components/shadcn`）。

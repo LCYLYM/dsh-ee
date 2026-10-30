@@ -85,7 +85,14 @@ go run ./cmd/dsh-ee
 
 # 4. 测试（每次建随机库，跑完删除）
 DSH_EE_TEST_DSN='root:@tcp(127.0.0.1:4000)/' go test ./...
+
+# 5. 补演示数据（角色、员工、额度、上游模型与 key；可重复执行）
+go run ./cmd/seed
 ```
+
+`cmd/seed` 通过 HTTP 接口写入，需要管理员密码：默认读 `DSH_EE_BOOTSTRAP_ADMIN_PASSWORD`，也可以用
+`DSH_EE_SEED_ADMIN_PASSWORD` 指定；员工初始密码用 `DSH_EE_SEED_USER_PASSWORD`（默认 `dsh-ee-demo-2026`）。
+上游 key 默认是占位值，接真实上游时传 `DSH_EE_SEED_DEEPSEEK_KEY` / `DSH_EE_SEED_GATEWAY_KEY`。
 
 前端开发时用 Vite（见仓库根目录 README）；要一个嵌好前端的单文件，在仓库根目录 `make build`，产物是 `dist/dsh-ee`。
 

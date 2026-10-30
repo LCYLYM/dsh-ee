@@ -8,3 +8,6 @@ dist
 
 # 离线安装包产物
 deploy/out/
+
+# pnpm 的本地存储（视配置可能落在仓库根目录）
+.pnpm-store/
