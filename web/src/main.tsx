@@ -7,6 +7,9 @@ import { StoreProvider } from "./lib/store";
 import { AuthProvider, RequireAuth } from "./lib/auth";
 import { MenuProvider, useMenus } from "./lib/menus";
 import { AppLayout } from "./components/layout";
+import { Toaster } from "@/components/shadcn/sonner";
+import { TooltipProvider } from "@/components/shadcn/tooltip";
+import { ConfirmProvider } from "./lib/confirm";
 import { PAGE_COMPONENTS } from "./pages/registry";
 import type { PageKey } from "./lib/page-meta";
 import Landing from "./pages/landing";
@@ -73,9 +76,14 @@ createRoot(document.getElementById("root")!).render(
     <StoreProvider>
       <AuthProvider>
         <MenuProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
+          <TooltipProvider delayDuration={300}>
+            <ConfirmProvider>
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+              <Toaster position="bottom-center" />
+            </ConfirmProvider>
+          </TooltipProvider>
         </MenuProvider>
       </AuthProvider>
     </StoreProvider>

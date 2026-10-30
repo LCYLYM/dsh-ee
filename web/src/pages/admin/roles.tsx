@@ -7,6 +7,7 @@ import { ErrorNote, LoadState } from "../../components/api-ui";
 import { useLabels } from "../../lib/labels";
 import { Badge, Button, Card, CardHeader, cx, Field, inputCls, PageHeader } from "../../components/ui";
 import { useTranslation } from "react-i18next";
+import { useConfirm } from "@/lib/confirm";
 
 function groupPermissions(ps: Permission[]) {
   const groups: { name: string; items: Permission[] }[] = [];
@@ -84,6 +85,7 @@ function PermissionGrid({
 
 function RoleEditor({ role, permissions, onSaved, onDeleted }: { role: Role; permissions: Permission[]; onSaved: () => void; onDeleted: () => void }) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const L = useLabels();
   const { user, refresh } = useAuth();
   const { notify } = useStore();
@@ -113,7 +115,7 @@ function RoleEditor({ role, permissions, onSaved, onDeleted }: { role: Role; per
   };
 
   const remove = async () => {
-    if (!window.confirm(t("roles.deleteConfirm", { name: L.role(role), count: role.user_count }))) return;
+    if (!(await confirm({ kind: "delete", description: t("roles.deleteConfirm", { name: L.role(role), count: role.user_count }) }))) return;
     const r = await run(() => api.deleteRole(role.id));
     if (!r.ok) return setError(r.error);
     notify(t("roles.deleted", { name: L.role(role) }));
@@ -224,6 +226,7 @@ function CreateRole({ permissions, onCreated }: { permissions: Permission[]; onC
 
 function CustomPermissions({ permissions, onChange }: { permissions: Permission[]; onChange: () => void }) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const L = useLabels();
   const { notify } = useStore();
   const [f, setF] = useState({ code: "", name: "", group: t("roles.customGroup"), description: "" });
@@ -242,7 +245,7 @@ function CustomPermissions({ permissions, onChange }: { permissions: Permission[
   };
 
   const remove = async (p: Permission) => {
-    if (!window.confirm(t("roles.permDeleteConfirm", { code: p.code }))) return;
+    if (!(await confirm({ kind: "delete", description: t("roles.permDeleteConfirm", { code: p.code }) }))) return;
     const r = await run(() => api.deletePermission(p.code));
     notify(r.ok ? t("roles.permDeleted", { code: p.code }) : r.error);
     if (r.ok) onChange();

@@ -44,6 +44,11 @@ export default {
     disabledMsg: "Disabled {{name}}",
     enable: "Enable",
     disable: "Disable",
+    searchPlaceholder: "Search by username, name, department or role",
+    none: "No users yet.",
+    noMatch: "No users match.",
+    resetPasswordFor: "New password for {{name}}:",
+    rolesFor: "Roles for {{name}}:",
   },
   roles: {
     builtin: { admin: "Super admin", member: "Employee" },

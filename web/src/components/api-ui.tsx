@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { formatTokens, keyState, type ApiKey } from "../lib/api";
 import { Badge, Button, cx } from "./ui";
 import { useTranslation } from "react-i18next";
+import { Tip } from "@/components/tip";
 
 export function LoadState({ loading, error, onRetry, children }: { loading: boolean; error: string | null; onRetry: () => void; children: ReactNode }) {
   const { t } = useTranslation();
@@ -59,7 +60,8 @@ export function QuotaBar({ used, limit }: { used: number; limit: number | null }
   const pct = Math.min(100, (used / limit) * 100);
   const over = used >= limit;
   return (
-    <div className="min-w-32">
+    <Tip label={t("keys.quota.exact", { used: used.toLocaleString(), limit: limit.toLocaleString(), pct: pct.toFixed(1) })}>
+    <div tabIndex={0} className="min-w-32 cursor-help">
       <div className="text-right tabular-nums">
         {formatTokens(used)}
         <span className="text-neutral-500"> / {formatTokens(limit)}</span>
@@ -72,6 +74,7 @@ export function QuotaBar({ used, limit }: { used: number; limit: number | null }
       </div>
       {over && <div className="mt-0.5 text-right text-xs text-red-700">{t("keys.quota.exhausted")}</div>}
     </div>
+    </Tip>
   );
 }
 

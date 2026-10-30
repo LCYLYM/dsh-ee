@@ -2,7 +2,7 @@
 export default {
   keys: {
     state: { active: "有效", revoked: "已吊销", expired: "已过期" },
-    quota: { unassigned: "未分配", exhausted: "已用完" },
+    quota: { unassigned: "未分配", exhausted: "已用完", exact: "本月已用 {{used}} / {{limit}} token（{{pct}}%）" },
     issued: {
       title: "已创建「{{name}}」",
       hint: "完整的 key 只显示这一次，关闭后无法再查看。请复制到 DSH 或客户端的配置里。",

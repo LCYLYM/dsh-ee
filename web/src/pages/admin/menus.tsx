@@ -10,6 +10,9 @@ import { ICONS, MenuIcon } from "../../lib/icons";
 import { ErrorNote, LoadState } from "../../components/api-ui";
 import { Badge, Button, Card, CardHeader, cx, Field, inputCls, PageHeader, Segmented, Toggle } from "../../components/ui";
 import { useTranslation } from "react-i18next";
+import { useConfirm } from "@/lib/confirm";
+import { Combobox } from "@/components/pickers";
+import { Tip } from "@/components/tip";
 
 type Editing = { mode: "edit"; menu: Menu } | { mode: "new"; kind: MenuKind };
 
@@ -36,6 +39,7 @@ function MenuForm({
   onDone: (deleted?: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const L = useLabels();
   const menuTitle = useMenuTitle();
   const { notify } = useStore();
@@ -66,7 +70,7 @@ function MenuForm({
 
   const remove = async () => {
     if (editing.mode !== "edit") return;
-    if (!window.confirm(t("menusAdmin.deleteConfirm", { title: editing.menu.title }))) return;
+    if (!(await confirm({ kind: "delete", description: t("menusAdmin.deleteConfirm", { title: editing.menu.title }) }))) return;
     const r = await run(() => api.deleteMenu(editing.menu.id));
     if (!r.ok) return setError(r.error);
     notify(t("menusAdmin.deleted", { title: editing.menu.title }));
@@ -96,12 +100,14 @@ function MenuForm({
         {m.kind === "page" && (
           <>
             <Field label={t("menusAdmin.component")} hint={m.page_key && PAGE_META[m.page_key] ? t(`pageDesc.${m.page_key as PageKey}`) : t("menusAdmin.componentHint")}>
-              <select
-                className={inputCls}
-                required
+              <Combobox
                 value={m.page_key}
-                onChange={(e) => {
-                  const k = e.target.value;
+                placeholder={t("menusAdmin.choosePage")}
+                options={[
+                  ...(unknownKey ? [{ value: m.page_key, label: t("menusAdmin.unregistered", { key: m.page_key }) }] : []),
+                  ...pageKeys.map((k) => ({ value: k, label: t(`pages.${k as PageKey}`), hint: k })),
+                ]}
+                onChange={(k) => {
                   const meta = PAGE_META[k];
                   // 新建时顺手带出默认标题与路由
                   set({
@@ -110,15 +116,7 @@ function MenuForm({
                     ...(meta && (m.path === "/" || !m.path) ? { path: meta.defaultPath } : {}),
                   });
                 }}
-              >
-                <option value="">{t("menusAdmin.choosePage")}</option>
-                {unknownKey && <option value={m.page_key}>{t("menusAdmin.unregistered", { key: m.page_key })}</option>}
-                {pageKeys.map((k) => (
-                  <option key={k} value={k}>
-                    {t(`pages.${k as PageKey}`)} ({k})
-                  </option>
-                ))}
-              </select>
+              />
             </Field>
             <Field label={t("menusAdmin.route")} hint={t("menusAdmin.routeHint")}>
               <input className={cx(inputCls, "font-mono")} required value={m.path} onChange={(e) => set({ path: e.target.value })} />
@@ -149,14 +147,13 @@ function MenuForm({
         )}
 
         <Field label={t("menusAdmin.access")} hint={m.kind === "group" ? t("menusAdmin.accessGroupHint") : t("menusAdmin.accessPageHint")}>
-          <select className={inputCls} value={m.permission} onChange={(e) => set({ permission: e.target.value })}>
-            <option value="">{t("menusAdmin.loginOnly")}</option>
-            {permissions.map((p) => (
-              <option key={p.code} value={p.code}>
-                {L.group(p.group)} · {L.perm(p)} ({p.code})
-              </option>
-            ))}
-          </select>
+          <Combobox
+            value={m.permission}
+            onChange={(permission) => set({ permission })}
+            allowEmpty
+            emptyLabel={t("menusAdmin.loginOnly")}
+            options={permissions.map((p) => ({ value: p.code, label: L.perm(p), hint: p.code, group: L.group(p.group) }))}
+          />
         </Field>
 
         {m.kind !== "group" && (
@@ -252,12 +249,16 @@ function Row({
         </span>
       </button>
       <span className="flex shrink-0 gap-0.5">
-        <button type="button" aria-label={t("menusAdmin.moveUp")} disabled={first} onClick={() => onMove(-1)} className="rounded p-1 text-neutral-500 hover:bg-neutral-200 disabled:opacity-30">
-          <ArrowUp size={14} />
-        </button>
-        <button type="button" aria-label={t("menusAdmin.moveDown")} disabled={last} onClick={() => onMove(1)} className="rounded p-1 text-neutral-500 hover:bg-neutral-200 disabled:opacity-30">
-          <ArrowDown size={14} />
-        </button>
+        <Tip label={t("menusAdmin.moveUp")}>
+          <button type="button" aria-label={t("menusAdmin.moveUp")} disabled={first} onClick={() => onMove(-1)} className="rounded p-1 text-neutral-500 hover:bg-neutral-200 disabled:opacity-30">
+            <ArrowUp size={14} />
+          </button>
+        </Tip>
+        <Tip label={t("menusAdmin.moveDown")}>
+          <button type="button" aria-label={t("menusAdmin.moveDown")} disabled={last} onClick={() => onMove(1)} className="rounded p-1 text-neutral-500 hover:bg-neutral-200 disabled:opacity-30">
+            <ArrowDown size={14} />
+          </button>
+        </Tip>
       </span>
     </div>
   );
@@ -265,6 +266,7 @@ function Row({
 
 export default function AdminMenus() {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const L = useLabels();
   const { notify } = useStore();
   const all = useApi(api.menus);
@@ -295,7 +297,7 @@ export default function AdminMenus() {
   };
 
   const reset = async () => {
-    if (!window.confirm(t("menusAdmin.resetConfirm"))) return;
+    if (!(await confirm({ kind: "reset", description: t("menusAdmin.resetConfirm") }))) return;
     const r = await run(() => api.resetMenus());
     notify(r.ok ? t("menusAdmin.resetDone") : r.error);
     setEditing(null);

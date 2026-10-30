@@ -42,6 +42,11 @@ export default {
     disabledMsg: "已禁用 {{name}}",
     enable: "启用",
     disable: "禁用",
+    searchPlaceholder: "搜索用户名、显示名、部门或角色",
+    none: "还没有用户。",
+    noMatch: "没有符合条件的用户。",
+    resetPasswordFor: "重置 {{name}} 的密码：",
+    rolesFor: "{{name}} 的角色：",
   },
   roles: {
     builtin: { admin: "超级管理员", member: "员工" },

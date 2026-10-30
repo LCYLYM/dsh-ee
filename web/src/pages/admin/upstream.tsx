@@ -4,6 +4,7 @@ import { categoryIds, categoryLabel, offlineImports, preloadCandidates } from ".
 import { useScoring, useStore } from "../../lib/store";
 import { Badge, Button, Card, cx, Field, formatKb, inputCls, PageHeader, Segmented, Toggle } from "../../components/ui";
 import { useTranslation } from "react-i18next";
+import { Combobox, DatePicker } from "@/components/pickers";
 
 type RankBy = "stars" | "score";
 
@@ -225,6 +226,7 @@ function Offline() {
   const { t } = useTranslation();
   const { notify } = useStore();
   const [file, setFile] = useState("");
+  const [exportSince, setExportSince] = useState("2026-10-03");
   const [step, setStep] = useState(0);
   const steps = [t("upstreamAdmin.stepSignature"), t("upstreamAdmin.stepIntegrity"), t("upstreamAdmin.stepUnpack"), t("upstreamAdmin.stepManifest")];
 
@@ -279,7 +281,7 @@ function Offline() {
           </div>
           <p className="mb-4 text-sm text-neutral-500">{t("upstreamAdmin.exportDesc")}</p>
           <Field label={t("upstreamAdmin.exportSince")}>
-            <input type="date" defaultValue="2026-10-03" className={inputCls} />
+            <DatePicker value={exportSince} onChange={setExportSince} clearable={false} />
           </Field>
           <label className="mt-3 flex items-center gap-2 text-sm text-neutral-600">
             <input type="checkbox" defaultChecked className="accent-brand-500" /> {t("upstreamAdmin.includeDsh")}

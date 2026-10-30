@@ -18,6 +18,18 @@ pnpm dev        # http://localhost:5188
 
 除落地页外，所有页面都需要登录；账号用服务端首次启动时创建的管理员。
 
+### UI 组件
+
+基础交互组件来自 [shadcn/ui](https://ui.shadcn.com)（Radix），源码在 `web/src/components/shadcn/`，主题变量映射到项目原有的中性灰与品牌蓝（`web/src/index.css`）。新增组件：`cd web && pnpm dlx shadcn@latest add <组件名>`（`components.json` 已把输出目录指向 `components/shadcn`）。
+
+项目里封装好的用法：
+
+- 确认操作：`const confirm = useConfirm(); if (!(await confirm({ kind: "delete", description })))`（`lib/confirm.tsx`），不要用 `window.confirm`。
+- 提示消息：`notify(msg)`（Sonner）。
+- 可搜索下拉 `Combobox`、日期选择 `DatePicker`：`components/pickers.tsx`。
+- 数据表 `DataTable`（TanStack Table v9，排序 / 搜索 / 分页 / 行内展开）：`components/data-table.tsx`。
+- 悬停提示 `Tip`：`components/tip.tsx`；行操作用 shadcn 的 `DropdownMenu`。
+
 ### 多语言
 
 界面支持简体中文与英文（`react-i18next`）：按浏览器语言自动选择（zh-* → 简体中文，其它 → 英文），侧边栏、登录页与落地页右上角可切换，选择记在 localStorage。

@@ -5,6 +5,8 @@ import { useAction, useApi } from "../../lib/use-api";
 import { ErrorNote, LoadState, ModelsCell, QuotaBar } from "../../components/api-ui";
 import { Badge, Button, Card, CardHeader, cx, Field, inputBase, inputCls, PageHeader } from "../../components/ui";
 import { useTranslation } from "react-i18next";
+import { DataTable, columnHelper, type DataColumn } from "@/components/data-table";
+import { Combobox, DatePicker } from "@/components/pickers";
 
 /** ISO 时间转本地日期输入框的 YYYY-MM-DD。 */
 function toDateInput(iso: string | null) {
@@ -59,7 +61,7 @@ function QuotaEditor({ user, models, onSaved, onCancel }: { user: User; models: 
           />
         </Field>
         <Field label={t("quotas.expiry")} hint={t("quotas.expiryHint")}>
-          <input className={inputCls} type="date" value={expires} onChange={(e) => setExpires(e.target.value)} />
+          <DatePicker value={expires} onChange={setExpires} futureOnly />
         </Field>
       </div>
       {models.length > 0 && (
@@ -105,18 +107,65 @@ export default function AdminQuotas() {
   const { data: users, error, loading, reload } = useApi(api.users);
   const { data: providers } = useApi(api.providers);
   const [editing, setEditing] = useState<number | null>(null);
-  const [q, setQ] = useState("");
 
   const allModels = useMemo(
     () => [...new Set((providers ?? []).filter((p) => p.enabled).flatMap((p) => p.models))],
     [providers],
   );
-  const list = (users ?? []).filter((u) => {
-    const hay = `${u.username} ${u.display_name} ${u.department}`.toLowerCase();
-    return !q.trim() || hay.includes(q.trim().toLowerCase());
-  });
   const assigned = (users ?? []).filter((u) => u.monthly_token_limit !== 0).length;
   const totalUsed = (users ?? []).reduce((a, u) => a + u.month_tokens, 0);
+
+  const col = columnHelper<User>();
+  const columns: DataColumn<User>[] = [
+    col.accessor((u) => u.display_name || u.username, {
+      id: "user",
+      header: () => t("quotas.colEmployee"),
+      cell: ({ row: { original: u } }) => (
+        <>
+          <div className={u.disabled ? "" : "text-neutral-900"}>{u.display_name || u.username}</div>
+          <div className="text-xs text-neutral-600">{u.username}</div>
+        </>
+      ),
+    }),
+    col.accessor((u) => u.department, { id: "department", header: () => t("quotas.colDepartment"), cell: (c) => c.getValue() || "—" }),
+    // 按本月用量排序；未分配额度的排在不限额度之前
+    col.accessor((u) => u.month_tokens, {
+      id: "usage",
+      header: () => t("quotas.colUsage"),
+      cell: ({ row: { original: u } }) => <QuotaBar used={u.month_tokens} limit={u.monthly_token_limit} />,
+    }),
+    col.display({ id: "models", header: () => t("quotas.colModels"), cell: ({ row: { original: u } }) => <ModelsCell models={u.allowed_models} /> }),
+    col.accessor((u) => u.quota_expires_at ?? "9999", {
+      id: "expiry",
+      header: () => t("quotas.colExpiry"),
+      cell: ({ row: { original: u } }) =>
+        u.quota_expires_at ? (
+          <span className={quotaExpired(u) ? "text-red-700" : "text-neutral-700"}>{formatTime(u.quota_expires_at)}</span>
+        ) : (
+          <span className="text-neutral-600">{t("quotas.noExpiry")}</span>
+        ),
+    }),
+    col.accessor((u) => (u.disabled ? 1 : 0), {
+      id: "status",
+      header: () => t("quotas.colStatus"),
+      cell: ({ row: { original: u } }) => (u.disabled ? <Badge>{t("quotas.disabled")}</Badge> : <Badge tone="green">{t("quotas.active")}</Badge>),
+    }),
+    col.display({
+      id: "actions",
+      header: () => <span className="sr-only">{t("table.actions")}</span>,
+      cell: ({ row: { original: u } }) => (
+        <div className="text-right">
+          <button
+            type="button"
+            onClick={() => setEditing((v) => (v === u.id ? null : u.id))}
+            className="text-sm whitespace-nowrap text-neutral-700 hover:text-neutral-900"
+          >
+            {editing === u.id ? t("common.close") : t("quotas.adjust")}
+          </button>
+        </div>
+      ),
+    }),
+  ];
 
   return (
     <div>
@@ -135,88 +184,32 @@ export default function AdminQuotas() {
           title={t("quotas.allUsers")}
           aside={users ? t("quotas.summary", { users: users.length, assigned, tokens: totalUsed.toLocaleString() }) : undefined}
         />
-        <div className="flex flex-wrap items-center gap-3 px-5 pb-3">
-          <input
-            aria-label={t("quotas.searchLabel")}
-            className={cx(inputBase, "w-full sm:w-64")}
-            placeholder={t("quotas.searchPlaceholder")}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
         <LoadState loading={loading && !users} error={error} onRetry={reload}>
-          {list.length === 0 ? (
-            <p className="px-5 pb-6 text-sm text-neutral-600">{users?.length ? t("quotas.noMatch") : t("quotas.noUsers")}</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs text-neutral-600">
-                  <tr>
-                    <th className="px-5 py-2 font-normal">{t("quotas.colEmployee")}</th>
-                    <th className="px-5 py-2 font-normal">{t("quotas.colDepartment")}</th>
-                    <th className="px-5 py-2 text-right font-normal">{t("quotas.colUsage")}</th>
-                    <th className="px-5 py-2 font-normal">{t("quotas.colModels")}</th>
-                    <th className="px-5 py-2 font-normal">{t("quotas.colExpiry")}</th>
-                    <th className="px-5 py-2 font-normal">{t("quotas.colStatus")}</th>
-                    <th className="px-5 py-2" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((u) => (
-                    <Fragment key={u.id}>
-                      <tr className={cx("border-t border-neutral-100 align-top", u.disabled && "text-neutral-500")}>
-                        <td className="px-5 py-3">
-                          <div className={u.disabled ? "" : "text-neutral-900"}>{u.display_name || u.username}</div>
-                          <div className="text-xs text-neutral-600">{u.username}</div>
-                        </td>
-                        <td className="px-5 py-3">{u.department || "—"}</td>
-                        <td className="px-5 py-3">
-                          <QuotaBar used={u.month_tokens} limit={u.monthly_token_limit} />
-                        </td>
-                        <td className="px-5 py-3">
-                          <ModelsCell models={u.allowed_models} />
-                        </td>
-                        <td className="px-5 py-3">
-                          {u.quota_expires_at ? (
-                            <span className={quotaExpired(u) ? "text-red-700" : "text-neutral-700"}>{formatTime(u.quota_expires_at)}</span>
-                          ) : (
-                            <span className="text-neutral-600">{t("quotas.noExpiry")}</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3">
-                          {u.disabled ? <Badge>{t("quotas.disabled")}</Badge> : <Badge tone="green">{t("quotas.active")}</Badge>}
-                        </td>
-                        <td className="px-5 py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setEditing((v) => (v === u.id ? null : u.id))}
-                            className="text-sm whitespace-nowrap text-neutral-700 hover:text-neutral-900"
-                          >
-                            {editing === u.id ? t("common.close") : t("quotas.adjust")}
-                          </button>
-                        </td>
-                      </tr>
-                      {editing === u.id && (
-                        <tr className="border-t border-neutral-100">
-                          <td colSpan={7} className="px-5 py-4">
-                            <QuotaEditor
-                              user={u}
-                              models={allModels}
-                              onSaved={() => {
-                                setEditing(null);
-                                reload();
-                              }}
-                              onCancel={() => setEditing(null)}
-                            />
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DataTable
+            data={users ?? []}
+            getRowId={(u) => String(u.id)}
+            columns={columns}
+            searchText={(u) => `${u.username} ${u.display_name} ${u.department}`}
+            searchPlaceholder={t("quotas.searchPlaceholder")}
+            alignRight={["usage"]}
+            hideOnMobile={["department", "models", "expiry"]}
+            rowClassName={(u) => u.disabled && "text-neutral-500"}
+            emptyText={t("quotas.noUsers")}
+            noMatchText={t("quotas.noMatch")}
+            renderExpanded={(u) =>
+              editing === u.id ? (
+                <QuotaEditor
+                  user={u}
+                  models={allModels}
+                  onSaved={() => {
+                    setEditing(null);
+                    reload();
+                  }}
+                  onCancel={() => setEditing(null)}
+                />
+              ) : null
+            }
+          />
         </LoadState>
       </Card>
     </div>

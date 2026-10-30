@@ -10,19 +10,8 @@ import { MenuIcon } from "../lib/icons";
 import type { Menu } from "../lib/api";
 import { cx } from "./ui";
 import { useTranslation } from "react-i18next";
+import { Tip } from "@/components/tip";
 
-function Toast() {
-  const { toast } = useStore();
-  if (!toast) return null;
-  return (
-    <div
-      role="status"
-      className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md bg-neutral-900 px-4 py-2.5 text-sm text-white shadow-lg"
-    >
-      {toast}
-    </div>
-  );
-}
 
 /** 个别页面在侧边栏上的附加状态（计数、已关闭、按设置隐藏），按 page_key 挂接。 */
 function useNavExtras() {
@@ -142,15 +131,16 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
               </span>
             </span>
           </Link>
-          <button
-            type="button"
-            aria-label={t("shell.logout")}
-            title={t("shell.logout")}
-            onClick={() => void logout()}
-            className="rounded-md p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
-          >
-            <LogOut size={16} />
-          </button>
+          <Tip label={t("shell.logout")} side="top">
+            <button
+              type="button"
+              aria-label={t("shell.logout")}
+              onClick={() => void logout()}
+              className="rounded-md p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+            >
+              <LogOut size={16} />
+            </button>
+          </Tip>
         </div>
       )}
     </div>
@@ -200,7 +190,6 @@ export function AppLayout() {
           {t("shell.footer")}
         </footer>
       </div>
-      <Toast />
     </div>
   );
 }

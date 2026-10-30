@@ -1,6 +1,7 @@
 import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { Check, Copy, Star } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Tip } from "@/components/tip";
 
 export function cx(...xs: (string | false | null | undefined)[]) {
   return xs.filter(Boolean).join(" ");
@@ -111,9 +112,9 @@ export function CopyBox({ text, label }: { text: string; label?: string }) {
     <div className="group relative rounded-md bg-neutral-900 text-neutral-100">
       {label && <div className="border-b border-white/10 px-4 py-1.5 text-xs text-neutral-500">{label}</div>}
       <pre className="overflow-x-auto px-4 py-3 pr-12 font-mono text-[13px] leading-relaxed">{text}</pre>
+      <Tip label={done ? t("common.copied") : t("common.copy")}>
       <button
         type="button"
-        title={t("common.copy")}
         aria-label={t("common.copy")}
         onClick={() => {
           void navigator.clipboard?.writeText(text);
@@ -124,6 +125,7 @@ export function CopyBox({ text, label }: { text: string; label?: string }) {
       >
         {done ? <Check size={16} /> : <Copy size={16} />}
       </button>
+      </Tip>
     </div>
   );
 }

@@ -7,6 +7,8 @@ import { ErrorNote, LoadState } from "../../components/api-ui";
 import zhLlm from "../../i18n/zh/llm-admin";
 import { Badge, Button, Card, CardHeader, cx, Field, inputBase, inputCls, PageHeader, Toggle } from "../../components/ui";
 import { useTranslation } from "react-i18next";
+import { useConfirm } from "@/lib/confirm";
+import { Tip } from "@/components/tip";
 
 /**
  * 常见厂商的 OpenAI 兼容地址。只是预填，管理员可以改；厂商列表与模型名变化快，
@@ -130,11 +132,13 @@ function HealthBadge({ p }: { p: Provider }) {
       </span>
     );
   return (
-    <span className={cx("inline-flex items-center gap-1 text-sm", p.last_check_ok ? "text-emerald-700" : "text-red-700")} title={p.last_check_msg}>
-      {p.last_check_ok ? <CircleCheck size={14} /> : <CircleAlert size={14} />}
-      {p.last_check_ok ? t("providers.healthy") : t("providers.unhealthy")}
-      <span className="text-neutral-500">· {formatTime(p.last_check_at)}</span>
-    </span>
+    <Tip label={p.last_check_msg || "—"}>
+      <span tabIndex={0} className={cx("inline-flex cursor-help items-center gap-1 text-sm", p.last_check_ok ? "text-emerald-700" : "text-red-700")}>
+        {p.last_check_ok ? <CircleCheck size={14} /> : <CircleAlert size={14} />}
+        {p.last_check_ok ? t("providers.healthy") : t("providers.unhealthy")}
+        <span className="text-neutral-500">· {formatTime(p.last_check_at)}</span>
+      </span>
+    </Tip>
   );
 }
 
@@ -178,6 +182,7 @@ function ImportPicker({ result, existing, onImport, onClose, busy }: { result: C
 
 function ModelRow({ m, onChanged }: { m: Model; onChanged: () => void }) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const { notify } = useStore();
   const { busy, run } = useAction();
   const [editing, setEditing] = useState(false);
@@ -199,7 +204,7 @@ function ModelRow({ m, onChanged }: { m: Model; onChanged: () => void }) {
     onChanged();
   };
   const remove = async () => {
-    if (!window.confirm(t("providers.modelDeleteConfirm", { name: m.name }))) return;
+    if (!(await confirm({ kind: "delete", description: t("providers.modelDeleteConfirm", { name: m.name }) }))) return;
     const r = await run(() => api.deleteModel(m.id));
     notify(r.ok ? t("providers.modelDeleted", { name: m.name }) : r.error);
     onChanged();
@@ -254,6 +259,7 @@ function ModelRow({ m, onChanged }: { m: Model; onChanged: () => void }) {
 
 function ProviderCard({ p, models, onChanged }: { p: Provider; models: Model[]; onChanged: () => void }) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const { notify } = useStore();
   const { busy, run } = useAction();
   const [editing, setEditing] = useState(false);
@@ -294,7 +300,7 @@ function ProviderCard({ p, models, onChanged }: { p: Provider; models: Model[]; 
     onChanged();
   };
   const remove = async () => {
-    if (!window.confirm(t("providers.deleteConfirm", { name: p.name, count: models.length }))) return;
+    if (!(await confirm({ kind: "delete", description: t("providers.deleteConfirm", { name: p.name, count: models.length }) }))) return;
     const r = await run(() => api.deleteProvider(p.id));
     notify(r.ok ? t("providers.deleted", { name: p.name }) : r.error);
     onChanged();

@@ -4,7 +4,7 @@ import type { Messages } from "../types";
 export default {
   keys: {
     state: { active: "Active", revoked: "Revoked", expired: "Expired" },
-    quota: { unassigned: "Not assigned", exhausted: "Used up" },
+    quota: { unassigned: "Not assigned", exhausted: "Used up", exact: "{{used}} of {{limit}} tokens used this month ({{pct}}%)" },
     issued: {
       title: "Created “{{name}}”",
       hint: "The full key is shown only this once and can't be viewed again after you close this. Copy it into DSH or your client's settings now.",

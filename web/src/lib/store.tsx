@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import { initialPlugins, initialReleases, initialTokens } from "../mock/data";
 import type { DshRelease, Plugin, PluginStatus, RegistryToken, Settings } from "./types";
 
@@ -67,7 +68,6 @@ interface Store {
   tokens: RegistryToken[];
   createToken: (name: string, access: RegistryToken["access"]) => string;
   revokeToken: (id: string) => void;
-  toast: string | null;
   notify: (msg: string) => void;
 }
 
@@ -78,17 +78,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [plugins, setPlugins] = useState<Plugin[]>(initialPlugins);
   const [releases, setReleases] = useState<DshRelease[]>(initialReleases);
   const [tokens, setTokens] = useState<RegistryToken[]>(initialTokens);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }, [settings]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2400);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   const store: Store = {
     settings,
@@ -119,8 +113,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return `ee_${access === "publish" ? "pub" : "tok"}_${id}${Math.random().toString(36).slice(2, 14)}`;
     },
     revokeToken: (id) => setTokens((ts) => ts.filter((t) => t.id !== id)),
-    toast,
-    notify: setToast,
+    notify: (msg) => void toast(msg),
   };
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;

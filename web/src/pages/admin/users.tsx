@@ -5,9 +5,14 @@ import { useStore } from "../../lib/store";
 import { useAction, useApi } from "../../lib/use-api";
 import { PageLink } from "../../lib/menus";
 import { useLabels } from "../../lib/labels";
+import { DataTable, columnHelper, type DataColumn } from "@/components/data-table";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/shadcn/tooltip";
+import { KeyRound, MoreHorizontal, ShieldCheck, UserCheck, UserX } from "lucide-react";
 import { ErrorNote, LoadState } from "../../components/api-ui";
 import { Badge, Button, Card, CardHeader, cx, Field, inputBase, inputCls, PageHeader } from "../../components/ui";
 import { useTranslation } from "react-i18next";
+import { useConfirm } from "@/lib/confirm";
 
 const emptyForm = { username: "", password: "", display_name: "", department: "" };
 
@@ -87,6 +92,7 @@ function CreateUser({ roles, onCreated }: { roles: Role[] | null; onCreated: (u:
 
 export default function AdminUsers() {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const L = useLabels();
   const { user: me, can, refresh } = useAuth();
   const { notify } = useStore();
@@ -117,6 +123,125 @@ export default function AdminUsers() {
       if (u.id === me?.id) await refresh();
     }
   };
+
+  const col = columnHelper<User>();
+  const columns: DataColumn<User>[] = [
+    col.accessor((u) => u.display_name || u.username, {
+      id: "user",
+      header: () => t("users.colUser"),
+      cell: ({ row: { original: u } }) => (
+        <>
+          <div className={u.disabled ? "" : "text-neutral-900"}>
+            {u.display_name || u.username}
+            {u.id === me?.id && <span className="ml-1.5 text-xs text-neutral-500">{t("users.you")}</span>}
+          </div>
+          <div className="text-xs text-neutral-600">{u.username}</div>
+        </>
+      ),
+    }),
+    col.accessor((u) => u.department, {
+      id: "department",
+      header: () => t("users.colDepartment"),
+      cell: (c) => c.getValue() || "—",
+    }),
+    col.accessor((u) => (u.roles ?? []).map((r) => L.role(r)).join(", "), {
+      id: "roles",
+      header: () => t("users.colRoles"),
+      cell: ({ row: { original: u } }) => (
+        <div className="flex flex-wrap gap-1">
+          {(u.roles ?? []).length === 0 && <span className="text-neutral-500">{t("users.unassigned")}</span>}
+          {(u.roles ?? []).map((r) => (
+            <Badge key={r.id} tone={r.is_super ? "brand" : "slate"}>
+              {L.role(r)}
+            </Badge>
+          ))}
+        </div>
+      ),
+    }),
+    col.accessor((u) => u.created_at, {
+      id: "created",
+      header: () => t("users.colCreated"),
+      cell: (c) => formatTime(c.getValue()),
+    }),
+    col.accessor((u) => (u.disabled ? 1 : 0), {
+      id: "status",
+      header: () => t("users.colStatus"),
+      cell: ({ row: { original: u } }) => (u.disabled ? <Badge>{t("users.disabled")}</Badge> : <Badge tone="green">{t("users.active")}</Badge>),
+    }),
+    col.display({
+      id: "actions",
+      header: () => <span className="sr-only">{t("table.actions")}</span>,
+      cell: ({ row: { original: u } }) => {
+        const self = u.id === me?.id;
+        if (!canRoles && !canManage) return null;
+        return (
+          <div className="flex justify-end">
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={t("table.more")}
+                      disabled={busy}
+                      className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-40"
+                    >
+                      <MoreHorizontal size={16} />
+                    </button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>{t("table.more")}</TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="end">
+                {canRoles && (
+                  <DropdownMenuItem
+                    disabled={!roles.data}
+                    onSelect={() => {
+                      setResetFor(null);
+                      setRolesFor({ id: u.id, ids: (u.roles ?? []).map((r) => r.id) });
+                    }}
+                  >
+                    <ShieldCheck /> {t("users.rolesAction")}
+                  </DropdownMenuItem>
+                )}
+                {canManage && (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setRolesFor(null);
+                      setResetFor(u.id);
+                      setNewPw("");
+                    }}
+                  >
+                    <KeyRound /> {t("users.resetPassword")}
+                  </DropdownMenuItem>
+                )}
+                {canManage && !self && (
+                  <>
+                    <DropdownMenuSeparator />
+                    {u.disabled ? (
+                      <DropdownMenuItem onSelect={() => void patch(u, { disabled: false }, t("users.enabledMsg", { name: u.username }))}>
+                        <UserCheck /> {t("users.enable")}
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={async () => {
+                          if (!(await confirm({ kind: "disable", description: t("users.disableConfirm", { name: u.username }) }))) return;
+                          void patch(u, { disabled: true }, t("users.disabledMsg", { name: u.username }));
+                        }}
+                      >
+                        <UserX /> {t("users.disable")}
+                      </DropdownMenuItem>
+                    )}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
+    }),
+  ];
 
   return (
     <div>
@@ -164,130 +289,63 @@ export default function AdminUsers() {
           }
         />
         <LoadState loading={loading && !users} error={error} onRetry={reload}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs text-neutral-600">
-                <tr>
-                  <th className="px-5 py-2 font-normal">{t("users.colUser")}</th>
-                  <th className="px-5 py-2 font-normal">{t("users.colDepartment")}</th>
-                  <th className="px-5 py-2 font-normal">{t("users.colRoles")}</th>
-                  <th className="px-5 py-2 text-right font-normal">{t("users.colCreated")}</th>
-                  <th className="px-5 py-2 font-normal">{t("users.colStatus")}</th>
-                  <th className="px-5 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {users?.map((u) => {
-                  const self = u.id === me?.id;
-                  const userRoles = u.roles ?? [];
-                  return (
-                    <tr key={u.id} className={cx("border-t border-neutral-100 align-top", u.disabled && "text-neutral-500")}>
-                      <td className="px-5 py-3">
-                        <div className={u.disabled ? "" : "text-neutral-900"}>
-                          {u.display_name || u.username}
-                          {self && <span className="ml-1.5 text-xs text-neutral-500">{t("users.you")}</span>}
-                        </div>
-                        <div className="text-xs text-neutral-600">{u.username}</div>
-                        {resetFor === u.id && (
-                          <form
-                            className="mt-2 flex flex-wrap gap-2"
-                            onSubmit={async (e) => {
-                              e.preventDefault();
-                              if (await patch(u, { password: newPw }, t("users.passwordReset", { name: u.username }))) {
-                                setResetFor(null);
-                                setNewPw("");
-                              }
-                            }}
-                          >
-                            <input
-                              aria-label={t("users.newPassword")}
-                              className={cx(inputBase, "h-8 w-48")}
-                              placeholder={t("users.newPasswordPlaceholder")}
-                              autoComplete="off"
-                              value={newPw}
-                              onChange={(e) => setNewPw(e.target.value)}
-                            />
-                            <Button size="sm" type="submit" disabled={busy || !newPw}>
-                              {t("users.confirmReset")}
-                            </Button>
-                            <Button size="sm" variant="ghost" type="button" onClick={() => setResetFor(null)}>
-                              {t("common.cancel")}
-                            </Button>
-                          </form>
-                        )}
-                        {rolesFor?.id === u.id && roles.data && (
-                          <div className="mt-3 space-y-3 rounded-md bg-neutral-50 p-3">
-                            <RolePicker roles={roles.data} value={rolesFor.ids} onChange={(ids) => setRolesFor({ id: u.id, ids })} />
-                            <div className="flex gap-2">
-                              <Button size="sm" disabled={busy} onClick={() => saveRoles(u, rolesFor.ids)}>
-                                {t("users.saveRoles")}
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setRolesFor(null)}>
-                                {t("common.cancel")}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-5 py-3">{u.department || "—"}</td>
-                      <td className="px-5 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {userRoles.length === 0 && <span className="text-neutral-500">{t("users.unassigned")}</span>}
-                          {userRoles.map((r) => (
-                            <Badge key={r.id} tone={r.is_super ? "brand" : "slate"}>
-                              {L.role(r)}
-                            </Badge>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums">{formatTime(u.created_at)}</td>
-                      <td className="px-5 py-3">{u.disabled ? <Badge>{t("users.disabled")}</Badge> : <Badge tone="green">{t("users.active")}</Badge>}</td>
-                      <td className="px-5 py-3">
-                        <div className="flex justify-end gap-3 text-sm whitespace-nowrap">
-                          {canRoles && (
-                            <button
-                              type="button"
-                              className="text-neutral-700 hover:text-neutral-900 disabled:opacity-50"
-                              disabled={busy || !roles.data}
-                              onClick={() => setRolesFor({ id: u.id, ids: userRoles.map((r) => r.id) })}
-                            >
-                              {t("users.rolesAction")}
-                            </button>
-                          )}
-                          {canManage && (
-                            <button
-                              type="button"
-                              className="text-neutral-700 hover:text-neutral-900 disabled:opacity-50"
-                              disabled={busy}
-                              onClick={() => {
-                                setResetFor(u.id);
-                                setNewPw("");
-                              }}
-                            >
-                              {t("users.resetPassword")}
-                            </button>
-                          )}
-                          {canManage && !self && (
-                            <button
-                              type="button"
-                              className={cx("disabled:opacity-50", u.disabled ? "text-neutral-700 hover:text-neutral-900" : "text-neutral-600 hover:text-red-700")}
-                              disabled={busy}
-                              onClick={() => {
-                                if (!u.disabled && !window.confirm(t("users.disableConfirm", { name: u.username }))) return;
-                                void patch(u, { disabled: !u.disabled }, u.disabled ? t("users.enabledMsg", { name: u.username }) : t("users.disabledMsg", { name: u.username }));
-                              }}
-                            >
-                              {u.disabled ? t("users.enable") : t("users.disable")}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            data={users ?? []}
+            getRowId={(u) => String(u.id)}
+            columns={columns}
+            searchText={(u) => `${u.username} ${u.display_name} ${u.department} ${(u.roles ?? []).map((r) => L.role(r)).join(" ")}`}
+            searchPlaceholder={t("users.searchPlaceholder")}
+            hideOnMobile={["department", "created"]}
+            alignRight={["created"]}
+            rowClassName={(u) => u.disabled && "text-neutral-500"}
+            emptyText={t("users.none")}
+            noMatchText={t("users.noMatch")}
+            initialSorting={[{ id: "created", desc: false }]}
+            renderExpanded={(u) =>
+              resetFor === u.id ? (
+                <form
+                  className="flex flex-wrap items-center gap-2"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (await patch(u, { password: newPw }, t("users.passwordReset", { name: u.username }))) {
+                      setResetFor(null);
+                      setNewPw("");
+                    }
+                  }}
+                >
+                  <span className="text-sm text-neutral-700">{t("users.resetPasswordFor", { name: u.username })}</span>
+                  <input
+                    aria-label={t("users.newPassword")}
+                    className={cx(inputBase, "h-8 w-56")}
+                    placeholder={t("users.newPasswordPlaceholder")}
+                    autoComplete="off"
+                    autoFocus
+                    value={newPw}
+                    onChange={(e) => setNewPw(e.target.value)}
+                  />
+                  <Button size="sm" type="submit" disabled={busy || !newPw}>
+                    {t("users.confirmReset")}
+                  </Button>
+                  <Button size="sm" variant="ghost" type="button" onClick={() => setResetFor(null)}>
+                    {t("common.cancel")}
+                  </Button>
+                </form>
+              ) : rolesFor?.id === u.id && roles.data ? (
+                <div className="space-y-3">
+                  <div className="text-sm text-neutral-700">{t("users.rolesFor", { name: u.username })}</div>
+                  <RolePicker roles={roles.data} value={rolesFor.ids} onChange={(ids) => setRolesFor({ id: u.id, ids })} />
+                  <div className="flex gap-2">
+                    <Button size="sm" disabled={busy} onClick={() => saveRoles(u, rolesFor.ids)}>
+                      {t("users.saveRoles")}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setRolesFor(null)}>
+                      {t("common.cancel")}
+                    </Button>
+                  </div>
+                </div>
+              ) : null
+            }
+          />
         </LoadState>
       </Card>
     </div>

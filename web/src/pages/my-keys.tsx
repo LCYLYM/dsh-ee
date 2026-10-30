@@ -5,6 +5,8 @@ import { useStore } from "../lib/store";
 import { ErrorNote, KeyStateBadge, LoadState, ModelsCell, TokensCell } from "../components/api-ui";
 import { Button, Card, CardHeader, CopyBox, Field, inputCls, PageHeader } from "../components/ui";
 import { useTranslation } from "react-i18next";
+import { useConfirm } from "@/lib/confirm";
+import { Combobox, DatePicker } from "@/components/pickers";
 
 function IssuedCard({ issued, onClose }: { issued: { plain: string; k: ApiKey }; onClose: () => void }) {
   const { t } = useTranslation();
@@ -147,7 +149,7 @@ function CreateKeyForm({
             <input className={inputCls} required value={name} onChange={(e) => setName(e.target.value)} placeholder={t("keys.create.namePlaceholder")} />
           </Field>
           <Field label={t("keys.create.expires")} hint={t("keys.create.expiresHint")}>
-            <input className={inputCls} type="date" value={expires} onChange={(e) => setExpires(e.target.value)} />
+            <DatePicker value={expires} onChange={setExpires} futureOnly />
           </Field>
         </div>
         <ErrorNote>{error}</ErrorNote>
@@ -166,6 +168,7 @@ function CreateKeyForm({
 
 export default function MyKeys() {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const { notify } = useStore();
   const { data, error, loading, reload } = useApi(api.myKeys);
   const { busy, run } = useAction();
@@ -179,7 +182,7 @@ export default function MyKeys() {
   const maxed = !!quota && quota.active_keys >= quota.max_keys;
 
   const revoke = async (id: number, name: string) => {
-    if (!window.confirm(t("keys.page.revokeConfirm", { name }))) return;
+    if (!(await confirm({ kind: "revoke", description: t("keys.page.revokeConfirm", { name }) }))) return;
     const r = await run(() => api.revokeMyKey(id));
     if (r.ok) {
       notify(t("keys.page.revoked", { name }));
