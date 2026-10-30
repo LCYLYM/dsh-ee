@@ -12,6 +12,7 @@ import Account from "./pages/account";
 import AdminUsers from "./pages/admin/users";
 import AdminProviders from "./pages/admin/providers";
 import AdminKeys from "./pages/admin/keys";
+import AdminQuotas from "./pages/admin/quotas";
 import Workbench from "./pages/workbench";
 import Apps from "./pages/apps";
 import Market from "./pages/market";
@@ -70,6 +71,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="admin/settings" element={<AdminSettings />} />
             <Route path="admin/users" element={<AdminUsers />} />
             <Route path="admin/providers" element={<AdminProviders />} />
+            <Route path="admin/quotas" element={<AdminQuotas />} />
             <Route path="admin/keys" element={<AdminKeys />} />
             </Route>
           </Route>

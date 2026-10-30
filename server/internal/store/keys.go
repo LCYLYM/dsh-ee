@@ -210,13 +210,51 @@ func (s *Store) CreateAPIKey(ctx context.Context, k *APIKey, keyHash string) err
 	return err
 }
 
+// UserQuota 是 key 所属用户的额度。网关鉴权时随 key 一起带出，避免二次查询。
+type UserQuota struct {
+	MonthlyTokenLimit *int64     `json:"monthly_token_limit"`
+	AllowedModels     []string   `json:"allowed_models"`
+	QuotaExpiresAt    *time.Time `json:"quota_expires_at"`
+}
+
 // ActiveKeyByHash 用于网关鉴权：未吊销、未过期、所属用户未禁用。
-func (s *Store) ActiveKeyByHash(ctx context.Context, keyHash string) (*APIKey, error) {
+func (s *Store) ActiveKeyByHash(ctx context.Context, keyHash string) (*APIKey, *UserQuota, error) {
 	t := now()
-	return scanKey(s.db.QueryRowContext(ctx,
-		`SELECT `+keyCols+` FROM api_keys k JOIN users u ON u.id = k.user_id
+	var limit sql.NullInt64
+	var models sql.NullString
+	var expires sql.NullTime
+	k, err := scanKey(s.db.QueryRowContext(ctx,
+		`SELECT `+keyCols+`, u.monthly_token_limit, u.allowed_models, u.quota_expires_at
+		 FROM api_keys k JOIN users u ON u.id = k.user_id
 		 WHERE k.key_hash = ? AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > ?) AND u.disabled = 0`,
-		keyHash, t))
+		keyHash, t), &limit, &models, &expires)
+	if err != nil {
+		return nil, nil, err
+	}
+	q := &UserQuota{}
+	if limit.Valid {
+		v := limit.Int64
+		q.MonthlyTokenLimit = &v
+	}
+	if models.Valid && models.String != "" {
+		if err := json.Unmarshal([]byte(models.String), &q.AllowedModels); err != nil {
+			return nil, nil, err
+		}
+	}
+	if expires.Valid {
+		v := expires.Time
+		q.QuotaExpiresAt = &v
+	}
+	return k, q, nil
+}
+
+// CountActiveKeys 统计用户当前可用的 key 数，用于限制自助创建的数量。
+func (s *Store) CountActiveKeys(ctx context.Context, userID int64) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM api_keys WHERE user_id = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)",
+		userID, now()).Scan(&n)
+	return n, err
 }
 
 func (s *Store) GetAPIKey(ctx context.Context, id int64) (*APIKey, error) {
@@ -290,11 +328,11 @@ func (s *Store) RecordUsage(ctx context.Context, u Usage) error {
 	return err
 }
 
-func (s *Store) MonthTokens(ctx context.Context, apiKeyID int64) (int64, error) {
+func (s *Store) MonthTokensByUser(ctx context.Context, userID int64) (int64, error) {
 	var n int64
 	err := s.db.QueryRowContext(ctx,
-		"SELECT COALESCE(SUM(total_tokens), 0) FROM usage_logs WHERE api_key_id = ? AND created_at >= ?",
-		apiKeyID, MonthStart(now())).Scan(&n)
+		"SELECT COALESCE(SUM(total_tokens), 0) FROM usage_logs WHERE user_id = ? AND created_at >= ?",
+		userID, MonthStart(now())).Scan(&n)
 	return n, err
 }
 

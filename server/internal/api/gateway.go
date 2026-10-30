@@ -26,33 +26,41 @@ func writeOpenAIErr(w http.ResponseWriter, status int, typ, code, msg string) {
 	writeJSON(w, status, map[string]any{"error": map[string]string{"message": msg, "type": typ, "code": code}})
 }
 
-// authKey 校验 Authorization: Bearer sk-ee-…
-func (s *Server) authKey(w http.ResponseWriter, r *http.Request) (*store.APIKey, bool) {
+// authKey 校验 Authorization: Bearer sk-ee-…，并带出所属用户的额度。
+func (s *Server) authKey(w http.ResponseWriter, r *http.Request) (*store.APIKey, *store.UserQuota, bool) {
 	auth := r.Header.Get("Authorization")
 	token, ok := strings.CutPrefix(auth, "Bearer ")
 	if !ok || !strings.HasPrefix(token, keyPrefix) {
 		writeOpenAIErr(w, http.StatusUnauthorized, "invalid_request_error", "invalid_api_key", "缺少或无效的 API key")
-		return nil, false
+		return nil, nil, false
 	}
-	k, err := s.store.ActiveKeyByHash(r.Context(), secret.Hash(strings.TrimSpace(token)))
+	k, quota, err := s.store.ActiveKeyByHash(r.Context(), secret.Hash(strings.TrimSpace(token)))
 	if notFound(err) {
 		writeOpenAIErr(w, http.StatusUnauthorized, "invalid_request_error", "invalid_api_key", "API key 无效、已吊销或已过期")
-		return nil, false
+		return nil, nil, false
 	}
 	if err != nil {
 		s.log.Error("gateway auth", "err", err)
 		writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "internal_error", "服务器内部错误")
-		return nil, false
+		return nil, nil, false
 	}
-	return k, true
+	if quota.QuotaExpiresAt != nil && !quota.QuotaExpiresAt.After(time.Now()) {
+		writeOpenAIErr(w, http.StatusForbidden, "permission_error", "quota_expired", "额度已过期，请联系管理员")
+		return nil, nil, false
+	}
+	return k, quota, true
 }
 
-func modelAllowed(k *store.APIKey, model string) bool {
+// modelAllowed 同时校验用户额度上的模型权限与旧 key 上的限制（兼容升级前的数据）。
+func modelAllowed(k *store.APIKey, quota *store.UserQuota, model string) bool {
+	if len(quota.AllowedModels) > 0 && !slices.Contains(quota.AllowedModels, model) {
+		return false
+	}
 	return len(k.AllowedModels) == 0 || slices.Contains(k.AllowedModels, model)
 }
 
 func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
-	k, ok := s.authKey(w, r)
+	k, quota, ok := s.authKey(w, r)
 	if !ok {
 		return
 	}
@@ -71,7 +79,7 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 	data := []model{}
 	for _, p := range ps {
 		for _, m := range p.Models {
-			if !seen[m] && modelAllowed(k, m) {
+			if !seen[m] && modelAllowed(k, quota, m) {
 				seen[m] = true
 				data = append(data, model{ID: m, Object: "model", OwnedBy: p.Name})
 			}
@@ -88,7 +96,7 @@ type tokenUsage struct {
 
 func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	k, ok := s.authKey(w, r)
+	k, quota, ok := s.authKey(w, r)
 	if !ok {
 		return
 	}
@@ -110,19 +118,23 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		writeOpenAIErr(w, http.StatusBadRequest, "invalid_request_error", "model_required", "缺少 model")
 		return
 	}
-	if !modelAllowed(k, model) {
-		writeOpenAIErr(w, http.StatusForbidden, "permission_error", "model_not_allowed", "这个 key 不允许使用模型 "+model)
+	if !modelAllowed(k, quota, model) {
+		writeOpenAIErr(w, http.StatusForbidden, "permission_error", "model_not_allowed", "这个账号的额度不允许使用模型 "+model)
 		return
 	}
-	if k.MonthlyTokenLimit != nil {
-		used, err := s.store.MonthTokens(r.Context(), k.ID)
+	if quota.MonthlyTokenLimit != nil {
+		used, err := s.store.MonthTokensByUser(r.Context(), k.UserID)
 		if err != nil {
-			s.log.Error("month tokens", "err", err)
+			s.log.Error("month tokens", "user", k.UserID, "err", err)
 			writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "internal_error", "服务器内部错误")
 			return
 		}
-		if used >= *k.MonthlyTokenLimit {
-			writeOpenAIErr(w, http.StatusTooManyRequests, "insufficient_quota", "monthly_quota_exceeded", "本月 token 额度已用完，请联系管理员")
+		if used >= *quota.MonthlyTokenLimit {
+			msg := "本月 token 额度已用完，请联系管理员"
+			if *quota.MonthlyTokenLimit == 0 {
+				msg = "管理员还没有给你分配额度，请联系管理员"
+			}
+			writeOpenAIErr(w, http.StatusTooManyRequests, "insufficient_quota", "monthly_quota_exceeded", msg)
 			return
 		}
 	}

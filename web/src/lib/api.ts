@@ -10,6 +10,22 @@ export interface User {
   role: Role;
   disabled: boolean;
   created_at: string;
+  /** 用户级月度额度：null = 不限额，0 = 未分配，>0 = 每月 token 上限。 */
+  monthly_token_limit: number | null;
+  allowed_models: string[] | null;
+  quota_expires_at: string | null;
+  /** 本月（UTC）已用 token，管理端列表查询时填充。 */
+  month_tokens: number;
+}
+
+/** 员工自己的额度视图，所有 key 共享。 */
+export interface MyQuota {
+  monthly_token_limit: number | null;
+  month_tokens: number;
+  allowed_models: string[] | null;
+  expires_at: string | null;
+  active_keys: number;
+  max_keys: number;
 }
 
 export interface Provider {
@@ -92,7 +108,9 @@ export const api = {
   changePassword: (old_password: string, new_password: string) =>
     request<void>("POST", "/api/auth/password", { old_password, new_password }),
 
-  myKeys: () => request<{ keys: ApiKey[] }>("GET", "/api/me/keys").then((r) => r.keys),
+  myKeys: () => request<{ keys: ApiKey[]; quota: MyQuota }>("GET", "/api/me/keys"),
+  createMyKey: (k: { name: string; expires_at?: string }) =>
+    request<{ key: string; api_key: ApiKey }>("POST", "/api/me/keys", k),
   revokeMyKey: (id: number) => request<void>("DELETE", `/api/me/keys/${id}`),
 
   users: () => request<{ users: User[] }>("GET", "/api/admin/users").then((r) => r.users),
@@ -102,6 +120,11 @@ export const api = {
     id: number,
     patch: Partial<{ display_name: string; department: string; role: Role; disabled: boolean; password: string }>,
   ) => request<User>("PATCH", `/api/admin/users/${id}`, patch),
+  /** 整份替换额度：显式 null 表示不限额 / 全部模型 / 永不过期。 */
+  updateUserQuota: (
+    id: number,
+    patch: { monthly_token_limit?: number | null; allowed_models?: string[] | null; quota_expires_at?: string | null },
+  ) => request<User>("PATCH", `/api/admin/users/${id}/quota`, patch),
 
   providers: () => request<{ providers: Provider[] }>("GET", "/api/admin/providers").then((r) => r.providers),
   createProvider: (p: { name: string; base_url: string; api_key: string; models: string[] }) =>
@@ -111,13 +134,8 @@ export const api = {
   deleteProvider: (id: number) => request<void>("DELETE", `/api/admin/providers/${id}`),
 
   keys: () => request<{ keys: ApiKey[] }>("GET", "/api/admin/keys").then((r) => r.keys),
-  issueKey: (k: {
-    user_id: number;
-    name: string;
-    monthly_token_limit?: number;
-    allowed_models?: string[];
-    expires_at?: string;
-  }) => request<{ key: string; api_key: ApiKey }>("POST", "/api/admin/keys", k),
+  issueKey: (k: { user_id: number; name: string; expires_at?: string }) =>
+    request<{ key: string; api_key: ApiKey }>("POST", "/api/admin/keys", k),
   revokeKey: (id: number) => request<void>("DELETE", `/api/admin/keys/${id}`),
 };
 

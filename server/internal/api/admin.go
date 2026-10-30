@@ -26,11 +26,12 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 type createUserReq struct {
-	Username    string `json:"username"`
-	Password    string `json:"password"`
-	DisplayName string `json:"display_name"`
-	Department  string `json:"department"`
-	Role        string `json:"role"`
+	Username          string        `json:"username"`
+	Password          string        `json:"password"`
+	DisplayName       string        `json:"display_name"`
+	Department        string        `json:"department"`
+	Role              string        `json:"role"`
+	MonthlyTokenLimit nullableInt64 `json:"monthly_token_limit"`
 }
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -55,12 +56,27 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	// 新用户默认 0：管理员分配额度后才能调用模型。显式传 null 表示不限额。
+	limit := int64(0)
+	if req.MonthlyTokenLimit.Set {
+		if req.MonthlyTokenLimit.Value != nil && *req.MonthlyTokenLimit.Value < 0 {
+			writeErr(w, http.StatusBadRequest, "monthly_token_limit 不能为负数")
+			return
+		}
+		if req.MonthlyTokenLimit.Value != nil {
+			limit = *req.MonthlyTokenLimit.Value
+		}
+	}
 	u := &store.User{
-		Username:     req.Username,
-		DisplayName:  strings.TrimSpace(req.DisplayName),
-		Department:   strings.TrimSpace(req.Department),
-		Role:         req.Role,
-		PasswordHash: hash,
+		Username:          req.Username,
+		DisplayName:       strings.TrimSpace(req.DisplayName),
+		Department:        strings.TrimSpace(req.Department),
+		Role:              req.Role,
+		PasswordHash:      hash,
+		MonthlyTokenLimit: &limit,
+	}
+	if req.MonthlyTokenLimit.Set && req.MonthlyTokenLimit.Value == nil {
+		u.MonthlyTokenLimit = nil
 	}
 	if err := s.store.CreateUser(r.Context(), u); err != nil {
 		if errors.Is(err, store.ErrDuplicate) {
@@ -285,7 +301,7 @@ func (s *Server) handleDeleteProvider(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// ---- 分发 key ----
+// ---- 代发 key（员工也可以在自己的「我的 API key」里自助创建）----
 
 func (s *Server) handleListKeys(w http.ResponseWriter, r *http.Request) {
 	keys, err := s.store.ListAPIKeys(r.Context(), 0)
@@ -297,11 +313,9 @@ func (s *Server) handleListKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 type issueKeyReq struct {
-	UserID            int64      `json:"user_id"`
-	Name              string     `json:"name"`
-	MonthlyTokenLimit *int64     `json:"monthly_token_limit"`
-	AllowedModels     []string   `json:"allowed_models"`
-	ExpiresAt         *time.Time `json:"expires_at"`
+	UserID    int64      `json:"user_id"`
+	Name      string     `json:"name"`
+	ExpiresAt *time.Time `json:"expires_at"`
 }
 
 const keyPrefix = "sk-ee-"
@@ -314,10 +328,6 @@ func (s *Server) handleIssueKey(w http.ResponseWriter, r *http.Request) {
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
 		writeErr(w, http.StatusBadRequest, "name 不能为空")
-		return
-	}
-	if req.MonthlyTokenLimit != nil && *req.MonthlyTokenLimit <= 0 {
-		writeErr(w, http.StatusBadRequest, "monthly_token_limit 必须大于 0，不限额请不传")
 		return
 	}
 	if req.ExpiresAt != nil && !req.ExpiresAt.After(time.Now()) {
@@ -340,14 +350,12 @@ func (s *Server) handleIssueKey(w http.ResponseWriter, r *http.Request) {
 
 	plain := keyPrefix + secret.Token()
 	k := &store.APIKey{
-		UserID:            owner.ID,
-		Username:          owner.Username,
-		Name:              req.Name,
-		Prefix:            plain[:len(keyPrefix)+6],
-		MonthlyTokenLimit: req.MonthlyTokenLimit,
-		AllowedModels:     cleanModels(req.AllowedModels),
-		ExpiresAt:         req.ExpiresAt,
-		CreatedBy:         currentUser(r).ID,
+		UserID:    owner.ID,
+		Username:  owner.Username,
+		Name:      req.Name,
+		Prefix:    plain[:len(keyPrefix)+6],
+		ExpiresAt: req.ExpiresAt,
+		CreatedBy: currentUser(r).ID,
 	}
 	if k.ExpiresAt != nil {
 		t := k.ExpiresAt.UTC()
@@ -369,41 +377,6 @@ func (s *Server) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.RevokeAPIKey(r.Context(), id); err != nil {
 		if notFound(err) {
 			writeErr(w, http.StatusNotFound, "key 不存在或已吊销")
-			return
-		}
-		s.internalErr(w, r, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (s *Server) handleMyKeys(w http.ResponseWriter, r *http.Request) {
-	keys, err := s.store.ListAPIKeys(r.Context(), currentUser(r).ID)
-	if err != nil {
-		s.internalErr(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"keys": nonNil(keys)})
-}
-
-func (s *Server) handleRevokeMyKey(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r)
-	if !ok {
-		return
-	}
-	k, err := s.store.GetAPIKey(r.Context(), id)
-	// 不是自己的 key 一律按不存在处理，不暴露别人的 key id
-	if notFound(err) || (err == nil && k.UserID != currentUser(r).ID) {
-		writeErr(w, http.StatusNotFound, "key 不存在")
-		return
-	}
-	if err != nil {
-		s.internalErr(w, r, err)
-		return
-	}
-	if err := s.store.RevokeAPIKey(r.Context(), id); err != nil {
-		if notFound(err) {
-			writeErr(w, http.StatusNotFound, "key 已吊销")
 			return
 		}
 		s.internalErr(w, r, err)

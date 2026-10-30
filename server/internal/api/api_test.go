@@ -133,7 +133,7 @@ func expect(t *testing.T, what string, got, want int, body []byte) {
 	}
 }
 
-func TestLoginAndKeyDistribution(t *testing.T) {
+func TestLoginAndUserQuota(t *testing.T) {
 	st := openTestStore(t)
 	ctx := context.Background()
 	if ok, err := api.Bootstrap(ctx, st, "admin", "admin-password-123"); err != nil || !ok {
@@ -179,7 +179,7 @@ func TestLoginAndKeyDistribution(t *testing.T) {
 		t.Fatalf("上游明文 key 被返回了：%s", body)
 	}
 
-	// 员工 alice
+	// 员工 alice：新用户默认额度为 0，管理员分配后才能调用
 	code, body = admin.do("POST", "/api/admin/users", map[string]any{"username": "alice", "password": "short"}, nil)
 	expect(t, "弱密码", code, 400, body)
 	code, body = admin.do("POST", "/api/admin/users", map[string]any{
@@ -188,73 +188,206 @@ func TestLoginAndKeyDistribution(t *testing.T) {
 	expect(t, "创建员工", code, 201, body)
 	var alice store.User
 	_ = json.Unmarshal(body, &alice)
+	if alice.MonthlyTokenLimit == nil || *alice.MonthlyTokenLimit != 0 {
+		t.Fatalf("新用户应默认 0 额度：%s", body)
+	}
 
-	// 给 alice 分发 key：每月 20 token，只能用 deepseek-chat
-	code, body = admin.do("POST", "/api/admin/keys", map[string]any{
-		"user_id": alice.ID, "name": "alice 的 DSH", "monthly_token_limit": 20, "allowed_models": []string{"deepseek-chat"},
+	// 给 alice 分配：每月 20 token，只能用 deepseek-chat
+	code, body = admin.do("PATCH", "/api/admin/users/"+itoa(alice.ID)+"/quota", map[string]any{
+		"monthly_token_limit": 20, "allowed_models": []string{"deepseek-chat"},
 	}, nil)
-	expect(t, "分发 key", code, 201, body)
-	var issued struct {
-		Key    string       `json:"key"`
-		APIKey store.APIKey `json:"api_key"`
+	expect(t, "分配额度", code, 200, body)
+	var aliceQuota store.User
+	_ = json.Unmarshal(body, &aliceQuota)
+	if aliceQuota.MonthlyTokenLimit == nil || *aliceQuota.MonthlyTokenLimit != 20 ||
+		len(aliceQuota.AllowedModels) != 1 || aliceQuota.AllowedModels[0] != "deepseek-chat" {
+		t.Fatalf("额度没有保存：%s", body)
 	}
-	_ = json.Unmarshal(body, &issued)
-	if !strings.HasPrefix(issued.Key, "sk-ee-") || !strings.HasPrefix(issued.Key, issued.APIKey.Prefix) {
-		t.Fatalf("key 格式不对：%+v", issued)
+	code, body = admin.do("PATCH", "/api/admin/users/"+itoa(alice.ID)+"/quota", map[string]any{"monthly_token_limit": -1}, nil)
+	expect(t, "负数额度", code, 400, body)
+	code, body = admin.do("PATCH", "/api/admin/users/"+itoa(alice.ID)+"/quota", map[string]any{"quota_expires_at": "2020-01-01T00:00:00Z"}, nil)
+	expect(t, "过去的额度有效期", code, 400, body)
+
+	// alice 登录后自助创建两个 key：key 只是凭证，额度按用户共享
+	ac := newClient(t, ts.URL)
+	code, body = ac.do("POST", "/api/auth/login", map[string]string{"username": "alice", "password": "alice-password-1"}, nil)
+	expect(t, "alice 登录", code, 200, body)
+	mkKey := func(name string) (string, store.APIKey) {
+		t.Helper()
+		code, body := ac.do("POST", "/api/me/keys", map[string]any{"name": name}, nil)
+		expect(t, "自助创建 key", code, 201, body)
+		var issued struct {
+			Key    string       `json:"key"`
+			APIKey store.APIKey `json:"api_key"`
+		}
+		_ = json.Unmarshal(body, &issued)
+		if !strings.HasPrefix(issued.Key, "sk-ee-") || !strings.HasPrefix(issued.Key, issued.APIKey.Prefix) {
+			t.Fatalf("key 格式不对：%s", body)
+		}
+		if issued.APIKey.CreatedBy != alice.ID {
+			t.Fatalf("自助创建的 key 应记在员工自己名下：%s", body)
+		}
+		return issued.Key, issued.APIKey
 	}
-	bearer := map[string]string{"Authorization": "Bearer " + issued.Key}
+	key1, k1 := mkKey("alice 的 DSH")
+	key2, k2 := mkKey("alice 的脚本")
+	bearer1 := map[string]string{"Authorization": "Bearer " + key1}
+	bearer2 := map[string]string{"Authorization": "Bearer " + key2}
+
+	type myKeysResp struct {
+		Keys  []store.APIKey `json:"keys"`
+		Quota struct {
+			MonthlyTokenLimit *int64   `json:"monthly_token_limit"`
+			MonthTokens       int64    `json:"month_tokens"`
+			AllowedModels     []string `json:"allowed_models"`
+			ActiveKeys        int      `json:"active_keys"`
+			MaxKeys           int      `json:"max_keys"`
+		} `json:"quota"`
+	}
+	code, body = ac.do("GET", "/api/me/keys", nil, nil)
+	expect(t, "我的 key", code, 200, body)
+	var mine myKeysResp
+	_ = json.Unmarshal(body, &mine)
+	if len(mine.Keys) != 2 || mine.Quota.MonthTokens != 0 || mine.Quota.ActiveKeys != 2 || mine.Quota.MaxKeys != 10 ||
+		mine.Quota.MonthlyTokenLimit == nil || *mine.Quota.MonthlyTokenLimit != 20 {
+		t.Fatalf("我的 key / 额度不对：%s", body)
+	}
 
 	gw := newClient(t, ts.URL)
 	code, body = gw.do("GET", "/v1/models", nil, map[string]string{"Authorization": "Bearer sk-ee-bogus"})
 	expect(t, "假 key", code, 401, body)
-	code, body = gw.do("GET", "/v1/models", nil, bearer)
+	code, body = gw.do("GET", "/v1/models", nil, bearer1)
 	expect(t, "模型列表", code, 200, body)
 	if !bytes.Contains(body, []byte("deepseek-chat")) || bytes.Contains(body, []byte("deepseek-reasoner")) {
-		t.Fatalf("模型列表应只含允许的模型：%s", body)
+		t.Fatalf("模型列表应只含额度允许的模型：%s", body)
 	}
 
-	chat := func(model string, stream bool) (int, []byte) {
+	chat := func(bearer map[string]string, model string, stream bool) (int, []byte) {
 		return gw.do("POST", "/v1/chat/completions", map[string]any{
 			"model": model, "stream": stream, "messages": []map[string]string{{"role": "user", "content": "你好"}},
 		}, bearer)
 	}
-	code, body = chat("deepseek-reasoner", false)
+	code, body = chat(bearer1, "deepseek-reasoner", false)
 	expect(t, "不允许的模型", code, 403, body)
-	code, body = chat("deepseek-chat", false)
+	code, body = chat(bearer1, "deepseek-chat", false)
 	expect(t, "非流式调用", code, 200, body)
-	code, body = chat("deepseek-chat", true)
-	expect(t, "流式调用", code, 200, body)
+	code, body = chat(bearer2, "deepseek-chat", true)
+	expect(t, "另一个 key 的流式调用", code, 200, body)
 	if !bytes.Contains(body, []byte("data: [DONE]")) || !bytes.Contains(body, []byte(`"好"`)) {
 		t.Fatalf("流式响应没有完整转发：%s", body)
 	}
 	if !sawIncludeUsage.Load() {
 		t.Fatal("流式请求应带上 stream_options.include_usage")
 	}
-	// 已用 15 + 15 = 30 ≥ 20，额度用完
-	code, body = chat("deepseek-chat", false)
-	expect(t, "超额", code, 429, body)
+	// 两个 key 各用 15 token，共享同一份 20 token 额度
+	code, body = chat(bearer1, "deepseek-chat", false)
+	expect(t, "共享额度用完后超额", code, 429, body)
+	if !bytes.Contains(body, []byte("monthly_quota_exceeded")) {
+		t.Fatalf("超额错误码不对：%s", body)
+	}
 
-	// alice 登录后能看到自己的 key 与本月用量，但进不了管理接口
-	ac := newClient(t, ts.URL)
-	code, body = ac.do("POST", "/api/auth/login", map[string]string{"username": "alice", "password": "alice-password-1"}, nil)
-	expect(t, "alice 登录", code, 200, body)
+	// 额度用量按用户统计，key 上只显示各自的用量
+	code, body = ac.do("GET", "/api/me/keys", nil, nil)
+	expect(t, "超额后的我的 key", code, 200, body)
+	mine = myKeysResp{}
+	_ = json.Unmarshal(body, &mine)
+	if mine.Quota.MonthTokens != 30 {
+		t.Fatalf("用户本月用量应为 30：%s", body)
+	}
+	for _, k := range mine.Keys {
+		if k.MonthTokens != 15 {
+			t.Fatalf("每个 key 的用量应为 15：%s", body)
+		}
+	}
+
+	// 员工可以吊销自己的 key，但动不了别人的
+	code, body = ac.do("DELETE", "/api/me/keys/"+itoa(k2.ID), nil, nil)
+	expect(t, "吊销自己的 key", code, 204, body)
+	code, body = chat(bearer2, "deepseek-chat", false)
+	expect(t, "已吊销的 key", code, 401, body)
+
+	// 管理员也能吊销任意 key
+	code, body = admin.do("DELETE", "/api/admin/keys/"+itoa(k1.ID), nil, nil)
+	expect(t, "管理员吊销", code, 204, body)
+	code, body = chat(bearer1, "deepseek-chat", false)
+	expect(t, "管理员吊销后的 key", code, 401, body)
+
+	// 管理员仍可代发 key：额度仍按用户算，alice 已用完 → 429
+	code, body = admin.do("POST", "/api/admin/keys", map[string]any{"user_id": alice.ID, "name": "运维代发"}, nil)
+	expect(t, "管理员代发 key", code, 201, body)
+	var proxyIssued struct {
+		Key string `json:"key"`
+	}
+	_ = json.Unmarshal(body, &proxyIssued)
+	code, body = chat(map[string]string{"Authorization": "Bearer " + proxyIssued.Key}, "deepseek-chat", false)
+	expect(t, "代发 key 共享用户额度", code, 429, body)
+
+	// 未分配额度的用户：能建 key，但调用会被拒；管理员可改成不限额
+	code, body = admin.do("POST", "/api/admin/users", map[string]any{"username": "bob", "password": "bob-password-1"}, nil)
+	expect(t, "创建 bob", code, 201, body)
+	var bob store.User
+	_ = json.Unmarshal(body, &bob)
+	bc := newClient(t, ts.URL)
+	code, body = bc.do("POST", "/api/auth/login", map[string]string{"username": "bob", "password": "bob-password-1"}, nil)
+	expect(t, "bob 登录", code, 200, body)
+	bobKey, _ := func() (string, store.APIKey) {
+		code, body := bc.do("POST", "/api/me/keys", map[string]any{"name": "bob 的 key"}, nil)
+		expect(t, "bob 建 key", code, 201, body)
+		var issued struct {
+			Key    string       `json:"key"`
+			APIKey store.APIKey `json:"api_key"`
+		}
+		_ = json.Unmarshal(body, &issued)
+		return issued.Key, issued.APIKey
+	}()
+	code, body = chat(map[string]string{"Authorization": "Bearer " + bobKey}, "deepseek-chat", false)
+	expect(t, "未分配额度", code, 429, body)
+	if !bytes.Contains(body, []byte("还没有给你分配额度")) {
+		t.Fatalf("未分配额度的错误信息不对：%s", body)
+	}
+	code, body = admin.do("PATCH", "/api/admin/users/"+itoa(bob.ID)+"/quota", map[string]any{"monthly_token_limit": nil}, nil)
+	expect(t, "改成不限额", code, 200, body)
+	code, body = chat(map[string]string{"Authorization": "Bearer " + bobKey}, "deepseek-chat", false)
+	expect(t, "不限额后调用", code, 200, body)
+	code, body = admin.do("PATCH", "/api/admin/users/"+itoa(bob.ID)+"/quota", map[string]any{"monthly_token_limit": 0}, nil)
+	expect(t, "改回 0 额度", code, 200, body)
+	code, body = chat(map[string]string{"Authorization": "Bearer " + bobKey}, "deepseek-chat", false)
+	expect(t, "0 额度", code, 429, body)
+
+	// 自助建 key 有数量上限（默认 10 个有效 key）
+	for i := 0; i < 9; i++ {
+		code, body = bc.do("POST", "/api/me/keys", map[string]any{"name": "bob 的 key " + itoa(int64(i+2))}, nil)
+		expect(t, "bob 继续建 key", code, 201, body)
+	}
+	code, body = bc.do("POST", "/api/me/keys", map[string]any{"name": "第 11 个"}, nil)
+	expect(t, "超过 key 数量上限", code, 400, body)
+
+	// 管理列表带额度与本月用量
+	code, body = admin.do("GET", "/api/admin/users", nil, nil)
+	expect(t, "用户列表", code, 200, body)
+	var users struct {
+		Users []store.User `json:"users"`
+	}
+	_ = json.Unmarshal(body, &users)
+	var bobListed, aliceListed *store.User
+	for i := range users.Users {
+		switch users.Users[i].Username {
+		case "bob":
+			bobListed = &users.Users[i]
+		case "alice":
+			aliceListed = &users.Users[i]
+		}
+	}
+	if bobListed == nil || bobListed.MonthTokens != 15 {
+		t.Fatalf("bob 的本月用量应为 15：%s", body)
+	}
+	if aliceListed == nil || aliceListed.MonthTokens != 30 {
+		t.Fatalf("alice 的本月用量应为 30：%s", body)
+	}
+
+	// 员工不能访问管理接口
 	code, body = ac.do("GET", "/api/admin/users", nil, nil)
 	expect(t, "员工访问管理接口", code, 403, body)
-	code, body = ac.do("GET", "/api/me/keys", nil, nil)
-	expect(t, "我的 key", code, 200, body)
-	var mine struct {
-		Keys []store.APIKey `json:"keys"`
-	}
-	_ = json.Unmarshal(body, &mine)
-	if len(mine.Keys) != 1 || mine.Keys[0].MonthTokens != 30 || mine.Keys[0].LastUsedAt == nil {
-		t.Fatalf("我的 key 用量不对：%s", body)
-	}
-
-	// 吊销后网关立即拒绝
-	code, body = admin.do("DELETE", "/api/admin/keys/"+itoa(issued.APIKey.ID), nil, nil)
-	expect(t, "吊销", code, 204, body)
-	code, body = chat("deepseek-chat", false)
-	expect(t, "已吊销的 key", code, 401, body)
 
 	// 禁用 alice：会话立即失效
 	code, body = admin.do("PATCH", "/api/admin/users/"+itoa(alice.ID), map[string]any{"disabled": true}, nil)

@@ -19,6 +19,7 @@ import {
   Settings as SettingsIcon,
   Terminal,
   Upload,
+  Wallet,
   X,
 } from "lucide-react";
 import { useStore } from "../lib/store";
@@ -90,7 +91,7 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
     ...(settings.distribution.enabled ? [{ to: "/dsh", label: "下载 DSH", icon: Download }] : []),
     { to: "/setup", label: "接入指南", icon: Terminal },
     { to: "/publish", label: "分享能力", icon: Upload },
-    { to: "/keys", label: "我的 API key", icon: KeyRound },
+    { to: "/keys", label: "额度与 API key", icon: KeyRound },
   ];
   const admin: NavItem[] = [
     { to: "/admin", label: "总览", icon: Gauge, end: true },
@@ -104,8 +105,9 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
   ];
   const access: NavItem[] = [
     { to: "/admin/users", label: "用户", icon: Users },
+    { to: "/admin/quotas", label: "额度分配", icon: Wallet },
     { to: "/admin/providers", label: "模型服务", icon: Bot },
-    { to: "/admin/keys", label: "API key 分发", icon: KeyRound },
+    { to: "/admin/keys", label: "API key", icon: KeyRound },
   ];
   return (
     <div className="flex min-h-full flex-col px-3 py-4">
@@ -194,7 +196,7 @@ export function AppLayout() {
           <Outlet />
         </main>
         <footer className="mx-auto max-w-[1240px] px-4 pb-8 text-xs text-neutral-500 sm:px-8">
-          dsh-ee 原型 · 账号、模型服务与 API key 已接真实后端，其余页面为模拟数据 · 上游插件取自 dshfind.com
+          dsh-ee 原型 · 账号、额度、模型服务与 API key 已接真实后端，其余页面为模拟数据 · 上游插件取自 dshfind.com
         </footer>
       </div>
       <Toast />

@@ -57,8 +57,9 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/auth/me", s.requireUser(http.HandlerFunc(s.handleMe)))
 	mux.Handle("POST /api/auth/password", s.requireUser(http.HandlerFunc(s.handleChangePassword)))
 
-	// 员工：查看、吊销自己的 key
+	// 员工：额度、查看并自助创建 / 吊销自己的 key
 	mux.Handle("GET /api/me/keys", s.requireUser(http.HandlerFunc(s.handleMyKeys)))
+	mux.Handle("POST /api/me/keys", s.requireUser(http.HandlerFunc(s.handleCreateMyKey)))
 	mux.Handle("DELETE /api/me/keys/{id}", s.requireUser(http.HandlerFunc(s.handleRevokeMyKey)))
 
 	// 管理员
@@ -66,6 +67,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/admin/users", admin(s.handleListUsers))
 	mux.Handle("POST /api/admin/users", admin(s.handleCreateUser))
 	mux.Handle("PATCH /api/admin/users/{id}", admin(s.handleUpdateUser))
+	mux.Handle("PATCH /api/admin/users/{id}/quota", admin(s.handleUpdateUserQuota))
 	mux.Handle("GET /api/admin/providers", admin(s.handleListProviders))
 	mux.Handle("POST /api/admin/providers", admin(s.handleCreateProvider))
 	mux.Handle("PATCH /api/admin/providers/{id}", admin(s.handleUpdateProvider))
@@ -74,7 +76,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/admin/keys", admin(s.handleIssueKey))
 	mux.Handle("DELETE /api/admin/keys/{id}", admin(s.handleRevokeKey))
 
-	// OpenAI 兼容网关，用分发的 key 鉴权
+	// OpenAI 兼容网关，用个人 key 鉴权
 	mux.HandleFunc("GET /v1/models", s.handleModels)
 	mux.HandleFunc("POST /v1/chat/completions", s.handleChatCompletions)
 

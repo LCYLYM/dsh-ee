@@ -1,7 +1,7 @@
 /** 接真实接口的页面共用的小组件：加载 / 出错状态、key 状态、用量条。 */
 import type { ReactNode } from "react";
 import { formatTokens, keyState, type ApiKey } from "../lib/api";
-import { Badge, Button } from "./ui";
+import { Badge, Button, cx } from "./ui";
 
 export function LoadState({ loading, error, onRetry, children }: { loading: boolean; error: string | null; onRetry: () => void; children: ReactNode }) {
   if (error) {
@@ -34,27 +34,39 @@ export function KeyStateBadge({ k }: { k: ApiKey }) {
   return <Badge tone="green">有效</Badge>;
 }
 
-/** 本月用量；有额度时画一条进度，超过 90% 标红。 */
-export function UsageCell({ k }: { k: ApiKey }) {
-  const limit = k.monthly_token_limit;
-  if (!limit) {
+/** 单个 key 的本月用量（额度按用户共享，所以这里不显示上限）。 */
+export function TokensCell({ tokens }: { tokens: number }) {
+  return <span className="tabular-nums">{formatTokens(tokens)}</span>;
+}
+
+/** 用户级额度条：null = 不限额，0 = 未分配，>0 = 本月上限。 */
+export function QuotaBar({ used, limit }: { used: number; limit: number | null }) {
+  if (limit === 0) {
+    return <Badge tone="amber">未分配</Badge>;
+  }
+  if (limit === null) {
     return (
       <span className="tabular-nums">
-        {formatTokens(k.month_tokens)}
+        {formatTokens(used)}
         <span className="text-neutral-500"> / 不限</span>
       </span>
     );
   }
-  const pct = Math.min(100, (k.month_tokens / limit) * 100);
+  const pct = Math.min(100, (used / limit) * 100);
+  const over = used >= limit;
   return (
     <div className="min-w-32">
       <div className="text-right tabular-nums">
-        {formatTokens(k.month_tokens)}
+        {formatTokens(used)}
         <span className="text-neutral-500"> / {formatTokens(limit)}</span>
       </div>
       <div className="mt-1 h-1.5 rounded-full bg-neutral-100">
-        <div className={pct >= 90 ? "h-full rounded-full bg-red-600" : "h-full rounded-full bg-brand-500"} style={{ width: `${pct}%` }} />
+        <div
+          className={cx("h-full rounded-full", over || pct >= 90 ? "bg-red-600" : pct >= 70 ? "bg-amber-500" : "bg-brand-500")}
+          style={{ width: `${pct}%` }}
+        />
       </div>
+      {over && <div className="mt-0.5 text-right text-xs text-red-700">已用完</div>}
     </div>
   );
 }

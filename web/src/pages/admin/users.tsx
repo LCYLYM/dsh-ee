@@ -190,7 +190,7 @@ export default function AdminUsers() {
                                 className={cx("disabled:opacity-50", u.disabled ? "text-neutral-700 hover:text-neutral-900" : "text-neutral-600 hover:text-red-700")}
                                 disabled={busy}
                                 onClick={() => {
-                                  if (!u.disabled && !window.confirm(`禁用 ${u.username}？该用户会立即下线，分发给该用户的 key 也会失效。`)) return;
+                                  if (!u.disabled && !window.confirm(`禁用 ${u.username}？该用户会立即下线，已创建的 key 与额度都会失效。`)) return;
                                   void patch(u, { disabled: !u.disabled }, u.disabled ? `已启用 ${u.username}` : `已禁用 ${u.username}`);
                                 }}
                               >

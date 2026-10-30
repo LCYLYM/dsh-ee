@@ -87,7 +87,7 @@ export default function AdminProviders() {
     <div>
       <PageHeader
         title="模型服务"
-        desc="企业在上游开通的模型服务。员工用分发的 key 调用时，dsh-ee 换成这里的企业 key 转发，员工看不到企业 key。"
+        desc="企业在上游开通的模型服务。员工用自己的 key 调用时，dsh-ee 换成这里的企业 key 转发，员工看不到企业 key。"
         actions={
           <Button size="sm" onClick={() => setCreating((v) => !v)}>
             {creating ? "收起" : "添加模型服务"}
@@ -112,7 +112,7 @@ export default function AdminProviders() {
       <LoadState loading={loading && !providers} error={error} onRetry={reload}>
         {providers && providers.length === 0 && !creating && (
           <Card className="px-5 py-10 text-center text-sm text-neutral-600">
-            还没有模型服务。添加企业的 DeepSeek 或其它 OpenAI 兼容服务后，才能给员工分发 key。
+            还没有模型服务。添加企业的 DeepSeek 或其它 OpenAI 兼容服务后，员工才能调用模型。
           </Card>
         )}
         <div className="space-y-4">

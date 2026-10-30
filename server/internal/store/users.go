@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -18,25 +19,67 @@ const (
 var ErrDuplicate = errors.New("duplicate")
 
 type User struct {
-	ID           int64     `json:"id"`
-	Username     string    `json:"username"`
-	DisplayName  string    `json:"display_name"`
-	Department   string    `json:"department"`
-	Role         string    `json:"role"`
-	Disabled     bool      `json:"disabled"`
-	CreatedAt    time.Time `json:"created_at"`
-	PasswordHash string    `json:"-"`
+	ID          int64     `json:"id"`
+	Username    string    `json:"username"`
+	DisplayName string    `json:"display_name"`
+	Department  string    `json:"department"`
+	Role        string    `json:"role"`
+	Disabled    bool      `json:"disabled"`
+	CreatedAt   time.Time `json:"created_at"`
+	// 额度挂在用户上，同一用户的全部 key 共享。
+	// nil = 不限；0 = 未分配（不能调用）；>0 = 每月 token 上限。
+	MonthlyTokenLimit *int64     `json:"monthly_token_limit"`
+	AllowedModels     []string   `json:"allowed_models"`
+	QuotaExpiresAt    *time.Time `json:"quota_expires_at"`
+	// 本月（UTC）已用 token，列表查询时填充。
+	MonthTokens  int64  `json:"month_tokens"`
+	PasswordHash string `json:"-"`
 }
 
-const userCols = "id, username, display_name, department, role, disabled, created_at, password_hash"
+// userColumns 让同一份列清单能同时用于单表查询和带别名的 JOIN。
+func userColumns(alias string) string {
+	cols := []string{
+		"id", "username", "display_name", "department", "role", "disabled", "created_at",
+		"password_hash", "monthly_token_limit", "allowed_models", "quota_expires_at",
+	}
+	if alias != "" {
+		for i := range cols {
+			cols[i] = alias + cols[i]
+		}
+	}
+	return strings.Join(cols, ", ")
+}
 
-func scanUser(row interface{ Scan(...any) error }) (*User, error) {
+func scanUser(row interface{ Scan(...any) error }, extra ...any) (*User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Username, &u.DisplayName, &u.Department, &u.Role, &u.Disabled, &u.CreatedAt, &u.PasswordHash)
+	var limit sql.NullInt64
+	var models sql.NullString
+	var expires sql.NullTime
+	dest := []any{
+		&u.ID, &u.Username, &u.DisplayName, &u.Department, &u.Role, &u.Disabled, &u.CreatedAt,
+		&u.PasswordHash, &limit, &models, &expires,
+	}
+	err := row.Scan(append(dest, extra...)...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
-	return &u, err
+	if err != nil {
+		return nil, err
+	}
+	if limit.Valid {
+		v := limit.Int64
+		u.MonthlyTokenLimit = &v
+	}
+	if models.Valid && models.String != "" {
+		if err := json.Unmarshal([]byte(models.String), &u.AllowedModels); err != nil {
+			return nil, err
+		}
+	}
+	if expires.Valid {
+		v := expires.Time
+		u.QuotaExpiresAt = &v
+	}
+	return &u, nil
 }
 
 func isDuplicate(err error) bool {
@@ -53,9 +96,9 @@ func (s *Store) CountUsers(ctx context.Context) (int, error) {
 func (s *Store) CreateUser(ctx context.Context, u *User) error {
 	t := now()
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO users (username, display_name, department, password_hash, role, disabled, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.Username, u.DisplayName, u.Department, u.PasswordHash, u.Role, u.Disabled, t, t)
+		`INSERT INTO users (username, display_name, department, password_hash, role, disabled, created_at, updated_at, monthly_token_limit)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.Username, u.DisplayName, u.Department, u.PasswordHash, u.Role, u.Disabled, t, t, u.MonthlyTokenLimit)
 	if isDuplicate(err) {
 		return ErrDuplicate
 	}
@@ -68,25 +111,30 @@ func (s *Store) CreateUser(ctx context.Context, u *User) error {
 }
 
 func (s *Store) GetUser(ctx context.Context, id int64) (*User, error) {
-	return scanUser(s.db.QueryRowContext(ctx, "SELECT "+userCols+" FROM users WHERE id = ?", id))
+	return scanUser(s.db.QueryRowContext(ctx, "SELECT "+userColumns("")+" FROM users WHERE id = ?", id))
 }
 
 func (s *Store) GetUserByUsername(ctx context.Context, username string) (*User, error) {
-	return scanUser(s.db.QueryRowContext(ctx, "SELECT "+userCols+" FROM users WHERE username = ?", username))
+	return scanUser(s.db.QueryRowContext(ctx, "SELECT "+userColumns("")+" FROM users WHERE username = ?", username))
 }
 
 func (s *Store) ListUsers(ctx context.Context) ([]*User, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT "+userCols+" FROM users ORDER BY id")
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+userColumns("u.")+`,
+			(SELECT COALESCE(SUM(l.total_tokens), 0) FROM usage_logs l WHERE l.user_id = u.id AND l.created_at >= ?)
+		 FROM users u ORDER BY u.id`, MonthStart(now()))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var out []*User
 	for rows.Next() {
-		u, err := scanUser(rows)
+		var month int64
+		u, err := scanUser(rows, &month)
 		if err != nil {
 			return nil, err
 		}
+		u.MonthTokens = month
 		out = append(out, u)
 	}
 	return out, rows.Err()
@@ -134,6 +182,32 @@ func (s *Store) UpdateUser(ctx context.Context, id int64, p UserPatch) error {
 	return nil
 }
 
+// UserQuotaPatch 是整份额度的替换值：nil 表示不限（额度）/ 永不过期（有效期），
+// 空列表表示允许全部模型。调用方负责把「未填」翻译成对应的 nil。
+type UserQuotaPatch struct {
+	MonthlyTokenLimit *int64
+	AllowedModels     []string
+	QuotaExpiresAt    *time.Time
+}
+
+func (s *Store) SetUserQuota(ctx context.Context, id int64, q UserQuotaPatch) error {
+	var models any
+	if len(q.AllowedModels) > 0 {
+		b, _ := json.Marshal(q.AllowedModels)
+		models = string(b)
+	}
+	res, err := s.db.ExecContext(ctx,
+		"UPDATE users SET monthly_token_limit = ?, allowed_models = ?, quota_expires_at = ?, updated_at = ? WHERE id = ?",
+		q.MonthlyTokenLimit, models, q.QuotaExpiresAt, now(), id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // ---- 会话 ----
 
 func (s *Store) CreateSession(ctx context.Context, tokenHash string, userID int64, ttl time.Duration) error {
@@ -147,7 +221,7 @@ func (s *Store) CreateSession(ctx context.Context, tokenHash string, userID int6
 // SessionUser 返回未过期会话对应的、未被禁用的用户。
 func (s *Store) SessionUser(ctx context.Context, tokenHash string) (*User, error) {
 	return scanUser(s.db.QueryRowContext(ctx,
-		`SELECT u.id, u.username, u.display_name, u.department, u.role, u.disabled, u.created_at, u.password_hash
+		`SELECT `+userColumns("u.")+`
 		 FROM sessions s JOIN users u ON u.id = s.user_id
 		 WHERE s.token_hash = ? AND s.expires_at > ? AND u.disabled = 0`, tokenHash, now()))
 }
