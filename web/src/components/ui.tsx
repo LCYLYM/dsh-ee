@@ -160,16 +160,26 @@ export function PluginIcon({ name, icon, size = 40 }: { name: string; icon: stri
   const [broken, setBroken] = useState(false);
   const letter = name.replace(/^@[^/]+\//, "").replace(/^dsh-?/i, "").charAt(0).toUpperCase() || "?";
   if (icon && !broken) {
+    // 首字母垫在图片下面：远程图还没加载完时也不会是一个空白方块。
     return (
-      <img
-        src={icon}
-        alt=""
-        width={size}
-        height={size}
-        onError={() => setBroken(true)}
-        className="shrink-0 rounded-md bg-neutral-100 object-cover"
-        style={{ width: size, height: size }}
-      />
+      <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
+        <span
+          aria-hidden
+          className="absolute inset-0 flex items-center justify-center rounded-md bg-neutral-100 font-semibold text-neutral-600"
+          style={{ fontSize: size * 0.42 }}
+        >
+          {letter}
+        </span>
+        <img
+          src={icon}
+          alt=""
+          width={size}
+          height={size}
+          onError={() => setBroken(true)}
+          className="relative rounded-md object-cover"
+          style={{ width: size, height: size }}
+        />
+      </span>
     );
   }
   return (

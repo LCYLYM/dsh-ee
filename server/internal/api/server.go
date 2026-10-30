@@ -312,6 +312,12 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 }
 
 func (s *Server) internalErr(w http.ResponseWriter, r *http.Request, err error) {
+	// 客户端刷新或切页会取消请求上下文，这时写库/读库报 context canceled 是正常现象，
+	// 既不是服务端故障，也没有可写的响应，别在日志里刷 500。
+	if errors.Is(err, context.Canceled) || r.Context().Err() != nil {
+		s.log.Debug("请求已取消", "path", r.URL.Path)
+		return
+	}
 	s.log.Error("internal error", "path", r.URL.Path, "err", err)
 	writeErr(w, http.StatusInternalServerError, "服务器内部错误")
 }
