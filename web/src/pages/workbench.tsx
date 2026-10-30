@@ -1,29 +1,37 @@
 import { Link } from "react-router";
-import { ArrowRight, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import { kindLabels, kindOf, me, microApps } from "../mock/data";
 import { useStore } from "../lib/store";
 import { useAuth } from "../lib/auth";
+import { api, formatTokens, type MyQuota } from "../lib/api";
+import { useApi } from "../lib/use-api";
 import { pluginPath } from "../components/plugin-card";
-import { Badge, Button, Card, CardHeader, PageHeader, PluginIcon } from "../components/ui";
+import { Badge, Button, Card, CardHeader, PageHeader, PluginIcon, Stat } from "../components/ui";
 import { statusBadge } from "../components/status";
 
-/** 接入状态里的一格：标签、值、一行说明或操作。 */
-function StatusCell({ label, value, note }: { label: string; value: React.ReactNode; note: React.ReactNode }) {
-  return (
-    <div className="px-5 py-4">
-      <div className="text-sm text-neutral-600">{label}</div>
-      <div className="mt-1.5 text-lg font-medium text-neutral-900">{value}</div>
-      <div className="mt-1 text-sm text-neutral-600">{note}</div>
-    </div>
-  );
+/** 指标值还没拿到（加载中 / 接口失败）时显示的内容。 */
+const noValue = "—";
+
+/** 本月 Token 用量下面那行：先把额度讲清楚，没拿到数据就说明当前状态。 */
+function tokenHint(quota: MyQuota | undefined, error: string | null) {
+  if (!quota) return error ? "暂时取不到数据" : "读取中…";
+  const limit = quota.monthly_token_limit;
+  if (limit === null) return "额度不限";
+  if (limit === 0) return "管理员还没分配额度";
+  return `额度 ${formatTokens(limit)}`;
+}
+
+function keysHint(quota: MyQuota | undefined, error: string | null) {
+  if (quota) return `个有效，最多 ${quota.max_keys} 个`;
+  return error ? "暂时取不到数据" : "读取中…";
 }
 
 export default function Workbench() {
-  const { plugins, releases, settings, notify } = useStore();
+  const { plugins, notify } = useStore();
   const { user } = useAuth();
+  const { data: myKeys, error: keysError } = useApi(api.myKeys);
+  const quota = myKeys?.quota;
   const byName = (n: string) => plugins.find((p) => p.name === n);
-  const core = releases.find((r) => r.product === "core" && r.recommended);
-  const outdated = core && core.version !== me.dshVersion;
 
   const myApps = me.apps.flatMap((a) => {
     const m = microApps.find((x) => x.id === a.id);
@@ -49,33 +57,21 @@ export default function Workbench() {
     <div>
       <PageHeader title="我的工作台" desc={[user?.display_name || user?.username, user?.department].filter(Boolean).join(" · ")} />
 
-      <Card className="grid divide-neutral-200/80 max-md:divide-y md:grid-cols-3 md:divide-x">
-        <StatusCell
-          label="本机 DSH"
-          value={`DSH ${me.dshVersion}`}
-          note={
-            outdated && settings.distribution.enabled ? (
-              <Link to="/dsh" className="inline-flex items-center gap-1 font-medium text-neutral-900 hover:underline">
-                企业推荐 {core.version}，去升级 <ArrowRight size={14} />
-              </Link>
-            ) : (
-              "已是企业推荐版本"
-            )
-          }
+      {/* 顶部四个个人指标。Token 用量与密钥已走服务端接口，其余等待真实数据接入。 */}
+      <Card className="grid grid-cols-4 divide-x divide-neutral-200/80">
+        <Stat
+          label="本月消耗的 Token"
+          value={quota ? formatTokens(quota.month_tokens) : noValue}
+          hint={tokenHint(quota, keysError)}
         />
-        <StatusCell label="企业源" value="已接入" note={`${settings.baseUrl.replace(/^https?:\/\//, "")} · 最近连接 ${me.lastSeen}`} />
-        <StatusCell
-          label="安装令牌"
-          value="有效"
-          note={
-            <>
-              {me.tokenExpires} 到期 ·{" "}
-              <Link to="/setup" className="font-medium text-neutral-900 hover:underline">
-                重新接入
-              </Link>
-            </>
-          }
+        <Stat
+          label="我的密钥"
+          value={quota ? quota.active_keys : noValue}
+          hint={keysHint(quota, keysError)}
         />
+        {/* TODO(接入真实数据)：安装 / 贡献改为按账号查询后填入（与下方「已安装的能力」「我分享的」同一数据源）。 */}
+        <Stat label="我安装的应用" value={noValue} hint="安装记录待接入" />
+        <Stat label="我贡献的应用" value={noValue} hint="贡献记录待接入" />
       </Card>
 
       <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">

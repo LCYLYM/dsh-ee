@@ -451,10 +451,6 @@ export const initialTokens: RegistryToken[] = [
 export const me = {
   user: "zhang.wei",
   department: "研发效能部",
-  /** 本机 DSH 核心版本（客户端上报）。 */
-  dshVersion: "0.1.1-rc.2",
-  lastSeen: "今天 09:40",
-  tokenExpires: "2027-01-26",
   /** 固定在工作台的微应用与最近使用时间。 */
   apps: [
     { id: "mr-review", lastUsed: "今天 16:31" },
