@@ -31,11 +31,20 @@ func writeOpenAIErr(w http.ResponseWriter, status int, typ, code, msg string) {
 func (s *Server) authKey(w http.ResponseWriter, r *http.Request) (*store.APIKey, *store.UserQuota, bool) {
 	auth := r.Header.Get("Authorization")
 	token, ok := strings.CutPrefix(auth, "Bearer ")
-	if !ok || !strings.HasPrefix(token, keyPrefix) {
+	token = strings.TrimSpace(token)
+	if !ok || !(strings.HasPrefix(token, keyPrefix) || strings.HasPrefix(token, npmTokenPrefix)) {
 		writeOpenAIErr(w, http.StatusUnauthorized, "invalid_request_error", "invalid_api_key", "缺少或无效的 API key")
 		return nil, nil, false
 	}
-	k, quota, err := s.store.ActiveKeyByHash(r.Context(), secret.Hash(strings.TrimSpace(token)))
+	var k *store.APIKey
+	var quota *store.UserQuota
+	var err error
+	if strings.HasPrefix(token, npmTokenPrefix) {
+		// 接入令牌：DSH 接入插件用同一个令牌访问模型网关，额度照常按账号计算
+		k, quota, err = s.tokenAsKey(r.Context(), token)
+	} else {
+		k, quota, err = s.store.ActiveKeyByHash(r.Context(), secret.Hash(token))
+	}
 	if notFound(err) {
 		writeOpenAIErr(w, http.StatusUnauthorized, "invalid_request_error", "invalid_api_key", "API key 无效、已吊销或已过期")
 		return nil, nil, false
@@ -59,6 +68,17 @@ func (s *Server) authKey(w http.ResponseWriter, r *http.Request) (*store.APIKey,
 		return nil, nil, false
 	}
 	return k, quota, true
+}
+
+// tokenAsKey 把接入令牌当作一把 id 为 0 的 key：用账号的额度，没有 key 级别的限制。
+func (s *Server) tokenAsKey(ctx context.Context, token string) (*store.APIKey, *store.UserQuota, error) {
+	t, u, err := s.store.ActiveNpmToken(ctx, secret.Hash(token))
+	if err != nil {
+		return nil, nil, err
+	}
+	_ = s.store.TouchNpmToken(ctx, t.ID)
+	return &store.APIKey{UserID: u.ID, Username: u.Username, Name: t.Name},
+		&store.UserQuota{MonthlyTokenLimit: u.MonthlyTokenLimit, AllowedModels: u.AllowedModels, QuotaExpiresAt: u.QuotaExpiresAt}, nil
 }
 
 // modelAllowed 同时校验用户额度上的模型权限与旧 key 上的限制（兼容升级前的数据）。
@@ -306,7 +326,7 @@ func (s *Server) recordUsage(ctx context.Context, k *store.APIKey, p *store.Prov
 		StatusCode:       status,
 		LatencyMS:        int(time.Since(start).Milliseconds()),
 	})
-	if err == nil {
+	if err == nil && k.ID > 0 {
 		err = s.store.TouchAPIKey(ctx, k.ID)
 	}
 	if err != nil && !errors.Is(err, context.Canceled) {

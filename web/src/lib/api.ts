@@ -23,6 +23,11 @@ export interface User {
   quota_expires_at: string | null;
   /** 本月（UTC）已用 token，管理端列表查询时填充。 */
   month_tokens: number;
+  /** local：本地密码 / ldap：由企业目录认证，资料在每次登录时同步。 */
+  auth_source: "local" | "ldap";
+  email: string;
+  external_dn?: string;
+  last_login_at: string | null;
 }
 
 /** 当前登录用户：带有效权限。前端据此决定显示什么，后端每个接口仍会自行校验。 */
@@ -285,6 +290,277 @@ export interface FeedPlugin {
   offline_ready: boolean | null;
 }
 
+// ---- 统计与审计 ----
+
+export interface DailyStat {
+  date: string;
+  installs: number;
+  install_users: number;
+  downloads: number;
+  calls: number;
+  call_errors: number;
+  call_users: number;
+  tokens: number;
+}
+
+export interface Stats {
+  from: string;
+  daily: DailyStat[];
+  totals: { installs: number; downloads: number; calls: number; call_errors: number; tokens: number; users: number; active_users: number };
+  top_plugins: { name: string; title: string; origin: "hosted" | "upstream"; installs: number; users: number }[];
+  top_models: { model: string; calls: number; users: number; tokens: number }[];
+  departments: { department: string; users: number; active_users: number; installs: number; calls: number; tokens: number }[];
+  platforms: { os: string; arch: string; users: number; installs: number }[];
+  storage: { origin: "hosted" | "upstream"; versions: number; bytes: number }[];
+}
+
+export interface MyOverview {
+  installed: { name: string; version: string; installed_at: string; title: string; latest: string; has_update: boolean }[];
+  updates: number;
+  picks: { name: string; users: number; title: string; description: string; kind: string; category: string; origin: "internal" | "upstream" }[];
+  /** department：同部门同事在用；company：部门里没有可推荐的，按全公司算。 */
+  picks_scope: "department" | "company";
+  contributions: { name: string; title: string; version: string; status: PluginStatus; pending: number; users: number }[];
+  /** 装过我分享的任一能力的同事人数。 */
+  reach: number;
+}
+
+export interface AuditLog {
+  id: number;
+  actor_id: number | null;
+  actor_name: string;
+  action: string;
+  target: string;
+  detail: Record<string, unknown> | null;
+  ip: string;
+  created_at: string;
+  actor_display_name: string;
+  actor_department: string;
+}
+
+export interface AuditQuery {
+  before?: number;
+  limit?: number;
+  action?: string;
+  q?: string;
+  since?: string;
+  until?: string;
+}
+
+// ---- LDAP ----
+
+export interface LdapConfig {
+  enabled: boolean;
+  url: string;
+  startTls: boolean;
+  insecureSkipVerify: boolean;
+  caCert: string;
+  bindDn: string;
+  baseDn: string;
+  userFilter: string;
+  usernameAttr: string;
+  displayNameAttr: string;
+  departmentAttr: string;
+  emailAttr: string;
+  groupMode: "memberOf" | "search" | "none";
+  groupBaseDn: string;
+  groupFilter: string;
+  groupNameAttr: string;
+  roleMappings: { group: string; roleId: number }[];
+  autoCreate: boolean;
+  syncDisable: boolean;
+  timeoutSeconds: number;
+}
+
+export interface LdapSyncResult {
+  at: string;
+  ok: boolean;
+  error?: string;
+  checked: number;
+  updated: number;
+  disabled: string[];
+  missing: string[];
+}
+
+export interface LdapView extends LdapConfig {
+  bindPasswordSet: boolean;
+  lastSync: LdapSyncResult | null;
+}
+
+/** 提交时 bindPassword 不传表示沿用已存的，传空串表示清除。 */
+export type LdapInput = LdapConfig & { bindPassword?: string };
+
+export interface LdapTestResult {
+  ok: boolean;
+  steps: { step: "connect" | "search" | "verify"; ok: boolean; error?: string }[];
+  entry: { dn: string; username: string; display_name: string; department: string; email: string; groups: string[]; disabled: boolean } | null;
+  roles: RoleRef[];
+  username: string;
+  /** local：与已有本地账号重名，不能用目录登录；invalid：用户名不符合规则。 */
+  conflict: "" | "local" | "invalid";
+}
+
+// ---- 能力中心 ----
+
+export type AssetKind = "skill" | "prompt" | "app" | "connection";
+export type Delivery = "auto" | "optional";
+
+export interface Scope {
+  all: boolean;
+  departments: string[];
+  roles: number[];
+  users: number[];
+}
+
+/** 资产版本的内容，按 kind 取用其中的字段（与 server/internal/api/hub.go 的 assetSpec 对应）。 */
+export interface AssetSpec {
+  title: string;
+  description: string;
+  when_to_use?: string;
+  body?: string;
+  model_invocable?: boolean;
+  persona?: string;
+  starters?: string[];
+  skills?: string[];
+  connections?: string[];
+  plugins?: string[];
+  type?: "mcp" | "openapi";
+  url?: string;
+  auth?: { type: "none" | "bearer" | "header"; header?: string };
+  openapi?: string;
+  instructions?: string;
+  timeout_seconds?: number;
+}
+
+export interface HubAsset {
+  id: number;
+  kind: AssetKind;
+  slug: string;
+  title: string;
+  description: string;
+  category: string;
+  owner_id: number | null;
+  scope: Scope;
+  delivery: Delivery;
+  status: "active" | "unpublished";
+  secret_hint?: string;
+  created_at: string;
+  updated_at: string;
+  live_version: number;
+  pending: number;
+  spec: AssetSpec;
+  owner: string;
+  owner_name: string;
+  department: string;
+  available: boolean;
+  enabled: boolean;
+  subscribed: boolean;
+  uses: number;
+  users: number;
+  tools: number;
+  tools_total: number;
+  can_manage: boolean;
+}
+
+export interface AssetVersion {
+  asset_id: number;
+  version: number;
+  spec: AssetSpec;
+  status: PluginStatus;
+  review_note: string;
+  created_by: number | null;
+  reviewed_by: number | null;
+  reviewed_at: string | null;
+  created_at: string;
+  publisher: string;
+  reviewer: string;
+}
+
+export interface ConnectionTool {
+  asset_id: number;
+  name: string;
+  description: string;
+  input_schema: unknown;
+  read_only: boolean;
+  enabled: boolean;
+  roles: number[] | null;
+  updated_at: string;
+}
+
+export interface ConnectionCall {
+  tool: string;
+  username: string;
+  ok: boolean;
+  error: string;
+  latency_ms: number;
+  created_at: string;
+}
+
+export interface AssetDetail {
+  asset: HubAsset;
+  versions?: AssetVersion[];
+  tools?: ConnectionTool[];
+  calls?: ConnectionCall[];
+  server_name?: string;
+}
+
+export interface PluginPolicy {
+  name: string;
+  scope: Scope;
+  delivery: Delivery;
+}
+
+export interface AssetReviewItem {
+  asset: HubAsset;
+  version: number;
+  spec: AssetSpec;
+  previous: AssetSpec | null;
+  previous_version: number;
+  publisher: string;
+  publisher_name: string;
+  department: string;
+  created_at: string;
+}
+
+export interface AssetCreate {
+  kind: AssetKind;
+  slug: string;
+  category?: string;
+  spec: AssetSpec;
+  scope?: Scope;
+  delivery?: Delivery;
+  secret?: string;
+}
+
+export interface ConnTestResult {
+  ok: boolean;
+  error?: string;
+  tools?: ConnectionTool[];
+  instructions?: string;
+  base_url?: string;
+  latency_ms?: number;
+}
+
+export interface ConnectInfo {
+  package: string;
+  version: string;
+  ready: boolean;
+  enabled: boolean;
+  token_env: string;
+  profile: string;
+  server_name: string;
+  error?: string;
+}
+
+export interface ConnectState {
+  package: string;
+  version: string;
+  hash: string;
+  base_url: string;
+  published_at: string;
+  error?: string;
+}
+
 export interface ImportResult {
   packages: number;
   added: number;
@@ -393,9 +669,15 @@ export const api = {
   revokeMyKey: (id: number) => request<void>("DELETE", `/api/me/keys/${id}`),
 
   users: () => request<{ users: User[] }>("GET", "/api/admin/users").then((r) => r.users),
-  /** role_ids 不传时给默认的「员工」角色。 */
-  createUser: (u: { username: string; password: string; display_name: string; department: string; role_ids?: number[] }) =>
-    request<User>("POST", "/api/admin/users", u),
+  /** role_ids 不传时给默认的「员工」角色；auth_source 为 ldap 时不设密码。 */
+  createUser: (u: {
+    username: string;
+    password?: string;
+    display_name: string;
+    department: string;
+    role_ids?: number[];
+    auth_source?: "local" | "ldap";
+  }) => request<User>("POST", "/api/admin/users", u),
   updateUser: (id: number, patch: Partial<{ display_name: string; department: string; disabled: boolean; password: string }>) =>
     request<User>("PATCH", `/api/admin/users/${id}`, patch),
   setUserRoles: (id: number, role_ids: number[]) =>
@@ -446,6 +728,50 @@ export const api = {
   issueKey: (k: { user_id: number; name: string; expires_at?: string }) =>
     request<{ key: string; api_key: ApiKey }>("POST", "/api/admin/keys", k),
   revokeKey: (id: number) => request<void>("DELETE", `/api/admin/keys/${id}`),
+
+  authMethods: () => request<{ ldap: boolean }>("GET", "/api/auth/methods", undefined, { silent401: true }),
+  ldap: () => request<LdapView>("GET", "/api/admin/auth/ldap"),
+  saveLdap: (c: LdapInput) => request<LdapView>("PUT", "/api/admin/auth/ldap", c),
+  testLdap: (c: LdapInput & { testUsername?: string; testPassword?: string }) =>
+    request<LdapTestResult>("POST", "/api/admin/auth/ldap/test", c),
+  syncLdap: () => request<LdapSyncResult>("POST", "/api/admin/auth/ldap/sync"),
+
+  /** tz 为本地时区相对 UTC 的分钟数（东八区 480），按本地日期分天。 */
+  stats: (days: number) => request<Stats>("GET", `/api/admin/stats?days=${days}&tz=${-new Date().getTimezoneOffset()}`),
+  myOverview: () => request<MyOverview>("GET", "/api/me/overview"),
+  audit: (q: AuditQuery = {}) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(q)) if (v !== undefined && v !== "") params.set(k, String(v));
+    return request<{ logs: AuditLog[] }>("GET", `/api/admin/audit?${params}`).then((r) => r.logs);
+  },
+
+  hub: () => request<{ assets: HubAsset[]; plugin_policies: Record<string, PluginPolicy> }>("GET", "/api/hub"),
+  hubAsset: (id: number) => request<AssetDetail>("GET", `/api/hub/${id}`),
+  createAsset: (a: AssetCreate) =>
+    request<{ asset: HubAsset; status: PluginStatus; tools?: number; sync_error?: string }>("POST", "/api/hub", a),
+  newAssetVersion: (id: number, spec: AssetSpec, secret?: string) =>
+    request<{ version: number; status: PluginStatus; tools?: number; sync_error?: string }>("POST", `/api/hub/${id}/versions`, {
+      spec,
+      ...(secret !== undefined ? { secret } : {}),
+    }),
+  patchAsset: (id: number, p: Partial<{ category: string; scope: Scope; delivery: Delivery; status: "active" | "unpublished"; note: string }>) =>
+    request<HubAsset>("PATCH", `/api/hub/${id}`, p),
+  deleteAsset: (id: number) => request<void>("DELETE", `/api/hub/${id}`),
+  subscribe: (id: number) => request<void>("POST", `/api/hub/${id}/subscription`),
+  unsubscribe: (id: number) => request<void>("DELETE", `/api/hub/${id}/subscription`),
+  hubReviewQueue: () => request<{ items: AssetReviewItem[] }>("GET", "/api/admin/hub/review").then((r) => r.items),
+  reviewAsset: (r: { asset_id: number; version: number; action: "approve" | "reject"; note?: string }) =>
+    request<void>("POST", "/api/admin/hub/review", { note: "", ...r }),
+  setPluginPolicy: (name: string, p: { scope: Scope; delivery: Delivery }) =>
+    request<PluginPolicy>("PUT", `/api/admin/plugin-policies/${encName(name)}`, p),
+  testConnection: (spec: AssetSpec, secret?: string, id?: number) =>
+    request<ConnTestResult>("POST", "/api/admin/connections/test", { spec, ...(secret !== undefined ? { secret } : {}), ...(id ? { id } : {}) }),
+  syncConnection: (id: number) => request<{ ok: boolean; tools?: number; error?: string }>("POST", `/api/admin/connections/${id}/sync`),
+  setConnectionTool: (id: number, name: string, p: { enabled: boolean; roles: number[] }) =>
+    request<void>("PATCH", `/api/admin/connections/${id}/tools/${encodeURIComponent(name)}`, p),
+  connectInfo: () => request<ConnectInfo>("GET", "/api/connect"),
+  adminConnect: () => request<{ state: ConnectState; package?: string; stale?: boolean; patch?: string }>("GET", "/api/admin/connect"),
+  publishConnect: (force = false) => request<ConnectState>("POST", "/api/admin/connect/publish", { force }),
 
   /** 系统设置：未登录时返回 401（静默），调用方保留默认值。 */
   settings: () => request<Settings>("GET", "/api/settings", undefined, { silent401: true }),

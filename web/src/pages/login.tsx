@@ -2,6 +2,8 @@ import { useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
 import { Puzzle } from "lucide-react";
 import { useAuth } from "../lib/auth";
+import { api } from "../lib/api";
+import { useApi } from "../lib/use-api";
 import { Button, inputCls } from "../components/ui";
 import { LangSwitch } from "../components/lang-switch";
 import { useTranslation } from "react-i18next";
@@ -21,6 +23,8 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const methods = useApi(api.authMethods);
+  const ldap = !!methods.data?.ldap;
 
   if (!loading && user) return <Navigate to={next} replace />;
 
@@ -48,7 +52,7 @@ export default function Login() {
       </Link>
       <form onSubmit={submit} className="w-full max-w-sm rounded-lg border border-neutral-200/80 bg-white p-6">
         <h1 className="text-xl font-semibold text-neutral-900">{t("login.title")}</h1>
-        <p className="mt-1 text-sm text-neutral-600">{t("login.subtitle")}</p>
+        <p className="mt-1 text-sm text-neutral-600">{ldap ? t("login.ldapHint") : t("login.subtitle")}</p>
         <div className="mt-6 space-y-4">
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-neutral-800">{t("login.username")}</span>
@@ -82,7 +86,7 @@ export default function Login() {
           {busy ? t("login.submitting") : t("login.submit")}
         </Button>
       </form>
-      <p className="mt-6 text-xs text-neutral-500">{t("login.forgot")}</p>
+      <p className="mt-6 text-xs text-neutral-500">{ldap ? t("login.ldapForgot") : t("login.forgot")}</p>
       <LangSwitch className="mt-3" />
     </div>
   );

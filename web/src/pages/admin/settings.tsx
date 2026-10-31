@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { useStore } from "../../lib/store";
 import type { Settings } from "../../lib/types";
-import { Button, Card, cx, Field, inputBase, inputCls, PageHeader, Segmented, Toggle } from "../../components/ui";
+import { Button, Card, cx, Field, inputBase, inputCls, PageHeader, Segmented, ToggleRow } from "../../components/ui";
+import LdapSettings from "./ldap-settings";
+import ConnectSettings from "./connect-settings";
 import { PageLink } from "../../lib/menus";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -15,30 +17,6 @@ function Section({ title, desc, children }: { title: string; desc?: string; chil
       </div>
       <div className="space-y-5">{children}</div>
     </Card>
-  );
-}
-
-function Row({
-  label,
-  desc,
-  checked,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  desc?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className={cx("flex items-start justify-between gap-6", disabled && "opacity-50")}>
-      <div>
-        <div className="text-sm font-medium text-neutral-800">{label}</div>
-        {desc && <div className="mt-0.5 text-xs text-neutral-500">{desc}</div>}
-      </div>
-      <Toggle checked={checked} onChange={onChange} disabled={disabled} />
-    </div>
   );
 }
 
@@ -85,21 +63,21 @@ export default function AdminSettings() {
         </Section>
 
         <Section title={t("settingsAdmin.scoring")} desc={t("settingsAdmin.scoringDesc")}>
-          <Row
+          <ToggleRow
             label={t("settingsAdmin.enableScoring")}
             desc={t("settingsAdmin.enableScoringDesc")}
             checked={s.scoring.enabled}
             onChange={(v) => set("scoring", { enabled: v })}
           />
           <div className="space-y-5 border-l-2 border-neutral-100 pl-5">
-            <Row
+            <ToggleRow
               label={t("settingsAdmin.showUpstreamScore")}
               desc={t("settingsAdmin.showUpstreamScoreDesc")}
               checked={s.scoring.showUpstreamScore}
               disabled={!s.scoring.enabled}
               onChange={(v) => set("scoring", { showUpstreamScore: v })}
             />
-            <Row
+            <ToggleRow
               label={t("settingsAdmin.allowRating")}
               desc={t("settingsAdmin.allowRatingDesc")}
               checked={s.scoring.allowEmployeeRating}
@@ -153,7 +131,7 @@ export default function AdminSettings() {
               ]}
             />
           </Field>
-          <Row
+          <ToggleRow
             label={t("settingsAdmin.feed")}
             desc={t("settingsAdmin.feedDesc")}
             checked={s.upstream.dshfindFeed}
@@ -177,20 +155,20 @@ export default function AdminSettings() {
         </Section>
 
         <Section title={t("settingsAdmin.distribution")}>
-          <Row
+          <ToggleRow
             label={t("settingsAdmin.offerDownload")}
             desc={t("settingsAdmin.offerDownloadDesc")}
             checked={s.distribution.enabled}
             onChange={(v) => set("distribution", { enabled: v })}
           />
-          <Row
+          <ToggleRow
             label={t("settingsAdmin.showPreview")}
             desc={t("settingsAdmin.showPreviewDesc")}
             checked={s.distribution.allowAlpha}
             disabled={!s.distribution.enabled}
             onChange={(v) => set("distribution", { allowAlpha: v })}
           />
-          <Row
+          <ToggleRow
             label={t("settingsAdmin.communityDesktop")}
             desc={t("settingsAdmin.communityDesktopDesc")}
             checked={s.distribution.allowCommunityDesktop}
@@ -199,17 +177,12 @@ export default function AdminSettings() {
           />
         </Section>
 
-        <Section title={t("settingsAdmin.auth")}>
-          <Segmented
-            value={s.auth}
-            onChange={(v) => set("auth", v)}
-            options={[
-              { value: "local", label: t("settingsAdmin.localAccounts") },
-              { value: "ldap", label: "LDAP / AD" },
-              { value: "oidc", label: "OIDC SSO" },
-            ]}
-          />
-          <p className="text-xs text-neutral-500">{t("settingsAdmin.authNote")}</p>
+        <Section title={t("connectAdmin.title")}>
+          <ConnectSettings />
+        </Section>
+
+        <Section title={t("settingsAdmin.auth")} desc={t("settingsAdmin.authNote")}>
+          <LdapSettings />
         </Section>
       </div>
     </div>

@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Download } from "lucide-react";
 import { categoryLabel } from "../../lib/catalog";
 import i18n from "../../i18n";
-import { api, formatBytes, type ReviewItem } from "../../lib/api";
+import { api, formatBytes, type AssetReviewItem, type AssetSpec, type ReviewItem } from "../../lib/api";
+import { KIND_ICONS } from "../../lib/hub";
 import { useApi, useAction } from "../../lib/use-api";
 import { useScoring, useStore } from "../../lib/store";
 import { LoadState } from "../../components/api-ui";
 import { ScanList, scanWarnings } from "../../components/scan-list";
-import { Badge, Button, Card, cx, inputCls, PageHeader, PluginIcon, ScoreBadge } from "../../components/ui";
+import { Badge, Button, Card, cx, inputCls, PageHeader, PluginIcon, ScoreBadge, Segmented } from "../../components/ui";
 import { useTranslation } from "react-i18next";
 
 function ago(iso: string) {
@@ -19,9 +20,159 @@ const key = (v: ReviewItem) => `${v.name}@${v.version}`;
 
 export default function AdminReview() {
   const { t } = useTranslation();
+  const plugins = useApi(api.reviewQueue);
+  const assets = useApi(api.hubReviewQueue);
+  const [tab, setTab] = useState<"plugins" | "assets">("plugins");
+  // 插件队列空、能力队列不空时，默认看能力
+  const effective = tab === "plugins" && plugins.data?.length === 0 && (assets.data?.length ?? 0) > 0 ? "assets" : tab;
+  return (
+    <div>
+      <PageHeader
+        title={t("review.title")}
+        desc={t("review.desc")}
+        actions={
+          <Segmented
+            value={effective}
+            onChange={setTab}
+            options={[
+              { value: "plugins", label: `${t("reviewAssets.plugins")} ${plugins.data?.length ?? ""}` },
+              { value: "assets", label: `${t("reviewAssets.assets")} ${assets.data?.length ?? ""}` },
+            ]}
+          />
+        }
+      />
+      {effective === "plugins" ? <PluginReview q={plugins} /> : <AssetReview q={assets} />}
+    </div>
+  );
+}
+
+function SpecView({ spec }: { spec: AssetSpec }) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-3 text-sm">
+      <div>
+        <div className="font-medium text-neutral-900">{spec.title}</div>
+        <div className="text-neutral-700">{spec.description}</div>
+      </div>
+      {spec.when_to_use && (
+        <div>
+          <span className="text-neutral-500">{t("asset.whenToUse")}：</span>
+          {spec.when_to_use}
+        </div>
+      )}
+      {(spec.body || spec.persona) && (
+        <pre className="max-h-96 overflow-auto rounded-md bg-neutral-50 p-3 text-sm whitespace-pre-wrap text-neutral-800">{spec.body || spec.persona}</pre>
+      )}
+      {(spec.skills?.length || spec.connections?.length || spec.plugins?.length) ? (
+        <div className="flex flex-wrap gap-1.5">
+          {[...(spec.skills ?? []), ...(spec.connections ?? []), ...(spec.plugins ?? [])].map((x) => (
+            <Badge key={x}>{x}</Badge>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AssetReview({ q }: { q: ReturnType<typeof useApi<AssetReviewItem[]>> }) {
+  const { t } = useTranslation();
+  const { notify, reloadPending } = useStore();
+  const { busy, run } = useAction();
+  const [selected, setSelected] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const queue = q.data ?? [];
+  const k = (v: AssetReviewItem) => `${v.asset.id}#${v.version}`;
+  const current = queue.find((v) => k(v) === selected) ?? queue[0];
+
+  const decide = async (approve: boolean) => {
+    if (!current) return;
+    const r = await run(() => api.reviewAsset({ asset_id: current.asset.id, version: current.version, action: approve ? "approve" : "reject", note: reason.trim() }));
+    if (!r.ok) return notify(r.error);
+    notify(t(approve ? "reviewAssets.approved" : "reviewAssets.rejected", { title: current.spec.title, version: current.version }));
+    setSelected(null);
+    setReason("");
+    q.reload();
+    reloadPending();
+  };
+
+  return (
+    <LoadState loading={q.loading && !q.data} error={q.error} onRetry={q.reload}>
+      {queue.length === 0 ? (
+        <Card className="p-12 text-center text-sm text-neutral-500">{t("reviewAssets.empty")}</Card>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+          <Card className="h-fit divide-y divide-neutral-100">
+            {queue.map((v) => {
+              const Icon = KIND_ICONS[v.asset.kind];
+              return (
+                <button
+                  key={k(v)}
+                  onClick={() => setSelected(k(v))}
+                  className={cx("flex w-full gap-3 px-4 py-3 text-left", current && k(current) === k(v) ? "bg-neutral-100" : "hover:bg-neutral-50")}
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-700">
+                    <Icon size={16} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-neutral-800">{v.spec.title}</div>
+                    <div className="truncate font-mono text-xs text-neutral-500">
+                      /{v.asset.slug} · v{v.version}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      <Badge>{t(`assetKinds.${v.asset.kind}`)}</Badge>
+                      {v.previous_version === 0 && <Badge tone="brand">{t("reviewAssets.firstVersion")}</Badge>}
+                    </div>
+                  </div>
+                  <span className="text-xs whitespace-nowrap text-neutral-500">{ago(v.created_at)}</span>
+                </button>
+              );
+            })}
+          </Card>
+          {current && (
+            <Card className="p-6">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <h2 className="text-xl font-semibold text-neutral-900">{current.spec.title}</h2>
+                <Badge>{t(`assetKinds.${current.asset.kind}`)}</Badge>
+                <span className="text-sm text-neutral-600">
+                  {t("reviewAssets.submittedBy", { name: current.publisher_name || current.publisher || "—", department: current.department || "—" })}
+                </span>
+              </div>
+              <h3 className="mb-2 text-sm font-semibold text-neutral-800">{t("reviewAssets.current")}</h3>
+              <SpecView spec={current.spec} />
+              {current.previous && (
+                <>
+                  <h3 className="mt-6 mb-2 text-sm font-semibold text-neutral-800">
+                    {t("reviewAssets.previous")} · {t("reviewAssets.compare", { n: current.previous_version })}
+                  </h3>
+                  <div className="opacity-75">
+                    <SpecView spec={current.previous} />
+                  </div>
+                </>
+              )}
+              <div className="mt-6">
+                <textarea className={cx(inputCls, "h-20 py-2")} placeholder={t("review.commentPlaceholder")} value={reason} onChange={(e) => setReason(e.target.value)} />
+                <div className="mt-3 flex gap-2">
+                  <Button disabled={busy} onClick={() => decide(true)}>
+                    {t("review.approve")}
+                  </Button>
+                  <Button variant="danger" disabled={busy || !reason.trim()} onClick={() => decide(false)}>
+                    {t("review.reject")}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+    </LoadState>
+  );
+}
+
+function PluginReview({ q }: { q: ReturnType<typeof useApi<ReviewItem[]>> }) {
+  const { t } = useTranslation();
   const { notify, reloadPending, reloadPlugins } = useStore();
   const scoring = useScoring();
-  const { data, loading, error, reload } = useApi(api.reviewQueue);
+  const { data, loading, error, reload } = q;
   const { busy, run } = useAction();
   const [selected, setSelected] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -42,7 +193,6 @@ export default function AdminReview() {
 
   return (
     <div>
-      <PageHeader title={t("review.title")} desc={t("review.desc")} />
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
         {queue.length === 0 ? (
           <Card className="p-12 text-center text-sm text-neutral-500">{t("review.empty")}</Card>

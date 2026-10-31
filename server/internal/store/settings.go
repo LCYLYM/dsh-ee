@@ -38,7 +38,20 @@ type AppSettings struct {
 		AllowAlpha            bool `json:"allowAlpha"`
 		AllowCommunityDesktop bool `json:"allowCommunityDesktop"`
 	} `json:"distribution"`
-	Auth     string `json:"auth"`
+	Auth string `json:"auth"`
+	// DSH 接入插件（<主作用域>/dsh-connect）：由 dsh-ee 生成并发布到自己的 npm 源
+	Connect struct {
+		Enabled bool `json:"enabled"`
+		// 把 dsh-ee 的模型网关加为 DSH 的模型提供方并设为默认
+		Model        bool   `json:"model"`
+		DefaultModel string `json:"defaultModel"`
+		// 预置企业插件索引（DSH 插件页的「发现」）
+		Market bool `json:"market"`
+		// 自动安装设为「自动安装」的插件与微应用依赖的插件
+		InstallRequired bool `json:"installRequired"`
+		// 多久检查一次能力目录的变化
+		PollSeconds int `json:"pollSeconds"`
+	} `json:"connect"`
 	Registry struct {
 		// cache：企业作用域之外的包按需回源并缓存 / preloaded：只提供已预载的包
 		ProxyMode   string   `json:"proxyMode"`
@@ -66,6 +79,11 @@ func DefaultSettings() *AppSettings {
 	s.Upstream.AutoSync = "review"
 	s.Distribution.Enabled = true
 	s.Distribution.AllowCommunityDesktop = true
+	s.Connect.Enabled = true
+	s.Connect.Model = true
+	s.Connect.Market = true
+	s.Connect.InstallRequired = true
+	s.Connect.PollSeconds = 60
 	s.Registry.ProxyMode = "cache"
 	s.Registry.ExtraScopes = []string{}
 	s.Registry.RequireToken = true
@@ -121,5 +139,38 @@ func (s *Store) SaveSettings(ctx context.Context, v *AppSettings, userID int64) 
 		`INSERT INTO settings (name, value, updated_by, updated_at) VALUES (?, ?, ?, ?)
 		 ON DUPLICATE KEY UPDATE value = VALUES(value), updated_by = VALUES(updated_by), updated_at = VALUES(updated_at)`,
 		appSettingsKey, string(b), userID, now())
+	return err
+}
+
+// GetSettingJSON 读取一行独立保存的设置（如 LDAP 配置，员工不可读）；不存在时返回 false，dst 不变。
+func (s *Store) GetSettingJSON(ctx context.Context, name string, dst any) (bool, error) {
+	var raw string
+	err := s.db.QueryRowContext(ctx, "SELECT value FROM settings WHERE name = ?", name).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, json.Unmarshal([]byte(raw), dst)
+}
+
+// PutSettingJSON 保存一行独立的设置；userID 为 0 表示系统写入（如后台同步）。
+func (s *Store) PutSettingJSON(ctx context.Context, name string, v any, userID int64) error {
+	if name == appSettingsKey {
+		return errors.New("系统设置请用 SaveSettings")
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	var by any
+	if userID > 0 {
+		by = userID
+	}
+	_, err = s.db.ExecContext(ctx,
+		`INSERT INTO settings (name, value, updated_by, updated_at) VALUES (?, ?, ?, ?)
+		 ON DUPLICATE KEY UPDATE value = VALUES(value), updated_by = VALUES(updated_by), updated_at = VALUES(updated_at)`,
+		name, string(b), by, now())
 	return err
 }

@@ -14,6 +14,8 @@ import portal from "./portal";
 import keys from "./keys";
 import auth from "./auth";
 import registry from "./registry";
+import audit from "./audit";
+import hub from "./hub";
 
 export default {
   ...common,
@@ -30,4 +32,6 @@ export default {
   ...keys,
   ...auth,
   ...registry,
+  ...audit,
+  ...hub,
 } satisfies Messages<typeof zh>;

@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/shadcn/tooltip";
 import { KeyRound, MoreHorizontal, ShieldCheck, UserCheck, UserX } from "lucide-react";
 import { ErrorNote, LoadState } from "../../components/api-ui";
-import { Badge, Button, Card, CardHeader, cx, Field, inputBase, inputCls, PageHeader } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, cx, Field, inputBase, inputCls, PageHeader, Segmented } from "../../components/ui";
 import { useTranslation } from "react-i18next";
 import { useConfirm } from "@/lib/confirm";
 
@@ -43,15 +43,25 @@ function CreateUser({ roles, onCreated }: { roles: Role[] | null; onCreated: (u:
   const [f, setF] = useState(emptyForm);
   const defaultRoles = roles?.filter((r) => r.code === "member").map((r) => r.id) ?? [];
   const [roleIds, setRoleIds] = useState<number[] | null>(null);
+  const [source, setSource] = useState<"local" | "ldap">("local");
+  const methods = useApi(api.authMethods);
   const [error, setError] = useState<string | null>(null);
   const { busy, run } = useAction();
   const set = (patch: Partial<typeof f>) => setF((x) => ({ ...x, ...patch }));
+  const ldap = source === "ldap";
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    // 没动过角色就不传，由服务端给默认角色
-    const r = await run(() => api.createUser({ ...f, username: f.username.trim(), ...(roleIds ? { role_ids: roleIds } : {}) }));
+    // 没动过角色就不传，由服务端给默认角色；LDAP 账号不设本地密码
+    const r = await run(() =>
+      api.createUser({
+        ...f,
+        username: f.username.trim(),
+        ...(ldap ? { password: undefined, auth_source: "ldap" as const } : {}),
+        ...(roleIds ? { role_ids: roleIds } : {}),
+      }),
+    );
     if (!r.ok) return setError(r.error);
     setF(emptyForm);
     setRoleIds(null);
@@ -60,13 +70,28 @@ function CreateUser({ roles, onCreated }: { roles: Role[] | null; onCreated: (u:
 
   return (
     <form onSubmit={submit} className="space-y-4 px-5 pb-5">
+      <Field
+        label={t("users.source")}
+        hint={ldap ? (methods.data && !methods.data.ldap ? `${t("users.ldapCreateHint")} ${t("users.ldapOff")}` : t("users.ldapCreateHint")) : undefined}
+      >
+        <Segmented
+          value={source}
+          onChange={setSource}
+          options={[
+            { value: "local", label: t("users.sourceLocal") },
+            { value: "ldap", label: t("users.sourceLdap") },
+          ]}
+        />
+      </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t("users.username")} hint={t("users.usernameHint")}>
           <input className={inputCls} required value={f.username} onChange={(e) => set({ username: e.target.value })} placeholder="zhang.wei" />
         </Field>
-        <Field label={t("users.initialPassword")} hint={t("users.initialPasswordHint")}>
-          <input className={inputCls} type="text" autoComplete="off" required value={f.password} onChange={(e) => set({ password: e.target.value })} />
-        </Field>
+        {!ldap && (
+          <Field label={t("users.initialPassword")} hint={t("users.initialPasswordHint")}>
+            <input className={inputCls} type="text" autoComplete="off" required value={f.password} onChange={(e) => set({ password: e.target.value })} />
+          </Field>
+        )}
         <Field label={t("users.displayName")}>
           <input className={inputCls} value={f.display_name} onChange={(e) => set({ display_name: e.target.value })} placeholder={t("users.displayNamePlaceholder")} />
         </Field>
@@ -83,7 +108,7 @@ function CreateUser({ roles, onCreated }: { roles: Role[] | null; onCreated: (u:
         <p className="text-sm text-neutral-600">{t("users.defaultRoleNote")}</p>
       )}
       <ErrorNote>{error}</ErrorNote>
-      <Button type="submit" disabled={busy || !f.username || !f.password}>
+      <Button type="submit" disabled={busy || !f.username || (!ldap && !f.password)}>
         {busy ? t("common.creating") : t("users.create")}
       </Button>
     </form>
@@ -135,7 +160,14 @@ export default function AdminUsers() {
             {u.display_name || u.username}
             {u.id === me?.id && <span className="ml-1.5 text-xs text-neutral-500">{t("users.you")}</span>}
           </div>
-          <div className="text-xs text-neutral-600">{u.username}</div>
+          <div className="flex items-center gap-1.5 text-xs text-neutral-600">
+            {u.username}
+            {u.auth_source === "ldap" && (
+              <span title={u.external_dn ? t("users.ldapTip", { dn: u.external_dn }) : undefined}>
+                <Badge tone="brand">{t("users.ldapBadge")}</Badge>
+              </span>
+            )}
+          </div>
         </>
       ),
     }),
@@ -157,6 +189,11 @@ export default function AdminUsers() {
           ))}
         </div>
       ),
+    }),
+    col.accessor((u) => u.last_login_at ?? "", {
+      id: "lastLogin",
+      header: () => t("users.colLastLogin"),
+      cell: (c) => (c.getValue() ? formatTime(c.getValue()) : <span className="text-neutral-500">{t("users.never")}</span>),
     }),
     col.accessor((u) => u.created_at, {
       id: "created",
@@ -204,7 +241,7 @@ export default function AdminUsers() {
                     <ShieldCheck /> {t("users.rolesAction")}
                   </DropdownMenuItem>
                 )}
-                {canManage && (
+                {canManage && u.auth_source !== "ldap" && (
                   <DropdownMenuItem
                     onSelect={() => {
                       setRolesFor(null);
@@ -295,8 +332,8 @@ export default function AdminUsers() {
             columns={columns}
             searchText={(u) => `${u.username} ${u.display_name} ${u.department} ${(u.roles ?? []).map((r) => L.role(r)).join(" ")}`}
             searchPlaceholder={t("users.searchPlaceholder")}
-            hideOnMobile={["department", "created"]}
-            alignRight={["created"]}
+            hideOnMobile={["department", "lastLogin", "created"]}
+            alignRight={["lastLogin", "created"]}
             rowClassName={(u) => u.disabled && "text-neutral-500"}
             emptyText={t("users.none")}
             noMatchText={t("users.noMatch")}

@@ -49,6 +49,12 @@ type Server struct {
 	upstream *http.Client
 	registry *registry.Service
 	settings settingsCache
+	// 能力目录变化的通知（DSH 的 MCP 长连接据此刷新工具）
+	hub hubBroker
+	// 上游 MCP 连接的缓存，按资产 id
+	conns connClients
+	// 设置或模型变化后触发接入插件检查
+	connectKick chan struct{}
 }
 
 func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Server {
@@ -64,7 +70,7 @@ func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Serv
 			MaxIdleConnsPerHost:   32,
 		}}
 	}
-	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), upstream: up}
+	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), upstream: up, connectKick: make(chan struct{}, 1)}
 	s.registry = s.newRegistry()
 	return s
 }
@@ -115,6 +121,7 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, 200, map[string]string{"status": "ok", "version": s.opts.Version})
 	})
 
+	mux.HandleFunc("GET /api/auth/methods", s.handleAuthMethods)
 	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
 	mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
 	mux.Handle("GET /api/auth/me", s.requireUser(http.HandlerFunc(s.handleMe)))
@@ -173,6 +180,41 @@ func (s *Server) Handler() http.Handler {
 	// 系统设置：登录即可读（前端要用组织名、作用域、评分开关），按段落校验写权限
 	mux.Handle("GET /api/settings", user(s.handleGetSettings))
 	mux.Handle("PUT /api/admin/settings", perm(s.handlePutSettings, rbac.SettingsManage, rbac.RegistryManage, rbac.UpstreamManage))
+
+	// LDAP / AD 登录：配置里有服务账号，单独存、单独授权
+	mux.Handle("GET /api/admin/auth/ldap", perm(s.handleGetLDAP, rbac.SettingsManage))
+	mux.Handle("PUT /api/admin/auth/ldap", perm(s.handlePutLDAP, rbac.SettingsManage))
+	mux.Handle("POST /api/admin/auth/ldap/test", perm(s.handleTestLDAP, rbac.SettingsManage))
+	mux.Handle("POST /api/admin/auth/ldap/sync", perm(s.handleSyncLDAP, rbac.SettingsManage))
+
+	// 能力中心：技能、提示词、微应用、企业连接，插件的可用范围与下发方式
+	mux.Handle("GET /api/hub", perm(s.handleHub, rbac.PortalView))
+	mux.Handle("POST /api/hub", perm(s.handleHubCreate, rbac.RegistryPublish, rbac.ConnectionsManage))
+	mux.Handle("GET /api/hub/{id}", perm(s.handleHubDetail, rbac.PortalView))
+	mux.Handle("PATCH /api/hub/{id}", perm(s.handleHubPatch, rbac.PortalView))
+	mux.Handle("DELETE /api/hub/{id}", perm(s.handleHubDelete, rbac.PluginsManage, rbac.ConnectionsManage))
+	mux.Handle("POST /api/hub/{id}/versions", perm(s.handleHubNewVersion, rbac.RegistryPublish, rbac.PluginsManage, rbac.ConnectionsManage))
+	mux.Handle("POST /api/hub/{id}/subscription", perm(s.handleHubSubscribe, rbac.PortalView))
+	mux.Handle("DELETE /api/hub/{id}/subscription", perm(s.handleHubSubscribe, rbac.PortalView))
+	mux.Handle("GET /api/admin/hub/review", perm(s.handleHubReviewQueue, rbac.PluginsManage))
+	mux.Handle("POST /api/admin/hub/review", perm(s.handleHubReview, rbac.PluginsManage))
+	mux.Handle("PUT /api/admin/plugin-policies/{name...}", perm(s.handlePutPluginPolicy, rbac.PluginsManage))
+	mux.Handle("POST /api/admin/connections/test", perm(s.handleConnTest, rbac.ConnectionsManage))
+	mux.Handle("POST /api/admin/connections/{id}/sync", perm(s.handleConnSync, rbac.ConnectionsManage))
+	mux.Handle("PATCH /api/admin/connections/{id}/tools/{name}", perm(s.handleConnTool, rbac.ConnectionsManage))
+
+	// DSH 接入：接入插件的发布，以及员工本机 DSH 调用的目录与 MCP 网关（令牌认证）
+	mux.Handle("GET /api/connect", perm(s.handleConnectInfo, rbac.PortalView))
+	mux.Handle("GET /api/admin/connect", perm(s.handleAdminConnect, rbac.SettingsManage))
+	mux.Handle("POST /api/admin/connect/publish", perm(s.handlePublishConnect, rbac.SettingsManage))
+	mux.HandleFunc("GET /api/dsh/catalog", s.handleDshCatalog)
+	mux.HandleFunc("GET /api/dsh/skills/{name}", s.handleDshSkill)
+	mux.HandleFunc("/mcp", s.handleMCP)
+
+	// 统计与审计
+	mux.Handle("GET /api/admin/stats", perm(s.handleStats, rbac.DashboardView))
+	mux.Handle("GET /api/admin/audit", perm(s.handleListAudit, rbac.AuditView))
+	mux.Handle("GET /api/me/overview", perm(s.handleMyOverview, rbac.PortalView))
 
 	// 能力市场与发布（员工）
 	mux.Handle("GET /api/catalog", perm(s.handleCatalog, rbac.PortalView))
@@ -326,11 +368,13 @@ func currentAccess(r *http.Request) *rbac.Access {
 
 func notFound(err error) bool { return errors.Is(err, store.ErrNotFound) }
 
-// RunBackground 跑定时任务：每 6 小时检查已预载插件的新版本（按系统设置自动同步或进入审核）。
+// RunBackground 跑定时任务：每小时核对一次 LDAP 目录；每 6 小时检查已预载插件的新版本（按系统设置自动同步或进入审核）。
 func (s *Server) RunBackground(ctx context.Context) {
+	go s.runLDAPSync(ctx)
 	if s.registry == nil {
 		return
 	}
+	go s.runConnect(ctx)
 	t := time.NewTicker(6 * time.Hour)
 	defer t.Stop()
 	for {

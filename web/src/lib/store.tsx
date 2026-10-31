@@ -31,6 +31,14 @@ export const defaultSettings: Settings = {
     allowCommunityDesktop: true,
   },
   auth: "local",
+  connect: {
+    enabled: true,
+    model: true,
+    defaultModel: "",
+    market: true,
+    installRequired: true,
+    pollSeconds: 60,
+  },
   registry: {
     proxyMode: "cache",
     extraScopes: [],
@@ -99,7 +107,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setPendingCount(0);
       return;
     }
-    api.reviewQueue().then((q) => setPendingCount(q.length), () => {});
+    Promise.all([api.reviewQueue(), api.hubReviewQueue().catch(() => [])]).then(([q, h]) => setPendingCount(q.length + h.length), () => {});
   }, [userId, canReview]);
 
   useEffect(reloadPlugins, [reloadPlugins]);

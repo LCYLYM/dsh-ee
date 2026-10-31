@@ -41,6 +41,9 @@ type createUserReq struct {
 	// 不传时给默认的「员工」角色；传 [] 表示不分配任何角色。
 	RoleIDs           *[]int64      `json:"role_ids"`
 	MonthlyTokenLimit nullableInt64 `json:"monthly_token_limit"`
+	// local（默认）/ ldap：预先建好的目录账号，不设密码，首次登录时由目录验证并补全资料
+	AuthSource string `json:"auth_source"`
+	Email      string `json:"email"`
 }
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -78,9 +81,23 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	hash, err := HashPassword(req.Password)
-	if err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
+	var hash string
+	switch req.AuthSource {
+	case "", store.AuthLocal:
+		req.AuthSource = store.AuthLocal
+		h, err := HashPassword(req.Password)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		hash = h
+	case store.AuthLDAP:
+		if req.Password != "" {
+			writeErr(w, http.StatusBadRequest, "LDAP 账号不设本地密码")
+			return
+		}
+	default:
+		writeErr(w, http.StatusBadRequest, "auth_source 只能是 local 或 ldap")
 		return
 	}
 	// 新用户默认 0：管理员分配额度后才能调用模型。显式传 null 表示不限额。
@@ -98,8 +115,10 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		Username:          req.Username,
 		DisplayName:       strings.TrimSpace(req.DisplayName),
 		Department:        strings.TrimSpace(req.Department),
+		Email:             strings.TrimSpace(req.Email),
 		PasswordHash:      hash,
 		MonthlyTokenLimit: &limit,
+		AuthSource:        req.AuthSource,
 	}
 	if req.MonthlyTokenLimit.Set && req.MonthlyTokenLimit.Value == nil {
 		u.MonthlyTokenLimit = nil
@@ -116,6 +135,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditUserCreate, u.Username, map[string]any{"id": u.ID, "source": u.AuthSource, "roles": dedupe(roleIDs)})
 	writeJSON(w, http.StatusCreated, u)
 }
 
@@ -161,6 +181,10 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	p := store.UserPatch{DisplayName: req.DisplayName, Department: req.Department, Disabled: req.Disabled}
 	if req.Password != nil {
+		if u, err := s.store.GetUser(r.Context(), id); err == nil && u.AuthSource == store.AuthLDAP {
+			writeErr(w, http.StatusBadRequest, "LDAP 账号的密码由企业目录管理，不能在这里重置")
+			return
+		}
 		hash, err := HashPassword(*req.Password)
 		if err != nil {
 			writeErr(w, http.StatusBadRequest, err.Error())
@@ -188,6 +212,18 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	detail := map[string]any{"id": id}
+	if req.Disabled != nil {
+		detail["disabled"] = *req.Disabled
+	}
+	if req.Password != nil {
+		detail["password_reset"] = true
+	}
+	if req.DisplayName != nil || req.Department != nil {
+		detail["profile"] = true
+	}
+	s.audit(r, auditUserUpdate, u.Username, detail)
+	s.hub.notify()
 	writeJSON(w, http.StatusOK, u)
 }
 
@@ -255,6 +291,7 @@ func (s *Server) handleIssueKey(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditKeyCreate, owner.Username, map[string]any{"id": k.ID, "name": k.Name, "prefix": k.Prefix, "self": false})
 	// 明文只在这里返回一次
 	writeJSON(w, http.StatusCreated, map[string]any{"key": plain, "api_key": k})
 }
@@ -264,6 +301,7 @@ func (s *Server) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	k, _ := s.store.GetAPIKey(r.Context(), id)
 	if err := s.store.RevokeAPIKey(r.Context(), id); err != nil {
 		if notFound(err) {
 			writeErr(w, http.StatusNotFound, "key 不存在或已吊销")
@@ -271,6 +309,9 @@ func (s *Server) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
 		}
 		s.internalErr(w, r, err)
 		return
+	}
+	if k != nil {
+		s.audit(r, auditKeyRevoke, k.Username, map[string]any{"id": id, "name": k.Name, "prefix": k.Prefix, "self": false})
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

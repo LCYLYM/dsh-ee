@@ -3,8 +3,9 @@
 企业私有部署的 DSH 插件市场：一键部署、热门插件在线 / 离线预载、员工内部分享插件、内网分发 DSH 本体与桌面版。
 
 - 设计稿：[docs/design.md](./docs/design.md)
-- 前端：[web/](./web)（Vite + React + Tailwind；总览、运营数据、微应用、DSH 分发与个人工作台仍是模拟数据，其余已接服务端）
-- 服务端：[server/](./server)（Go；用户与 RBAC、账号月度额度、企业 API key 与 OpenAI 兼容网关、内置 npm 源与审核、上游预载、DSH 插件索引；OceanBase / TiDB）
+- 前端：[web/](./web)（Vite + React + Tailwind；DSH 分发仍是模拟数据，其余已接服务端）
+- 能力中心设计：[docs/capability-hub.md](./docs/capability-hub.md)（插件、技能、提示词、企业连接、微应用，以及 DSH 接入插件）
+- 服务端：[server/](./server)（Go；用户与 RBAC、LDAP / AD 登录、账号月度额度、企业 API key 与 OpenAI 兼容网关、内置 npm 源与审核、上游预载、DSH 插件索引、运营统计与审计日志；OceanBase / TiDB）
 - 部署：[deploy/](./deploy)（单文件二进制、docker compose、离线安装包）
 - 端到端测试：[e2e/](./e2e)（Playwright，跑在嵌好前端的单文件服务端上）
 
@@ -72,26 +73,29 @@ E2E_BASE=http://127.0.0.1:8080 ADMIN_PW=… make e2e      # 或 cd e2e && node r
 | `/login` | 登录（接真实后端） |
 | `/keys` | 额度与 API key（接真实后端） |
 | `/account` | 账号与修改密码（接真实后端） |
-| `/workbench` | 我的工作台（本月 Token 消耗、我的密钥、我安装 / 贡献的应用；下方为微应用、已装能力、部门在用、我贡献的） |
-| `/apps` | 微应用 |
-| `/market` | 能力市场（接真实后端：已上架的企业与社区插件） |
+| `/workbench` | 我的工作台（本月 Token、我的密钥、装过的能力与可更新、部门在用、我分享的；接真实后端，其中「我的微应用」仍是模拟数据） |
+| `/apps` | 微应用：人设 + 技能 + 企业系统 + 插件，在 DSH 里用 /名字 打开（接真实后端） |
+| `/hub` | 能力中心：插件、技能、提示词、企业连接、微应用分 Tab；启用 / 停用，启用的自动同步到员工 DSH（接真实后端；旧的 `/market` 会跳转过来） |
+| `/assets/:id`、`/assets/new` | 能力详情与编辑：版本、可用范围与下发方式、连接的工具与调用记录（接真实后端） |
 | `/plugins/:name` | 插件详情（安装命令、自动检查结果、版本、依赖、README；接真实后端） |
 | `/dsh` | 下载 DSH 核心 / 桌面版 |
 | `/setup` | 接入企业插件源：个人 npm 令牌、一键接入脚本、.npmrc 与 DSH 索引源（接真实后端） |
 | `/publish` | 分享插件（网页上传 .tgz / npm publish）、申请引入社区插件、我的提交（接真实后端） |
-| `/admin` | 管理总览（全链路 dashboard、审计日志） |
+| `/admin` | 管理总览（资产、治理、活跃员工与终端分布、每日安装与模型调用、热门能力、最近操作；接真实后端） |
 | `/admin/users` | 用户管理与角色分配（接真实后端） |
 | `/admin/roles` | 角色与权限、自定义权限点（接真实后端） |
 | `/admin/menus` | 菜单与页面：名称、路由、图标、分组、访问权限（接真实后端） |
 | `/admin/providers` | 模型接入：上游、连接检查、模型导入与对外名称、故障转移（接真实后端） |
 | `/admin/keys` | API key 分发（接真实后端） |
 | `/admin/quotas` | 额度分配：账号月度 token 额度、可用模型、有效期（接真实后端） |
-| `/admin/stats` | 运营数据（安装趋势、存储） |
+| `/admin/stats` | 运营数据：按 7 / 14 / 30 / 90 天看安装、活跃员工、模型调用与 Token，按部门、能力、模型、终端与存储（接真实后端） |
+| `/admin/audit` | 审计日志：登录、账号与权限、模型接入、设置、发布与审核等操作，可按类别与关键字筛选（接真实后端） |
 | `/admin/registry` | npm 源：统计、路由规则、上游与回源、客户端 .npmrc、访问令牌（接真实后端） |
-| `/admin/plugins` | 能力管理：按包 / 按版本下架与恢复（接真实后端） |
-| `/admin/review` | 审核队列：自动检查、依赖、下载 tarball、通过 / 驳回（接真实后端） |
+| `/admin/plugins` | 能力管理：按包 / 按版本下架与恢复，插件的可用范围与自动安装（接真实后端） |
+| `/admin/connections` | 企业连接：接入 MCP 服务或 OpenAPI 接口，凭据托管，工具级授权（接真实后端） |
+| `/admin/review` | 审核队列：插件（自动检查、依赖、tarball）与技能 / 提示词 / 微应用（对照线上版本），通过 / 驳回（接真实后端） |
 | `/admin/upstream` | 上游预载：dshfind 目录挑选、同步任务与日志、新版本检查、离线包导入导出（接真实后端） |
 | `/admin/distribution` | DSH 本体分发管理 |
-| `/admin/settings` | 系统设置（评分开关、收录模式、上游、分发、认证；保存在服务端） |
+| `/admin/settings` | 系统设置（评分开关、收录模式、上游、分发；LDAP / AD 登录的连接、属性、组 → 角色映射、试连与目录同步；保存在服务端） |
 
-DSH 本体分发的版本、安装包与 sha256 仍是占位；认证只实现了本地账号（LDAP / OIDC 选项只保存不生效）。
+DSH 本体分发的版本、安装包与 sha256 仍是占位；认证支持本地账号与 LDAP / AD，OIDC 尚未实现。

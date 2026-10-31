@@ -7,6 +7,7 @@ import {
   Boxes,
   BookOpen,
   Building2,
+  Cable,
   Circle,
   ClipboardCheck,
   CloudDownload,
@@ -24,6 +25,7 @@ import {
   MessageSquare,
   PanelsTopLeft,
   Puzzle,
+  ScrollText,
   Server,
   Settings,
   ShieldCheck,
@@ -71,6 +73,8 @@ export const ICONS: Record<string, LucideIcon> = {
   Workflow,
   Wrench,
   ExternalLink,
+  ScrollText,
+  Cable,
 };
 
 export function MenuIcon({ name, size = 16, className }: { name: string; size?: number; className?: string }) {

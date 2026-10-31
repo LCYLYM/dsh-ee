@@ -5,17 +5,34 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 )
 
+// tgz 按固定顺序写入：package/ 下的文件在前（第一个条目决定包根目录），其余按名字排序。
 func tgz(t *testing.T, files map[string]string) []byte {
 	t.Helper()
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	slices.SortFunc(names, func(a, b string) int {
+		pa, pb := strings.HasPrefix(a, "package/"), strings.HasPrefix(b, "package/")
+		if pa != pb {
+			if pa {
+				return -1
+			}
+			return 1
+		}
+		return strings.Compare(a, b)
+	})
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gz)
-	for name, body := range files {
+	for _, name := range names {
+		body := files[name]
 		_ = tw.WriteHeader(&tar.Header{Name: name, Mode: 0o644, Size: int64(len(body)), Typeflag: tar.TypeReg})
 		_, _ = tw.Write([]byte(body))
 	}
@@ -208,5 +225,24 @@ func TestRepoAndURL(t *testing.T) {
 	}
 	if iconURL("https://avatars.githubusercontent.com/x?s=96") == "" || iconURL("https://u:p@x.com/a.png") != "" {
 		t.Error("iconURL 应允许 query、拒绝凭据")
+	}
+}
+
+func TestParseUserAgent(t *testing.T) {
+	for ua, want := range map[string]Client{
+		"npm/10.8.2 node/v22.11.0 linux x64 workspaces/false": {"npm", "linux", "x64"},
+		"pnpm/9.12.3 npm/? node/v20.18.0 darwin arm64":        {"pnpm", "darwin", "arm64"},
+		"yarn/1.22.22 npm/? node/v20.18.0 win32 x64":          {"yarn", "win32", "x64"},
+		"pnpm/9.0.0 npm/? node/v20.0.0 linux loong64":         {"pnpm", "linux", "loong64"},
+		"Bun/1.1.30":                      {"bun", "", ""},
+		"curl/8.5.0":                      {"other", "", ""},
+		"npm/10 node/v22 haiku x64":       {"npm", "", "x64"},
+		"npm/10 node/v22":                 {"npm", "", ""},
+		"":                                {},
+		"Mozilla/5.0 (X11; Linux x86_64)": {"other", "", ""},
+	} {
+		if got := ParseUserAgent(ua); got != want {
+			t.Errorf("ParseUserAgent(%q) = %+v，期望 %+v", ua, got, want)
+		}
 	}
 }

@@ -28,7 +28,9 @@ const (
 	KeysManage      = "keys.manage"
 
 	DashboardView      = "dashboard.view"
+	AuditView          = "audit.view"
 	PluginsManage      = "plugins.manage"
+	ConnectionsManage  = "connections.manage"
 	RegistryManage     = "registry.manage"
 	UpstreamManage     = "upstream.manage"
 	DistributionManage = "distribution.manage"
@@ -50,7 +52,7 @@ var Catalog = []Permission{
 	{LLMUse, "调用大模型", "工作台", "用自己的 API key 通过 dsh-ee 调用模型", []string{RoleMember}},
 	{KeysSelf, "管理自己的 API key", "工作台", "查看额度，自助创建和吊销自己的 key", []string{RoleMember}},
 	{RegistryUse, "安装能力", "工作台", "从企业 npm 源安装插件与依赖，创建自己的 npm 令牌", []string{RoleMember}},
-	{RegistryPublish, "发布能力", "工作台", "向企业作用域发布插件（发布后进入审核），申请引入社区插件", []string{RoleMember}},
+	{RegistryPublish, "发布能力", "工作台", "发布插件、技能、提示词与微应用（发布后进入审核），申请引入社区插件", []string{RoleMember}},
 
 	{UsersView, "查看用户", "用户与权限", "查看用户列表（分配额度、分发 key、分配角色时也需要）", nil},
 	{UsersManage, "管理用户", "用户与权限", "新建、编辑、禁用用户，重置密码", nil},
@@ -62,11 +64,13 @@ var Catalog = []Permission{
 	{KeysManage, "管理全部 API key", "大模型", "查看、代发和吊销所有员工的 key", nil},
 
 	{DashboardView, "查看管理总览", "能力与分发", "管理总览与运营数据", nil},
-	{PluginsManage, "管理能力与审核", "能力与分发", "能力上下架与审核队列", nil},
+	{AuditView, "查看审计日志", "能力与分发", "登录、账号、权限、设置、发布与审核等操作记录", nil},
+	{PluginsManage, "管理能力与审核", "能力与分发", "插件、技能、提示词与微应用的审核、上下架、可用范围与下发方式", nil},
+	{ConnectionsManage, "管理企业连接", "能力与分发", "接入企业 MCP 服务与 API，托管凭据，配置工具与授权", nil},
 	{RegistryManage, "管理 npm 源", "能力与分发", "路由规则、上游与访问令牌", nil},
 	{UpstreamManage, "管理上游预载", "能力与分发", "在线同步与离线导入", nil},
 	{DistributionManage, "管理 DSH 分发", "能力与分发", "DSH 本体与桌面版的分发", nil},
-	{SettingsManage, "管理系统设置", "能力与分发", "评分、收录策略、上游、认证等全局设置", nil},
+	{SettingsManage, "管理系统设置", "能力与分发", "评分、收录策略、上游、LDAP 登录等全局设置", nil},
 }
 
 // Menu 是默认菜单树的一项。Kind: group / page / link。
@@ -85,7 +89,7 @@ var DefaultMenus = []Menu{
 	{Kind: "group", Title: "工作台", Children: []Menu{
 		{Kind: "page", Title: "我的工作台", Path: "/workbench", PageKey: "workbench", Icon: "House", Permission: PortalView},
 		{Kind: "page", Title: "微应用", Path: "/apps", PageKey: "apps", Icon: "AppWindow", Permission: PortalView},
-		{Kind: "page", Title: "能力市场", Path: "/market", PageKey: "market", Icon: "Puzzle", Permission: PortalView},
+		{Kind: "page", Title: "能力中心", Path: "/hub", PageKey: "market", Icon: "Puzzle", Permission: PortalView},
 		{Kind: "page", Title: "下载 DSH", Path: "/dsh", PageKey: "dsh-download", Icon: "Download", Permission: PortalView},
 		{Kind: "page", Title: "接入指南", Path: "/setup", PageKey: "setup", Icon: "Terminal", Permission: PortalView},
 		{Kind: "page", Title: "分享能力", Path: "/publish", PageKey: "publish", Icon: "Upload", Permission: PortalView},
@@ -102,7 +106,9 @@ var DefaultMenus = []Menu{
 	{Kind: "group", Title: "管理", Children: []Menu{
 		{Kind: "page", Title: "总览", Path: "/admin", PageKey: "admin-dashboard", Icon: "Gauge", Permission: DashboardView},
 		{Kind: "page", Title: "运营数据", Path: "/admin/stats", PageKey: "admin-stats", Icon: "LayoutDashboard", Permission: DashboardView},
+		{Kind: "page", Title: "审计日志", Path: "/admin/audit", PageKey: "admin-audit", Icon: "ScrollText", Permission: AuditView},
 		{Kind: "page", Title: "能力管理", Path: "/admin/plugins", PageKey: "admin-plugins", Icon: "Boxes", Permission: PluginsManage},
+		{Kind: "page", Title: "企业连接", Path: "/admin/connections", PageKey: "admin-connections", Icon: "Cable", Permission: ConnectionsManage},
 		{Kind: "page", Title: "待审核", Path: "/admin/review", PageKey: "admin-review", Icon: "ClipboardCheck", Permission: PluginsManage},
 		{Kind: "page", Title: "npm 源", Path: "/admin/registry", PageKey: "admin-registry", Icon: "Server", Permission: RegistryManage},
 		{Kind: "page", Title: "上游预载", Path: "/admin/upstream", PageKey: "admin-upstream", Icon: "CloudDownload", Permission: UpstreamManage},

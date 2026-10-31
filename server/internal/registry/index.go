@@ -210,7 +210,12 @@ func indexPlugin(p *store.NpmPackage, versions []*store.NpmVersion, installs int
 		if ts < 0 || ts >= maxPublishTimestamp {
 			ts = time.Now().Unix()
 		}
-		ip.Versions = append(ip.Versions, indexVersion{Version: v.Version, PublishTimestamp: ts, Source: map[string]string{"type": "npm"}})
+		src := map[string]string{"type": "npm"}
+		// 写明从 dsh-ee 的 npm 源装：DSH 安装时先问它，不依赖员工本机 .npmrc 的默认源
+		if portalBase != "" {
+			src["registry"] = portalBase + "/npm/"
+		}
+		ip.Versions = append(ip.Versions, indexVersion{Version: v.Version, PublishTimestamp: ts, Source: src})
 	}
 	if len(ip.Versions) == 0 {
 		return nil

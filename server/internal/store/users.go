@@ -28,15 +28,26 @@ type User struct {
 	// 本月（UTC）已用 token，列表查询时填充。
 	MonthTokens int64 `json:"month_tokens"`
 	// 角色摘要，列表与 me 接口填充。
-	Roles        []RoleRef `json:"roles"`
-	PasswordHash string    `json:"-"`
+	Roles []RoleRef `json:"roles"`
+	// local：本地密码 / ldap：由企业目录认证（本地不存密码，资料在每次登录时同步）
+	AuthSource   string     `json:"auth_source"`
+	Email        string     `json:"email"`
+	ExternalDN   string     `json:"external_dn,omitempty"`
+	LastLoginAt  *time.Time `json:"last_login_at"`
+	PasswordHash string     `json:"-"`
 }
+
+const (
+	AuthLocal = "local"
+	AuthLDAP  = "ldap"
+)
 
 // userColumns 让同一份列清单能同时用于单表查询和带别名的 JOIN。
 func userColumns(alias string) string {
 	cols := []string{
 		"id", "username", "display_name", "department", "disabled", "created_at",
 		"password_hash", "monthly_token_limit", "allowed_models", "quota_expires_at",
+		"auth_source", "email", "external_dn", "last_login_at",
 	}
 	if alias != "" {
 		for i := range cols {
@@ -50,10 +61,12 @@ func scanUser(row interface{ Scan(...any) error }, extra ...any) (*User, error) 
 	var u User
 	var limit sql.NullInt64
 	var models sql.NullString
-	var expires sql.NullTime
+	var expires, lastLogin sql.NullTime
+	var dn sql.NullString
 	dest := []any{
 		&u.ID, &u.Username, &u.DisplayName, &u.Department, &u.Disabled, &u.CreatedAt,
 		&u.PasswordHash, &limit, &models, &expires,
+		&u.AuthSource, &u.Email, &dn, &lastLogin,
 	}
 	err := row.Scan(append(dest, extra...)...)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -75,6 +88,11 @@ func scanUser(row interface{ Scan(...any) error }, extra ...any) (*User, error) 
 		v := expires.Time
 		u.QuotaExpiresAt = &v
 	}
+	u.ExternalDN = dn.String
+	if lastLogin.Valid {
+		v := lastLogin.Time
+		u.LastLoginAt = &v
+	}
 	return &u, nil
 }
 
@@ -91,10 +109,15 @@ func (s *Store) CountUsers(ctx context.Context) (int, error) {
 
 func (s *Store) CreateUser(ctx context.Context, u *User) error {
 	t := now()
+	if u.AuthSource == "" {
+		u.AuthSource = AuthLocal
+	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO users (username, display_name, department, password_hash, disabled, created_at, updated_at, monthly_token_limit)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.Username, u.DisplayName, u.Department, u.PasswordHash, u.Disabled, t, t, u.MonthlyTokenLimit)
+		`INSERT INTO users (username, display_name, department, password_hash, disabled, created_at, updated_at, monthly_token_limit,
+		                    auth_source, email, external_dn)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.Username, u.DisplayName, u.Department, u.PasswordHash, u.Disabled, t, t, u.MonthlyTokenLimit,
+		u.AuthSource, u.Email, nullStr(u.ExternalDN))
 	if isDuplicate(err) {
 		return ErrDuplicate
 	}
@@ -142,6 +165,8 @@ type UserPatch struct {
 	Department   *string
 	Disabled     *bool
 	PasswordHash *string
+	Email        *string
+	ExternalDN   *string
 }
 
 func (s *Store) UpdateUser(ctx context.Context, id int64, p UserPatch) error {
@@ -163,6 +188,12 @@ func (s *Store) UpdateUser(ctx context.Context, id int64, p UserPatch) error {
 	if p.PasswordHash != nil {
 		add("password_hash", *p.PasswordHash)
 	}
+	if p.Email != nil {
+		add("email", *p.Email)
+	}
+	if p.ExternalDN != nil {
+		add("external_dn", nullStr(*p.ExternalDN))
+	}
 	args = append(args, id)
 	res, err := s.db.ExecContext(ctx, "UPDATE users SET "+strings.Join(sets, ", ")+" WHERE id = ?", args...)
 	if err != nil {
@@ -172,6 +203,30 @@ func (s *Store) UpdateUser(ctx context.Context, id int64, p UserPatch) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// TouchLogin 记录最近一次登录时间。
+func (s *Store) TouchLogin(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE users SET last_login_at = ? WHERE id = ?", now(), id)
+	return err
+}
+
+// ListUsersBySource 列出某种认证来源的、未禁用的用户（目录同步用）。
+func (s *Store) ListUsersBySource(ctx context.Context, source string) ([]*User, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT "+userColumns("")+" FROM users WHERE auth_source = ? AND disabled = 0 ORDER BY id", source)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*User
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
 }
 
 // UserQuotaPatch 是整份额度的替换值：nil 表示不限（额度）/ 永不过期（有效期），

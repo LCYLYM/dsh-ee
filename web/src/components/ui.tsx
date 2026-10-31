@@ -77,6 +77,31 @@ export function Toggle({
   );
 }
 
+/** 设置项：左边标题与说明，右边开关。 */
+export function ToggleRow({
+  label,
+  desc,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  desc?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className={cx("flex items-start justify-between gap-6", disabled && "opacity-50")}>
+      <div>
+        <div className="text-sm font-medium text-neutral-800">{label}</div>
+        {desc && <div className="mt-0.5 text-xs text-neutral-500">{desc}</div>}
+      </div>
+      <Toggle checked={checked} onChange={onChange} disabled={disabled} />
+    </div>
+  );
+}
+
 export function Segmented<T extends string>({
   value,
   options,

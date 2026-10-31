@@ -86,6 +86,9 @@ func compareVersions(a, b string) int {
 	return va.Compare(vb)
 }
 
+// CompareVersions 按 semver 比较 a 与 b（-1 / 0 / 1），非法版本排在最前。
+func CompareVersions(a, b string) int { return compareVersions(a, b) }
+
 // SortVersions 按 semver 升序排序。
 func SortVersions(vs []string) {
 	slices.SortFunc(vs, compareVersions)

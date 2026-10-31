@@ -7,7 +7,9 @@ import { useScoring, useStore } from "../../lib/store";
 import type { PluginStatus } from "../../lib/types";
 import { StatusBadge } from "../../components/status";
 import { LoadState } from "../../components/api-ui";
-import { Button, Card, cx, inputBase, PageHeader, PluginIcon, Segmented } from "../../components/ui";
+import { Badge, Button, Card, cx, inputBase, PageHeader, PluginIcon, Segmented } from "../../components/ui";
+import { ScopeDialog } from "../../components/scope-dialog";
+import { allScope } from "../../lib/hub";
 import { useTranslation } from "react-i18next";
 
 export default function AdminPlugins() {
@@ -15,6 +17,9 @@ export default function AdminPlugins() {
   const { notify, reloadPlugins, reloadPending } = useStore();
   const scoring = useScoring();
   const { data, loading, error, reload } = useApi(api.adminPackages);
+  const hub = useApi(api.hub);
+  const policies = hub.data?.plugin_policies ?? {};
+  const [policyFor, setPolicyFor] = useState<string | null>(null);
   const { busy, run } = useAction();
   const [filter, setFilter] = useState<"all" | PluginStatus>("all");
   const [q, setQ] = useState("");
@@ -114,9 +119,15 @@ export default function AdminPlugins() {
                       <div className="flex items-center gap-1.5">
                         <StatusBadge status={p.status} />
                         {p.pending > 0 && p.status !== "pending" && <span className="text-xs text-amber-700">{t("registry.plugins.pendingVersions", { count: p.pending })}</span>}
+                        {policies[p.name]?.delivery === "auto" && <Badge tone="brand">{t("pluginPolicy.badgeAuto")}</Badge>}
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    <td className="space-x-2 px-4 py-2.5 text-right whitespace-nowrap">
+                      {p.is_plugin && (
+                        <Button variant="secondary" size="sm" onClick={() => setPolicyFor(p.name)}>
+                          {t("pluginPolicy.action")}
+                        </Button>
+                      )}
                       {p.status === "published" && (
                         <Button variant="danger" size="sm" disabled={busy} onClick={() => setYanking({ name: p.name, version: "" })}>
                           {t("pluginsAdmin.yank")}
@@ -168,6 +179,22 @@ export default function AdminPlugins() {
           </table>
         </Card>
       </LoadState>
+      <ScopeDialog
+        open={policyFor !== null}
+        onOpenChange={(v) => !v && setPolicyFor(null)}
+        title={t("pluginPolicy.title", { name: policyFor ?? "" })}
+        description={t("pluginPolicy.note")}
+        scope={(policyFor && policies[policyFor]?.scope) || allScope()}
+        delivery={(policyFor && policies[policyFor]?.delivery) || "optional"}
+        canDelivery
+        labels={{ auto: t("pluginPolicy.auto"), optional: t("pluginPolicy.optional"), autoHint: t("pluginPolicy.autoHint"), optionalHint: t("pluginPolicy.optionalHint") }}
+        onSave={async (scope, delivery) => {
+          if (!policyFor) return;
+          await api.setPluginPolicy(policyFor, { scope, delivery });
+          notify(t("pluginPolicy.saved", { name: policyFor }));
+          hub.reload();
+        }}
+      />
     </div>
   );
 }

@@ -145,6 +145,7 @@ func (s *Server) handleUpdateUserQuota(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditUserQuota, updated.Username, map[string]any{"id": id, "monthly_token_limit": updated.MonthlyTokenLimit, "allowed_models": updated.AllowedModels, "expires_at": updated.QuotaExpiresAt})
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -240,6 +241,7 @@ func (s *Server) handleCreateMyKey(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditKeyCreate, u.Username, map[string]any{"id": k.ID, "name": k.Name, "prefix": k.Prefix, "self": true})
 	// 明文只在这里返回一次
 	writeJSON(w, http.StatusCreated, map[string]any{"key": plain, "api_key": k})
 }
@@ -267,5 +269,6 @@ func (s *Server) handleRevokeMyKey(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditKeyRevoke, k.Username, map[string]any{"id": id, "name": k.Name, "prefix": k.Prefix, "self": true})
 	w.WriteHeader(http.StatusNoContent)
 }

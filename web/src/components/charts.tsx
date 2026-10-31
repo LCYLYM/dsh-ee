@@ -1,22 +1,41 @@
 import { useState } from "react";
 import { cx } from "./ui";
 
-/** 截至日期（与模拟数据的 now 一致）往前推 n 天的标签。 */
-function dayLabel(i: number, len: number) {
-  const d = new Date(Date.UTC(2026, 9, 26 - (len - 1 - i)));
-  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+/** 接口给的 YYYY-MM-DD → 轴上的 M/D。 */
+function dayLabel(date: string) {
+  const [, m, d] = date.split("-");
+  return `${Number(m)}/${Number(d)}`;
+}
+
+/** 刻度取整到 max 之上；全为 0 时给一个最小刻度，柱子贴着基线。 */
+function niceTop(max: number) {
+  if (max <= 0) return 4;
+  const step = 10 ** Math.floor(Math.log10(max));
+  return Math.ceil(max / step) * step;
 }
 
 /**
  * 逐日单序列柱状图：一个色相、无图例，只标峰值与最后一天，悬停看逐日值。
- * 背后三条淡网格线，刻度取整到 max 之上。
+ * 背后两条淡网格线，刻度取整到 max 之上。dates 与 values 一一对应（YYYY-MM-DD）。
  */
-export function DailyBars({ values, unit, height = "h-56" }: { values: number[]; unit: string; height?: string }) {
+export function DailyBars({
+  values,
+  dates,
+  unit,
+  height = "h-56",
+  format = (v: number) => v.toLocaleString(),
+}: {
+  values: number[];
+  dates: string[];
+  unit: string;
+  height?: string;
+  format?: (v: number) => string;
+}) {
   const [hover, setHover] = useState<number | null>(null);
-  const raw = Math.max(...values);
-  const step = 10 ** Math.floor(Math.log10(raw));
-  const top = Math.ceil(raw / step) * step;
-  const peak = values.indexOf(raw);
+  const raw = Math.max(0, ...values);
+  const top = niceTop(raw);
+  const peak = raw > 0 ? values.indexOf(raw) : -1;
+  const last = values.length - 1;
   const pct = (v: number) => `${(v / top) * 100}%`;
   return (
     <div className="pl-10">
@@ -24,13 +43,13 @@ export function DailyBars({ values, unit, height = "h-56" }: { values: number[];
         <div className={cx("relative flex-1", height)}>
           {[0.5, 1].map((f) => (
             <div key={f} className="absolute inset-x-0 border-t border-dashed border-neutral-200" style={{ bottom: `${f * 100}%` }}>
-              <span className="absolute -top-2.5 right-full mr-2 text-xs text-neutral-500 tabular-nums">{Math.round(top * f)}</span>
+              <span className="absolute -top-2.5 right-full mr-2 text-xs text-neutral-500 tabular-nums">{format(Math.round(top * f))}</span>
             </div>
           ))}
           <div className="absolute inset-0 flex items-end gap-[3px] border-b border-neutral-300">
             {values.map((v, i) => (
               <div
-                key={i}
+                key={dates[i] ?? i}
                 className="relative flex h-full flex-1 items-end"
                 onMouseEnter={() => setHover(i)}
                 onMouseLeave={() => setHover(null)}
@@ -39,9 +58,9 @@ export function DailyBars({ values, unit, height = "h-56" }: { values: number[];
                   className={cx("w-full rounded-t-[3px] transition-colors", hover === i ? "bg-brand-700" : "bg-brand-500")}
                   style={{ height: pct(v) }}
                 />
-                {(i === peak || i === values.length - 1) && hover === null && (
+                {(i === peak || (i === last && v > 0)) && hover === null && (
                   <span className="absolute left-1/2 -translate-x-1/2 text-xs text-neutral-700 tabular-nums" style={{ bottom: `calc(${pct(v)} + 2px)` }}>
-                    {v.toLocaleString()}
+                    {format(v)}
                   </span>
                 )}
                 {hover === i && (
@@ -49,7 +68,7 @@ export function DailyBars({ values, unit, height = "h-56" }: { values: number[];
                     className="absolute left-1/2 z-10 -translate-x-1/2 -translate-y-full rounded bg-neutral-900 px-2 py-1 text-xs whitespace-nowrap text-white shadow-md"
                     style={{ bottom: `calc(${pct(v)} + 6px)` }}
                   >
-                    {dayLabel(i, values.length)} · {v.toLocaleString()} {unit}
+                    {dates[i] && dayLabel(dates[i])} · {format(v)} {unit}
                   </div>
                 )}
               </div>
@@ -57,10 +76,12 @@ export function DailyBars({ values, unit, height = "h-56" }: { values: number[];
           </div>
         </div>
       </div>
-      <div className="mt-1.5 flex justify-between pl-0 text-xs text-neutral-500">
-        <span>{dayLabel(0, values.length)}</span>
-        <span>{dayLabel(values.length - 1, values.length)}</span>
-      </div>
+      {dates.length > 0 && (
+        <div className="mt-1.5 flex justify-between pl-0 text-xs text-neutral-500">
+          <span>{dayLabel(dates[0])}</span>
+          <span>{dayLabel(dates[dates.length - 1])}</span>
+        </div>
+      )}
     </div>
   );
 }

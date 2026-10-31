@@ -74,9 +74,12 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	// 认证方式由 LDAP 配置的开关决定（PUT /api/admin/auth/ldap），这里沿用当前值
+	next.Auth = cur.Auth
 	// 只检查实际改动的段落
 	a := currentAccess(r)
 	cv, nv := reflect.ValueOf(*cur), reflect.ValueOf(next)
+	var changed []string
 	for i := 0; i < cv.NumField(); i++ {
 		name := cv.Type().Field(i).Name
 		if reflect.DeepEqual(cv.Field(i).Interface(), nv.Field(i).Interface()) {
@@ -86,6 +89,7 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusForbidden, "没有权限修改「"+cv.Type().Field(i).Tag.Get("json")+"」设置")
 			return
 		}
+		changed = append(changed, cv.Type().Field(i).Tag.Get("json"))
 	}
 	if err := s.store.SaveSettings(r.Context(), &next, currentUser(r).ID); err != nil {
 		s.internalErr(w, r, err)
@@ -94,6 +98,10 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	s.settings.mu.Lock()
 	s.settings.v = nil
 	s.settings.mu.Unlock()
+	if len(changed) > 0 {
+		s.audit(r, auditSettingsUpdate, strings.Join(changed, ", "), map[string]any{"sections": changed})
+		s.kickConnect()
+	}
 	writeJSON(w, http.StatusOK, &next)
 }
 
@@ -149,6 +157,10 @@ func validateSettings(v *store.AppSettings) string {
 		}
 		v.Upstream.CustomRegistry = strings.TrimRight(v.Upstream.CustomRegistry, "/")
 	}
+	if v.Connect.PollSeconds < 15 || v.Connect.PollSeconds > 3600 {
+		return "DSH 接入插件的检查间隔应在 15–3600 秒之间"
+	}
+	v.Connect.DefaultModel = strings.TrimSpace(v.Connect.DefaultModel)
 	if v.Scoring.MinPreloadScore < 0 || v.Scoring.MinPreloadScore > 100 {
 		return "预载最低评分应在 0–100 之间"
 	}

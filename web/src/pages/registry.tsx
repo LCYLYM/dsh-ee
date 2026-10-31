@@ -15,7 +15,9 @@ import AdminQuotas from "./admin/quotas";
 import AdminKeys from "./admin/keys";
 import AdminDashboard from "./admin/dashboard";
 import AdminStats from "./admin/overview";
+import AdminAudit from "./admin/audit";
 import AdminPlugins from "./admin/plugins";
+import AdminConnections from "./admin/connections";
 import AdminReview from "./admin/review";
 import AdminRegistry from "./admin/registry";
 import AdminUpstream from "./admin/upstream";
@@ -39,7 +41,9 @@ export const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
   "admin-keys": AdminKeys,
   "admin-dashboard": AdminDashboard,
   "admin-stats": AdminStats,
+  "admin-audit": AdminAudit,
   "admin-plugins": AdminPlugins,
+  "admin-connections": AdminConnections,
   "admin-review": AdminReview,
   "admin-registry": AdminRegistry,
   "admin-upstream": AdminUpstream,

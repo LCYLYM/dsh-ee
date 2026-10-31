@@ -1,24 +1,21 @@
 import { Link } from "react-router";
 import { ArrowRight } from "lucide-react";
-import { auditLog, clientPlatforms, execTrend, microApps } from "../../mock/data";
 import { kindOf } from "../../lib/catalog";
 import { useStore } from "../../lib/store";
-import type { AuditEvent, PluginKind } from "../../lib/types";
+import { useAuth } from "../../lib/auth";
+import type { Plugin, PluginKind } from "../../lib/types";
+import { api, formatTime, formatTokens, toPlugin } from "../../lib/api";
+import { useApi } from "../../lib/use-api";
+import { auditAction, auditActor, auditTone } from "../../lib/audit";
+import { platformLabel } from "../../lib/labels";
 import { BarList, DailyBars } from "../../components/charts";
 import { pluginPath } from "../../components/plugin-card";
+import { LoadState } from "../../components/api-ui";
 import { Badge, Card, CardHeader, PageHeader } from "../../components/ui";
 import { PageLink } from "../../lib/menus";
 import { useTranslation } from "react-i18next";
 
 const kindOrder: PluginKind[] = ["skill", "connector", "knowledge", "plugin"];
-
-const actionTone: Record<AuditEvent["action"], "slate" | "brand" | "green" | "amber" | "red"> = {
-  run: "slate",
-  install: "slate",
-  publish: "amber",
-  approve: "green",
-  yank: "red",
-};
 
 /** 链路面板：标题、领头数字、一句说明，下面放明细。 */
 function ChainPanel({
@@ -60,42 +57,44 @@ function KeyValue({ rows }: { rows: [string, React.ReactNode][] }) {
   );
 }
 
+const DAYS = 14;
+
 export default function AdminDashboard() {
   const { t } = useTranslation();
-  const { plugins, releases, settings } = useStore();
-  const approved = plugins.filter((p) => p.status === "published");
-  const pending = plugins.filter((p) => p.status === "pending");
-  const count = (s: string) => plugins.filter((p) => p.status === s).length;
+  const { settings } = useStore();
+  const { can } = useAuth();
+  const canAudit = can("audit.view");
+  const stats = useApi(() => api.stats(DAYS));
+  const audit = useApi(() => (canAudit ? api.audit({ limit: 6 }) : Promise.resolve([])));
+  // 全部状态的能力（能力市场的列表只有已上架的，算不出待审核、驳回与下架）
+  const packages = useApi(api.adminPackages);
+  const s = stats.data;
+  const plugins = (packages.data ?? []).map(toPlugin);
+  const pendingVersions = (packages.data ?? []).reduce((n, p) => n + p.pending, 0);
 
+  const approved = plugins.filter((p) => p.status === "published");
+  const count = (st: string) => plugins.filter((p) => p.status === st).length;
   const byKind = kindOrder.map((k) => ({ label: t(`kinds.${k}`), value: approved.filter((p) => kindOf(p) === k).length }));
   const internal = approved.filter((p) => p.origin === "internal").length;
-
-  const terminals = clientPlatforms.reduce((a, c) => a + c.count, 0);
-  const xc = clientPlatforms.filter((c) => c.xinchuang).reduce((a, c) => a + c.count, 0);
-  const xcNames = new Set(clientPlatforms.filter((c) => c.xinchuang).map((c) => c.os));
-
-  const execTotal = execTrend.reduce((a, b) => a + b, 0);
-  const appRuns = microApps.reduce((a, m) => a + m.runs, 0);
-  const core = releases.find((r) => r.product === "core" && r.recommended);
-  const title = (name: string) => plugins.find((p) => p.name === name)?.title ?? name;
+  const dates = s?.daily.map((d) => d.date) ?? [];
 
   return (
     <div>
-      <PageHeader title={t("dashboard.title")} desc={t("dashboard.desc", { org: settings.orgName })} />
+      <PageHeader title={t("dashboard.title")} desc={[settings.orgName, t("dashboard.desc")].filter(Boolean).join(" · ")} />
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3">
         <ChainPanel
           step={t("dashboard.assets")}
           lead={approved.length.toLocaleString()}
           unit={t("dashboard.published")}
-          note={t("dashboard.assetsNote", { internal, upstream: approved.length - internal, apps: microApps.length })}
+          note={t("dashboard.assetsNote", { internal, upstream: approved.length - internal })}
         >
           <BarList rows={byKind} highlight={(l) => l !== t("kinds.plugin")} />
         </ChainPanel>
 
         <ChainPanel
           step={t("dashboard.governance")}
-          lead={String(pending.length)}
+          lead={String(pendingVersions)}
           unit={t("dashboard.pendingUnit")}
           note={
             <PageLink page="admin-review" className="inline-flex items-center gap-1 font-medium text-neutral-900 hover:underline">
@@ -107,7 +106,7 @@ export default function AdminDashboard() {
             rows={[
               [t("dashboard.approved"), approved.length],
               [t("dashboard.rejected"), count("rejected")],
-              [t("dashboard.yanked"), count("yanked")],
+              [t("dashboard.yanked"), count("unpublished")],
               [t("dashboard.admission"), settings.admissionMode === "allowlist" ? t("dashboard.allowlist") : t("dashboard.openBlocklist")],
               [t("dashboard.upstreamNew"), { auto: t("dashboard.syncAuto"), review: t("dashboard.syncReview"), off: t("dashboard.syncOff") }[settings.upstream.autoSync]],
             ]}
@@ -116,123 +115,179 @@ export default function AdminDashboard() {
 
         <ChainPanel
           step={t("dashboard.endpoints")}
-          lead={terminals.toLocaleString()}
-          unit={t("dashboard.devicesUnit")}
-          note={t("dashboard.endpointsNote", { xc, pct: ((xc / terminals) * 100).toFixed(1) }) + (core ? t("dashboard.recommendedDsh", { version: core.version }) : "")}
+          lead={s ? s.totals.active_users.toLocaleString() : "—"}
+          unit={t("dashboard.activeUnit")}
+          note={s ? t("dashboard.endpointsNote", { users: s.totals.users }) : ""}
         >
-          <BarList
-            rows={clientPlatforms.map((c) => ({ label: c.os, value: c.count, hint: c.xinchuang ? t("dashboard.xinchuang") : undefined }))}
-            highlight={(l) => xcNames.has(l)}
-          />
+          <LoadState loading={stats.loading && !s} error={s ? null : stats.error} onRetry={stats.reload}>
+            {s && s.platforms.length > 0 ? (
+              <>
+                <BarList
+                  rows={s.platforms.slice(0, 6).map((p) => ({
+                    label: platformLabel(p.os, p.arch, t("stats.unknownPlatform")),
+                    value: p.users,
+                  }))}
+                />
+                <p className="mt-3 text-xs text-neutral-500">{t("dashboard.platformsHint")}</p>
+              </>
+            ) : (
+              <p className="text-sm text-neutral-600">{t("dashboard.noPlatforms")}</p>
+            )}
+          </LoadState>
         </ChainPanel>
       </div>
 
-      <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title={t("dashboard.dailyRuns")} aside={t("dashboard.last14")} />
+          <CardHeader title={t("dashboard.dailyInstalls")} aside={t("dashboard.last14")} />
           <div className="px-5 pb-5">
-            <p className="mb-6 text-sm text-neutral-600">
-              {t("dashboard.runsSummary", { total: execTotal.toLocaleString(), apps: appRuns.toLocaleString() })}
-            </p>
-            <DailyBars values={execTrend} unit={t("dashboard.runsUnit")} height="h-52" />
+            <LoadState loading={stats.loading && !s} error={s ? null : stats.error} onRetry={stats.reload}>
+              {s && (
+                <>
+                  <p className="mb-6 text-sm text-neutral-600">
+                    {t("dashboard.installsSummary", { installs: s.totals.installs.toLocaleString(), deps: (s.totals.downloads - s.totals.installs).toLocaleString() })}
+                  </p>
+                  <DailyBars values={s.daily.map((d) => d.installs)} dates={dates} unit={t("dashboard.installsUnit")} height="h-44" />
+                </>
+              )}
+            </LoadState>
           </div>
         </Card>
-
         <Card>
-          <CardHeader title={t("dashboard.auditLog")} aside={t("dashboard.today")} />
-          <ul className="px-5 pb-3">
-            {auditLog.slice(0, 5).map((e) => (
-              <li key={e.at + e.target} className="flex gap-3 border-t border-neutral-100 py-2.5 first:border-t-0 first:pt-0">
-                <span className="w-10 shrink-0 pt-px text-xs text-neutral-500 tabular-nums">{e.at}</span>
-                <div className="min-w-0 flex-1 text-sm">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate text-neutral-900">
-                      {e.user} · {e.target}
-                    </span>
-                    <span className="ml-auto">
-                      <Badge tone={actionTone[e.action]}>{t(`audit.${e.action}`)}</Badge>
-                    </span>
-                  </div>
-                  <div className="truncate text-xs text-neutral-600">{e.client}</div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <CardHeader title={t("dashboard.dailyCalls")} aside={t("dashboard.last14")} />
+          <div className="px-5 pb-5">
+            <LoadState loading={stats.loading && !s} error={s ? null : stats.error} onRetry={stats.reload}>
+              {s && (
+                <>
+                  <p className="mb-6 text-sm text-neutral-600">
+                    {t("dashboard.callsSummary", {
+                      calls: s.totals.calls.toLocaleString(),
+                      tokens: formatTokens(s.totals.tokens),
+                      errors: s.totals.call_errors.toLocaleString(),
+                    })}
+                  </p>
+                  <DailyBars values={s.daily.map((d) => d.calls)} dates={dates} unit={t("dashboard.callsUnit")} height="h-44" />
+                </>
+              )}
+            </LoadState>
+          </div>
         </Card>
       </div>
 
       <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Card>
           <CardHeader
-            title={t("dashboard.apps")}
+            title={t("dashboard.topPlugins")}
             aside={
-              <PageLink page="apps" className="font-medium text-neutral-900 hover:underline">
-                {t("dashboard.allApps", { count: microApps.length })}
+              <PageLink page="admin-stats" className="font-medium text-neutral-900 hover:underline">
+                {t("dashboard.last14")}
               </PageLink>
             }
           />
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs text-neutral-600">
-                <tr>
-                  <th className="px-5 py-2 font-normal">{t("dashboard.colName")}</th>
-                  <th className="px-5 py-2 font-normal max-sm:hidden">{t("dashboard.colDeps")}</th>
-                  <th className="px-5 py-2 text-right font-normal">{t("dashboard.colRuns")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...microApps]
-                  .sort((a, b) => b.runs - a.runs)
-                  .map((m) => (
-                    <tr key={m.id} className="border-t border-neutral-100">
+          {s && s.top_plugins.length === 0 ? (
+            <p className="px-5 pb-5 text-sm text-neutral-600">{t("dashboard.noInstalls")}</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-left text-xs text-neutral-600">
+                  <tr>
+                    <th className="px-5 py-2 font-normal">{t("dashboard.colName")}</th>
+                    <th className="px-5 py-2 font-normal max-sm:hidden">{t("dashboard.colSource")}</th>
+                    <th className="px-5 py-2 text-right font-normal">{t("dashboard.colInstalls")}</th>
+                    <th className="px-5 py-2 text-right font-normal">{t("dashboard.colUsers")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(s?.top_plugins ?? []).slice(0, 6).map((p) => (
+                    <tr key={p.name} className="border-t border-neutral-100">
                       <td className="px-5 py-2.5">
-                        <div className="text-neutral-900">{m.title}</div>
-                        <div className="text-xs text-neutral-600">{m.department}</div>
+                        <Link to={pluginPath(p.name)} className="text-neutral-900 hover:underline">
+                          {p.title}
+                        </Link>
+                        <div className="font-mono text-xs text-neutral-600">{p.name}</div>
                       </td>
-                      <td className="px-5 py-2.5 text-neutral-600 max-sm:hidden">
-                        {m.uses.map((u, i) => (
-                          <span key={u}>
-                            {i > 0 && "、"}
-                            <Link to={pluginPath(u)} className="hover:text-neutral-900 hover:underline">
-                              {title(u)}
-                            </Link>
-                          </span>
-                        ))}
-                      </td>
-                      <td className="px-5 py-2.5 text-right text-neutral-900 tabular-nums">{m.runs.toLocaleString()}</td>
+                      <td className="px-5 py-2.5 text-neutral-600 max-sm:hidden">{p.origin === "hosted" ? t("dashboard.internal") : t("dashboard.upstream")}</td>
+                      <td className="px-5 py-2.5 text-right text-neutral-900 tabular-nums">{p.installs.toLocaleString()}</td>
+                      <td className="px-5 py-2.5 text-right text-neutral-900 tabular-nums">{p.users.toLocaleString()}</td>
                     </tr>
                   ))}
-              </tbody>
-            </table>
-          </div>
+                </tbody>
+              </table>
+            </div>
+          )}
         </Card>
 
-        <Card>
-          <CardHeader
-            title={t("dashboard.pendingReview")}
-            aside={
-              <PageLink page="admin-review" className="font-medium text-neutral-900 hover:underline">
-                {t("dashboard.pendingCount", { count: pending.length })}
-              </PageLink>
-            }
-          />
-          <ul className="px-5 pb-3">
-            {pending.slice(0, 5).map((p) => (
-              <li key={p.name} className="border-t border-neutral-100 py-2.5 first:border-t-0 first:pt-0">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="truncate text-neutral-900">{p.title}</span>
-                  <span className="ml-auto">
-                    <Badge tone={p.origin === "internal" ? "brand" : "slate"}>{p.origin === "internal" ? t("dashboard.colleagueSubmission") : t("dashboard.upstreamVersion")}</Badge>
-                  </span>
-                </div>
-                <div className="truncate text-xs text-neutral-600">
-                  {p.origin === "internal" ? `${p.author} · ${p.department}` : t("dashboard.upstreamMeta", { version: p.version })} · {t(`kinds.${kindOf(p)}`)}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <div className="flex flex-col gap-4">
+          {canAudit && (
+            <Card>
+              <CardHeader
+                title={t("dashboard.auditLog")}
+                aside={
+                  <PageLink page="admin-audit" className="font-medium text-neutral-900 hover:underline">
+                    {t("dashboard.allAudit")}
+                  </PageLink>
+                }
+              />
+              <LoadState loading={audit.loading && !audit.data} error={audit.data ? null : audit.error} onRetry={audit.reload}>
+                <ul className="px-5 pb-3">
+                  {audit.data?.length === 0 && <li className="pb-2 text-sm text-neutral-600">{t("dashboard.noAudit")}</li>}
+                  {audit.data?.map((e) => (
+                    <li key={e.id} className="flex gap-3 border-t border-neutral-100 py-2.5 first:border-t-0 first:pt-0">
+                      <div className="min-w-0 flex-1 text-sm">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate text-neutral-900">
+                            {auditActor(t, e)}
+                            {e.target && ` · ${e.target}`}
+                          </span>
+                          <span className="ml-auto">
+                            <Badge tone={auditTone(e.action)}>{auditAction(t, e.action)}</Badge>
+                          </span>
+                        </div>
+                        <div className="truncate text-xs text-neutral-600 tabular-nums">{formatTime(e.created_at)}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </LoadState>
+            </Card>
+          )}
+          <PendingCard plugins={plugins} total={pendingVersions} />
+        </div>
       </div>
     </div>
+  );
+}
+
+/** 有待审核版本的能力（包括已上架能力的新版本）。total 是待审核的版本数。 */
+function PendingCard({ plugins, total }: { plugins: Plugin[]; total: number }) {
+  const { t } = useTranslation();
+  const pending = plugins.filter((p) => (p.pending ?? 0) > 0);
+  return (
+    <Card>
+      <CardHeader
+        title={t("dashboard.pendingReview")}
+        aside={
+          <PageLink page="admin-review" className="font-medium text-neutral-900 hover:underline">
+            {t("dashboard.pendingCount", { count: total })}
+          </PageLink>
+        }
+      />
+      <ul className="px-5 pb-3">
+        {pending.length === 0 && <li className="pb-2 text-sm text-neutral-600">{t("dashboard.noPending")}</li>}
+        {pending.slice(0, 5).map((p) => (
+          <li key={p.name} className="border-t border-neutral-100 py-2.5 first:border-t-0 first:pt-0">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="truncate text-neutral-900">{p.title}</span>
+              <span className="ml-auto">
+                <Badge tone={p.origin === "internal" ? "brand" : "slate"}>{p.origin === "internal" ? t("dashboard.colleagueSubmission") : t("dashboard.upstreamVersion")}</Badge>
+              </span>
+            </div>
+            <div className="truncate text-xs text-neutral-600">
+              {p.origin === "internal" ? `${p.author} · ${p.department ?? ""}` : t("dashboard.upstreamMeta", { version: p.version })} · {t(`kinds.${kindOf(p)}`)}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }

@@ -25,3 +25,11 @@ export function useLabels() {
     group: (g: string) => (g in zh.perms.groups ? t(`perms.groups.${g as PermGroup}`) : g),
   };
 }
+
+const OS_NAMES: Record<string, string> = { linux: "Linux", darwin: "macOS", win32: "Windows", freebsd: "FreeBSD", android: "Android" };
+
+/** npm 上报的 process.platform / process.arch → 「Linux · arm64」；没有 User-Agent 时返回 unknown。 */
+export function platformLabel(os: string, arch: string, unknown: string) {
+  if (!os && !arch) return unknown;
+  return [OS_NAMES[os] ?? (os || "?"), arch].filter(Boolean).join(" · ");
+}

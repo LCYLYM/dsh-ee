@@ -100,6 +100,18 @@ export interface Settings {
     allowCommunityDesktop: boolean;
   };
   auth: "local" | "ldap" | "oidc";
+  /** DSH 接入插件（<主作用域>/dsh-connect）：由 dsh-ee 生成并发布到自己的 npm 源。 */
+  connect: {
+    enabled: boolean;
+    /** 把 dsh-ee 的模型网关加为 DSH 的模型提供方并设为默认。 */
+    model: boolean;
+    defaultModel: string;
+    /** 预置企业插件索引。 */
+    market: boolean;
+    /** 自动安装设为「自动安装」的插件与微应用依赖的插件。 */
+    installRequired: boolean;
+    pollSeconds: number;
+  };
   registry: {
     /** 企业作用域之外的包：按需回源上游并缓存，或只提供已预载 / 已审核的包。 */
     proxyMode: "cache" | "preloaded";

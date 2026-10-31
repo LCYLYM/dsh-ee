@@ -13,9 +13,9 @@ export interface PageMeta {
 }
 
 const META = {
-  workbench: { title: "我的工作台", defaultPath: "/workbench", description: "个人指标、我的微应用、已装能力" },
+  workbench: { title: "我的工作台", defaultPath: "/workbench", description: "个人指标、装过的能力、部门在用、我分享的" },
   apps: { title: "微应用", defaultPath: "/apps", description: "基于 DSH 运行的企业微应用" },
-  market: { title: "能力市场", defaultPath: "/market", description: "浏览与安装企业能力" },
+  market: { title: "能力中心", defaultPath: "/hub", description: "插件、技能、提示词、企业连接与微应用" },
   "dsh-download": { title: "下载 DSH", defaultPath: "/dsh", description: "DSH 核心与桌面版下载（模拟数据）" },
   setup: { title: "接入指南", defaultPath: "/setup", description: "一条命令接入企业源" },
   publish: { title: "分享能力", defaultPath: "/publish", description: "上传或申请引入能力" },
@@ -26,9 +26,11 @@ const META = {
   "admin-providers": { title: "模型接入", defaultPath: "/admin/providers", description: "上游模型服务、企业 key 与对外模型" },
   "admin-quotas": { title: "额度分配", defaultPath: "/admin/quotas", description: "用户的月度 token 额度与可用模型" },
   "admin-keys": { title: "API key", defaultPath: "/admin/keys", description: "全部员工的 key：查看、代发、吊销" },
-  "admin-dashboard": { title: "总览", defaultPath: "/admin", description: "全链路总览（模拟数据）" },
-  "admin-stats": { title: "运营数据", defaultPath: "/admin/stats", description: "安装趋势与存储（模拟数据）" },
+  "admin-dashboard": { title: "总览", defaultPath: "/admin", description: "全链路总览：资产、治理、员工与终端" },
+  "admin-stats": { title: "运营数据", defaultPath: "/admin/stats", description: "安装、模型用量、部门与存储" },
+  "admin-audit": { title: "审计日志", defaultPath: "/admin/audit", description: "登录、权限、设置、发布与审核等操作记录" },
   "admin-plugins": { title: "能力管理", defaultPath: "/admin/plugins", description: "能力上下架" },
+  "admin-connections": { title: "企业连接", defaultPath: "/admin/connections", description: "接入企业 MCP 服务与 HTTP 接口，托管凭据，配置工具与授权" },
   "admin-review": { title: "待审核", defaultPath: "/admin/review", description: "审核队列" },
   "admin-registry": { title: "npm 源", defaultPath: "/admin/registry", description: "路由规则、上游、访问令牌" },
   "admin-upstream": { title: "上游预载", defaultPath: "/admin/upstream", description: "在线同步与离线导入" },

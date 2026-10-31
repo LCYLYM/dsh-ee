@@ -411,6 +411,16 @@ func (s *Server) handlePatchPackage(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	changed := map[string]any{}
+	for k, v := range map[string]any{"title": req.Title, "description": req.Description, "category": req.Category, "kind": req.Kind, "icon": req.Icon} {
+		if p, ok := v.(*string); ok && p != nil {
+			changed[k] = *p
+		}
+	}
+	if req.Featured != nil {
+		changed["featured"] = *req.Featured
+	}
+	s.audit(r, auditPackageEdit, name, changed)
 	s.handleAdminPackageDetail(w, r)
 }
 
@@ -495,6 +505,23 @@ func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("review", "pkg", req.Name, "version", req.Version, "action", req.Action, "by", currentUser(r).Username, "count", n)
+	target := req.Name
+	if req.Version != "" {
+		target += "@" + req.Version
+	}
+	detail := map[string]any{"count": n}
+	if note := strings.TrimSpace(req.Note); note != "" {
+		detail["note"] = truncate(note, 500)
+	}
+	switch req.Action {
+	case "approve":
+		s.audit(r, auditReviewApprove, target, detail)
+	case "reject":
+		s.audit(r, auditReviewReject, target, detail)
+	default:
+		detail["action"] = req.Action
+		s.audit(r, auditPackageStatus, target, detail)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"changed": n})
 }
 
@@ -571,6 +598,7 @@ func (s *Server) handleUploadPackage(w http.ResponseWriter, r *http.Request) {
 		s.registryErr(w, r, err)
 		return
 	}
+	s.audit(r, auditPackagePublish, res.Name+"@"+res.Version, map[string]any{"via": "web", "status": res.Status})
 	writeJSON(w, http.StatusCreated, res)
 }
 
@@ -638,6 +666,11 @@ func (s *Server) handleImportRequest(w http.ResponseWriter, r *http.Request) {
 		s.registryErr(w, r, err)
 		return
 	}
+	target := req.Name
+	if req.Version != "" {
+		target += "@" + req.Version
+	}
+	s.audit(r, auditImportRequest, target, map[string]any{"job": j.ID, "reason": truncate(req.Reason, 500)})
 	writeJSON(w, http.StatusAccepted, j)
 }
 
@@ -713,6 +746,7 @@ func (s *Server) handleCreateMyNpmToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	t.Username = currentUser(r).Username
+	s.audit(r, auditNpmTokenCreate, t.Name, map[string]any{"id": t.ID, "access": t.Access, "prefix": t.Prefix})
 	writeJSON(w, http.StatusCreated, map[string]any{"token": plain, "info": t})
 }
 
@@ -734,6 +768,7 @@ func (s *Server) revokeNpmToken(w http.ResponseWriter, r *http.Request, own bool
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditNpmTokenRevoke, t.Name, map[string]any{"id": id, "owner": s.usernameOf(r, t.UserID), "prefix": t.Prefix, "self": own})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -910,6 +945,7 @@ func (s *Server) handleUpstreamSync(w http.ResponseWriter, r *http.Request) {
 		s.registryErr(w, r, err)
 		return
 	}
+	s.audit(r, auditUpstreamSync, strings.Join(req.Names, ", "), map[string]any{"job": j.ID, "count": len(req.Names), "publish": req.Publish})
 	writeJSON(w, http.StatusAccepted, j)
 }
 
@@ -963,6 +999,11 @@ func (s *Server) handleExportBundle(w http.ResponseWriter, r *http.Request) {
 		since = &t
 	}
 	file := "dsh-ee-bundle-" + time.Now().UTC().Format("20060102-150405") + ".tar"
+	detail := map[string]any{}
+	if since != nil {
+		detail["since"] = since.Format(time.DateOnly)
+	}
+	s.audit(r, auditUpstreamExport, file, detail)
 	w.Header().Set("Content-Type", "application/x-tar")
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": file}))
 	if _, err := s.registry.ExportBundle(r.Context(), w, since); err != nil {
@@ -988,5 +1029,6 @@ func (s *Server) handleImportBundle(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"error": err.Error(), "job": j})
 		return
 	}
+	s.audit(r, auditUpstreamImport, "", map[string]any{"packages": res.Packages, "added": res.Added, "pending": res.Pending})
 	writeJSON(w, http.StatusOK, map[string]any{"result": res, "job": j})
 }

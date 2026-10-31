@@ -23,12 +23,27 @@ export default function Setup() {
   const registryKey = registry.replace(/^https?:/, "");
   const scopes = [settings.scope, ...settings.registry.extraScopes];
   const example = plugins.find((p) => p.origin === "internal")?.name ?? plugins[0]?.name ?? `${settings.scope}/hello`;
+  const connect = useApi(api.connectInfo);
+  const ci = connect.data;
 
   return (
     <div className="max-w-4xl">
       <PageHeader title={t("setup.title")} desc={t("setup.desc")} />
 
       <Tokens onCreated={setToken} />
+
+      {ci && ci.enabled && (
+        <Card className="mt-6 p-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-semibold text-neutral-900">{t("setupConnect.title")}</h2>
+            {ci.ready ? <Badge tone="green">{t("setupConnect.ready", { pkg: ci.package, version: ci.version })}</Badge> : <Badge tone="amber">{t("hub.notLiveBadge")}</Badge>}
+          </div>
+          <p className="mt-1 text-sm text-neutral-600">{ci.ready ? t("setupConnect.desc", { pkg: ci.package }) : t("setupConnect.notReady")}</p>
+          <p className="mt-2 text-xs text-neutral-500">
+            {t("setupConnect.needs")} {t("setupConnect.tokenNote")}
+          </p>
+        </Card>
+      )}
 
       <div className="mt-6">
         <Segmented
@@ -71,7 +86,16 @@ export default function Setup() {
                 <CopyBox text={`echo "cafile=$HOME/.dsh-ee-ca.pem" >> ~/.npmrc\nexport NODE_EXTRA_CA_CERTS=$HOME/.dsh-ee-ca.pem   ${t("setup.shellComment")}`} />
               </Step>
             )}
-            <Step n={baseUrl.startsWith("https:") ? 4 : 3} title={t("setup.step4")}>
+            {ci?.ready && (
+              <Step n={baseUrl.startsWith("https:") ? 4 : 3} title={t("setupConnect.title")}>
+                <p className="mb-2 text-sm text-neutral-500">{t("setupConnect.manualEnv")}</p>
+                <CopyBox text={`${ci.token_env}=${shown}`} />
+                <p className="mt-3 mb-2 text-sm text-neutral-500">{t("setupConnect.manualAdd")}</p>
+                <CopyBox text={`dsh plugin --profile ${ci.profile} add ${ci.package}`} />
+                <p className="mt-3 text-sm text-neutral-500">{t("setupConnect.manualRestart")}</p>
+              </Step>
+            )}
+            <Step n={(baseUrl.startsWith("https:") ? 4 : 3) + (ci?.ready ? 1 : 0)} title={t("setup.step4")}>
               <CopyBox text={`dsh plugin add ${example}`} />
             </Step>
           </div>

@@ -54,29 +54,44 @@ export default function Account() {
           <dd className="text-neutral-900">{user.display_name || "—"}</dd>
           <dt className="text-neutral-600">{t("account.department")}</dt>
           <dd className="text-neutral-900">{user.department || "—"}</dd>
+          {user.email && (
+            <>
+              <dt className="text-neutral-600">{t("account.email")}</dt>
+              <dd className="text-neutral-900">{user.email}</dd>
+            </>
+          )}
+          <dt className="text-neutral-600">{t("account.source")}</dt>
+          <dd className="text-neutral-900">{user.auth_source === "ldap" ? t("account.sourceLdap") : t("account.sourceLocal")}</dd>
           <dt className="text-neutral-600">{t("account.roles")}</dt>
           <dd className="text-neutral-900">{(user.roles ?? []).map((r) => L.role(r)).join(", ") || t("shell.noRoles")}</dd>
         </dl>
       </Card>
 
-      <Card className="mt-4 p-5">
-        <form onSubmit={submit} className="space-y-4">
+      {user.auth_source === "ldap" ? (
+        <Card className="mt-4 p-5">
           <h2 className="text-base font-medium text-neutral-900">{t("account.changePassword")}</h2>
-          <Field label={t("account.currentPassword")}>
-            <input className={inputCls} type="password" autoComplete="current-password" required value={oldPw} onChange={(e) => setOldPw(e.target.value)} />
-          </Field>
-          <Field label={t("account.newPassword")} hint={t("account.newPasswordHint")}>
-            <input className={inputCls} type="password" autoComplete="new-password" required value={newPw} onChange={(e) => setNewPw(e.target.value)} />
-          </Field>
-          <Field label={t("account.confirmPassword")}>
-            <input className={inputCls} type="password" autoComplete="new-password" required value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} />
-          </Field>
-          <ErrorNote>{error}</ErrorNote>
-          <Button type="submit" disabled={busy || !oldPw || !newPw}>
-            {busy ? t("common.submitting") : t("account.changePassword")}
-          </Button>
-        </form>
-      </Card>
+          <p className="mt-2 text-sm text-neutral-600">{t("account.ldapManaged")}</p>
+        </Card>
+      ) : (
+        <Card className="mt-4 p-5">
+          <form onSubmit={submit} className="space-y-4">
+            <h2 className="text-base font-medium text-neutral-900">{t("account.changePassword")}</h2>
+            <Field label={t("account.currentPassword")}>
+              <input className={inputCls} type="password" autoComplete="current-password" required value={oldPw} onChange={(e) => setOldPw(e.target.value)} />
+            </Field>
+            <Field label={t("account.newPassword")} hint={t("account.newPasswordHint")}>
+              <input className={inputCls} type="password" autoComplete="new-password" required value={newPw} onChange={(e) => setNewPw(e.target.value)} />
+            </Field>
+            <Field label={t("account.confirmPassword")}>
+              <input className={inputCls} type="password" autoComplete="new-password" required value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} />
+            </Field>
+            <ErrorNote>{error}</ErrorNote>
+            <Button type="submit" disabled={busy || !oldPw || !newPw}>
+              {busy ? t("common.submitting") : t("account.changePassword")}
+            </Button>
+          </form>
+        </Card>
+      )}
     </div>
   );
 }

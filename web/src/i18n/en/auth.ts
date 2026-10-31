@@ -10,6 +10,8 @@ export default {
     submit: "Sign in",
     submitting: "Signing in…",
     forgot: "Forgot your password? Ask an administrator to reset it.",
+    ldapHint: "You can sign in with your company domain account (same as your computer password).",
+    ldapForgot: "Recover your domain password in the company's account system; for a local account, ask an administrator.",
   },
   account: {
     title: "Account",
@@ -23,6 +25,11 @@ export default {
     newPassword: "New password",
     newPasswordHint: "At least 10 characters. You'll need to sign in again on every device afterwards.",
     confirmPassword: "Repeat the new password",
+    source: "Account source",
+    sourceLocal: "Local account",
+    sourceLdap: "Enterprise directory (LDAP)",
+    email: "Email",
+    ldapManaged: "Your account is managed by the enterprise directory. Change your password in the company's account system; display name and department sync from the directory at each sign-in.",
     mismatch: "The new passwords don't match",
   },
 } satisfies Messages<typeof zh>;

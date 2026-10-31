@@ -539,9 +539,17 @@ func (s *Store) RegistryStats(ctx context.Context) (*RegistryStats, error) {
 
 // ---- 下载日志 ----
 
-func (s *Store) RecordDownload(ctx context.Context, name, version string, userID, tokenID *int64) error {
-	_, err := s.db.ExecContext(ctx, "INSERT INTO npm_downloads (name, version, user_id, token_id, created_at) VALUES (?, ?, ?, ?, ?)",
-		name, version, userID, tokenID, now())
+// Download 是一次 tarball 下载；Client / OS / Arch 来自 User-Agent，认不出时为空。
+type Download struct {
+	Name, Version    string
+	UserID, TokenID  *int64
+	Client, OS, Arch string
+}
+
+func (s *Store) RecordDownload(ctx context.Context, d Download) error {
+	_, err := s.db.ExecContext(ctx,
+		"INSERT INTO npm_downloads (name, version, user_id, token_id, client, os, arch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		d.Name, d.Version, d.UserID, d.TokenID, d.Client, d.OS, d.Arch, now())
 	return err
 }
 

@@ -7,19 +7,22 @@ export default async function (t) {
   await login(page, "admin", ADMIN_PW);
   try {
     await page.locator("aside").getByRole("link", { name: "菜单与页面" }).click();
-    await page.getByRole("button", { name: /能力市场/ }).click();
-    await page.getByLabel("标题").fill("能力中心");
+    await page.getByRole("button", { name: /能力中心/ }).click();
+    await page.getByLabel("标题").fill("企业能力");
     await page.getByLabel("路由").fill("/capabilities");
     await page.getByRole("button", { name: "保存", exact: true }).click();
-    await page.locator("aside").getByRole("link", { name: "能力中心" }).waitFor();
-    step("菜单「能力市场」改名为「能力中心」");
-    await page.locator("aside").getByRole("link", { name: "能力中心" }).click();
+    await page.locator("aside").getByRole("link", { name: "企业能力" }).waitFor();
+    step("菜单「能力中心」改名为「企业能力」");
+    await page.locator("aside").getByRole("link", { name: "企业能力" }).click();
     await page.waitForURL(`${BASE}/capabilities`);
-    await page.getByRole("heading", { name: "能力市场" }).waitFor();
-    step("新路由 /capabilities 打开的是能力市场页面");
-    await page.goto(`${BASE}/market`);
+    await page.getByRole("heading", { name: "能力中心" }).waitFor();
+    step("新路由 /capabilities 打开的是能力中心页面");
+    await page.goto(`${BASE}/hub`);
     await page.getByText("页面不存在，或你没有访问权限").waitFor();
-    step("旧路由 /market 已失效");
+    step("旧路由 /hub 已失效");
+    await page.goto(`${BASE}/market`);
+    await page.waitForURL(`${BASE}/capabilities`);
+    step("更早的 /market 链接跳到新路由");
 
     await page.locator("aside").getByRole("link", { name: "角色与权限" }).click();
     await page.getByRole("button", { name: "新建角色" }).click();

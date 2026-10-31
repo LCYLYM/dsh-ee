@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -157,27 +158,15 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &req) {
 		return
 	}
-	username := strings.TrimSpace(req.Username)
+	username := strings.ToLower(strings.TrimSpace(req.Username))
 	if s.limiter.locked(username) {
 		writeErr(w, http.StatusTooManyRequests, "失败次数过多，请 15 分钟后再试")
 		return
 	}
-	u, err := s.store.GetUserByUsername(r.Context(), username)
-	if err != nil && !notFound(err) {
-		s.internalErr(w, r, err)
+	u, ok := s.login(w, r, username, req.Password, "web")
+	if !ok {
 		return
 	}
-	hash := dummyHash
-	if u != nil {
-		hash = []byte(u.PasswordHash)
-	}
-	pwErr := bcrypt.CompareHashAndPassword(hash, []byte(req.Password))
-	if u == nil || pwErr != nil || u.Disabled {
-		s.limiter.fail(username)
-		writeErr(w, http.StatusUnauthorized, "用户名或密码错误")
-		return
-	}
-	s.limiter.reset(username)
 
 	token := secret.Token()
 	if err := s.store.CreateSession(r.Context(), secret.Hash(token), u.ID, s.opts.SessionTTL); err != nil {
@@ -194,6 +183,34 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 	writeJSON(w, http.StatusOK, u)
+}
+
+// login 验证密码并处理限流、审计与错误响应；失败时已写好响应，返回 false。via 是 web / npm。
+func (s *Server) login(w http.ResponseWriter, r *http.Request, username, password, via string) (*store.User, bool) {
+	u, err := s.authenticate(r.Context(), username, password)
+	switch {
+	case errors.Is(err, errBadCredentials):
+		s.limiter.fail(username)
+		s.auditAs(r, nil, auditLoginFailed, username, map[string]any{"via": via})
+		writeErr(w, http.StatusUnauthorized, err.Error())
+		return nil, false
+	case errors.Is(err, errNotProvisioned):
+		s.auditAs(r, nil, auditLoginFailed, username, map[string]any{"via": via, "reason": "not_provisioned"})
+		writeErr(w, http.StatusForbidden, err.Error())
+		return nil, false
+	case errors.Is(err, errDirectory):
+		writeErr(w, http.StatusBadGateway, err.Error())
+		return nil, false
+	case err != nil:
+		s.internalErr(w, r, err)
+		return nil, false
+	}
+	s.limiter.reset(username)
+	if err := s.store.TouchLogin(r.Context(), u.ID); err != nil {
+		s.log.Warn("记录登录时间失败", "err", err)
+	}
+	s.auditAs(r, u, auditLogin, u.Username, map[string]any{"via": via, "source": u.AuthSource})
+	return u, true
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -252,6 +269,10 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := currentUser(r)
+	if u.AuthSource == store.AuthLDAP {
+		writeErr(w, http.StatusBadRequest, "LDAP 账号的密码由企业目录管理，请在公司的账号系统里修改")
+		return
+	}
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.OldPassword)) != nil {
 		writeErr(w, http.StatusBadRequest, "原密码不正确")
 		return
@@ -270,6 +291,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditPasswordChange, u.Username, nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 

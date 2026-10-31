@@ -156,6 +156,8 @@ func (s *Server) handleSetUserRoles(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditUserRoles, s.usernameOf(r, id), map[string]any{"id": id, "roles": roleNames(refs[id])})
+	s.hub.notify()
 	writeJSON(w, http.StatusOK, map[string]any{"roles": nonNil(refs[id])})
 }
 
@@ -207,6 +209,7 @@ func (s *Server) handleCreatePermission(w http.ResponseWriter, r *http.Request) 
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditPermissionCreate, p.Code, map[string]any{"name": p.Name})
 	writeJSON(w, http.StatusCreated, p)
 }
 
@@ -223,6 +226,7 @@ func (s *Server) handleDeletePermission(w http.ResponseWriter, r *http.Request) 
 		}
 		return
 	}
+	s.audit(r, auditPermissionDelete, code, nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -296,6 +300,7 @@ func (s *Server) handleCreateRole(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditRoleCreate, role.Name, map[string]any{"id": role.ID, "code": role.Code, "permissions": role.Permissions})
 	writeJSON(w, http.StatusCreated, role)
 }
 
@@ -366,6 +371,7 @@ func (s *Server) handleUpdateRole(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditRoleUpdate, updated.Name, map[string]any{"id": id, "code": updated.Code, "permissions": updated.Permissions})
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -395,6 +401,7 @@ func (s *Server) handleDeleteRole(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditRoleDelete, role.Name, map[string]any{"id": id, "code": role.Code})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -573,6 +580,7 @@ func (s *Server) handleCreateMenu(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditMenuChange, m.Title, map[string]any{"op": "create", "id": m.ID, "path": m.Path, "permission": m.Permission})
 	writeJSON(w, http.StatusCreated, m)
 }
 
@@ -606,6 +614,7 @@ func (s *Server) handleUpdateMenu(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditMenuChange, updated.Title, map[string]any{"op": "update", "id": id, "path": updated.Path, "permission": updated.Permission, "visible": updated.Visible})
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -625,6 +634,7 @@ func (s *Server) handleDeleteMenu(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	s.audit(r, auditMenuChange, "", map[string]any{"op": "delete", "id": id})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -672,7 +682,24 @@ func (s *Server) handleResetMenus(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditMenuChange, "", map[string]any{"op": "reset"})
 	s.handleListMenus(w, r)
 }
 
 func itoa64(n int64) string { return strconv.FormatInt(n, 10) }
+
+// usernameOf 用于审计日志里的对象名；查不到时退回 id。
+func (s *Server) usernameOf(r *http.Request, id int64) string {
+	if u, err := s.store.GetUser(r.Context(), id); err == nil {
+		return u.Username
+	}
+	return "#" + itoa64(id)
+}
+
+func roleNames(refs []store.RoleRef) []string {
+	out := []string{}
+	for _, r := range refs {
+		out = append(out, r.Name)
+	}
+	return out
+}

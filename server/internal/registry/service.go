@@ -347,6 +347,8 @@ type Publisher struct {
 	Username string
 	// 有能力管理权限（可以替别人发新版本、发布后直接上架以外的事交给审核）
 	Manager bool
+	// 跳过审核直接上架：只给 dsh-ee 自己生成的包（如 DSH 接入组合包）用。UserID 为 0 表示系统发布。
+	AutoPublish bool
 }
 
 type PublishResult struct {
@@ -390,7 +392,7 @@ func (s *Service) Publish(ctx context.Context, p Publisher, doc *PublishDoc) (*P
 		return nil, err
 	case pkg.Origin != store.OriginHosted:
 		return nil, errf(409, "%s 已经作为上游包镜像在本地，不能在企业作用域里发布同名包", name)
-	case pkg.OwnerID != nil && *pkg.OwnerID != p.UserID && !p.Manager:
+	case pkg.OwnerID != nil && *pkg.OwnerID != p.UserID && !p.Manager && !p.AutoPublish:
 		return nil, errf(403, "%s 由其他人维护，你不能发布新版本", name)
 	}
 	if _, err := s.store.GetVersion(ctx, name, version); err == nil {
@@ -462,15 +464,19 @@ func (s *Service) Publish(ctx context.Context, p Publisher, doc *PublishDoc) (*P
 	items := Check(m, info, d.Size, scopes)
 	scan, _ := json.Marshal(items)
 	status := store.StatusPending
-	if set.AdmissionMode == "open" && !slices.ContainsFunc(items, func(i ScanItem) bool { return i.Level == LevelFail }) {
+	if p.AutoPublish || set.AdmissionMode == "open" && !slices.ContainsFunc(items, func(i ScanItem) bool { return i.Level == LevelFail }) {
 		status = store.StatusPublished
 	}
-	uid := p.UserID
+	var uid *int64
+	if p.UserID > 0 {
+		id := p.UserID
+		uid = &id
+	}
 	nv := &store.NpmVersion{
 		Name: name, Version: version, Manifest: manifest,
 		Integrity: d.Integrity, Shasum: d.Shasum, Size: d.Size, BlobKey: d.Key,
 		IsPlugin: m.IsPlugin, HasInstallScript: len(m.InstallScripts()) > 0,
-		Status: status, Scan: scan, PublisherID: &uid,
+		Status: status, Scan: scan, PublisherID: uid,
 	}
 	if status == store.StatusPublished {
 		t := time.Now().UTC().Truncate(time.Millisecond)
@@ -490,7 +496,7 @@ func (s *Service) Publish(ctx context.Context, p Publisher, doc *PublishDoc) (*P
 		yes := true
 		catalog.IsPlugin = &yes
 	}
-	created, err := s.store.PublishHosted(ctx, &store.NpmPackage{Name: name, Origin: store.OriginHosted, OwnerID: &uid}, nv, tags, catalog)
+	created, err := s.store.PublishHosted(ctx, &store.NpmPackage{Name: name, Origin: store.OriginHosted, OwnerID: uid}, nv, tags, catalog)
 	if errors.Is(err, store.ErrExists) {
 		return nil, errf(409, "%s@%s 正在被同时发布，请稍后重试", name, version)
 	}

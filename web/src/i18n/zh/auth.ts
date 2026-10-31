@@ -8,6 +8,8 @@ export default {
     submit: "登录",
     submitting: "登录中…",
     forgot: "忘记密码请联系管理员重置。",
+    ldapHint: "可以直接用公司域账号（与电脑开机密码相同）登录。",
+    ldapForgot: "域账号密码请在公司的账号系统里找回；本地账号忘记密码请联系管理员。",
   },
   account: {
     title: "账号",
@@ -22,5 +24,10 @@ export default {
     newPasswordHint: "至少 10 个字符。修改后所有设备都需要重新登录。",
     confirmPassword: "再输入一次新密码",
     mismatch: "两次输入的新密码不一致",
+    source: "账号来源",
+    sourceLocal: "本地账号",
+    sourceLdap: "企业目录（LDAP）",
+    email: "邮箱",
+    ldapManaged: "你的账号由企业目录管理，密码请在公司的账号系统里修改；显示名与部门会在每次登录时从目录同步。",
   },
 };

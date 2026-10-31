@@ -10,8 +10,6 @@ import (
 	"slices"
 	"strings"
 
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/hikariming/dsh-ee/server/internal/rbac"
 	"github.com/hikariming/dsh-ee/server/internal/registry"
 	"github.com/hikariming/dsh-ee/server/internal/secret"
@@ -274,7 +272,9 @@ func (s *Server) serveTarball(w http.ResponseWriter, r *http.Request, c *npmCall
 	}
 	defer f.Close()
 	if r.Method == http.MethodGet {
-		if err := s.store.RecordDownload(r.Context(), name, version, c.userID(), c.tokenID()); err != nil {
+		ua := registry.ParseUserAgent(r.UserAgent())
+		d := store.Download{Name: name, Version: version, UserID: c.userID(), TokenID: c.tokenID(), Client: ua.Name, OS: ua.OS, Arch: ua.Arch}
+		if err := s.store.RecordDownload(r.Context(), d); err != nil {
 			s.log.Warn("记录下载失败", "err", err)
 		}
 	}
@@ -341,6 +341,7 @@ func (s *Server) handleNpmPublish(w http.ResponseWriter, r *http.Request, c *npm
 		return
 	}
 	s.log.Info("npm publish", "pkg", res.Name, "version", res.Version, "status", res.Status, "user", c.user.Username)
+	s.auditAs(r, c.user, auditPackagePublish, res.Name+"@"+res.Version, map[string]any{"via": "npm", "status": res.Status})
 	if res.Status == store.StatusPending {
 		// npm 会把这个头原样打印成 npm notice。HTTP 头按 Latin-1 解码，中文会乱码，只能写 ASCII
 		w.Header().Set("npm-notice", res.Name+"@"+res.Version+" is pending review: it becomes installable after an admin approves it in dsh-ee (Review queue)")
@@ -443,26 +444,15 @@ func (s *Server) handleNpmLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "请求体格式错误")
 		return
 	}
-	username := strings.TrimSpace(body.Name)
+	username := strings.ToLower(strings.TrimSpace(body.Name))
 	if s.limiter.locked(username) {
 		writeErr(w, http.StatusTooManyRequests, "失败次数过多，请 15 分钟后再试")
 		return
 	}
-	u, err := s.store.GetUserByUsername(r.Context(), username)
-	if err != nil && !notFound(err) {
-		s.internalErr(w, r, err)
+	u, ok := s.login(w, r, username, body.Password, "npm")
+	if !ok {
 		return
 	}
-	hash := dummyHash
-	if u != nil {
-		hash = []byte(u.PasswordHash)
-	}
-	if bcrypt.CompareHashAndPassword(hash, []byte(body.Password)) != nil || u == nil || u.Disabled {
-		s.limiter.fail(username)
-		writeErr(w, http.StatusUnauthorized, "用户名或密码错误")
-		return
-	}
-	s.limiter.reset(username)
 	a, err := s.store.UserAccess(r.Context(), u.ID)
 	if err != nil {
 		s.internalErr(w, r, err)
@@ -482,6 +472,7 @@ func (s *Server) handleNpmLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("npm login", "user", u.Username, "token", t.ID)
+	s.auditAs(r, u, auditNpmTokenCreate, t.Name, map[string]any{"id": t.ID, "access": access, "via": "npm login"})
 	writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "id": "org.couchdb.user:" + u.Username, "token": plain})
 }
 

@@ -126,6 +126,8 @@ func (s *Server) handleCreateProvider(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditProviderCreate, created.Name, map[string]any{"id": created.ID, "base_url": created.BaseURL, "vendor": created.Vendor})
+	s.kickConnect()
 	writeJSON(w, http.StatusCreated, created)
 }
 
@@ -200,6 +202,8 @@ func (s *Server) handleUpdateProvider(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditProviderUpdate, pr.Name, map[string]any{"id": id, "base_url": pr.BaseURL, "enabled": pr.Enabled, "key_changed": req.APIKey != nil})
+	s.kickConnect()
 	writeJSON(w, http.StatusOK, pr)
 }
 
@@ -207,6 +211,10 @@ func (s *Server) handleDeleteProvider(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
+	}
+	target := "#" + itoa64(id)
+	if pv, err := s.store.GetProvider(r.Context(), id); err == nil {
+		target = pv.Name
 	}
 	if err := s.store.DeleteProvider(r.Context(), id); err != nil {
 		if notFound(err) {
@@ -216,6 +224,8 @@ func (s *Server) handleDeleteProvider(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditProviderDelete, target, map[string]any{"id": id})
+	s.kickConnect()
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -426,6 +436,14 @@ func (s *Server) handleCreateModels(w http.ResponseWriter, r *http.Request) {
 		}
 		created = append(created, m)
 	}
+	if len(created) > 0 {
+		names := make([]string, len(created))
+		for i, m := range created {
+			names[i] = m.Name
+		}
+		s.audit(r, auditModelChange, strings.Join(names, ", "), map[string]any{"op": "create", "count": len(created)})
+		s.kickConnect()
+	}
 	writeJSON(w, http.StatusCreated, map[string]any{"created": nonNil(created), "skipped": nonNil(skipped)})
 }
 
@@ -475,6 +493,8 @@ func (s *Server) handleUpdateModel(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditModelChange, m.Name, map[string]any{"op": "update", "id": id, "upstream_model": m.UpstreamModel, "enabled": m.Enabled})
+	s.kickConnect()
 	writeJSON(w, http.StatusOK, m)
 }
 
@@ -482,6 +502,10 @@ func (s *Server) handleDeleteModel(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
+	}
+	target := "#" + itoa64(id)
+	if m, err := s.store.GetModel(r.Context(), id); err == nil {
+		target = m.Name
 	}
 	if err := s.store.DeleteModel(r.Context(), id); err != nil {
 		if notFound(err) {
@@ -491,5 +515,7 @@ func (s *Server) handleDeleteModel(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	s.audit(r, auditModelChange, target, map[string]any{"op": "delete", "id": id})
+	s.kickConnect()
 	w.WriteHeader(http.StatusNoContent)
 }

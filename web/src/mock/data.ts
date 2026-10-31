@@ -1,6 +1,6 @@
 /**
- * 原型用的模拟数据：微应用、审计日志、执行趋势、DSH 发行版与个人工作台视角。
- * 能力、审核、npm 源与上游预载已经接入真实后端，不在这里。
+ * 原型用的模拟数据：落地页的示意内容（微应用、审计日志、终端分布）与 DSH 发行版。
+ * 能力中心（插件、技能、提示词、连接、微应用）、审核、npm 源、上游预载、运营统计、审计日志与工作台都已接入真实后端。
  * DSH 发行版的包名、版本号与 sha256 都是占位，接入真实分发前需按上游 deepseek-harness 核实。
  */
 import type { AuditEvent, DshRelease, MicroApp } from "../lib/types";
@@ -82,17 +82,6 @@ export const auditLog: AuditEvent[] = [
   { at: "16:31", user: "zhang.wei", department: "研发效能部", action: "run", target: "MR 评审", client: "DSH 0.2.0 · Windows" },
   { at: "15:47", user: "admin", department: "信息中心", action: "yank", target: "some-plugin 0.4.1", client: "管理后台" },
 ];
-
-export const auditLabels: Record<AuditEvent["action"], string> = {
-  run: "运行",
-  install: "安装",
-  publish: "提交",
-  approve: "审核通过",
-  yank: "下架",
-};
-
-/** 近 14 天 DSH 执行企业能力的次数（微应用运行 + Skill / 连接器调用）。 */
-export const execTrend = [1120, 1284, 1310, 1402, 1536, 402, 318, 1488, 1622, 1590, 1701, 1785, 512, 436];
 
 /** 预载候选：已入库的（已上架的上游插件）加上游还没同步进来的。 */
 
@@ -178,38 +167,3 @@ export const initialReleases: DshRelease[] = [
     artifacts: desktopArtifacts("anywhere-dsh-desktop", "1.8.3"),
   },
 ];
-
-
-export const activity = [
-  { t: "10 分钟前", text: "sun.hao 提交了 @acme/dsh-jira-sync 0.1.0，等待审核" },
-  { t: "1 小时前", text: "上游同步：12 个插件有新版本（策略：需审核）" },
-  { t: "今天 09:12", text: "管理员 admin 将 DSH 0.2.0 设为企业推荐版本" },
-  { t: "昨天", text: "zhou.lei 提交了 @acme/dsh-db-inspector 0.2.0" },
-  { t: "10-23", text: "下架 some-plugin@0.4.1：依赖出现高危漏洞" },
-];
-
-export const installTrend = [212, 248, 231, 296, 340, 188, 160, 305, 362, 351, 398, 420, 230, 205];
-
-
-
-/** 当前登录员工的视角（个人工作台）。 */
-export const me = {
-  user: "zhang.wei",
-  department: "研发效能部",
-  /** 固定在工作台的微应用与最近使用时间。 */
-  apps: [
-    { id: "mr-review", lastUsed: "今天 16:31" },
-    { id: "metrics-qa", lastUsed: "昨天" },
-    { id: "expense", lastUsed: "10-21" },
-  ],
-  /** 本机已安装的能力及版本；落后于市场版本的会提示更新。 */
-  installed: [
-    { name: "@acme/dsh-gitlab-review", version: "1.4.0" },
-    { name: "@acme/dsh-wiki-memory", version: "0.9.0" },
-    { name: "@acme/dsh-feishu-notify", version: "2.1.1" },
-    { name: "@acme/kb-metrics", version: "2.4.0" },
-    { name: "@deepseek-harness-tui/dsh-tui", version: "0.16.1" },
-  ],
-  /** 本部门同事装得最多、我还没装的。 */
-  teamPicks: ["@acme/dsh-sso-llm", "dsh-context", "@acme/skill-contract-review"],
-};

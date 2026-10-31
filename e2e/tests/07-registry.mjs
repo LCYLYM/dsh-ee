@@ -150,7 +150,7 @@ export default async function (t) {
     assert(hits.tarball === 1, `依赖 tarball 应只从上游取一次，实际 ${hits.tarball} 次`);
     step(`npm install 成功，依赖 ${depName} 经 dsh-ee 回源`);
 
-    await page.goto(`${BASE}/market`);
+    await page.goto(`${BASE}/hub?tab=plugin`);
     await page.getByText(`E2E 插件 ${tag}`).waitFor();
     await page.getByText(`E2E 插件 ${tag}`).click();
     await page.getByText(`dsh plugin add ${name}`).waitFor();
