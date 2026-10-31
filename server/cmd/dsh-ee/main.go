@@ -130,7 +130,7 @@ func openStore(ctx context.Context, cfg *config.Config, log *slog.Logger) (*stor
 	}
 }
 
-// sweepSessions 每小时清理过期会话。
+// sweepSessions 每小时清理过期会话与设备码。
 func sweepSessions(ctx context.Context, st *store.Store, log *slog.Logger) {
 	t := time.NewTicker(time.Hour)
 	defer t.Stop()
@@ -143,6 +143,11 @@ func sweepSessions(ctx context.Context, st *store.Store, log *slog.Logger) {
 				log.Warn("清理过期会话失败", "err", err)
 			} else if n > 0 {
 				log.Info("已清理过期会话", "count", n)
+			}
+			if n, err := st.DeleteExpiredDeviceCodes(ctx); err != nil {
+				log.Warn("清理过期设备码失败", "err", err)
+			} else if n > 0 {
+				log.Info("已清理过期设备码", "count", n)
 			}
 		}
 	}

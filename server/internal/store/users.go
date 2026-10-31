@@ -34,12 +34,17 @@ type User struct {
 	Email        string     `json:"email"`
 	ExternalDN   string     `json:"external_dn,omitempty"`
 	LastLoginAt  *time.Time `json:"last_login_at"`
+	AccountType  string     `json:"account_type"`
+	OwnerID      *int64     `json:"owner_id"`
 	PasswordHash string     `json:"-"`
 }
 
 const (
 	AuthLocal = "local"
 	AuthLDAP  = "ldap"
+
+	AccountHuman = "human"
+	AccountBot   = "bot"
 )
 
 // userColumns 让同一份列清单能同时用于单表查询和带别名的 JOIN。
@@ -47,7 +52,7 @@ func userColumns(alias string) string {
 	cols := []string{
 		"id", "username", "display_name", "department", "disabled", "created_at",
 		"password_hash", "monthly_token_limit", "allowed_models", "quota_expires_at",
-		"auth_source", "email", "external_dn", "last_login_at",
+		"auth_source", "email", "external_dn", "last_login_at", "account_type", "owner_id",
 	}
 	if alias != "" {
 		for i := range cols {
@@ -59,14 +64,14 @@ func userColumns(alias string) string {
 
 func scanUser(row interface{ Scan(...any) error }, extra ...any) (*User, error) {
 	var u User
-	var limit sql.NullInt64
+	var limit, owner sql.NullInt64
 	var models sql.NullString
 	var expires, lastLogin sql.NullTime
 	var dn sql.NullString
 	dest := []any{
 		&u.ID, &u.Username, &u.DisplayName, &u.Department, &u.Disabled, &u.CreatedAt,
 		&u.PasswordHash, &limit, &models, &expires,
-		&u.AuthSource, &u.Email, &dn, &lastLogin,
+		&u.AuthSource, &u.Email, &dn, &lastLogin, &u.AccountType, &owner,
 	}
 	err := row.Scan(append(dest, extra...)...)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -93,6 +98,9 @@ func scanUser(row interface{ Scan(...any) error }, extra ...any) (*User, error) 
 		v := lastLogin.Time
 		u.LastLoginAt = &v
 	}
+	if owner.Valid {
+		u.OwnerID = &owner.Int64
+	}
 	return &u, nil
 }
 
@@ -112,12 +120,15 @@ func (s *Store) CreateUser(ctx context.Context, u *User) error {
 	if u.AuthSource == "" {
 		u.AuthSource = AuthLocal
 	}
+	if u.AccountType == "" {
+		u.AccountType = AccountHuman
+	}
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO users (username, display_name, department, password_hash, disabled, created_at, updated_at, monthly_token_limit,
-		                    auth_source, email, external_dn)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		                    auth_source, email, external_dn, account_type, owner_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		u.Username, u.DisplayName, u.Department, u.PasswordHash, u.Disabled, t, t, u.MonthlyTokenLimit,
-		u.AuthSource, u.Email, nullStr(u.ExternalDN))
+		u.AuthSource, u.Email, nullStr(u.ExternalDN), u.AccountType, u.OwnerID)
 	if isDuplicate(err) {
 		return ErrDuplicate
 	}
@@ -265,12 +276,12 @@ func (s *Store) CreateSession(ctx context.Context, tokenHash string, userID int6
 	return err
 }
 
-// SessionUser 返回未过期会话对应的、未被禁用的用户。
+// SessionUser 返回未过期会话对应的、未被禁用的人类账号；机器人只能用令牌访问。
 func (s *Store) SessionUser(ctx context.Context, tokenHash string) (*User, error) {
 	return scanUser(s.db.QueryRowContext(ctx,
 		`SELECT `+userColumns("u.")+`
 		 FROM sessions s JOIN users u ON u.id = s.user_id
-		 WHERE s.token_hash = ? AND s.expires_at > ? AND u.disabled = 0`, tokenHash, now()))
+		 WHERE s.token_hash = ? AND s.expires_at > ? AND u.disabled = 0 AND u.account_type = 'human'`, tokenHash, now()))
 }
 
 func (s *Store) DeleteSession(ctx context.Context, tokenHash string) error {

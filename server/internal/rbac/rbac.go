@@ -23,9 +23,10 @@ const (
 	RolesManage = "roles.manage"
 	MenusManage = "menus.manage"
 
-	ProvidersManage = "providers.manage"
-	QuotasManage    = "quotas.manage"
-	KeysManage      = "keys.manage"
+	ProvidersManage  = "providers.manage"
+	QuotasManage     = "quotas.manage"
+	KeysManage       = "keys.manage"
+	TokensDeptManage = "tokens.dept_manage"
 
 	DashboardView      = "dashboard.view"
 	AuditView          = "audit.view"
@@ -62,6 +63,7 @@ var Catalog = []Permission{
 	{ProvidersManage, "管理模型接入", "大模型", "配置上游模型服务、企业 key 与对外模型", nil},
 	{QuotasManage, "分配额度", "大模型", "设置用户的月度 token 额度、可用模型与有效期", nil},
 	{KeysManage, "管理全部 API key", "大模型", "查看、代发和吊销所有员工的 key", nil},
+	{TokensDeptManage, "本部门令牌管理", "大模型", "查看、下发和吊销本部门机器人账号的令牌", nil},
 
 	{DashboardView, "查看管理总览", "能力与分发", "管理总览与运营数据", nil},
 	{AuditView, "查看审计日志", "能力与分发", "登录、账号、权限、设置、发布与审核等操作记录", nil},
@@ -93,7 +95,7 @@ var DefaultMenus = []Menu{
 		{Kind: "page", Title: "下载 DSH", Path: "/dsh", PageKey: "dsh-download", Icon: "Download", Permission: PortalView},
 		{Kind: "page", Title: "接入指南", Path: "/setup", PageKey: "setup", Icon: "Terminal", Permission: PortalView},
 		{Kind: "page", Title: "分享能力", Path: "/publish", PageKey: "publish", Icon: "Upload", Permission: PortalView},
-		{Kind: "page", Title: "额度与 API key", Path: "/keys", PageKey: "my-keys", Icon: "KeyRound", Permission: KeysSelf},
+		{Kind: "page", Title: "我的令牌", Path: "/tokens", PageKey: "my-keys", Icon: "KeyRound", Permission: KeysSelf},
 	}},
 	{Kind: "group", Title: "账号与模型", Children: []Menu{
 		{Kind: "page", Title: "用户", Path: "/admin/users", PageKey: "admin-users", Icon: "Users", Permission: UsersView},
@@ -101,7 +103,7 @@ var DefaultMenus = []Menu{
 		{Kind: "page", Title: "菜单与页面", Path: "/admin/menus", PageKey: "admin-menus", Icon: "PanelsTopLeft", Permission: MenusManage},
 		{Kind: "page", Title: "模型接入", Path: "/admin/providers", PageKey: "admin-providers", Icon: "Bot", Permission: ProvidersManage},
 		{Kind: "page", Title: "额度分配", Path: "/admin/quotas", PageKey: "admin-quotas", Icon: "Wallet", Permission: QuotasManage},
-		{Kind: "page", Title: "API key", Path: "/admin/keys", PageKey: "admin-keys", Icon: "KeyRound", Permission: KeysManage},
+		{Kind: "page", Title: "令牌管理", Path: "/admin/tokens", PageKey: "admin-keys", Icon: "KeyRound", Permission: KeysManage},
 	}},
 	{Kind: "group", Title: "管理", Children: []Menu{
 		{Kind: "page", Title: "总览", Path: "/admin", PageKey: "admin-dashboard", Icon: "Gauge", Permission: DashboardView},

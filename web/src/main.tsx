@@ -45,12 +45,16 @@ function NotFound() {
   return <Status title={t("shell.notFound")}>{t("shell.notFoundHint")}</Status>;
 }
 
-/** 旧的 /market 链接跳到能力中心现在的路由（等菜单加载完，否则会跳到默认路由）。 */
-function LegacyMarket() {
+/** 旧链接等菜单加载完再跳，避免落到默认路由。 */
+function LegacyPage({ pageKey }: { pageKey: PageKey }) {
   const { pathOf, loading } = useMenus();
   const { t } = useTranslation();
   if (loading) return <Status title={t("common.loading")} />;
-  return <Navigate to={pathOf("market")} replace />;
+  return <Navigate to={pathOf(pageKey)} replace />;
+}
+
+function LegacyMarket() {
+  return <LegacyPage pageKey="market" />;
 }
 
 /** 路由来自后端菜单：页面的路由、名称、访问权限都可在「菜单与页面」里在线修改。 */
@@ -75,6 +79,8 @@ function AppRoutes() {
         <Route path="assets/:id" element={<AssetDetail />} />
         <Route path="assets/:id/edit" element={<AssetEditor />} />
         {!pages.some((m) => m.path === "/market") && <Route path="market" element={<LegacyMarket />} />}
+        {!pages.some((m) => m.path === "/keys") && <Route path="keys" element={<LegacyPage pageKey="my-keys" />} />}
+        {!pages.some((m) => m.path === "/admin/keys") && <Route path="admin/keys" element={<LegacyPage pageKey="admin-keys" />} />}
         {pages.map((m) => {
           const Page = PAGE_COMPONENTS[m.page_key as PageKey];
           return <Route key={m.id} path={m.path.replace(/^\//, "")} element={<Page />} />;
