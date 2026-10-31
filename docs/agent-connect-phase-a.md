@@ -116,6 +116,8 @@ A0 已完成：`server/internal/api/legacy_auth_test.go` 固化 9 类身份 × 8
 - `store/users.go`：机器人账号（`account_type='bot'`，无密码，不能会话登录）。
 - 测试：store 层集成测试覆盖续期、一次性领取、并发批准（两个请求同时批准同一个码只成功一次）。
 
+A1 已完成（2026-11-01）：新增 `store/tokens_test.go`，另覆盖滑动续期、过期设备码清理与 bot 会话拒绝；TiDB 4001 上 `go test -count=1 ./...`（含 A0）与 `go vet ./...` 全过，前端 `pnpm build` 通过。
+
 ### A2 统一鉴权 `principal.go`（约 1.5 天）
 
 - `resolveBearer(ctx, token) (*Principal, error)`：`ee_at_` / `ee_npm_` / `sk-ee-` 三种前缀；返回用户、`Access`（RBAC ∩ scope）、scope 集合、令牌 id、令牌级额度与模型、客户端信息。
@@ -126,6 +128,8 @@ A0 已完成：`server/internal/api/legacy_auth_test.go` 固化 9 类身份 × 8
 - 单元测试 `gateway_dsh_errors_test.go`：把上游 `classifyPiAiError` 与 `isQuotaExceededError` 的正则抄进测试，断言上述每种错误体在带头时都不会被归为 `AUTH` / `QUOTA` / `RATE_LIMIT`，不带头时保持原状态码（与 A0 基线一致）。上游升级时对照更新这份正则。
 - 网关额度：账号额度检查之后再查令牌额度；`usage_logs` 写 `token_id`。
 - 跑 A0 基线，全部通过（有意改变的除外）。
+
+A2 已完成（2026-11-01）：统一三种前缀与 scope 求交，新增 `/api/dsh/whoami` 和令牌级额度；`principal_test.go` 覆盖 scope、whoami、npm 读写与双重额度，`gateway_dsh_errors_test.go` 覆盖全部 DSH 错误映射及上游正则。TiDB 4001 上 `go test -count=1 ./...`（含 A0）与 `go vet ./...` 全过。
 
 ### A3 令牌接口（约 1 天）
 

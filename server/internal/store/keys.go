@@ -184,6 +184,7 @@ type Usage struct {
 	APIKeyID         int64
 	UserID           int64
 	ProviderID       int64
+	TokenID          int64
 	Model            string
 	PromptTokens     int
 	CompletionTokens int
@@ -193,10 +194,14 @@ type Usage struct {
 }
 
 func (s *Store) RecordUsage(ctx context.Context, u Usage) error {
+	var tokenID any
+	if u.TokenID > 0 {
+		tokenID = u.TokenID
+	}
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO usage_logs (api_key_id, user_id, provider_id, model, prompt_tokens, completion_tokens, total_tokens, status_code, latency_ms, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.APIKeyID, u.UserID, u.ProviderID, u.Model, u.PromptTokens, u.CompletionTokens, u.TotalTokens, u.StatusCode, u.LatencyMS, now())
+		`INSERT INTO usage_logs (api_key_id, user_id, provider_id, model, prompt_tokens, completion_tokens, total_tokens, status_code, latency_ms, created_at, token_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.APIKeyID, u.UserID, u.ProviderID, u.Model, u.PromptTokens, u.CompletionTokens, u.TotalTokens, u.StatusCode, u.LatencyMS, now(), tokenID)
 	return err
 }
 

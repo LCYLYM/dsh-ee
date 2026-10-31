@@ -1,0 +1,142 @@
+package api
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+
+	"github.com/hikariming/dsh-ee/server/internal/rbac"
+	"github.com/hikariming/dsh-ee/server/internal/secret"
+	"github.com/hikariming/dsh-ee/server/internal/store"
+)
+
+const (
+	tokenRevoked = "token_revoked"
+	tokenExpired = "token_expired"
+	tokenInvalid = "token_invalid"
+)
+
+type bearerError string
+
+func (e bearerError) Error() string { return string(e) }
+
+type ScopeSet map[string]bool
+
+func (s ScopeSet) Has(scope string) bool { return s[scope] }
+
+type Principal struct {
+	User      *store.User
+	Access    *rbac.Access
+	Scopes    ScopeSet
+	TokenID   int64
+	Legacy    string
+	LegacyID  int64
+	Limit     *int64
+	Models    []string
+	AdminLive bool
+	Client    string
+	Prefix    string
+	ExpiresAt *time.Time
+}
+
+func (p *Principal) quota() *store.UserQuota {
+	return &store.UserQuota{
+		MonthlyTokenLimit: p.User.MonthlyTokenLimit,
+		AllowedModels:     p.User.AllowedModels,
+		QuotaExpiresAt:    p.User.QuotaExpiresAt,
+	}
+}
+
+func tokenError(code string) error { return bearerError(code) }
+
+func (s *Server) resolveBearer(ctx context.Context, token string) (*Principal, error) {
+	token = strings.TrimSpace(token)
+	hash := secret.Hash(token)
+	switch {
+	case strings.HasPrefix(token, "ee_at_"):
+		t, err := s.store.ActiveAccessToken(ctx, hash)
+		if errors.Is(err, store.ErrNotFound) {
+			inactive, lookupErr := s.store.AccessTokenByHash(ctx, hash)
+			if lookupErr == nil {
+				switch {
+				case inactive.RevokedAt != nil:
+					return nil, tokenError(tokenRevoked)
+				case inactive.ExpiresAt != nil && !inactive.ExpiresAt.After(time.Now()):
+					return nil, tokenError(tokenExpired)
+				}
+			}
+			return nil, tokenError(tokenInvalid)
+		}
+		if err != nil {
+			return nil, err
+		}
+		u, err := s.store.GetUser(ctx, t.UserID)
+		if err != nil {
+			return nil, err
+		}
+		account, err := s.store.UserAccess(ctx, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		scopes := ScopeSet{}
+		for _, scope := range t.Scopes {
+			scopes[scope] = true
+		}
+		_ = s.store.TouchAccessToken(ctx, t.ID, "")
+		return &Principal{
+			User: u, Access: rbac.ScopeFilter(account, t.Scopes), Scopes: scopes, TokenID: t.ID,
+			Limit: t.MonthlyTokenLimit, Models: t.AllowedModels, Client: t.ClientName,
+			Prefix: t.Prefix, ExpiresAt: t.ExpiresAt,
+		}, nil
+	case strings.HasPrefix(token, npmTokenPrefix):
+		t, u, err := s.store.ActiveNpmToken(ctx, hash)
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, tokenError(tokenInvalid)
+		}
+		if err != nil {
+			return nil, err
+		}
+		_ = s.store.TouchNpmToken(ctx, t.ID)
+		scopes := []string{rbac.ScopeModels, rbac.ScopeRegistryRead, rbac.ScopeHub, rbac.ScopeConnections}
+		if t.Access == "publish" {
+			scopes = append(scopes, rbac.ScopeRegistryPublish)
+		}
+		account, err := s.store.UserAccess(ctx, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		set := ScopeSet{}
+		for _, scope := range scopes {
+			set[scope] = true
+		}
+		return &Principal{User: u, Access: rbac.ScopeFilter(account, scopes), Scopes: set, Legacy: "npm", Prefix: t.Prefix}, nil
+	case strings.HasPrefix(token, keyPrefix):
+		k, _, err := s.store.ActiveKeyByHash(ctx, hash)
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, tokenError(tokenInvalid)
+		}
+		if err != nil {
+			return nil, err
+		}
+		u, err := s.store.GetUser(ctx, k.UserID)
+		if err != nil {
+			return nil, err
+		}
+		account, err := s.store.UserAccess(ctx, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		scopes := []string{rbac.ScopeModels, rbac.ScopeHub, rbac.ScopeConnections}
+		set := ScopeSet{}
+		for _, scope := range scopes {
+			set[scope] = true
+		}
+		return &Principal{
+			User: u, Access: rbac.ScopeFilter(account, scopes), Scopes: set, Legacy: "key", LegacyID: k.ID,
+			Models: k.AllowedModels, Prefix: k.Prefix, ExpiresAt: k.ExpiresAt,
+		}, nil
+	default:
+		return nil, tokenError(tokenInvalid)
+	}
+}

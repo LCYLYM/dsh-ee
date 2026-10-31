@@ -23,9 +23,10 @@ const npmTokenPrefix = "ee_npm_"
 
 // npmCaller 是一次 npm 请求的调用者；匿名时为 nil。
 type npmCaller struct {
-	user   *store.User
-	access *rbac.Access
-	token  *store.NpmToken // 用网页会话访问时为 nil
+	user      *store.User
+	access    *rbac.Access
+	token     *store.NpmToken // 旧 npm 令牌；会话与新 ee_at 令牌为 nil
+	principal *Principal
 }
 
 func (c *npmCaller) userID() *int64 {
@@ -36,10 +37,16 @@ func (c *npmCaller) userID() *int64 {
 }
 
 func (c *npmCaller) tokenID() *int64 {
-	if c == nil || c.token == nil {
+	if c == nil {
 		return nil
 	}
-	return &c.token.ID
+	if c.principal != nil && c.principal.TokenID > 0 {
+		return &c.principal.TokenID
+	}
+	if c.token != nil {
+		return &c.token.ID
+	}
+	return nil
 }
 
 // npmAuth 识别调用者：Bearer 令牌（npm / pnpm 的 _authToken）、Basic（密码位放令牌），或网页会话。
@@ -55,22 +62,22 @@ func (s *Server) npmAuth(r *http.Request) (*npmCaller, error) {
 		}
 	}
 	if token != "" {
-		if !strings.HasPrefix(token, npmTokenPrefix) {
-			return nil, errBadToken
-		}
-		t, u, err := s.store.ActiveNpmToken(r.Context(), secret.Hash(token))
-		if notFound(err) {
+		p, err := s.resolveBearer(r.Context(), token)
+		var be bearerError
+		if errors.As(err, &be) {
 			return nil, errBadToken
 		}
 		if err != nil {
 			return nil, err
 		}
-		a, err := s.store.UserAccess(r.Context(), u.ID)
-		if err != nil {
-			return nil, err
+		if p.Legacy == "key" {
+			return nil, errBadToken
 		}
-		_ = s.store.TouchNpmToken(r.Context(), t.ID)
-		return &npmCaller{user: u, access: a, token: t}, nil
+		caller := &npmCaller{user: p.User, access: p.Access, principal: p}
+		if p.Legacy == "npm" {
+			caller.token, _, _ = s.store.ActiveNpmToken(r.Context(), secret.Hash(token))
+		}
+		return caller, nil
 	}
 	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
 		u, err := s.store.SessionUser(r.Context(), secret.Hash(c.Value))
@@ -187,7 +194,7 @@ func (s *Server) npmRead(w http.ResponseWriter, r *http.Request, c *npmCaller) b
 		writeErr(w, http.StatusUnauthorized, "这个 npm 源需要令牌：在 dsh-ee 的「接入指南」里生成后写进 .npmrc")
 		return false
 	}
-	if !c.access.Has(rbac.RegistryUse) {
+	if !c.access.Has(rbac.RegistryUse) || c.principal != nil && !c.principal.Scopes.Has(rbac.ScopeRegistryRead) {
 		writeErr(w, http.StatusForbidden, "你的账号没有安装能力的权限，请联系管理员")
 		return false
 	}
@@ -301,7 +308,7 @@ func (s *Server) requirePublish(w http.ResponseWriter, c *npmCaller) bool {
 		writeErr(w, http.StatusForbidden, "你的账号没有发布能力的权限，请联系管理员")
 		return false
 	}
-	if c.token != nil && c.token.Access != "publish" {
+	if c.token != nil && c.token.Access != "publish" || c.principal != nil && !c.principal.Scopes.Has(rbac.ScopeRegistryPublish) {
 		writeErr(w, http.StatusForbidden, "这个令牌是只读的，发布需要「可发布」令牌")
 		return false
 	}

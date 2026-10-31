@@ -207,6 +207,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/connect", perm(s.handleConnectInfo, rbac.PortalView))
 	mux.Handle("GET /api/admin/connect", perm(s.handleAdminConnect, rbac.SettingsManage))
 	mux.Handle("POST /api/admin/connect/publish", perm(s.handlePublishConnect, rbac.SettingsManage))
+	mux.HandleFunc("GET /api/dsh/whoami", s.handleDshWhoami)
 	mux.HandleFunc("GET /api/dsh/catalog", s.handleDshCatalog)
 	mux.HandleFunc("GET /api/dsh/skills/{name}", s.handleDshSkill)
 	mux.HandleFunc("/mcp", s.handleMCP)

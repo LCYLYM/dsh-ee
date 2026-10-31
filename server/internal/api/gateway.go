@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/hikariming/dsh-ee/server/internal/rbac"
-	"github.com/hikariming/dsh-ee/server/internal/secret"
 	"github.com/hikariming/dsh-ee/server/internal/store"
 )
 
@@ -27,66 +26,71 @@ func writeOpenAIErr(w http.ResponseWriter, status int, typ, code, msg string) {
 	writeJSON(w, status, map[string]any{"error": map[string]string{"message": msg, "type": typ, "code": code}})
 }
 
-// authKey 校验 Authorization: Bearer sk-ee-…，并带出所属用户的额度。
-func (s *Server) authKey(w http.ResponseWriter, r *http.Request) (*store.APIKey, *store.UserQuota, bool) {
-	auth := r.Header.Get("Authorization")
-	token, ok := strings.CutPrefix(auth, "Bearer ")
-	token = strings.TrimSpace(token)
-	if !ok || !(strings.HasPrefix(token, keyPrefix) || strings.HasPrefix(token, npmTokenPrefix)) {
-		writeOpenAIErr(w, http.StatusUnauthorized, "invalid_request_error", "invalid_api_key", "缺少或无效的 API key")
+func dshConnect(r *http.Request) bool {
+	return strings.HasPrefix(r.Header.Get("X-DshEE-Client"), "dsh-connect/")
+}
+
+// writeGatewayError 给普通客户端保留 OpenAI 状态码；接入插件需要能直接展示的 400 中文文案。
+func writeGatewayError(w http.ResponseWriter, r *http.Request, status int, typ, code, msg string) {
+	if !dshConnect(r) {
+		writeOpenAIErr(w, status, typ, code, msg)
+		return
+	}
+	mapped := code
+	switch code {
+	case "invalid_api_key", tokenRevoked, tokenExpired, tokenInvalid:
+		mapped, msg = "dshee_login_required", "企业账号登录已失效，在对话框输入 /ee-login 重新登录"
+	case "permission_denied":
+		mapped, msg = "dshee_forbidden", "你的账号没有调用大模型的权限，请联系管理员"
+	case "model_not_allowed":
+		mapped = "dshee_model_denied"
+	case "monthly_quota_exceeded":
+		if strings.Contains(msg, "还没有") {
+			mapped = "dshee_no_allowance"
+		} else {
+			mapped = "dshee_monthly_limit_reached"
+		}
+	case "quota_expired":
+		mapped, msg = "dshee_allowance_expired", "额度已过期，请联系管理员"
+	}
+	writeOpenAIErr(w, http.StatusBadRequest, "invalid_request_error", mapped, msg)
+}
+
+func (s *Server) authKey(w http.ResponseWriter, r *http.Request) (*Principal, *store.UserQuota, bool) {
+	token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if !ok {
+		writeGatewayError(w, r, http.StatusUnauthorized, "invalid_request_error", tokenInvalid, "缺少或无效的 API key")
 		return nil, nil, false
 	}
-	var k *store.APIKey
-	var quota *store.UserQuota
-	var err error
-	if strings.HasPrefix(token, npmTokenPrefix) {
-		// 接入令牌：DSH 接入插件用同一个令牌访问模型网关，额度照常按账号计算
-		k, quota, err = s.tokenAsKey(r.Context(), token)
-	} else {
-		k, quota, err = s.store.ActiveKeyByHash(r.Context(), secret.Hash(token))
-	}
-	if notFound(err) {
-		writeOpenAIErr(w, http.StatusUnauthorized, "invalid_request_error", "invalid_api_key", "API key 无效、已吊销或已过期")
-		return nil, nil, false
-	}
+	p, err := s.resolveBearer(r.Context(), token)
 	if err != nil {
-		s.log.Error("gateway auth", "err", err)
-		writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "internal_error", "服务器内部错误")
+		var be bearerError
+		if errors.As(err, &be) {
+			writeGatewayError(w, r, http.StatusUnauthorized, "invalid_request_error", string(be), "API key 无效、已吊销或已过期")
+		} else {
+			s.log.Error("gateway auth", "err", err)
+			writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "internal_error", "服务器内部错误")
+		}
 		return nil, nil, false
 	}
-	// 权限随角色实时生效：撤掉「调用大模型」后，已发出去的 key 立即不能用
-	if acc, err := s.store.UserAccess(r.Context(), k.UserID); err != nil {
-		s.log.Error("gateway access", "user", k.UserID, "err", err)
-		writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "internal_error", "服务器内部错误")
-		return nil, nil, false
-	} else if !acc.Has(rbac.LLMUse) {
-		writeOpenAIErr(w, http.StatusForbidden, "permission_error", "permission_denied", "你的账号没有调用大模型的权限，请联系管理员")
+	if !p.Scopes.Has(rbac.ScopeModels) || !p.Access.Has(rbac.LLMUse) {
+		writeGatewayError(w, r, http.StatusForbidden, "permission_error", "permission_denied", "你的账号没有调用大模型的权限，请联系管理员")
 		return nil, nil, false
 	}
+	quota := p.quota()
 	if quota.QuotaExpiresAt != nil && !quota.QuotaExpiresAt.After(time.Now()) {
-		writeOpenAIErr(w, http.StatusForbidden, "permission_error", "quota_expired", "额度已过期，请联系管理员")
+		writeGatewayError(w, r, http.StatusForbidden, "permission_error", "quota_expired", "额度已过期，请联系管理员")
 		return nil, nil, false
 	}
-	return k, quota, true
+	return p, quota, true
 }
 
-// tokenAsKey 把接入令牌当作一把 id 为 0 的 key：用账号的额度，没有 key 级别的限制。
-func (s *Server) tokenAsKey(ctx context.Context, token string) (*store.APIKey, *store.UserQuota, error) {
-	t, u, err := s.store.ActiveNpmToken(ctx, secret.Hash(token))
-	if err != nil {
-		return nil, nil, err
-	}
-	_ = s.store.TouchNpmToken(ctx, t.ID)
-	return &store.APIKey{UserID: u.ID, Username: u.Username, Name: t.Name},
-		&store.UserQuota{MonthlyTokenLimit: u.MonthlyTokenLimit, AllowedModels: u.AllowedModels, QuotaExpiresAt: u.QuotaExpiresAt}, nil
-}
-
-// modelAllowed 同时校验用户额度上的模型权限与旧 key 上的限制（兼容升级前的数据）。
-func modelAllowed(k *store.APIKey, quota *store.UserQuota, model string) bool {
+// modelAllowed 同时校验账号额度与令牌上的模型限制。
+func modelAllowed(p *Principal, quota *store.UserQuota, model string) bool {
 	if len(quota.AllowedModels) > 0 && !slices.Contains(quota.AllowedModels, model) {
 		return false
 	}
-	return len(k.AllowedModels) == 0 || slices.Contains(k.AllowedModels, model)
+	return len(p.Models) == 0 || slices.Contains(p.Models, model)
 }
 
 func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
@@ -145,13 +149,13 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !modelAllowed(k, quota, model) {
-		writeOpenAIErr(w, http.StatusForbidden, "permission_error", "model_not_allowed", "这个账号的额度不允许使用模型 "+model)
+		writeGatewayError(w, r, http.StatusForbidden, "permission_error", "model_not_allowed", "你的账号不能使用模型 "+model+"，可在 /ee-status 查看可用模型")
 		return
 	}
 	if quota.MonthlyTokenLimit != nil {
-		used, err := s.store.MonthTokensByUser(r.Context(), k.UserID)
+		used, err := s.store.MonthTokensByUser(r.Context(), k.User.ID)
 		if err != nil {
-			s.log.Error("month tokens", "user", k.UserID, "err", err)
+			s.log.Error("month tokens", "user", k.User.ID, "err", err)
 			writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "internal_error", "服务器内部错误")
 			return
 		}
@@ -160,7 +164,19 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 			if *quota.MonthlyTokenLimit == 0 {
 				msg = "管理员还没有给你分配额度，请联系管理员"
 			}
-			writeOpenAIErr(w, http.StatusTooManyRequests, "insufficient_quota", "monthly_quota_exceeded", msg)
+			writeGatewayError(w, r, http.StatusTooManyRequests, "insufficient_quota", "monthly_quota_exceeded", msg)
+			return
+		}
+	}
+	if k.Limit != nil {
+		used, err := s.store.TokenMonthUsage(r.Context(), k.TokenID)
+		if err != nil {
+			s.log.Error("token month tokens", "token", k.TokenID, "err", err)
+			writeOpenAIErr(w, http.StatusInternalServerError, "server_error", "internal_error", "服务器内部错误")
+			return
+		}
+		if used >= *k.Limit {
+			writeGatewayError(w, r, http.StatusTooManyRequests, "insufficient_quota", "monthly_quota_exceeded", "本月 token 额度已用完（此令牌），请联系管理员")
 			return
 		}
 	}
@@ -309,16 +325,17 @@ func relaySSE(w http.ResponseWriter, body io.Reader) tokenUsage {
 }
 
 // recordUsage 在响应写完后记账；客户端提前断开也要记，所以脱离请求的取消信号。
-func (s *Server) recordUsage(ctx context.Context, k *store.APIKey, p *store.Provider, model string, u tokenUsage, status int, start time.Time) {
+func (s *Server) recordUsage(ctx context.Context, k *Principal, p *store.Provider, model string, u tokenUsage, status int, start time.Time) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	if u.TotalTokens == 0 {
 		u.TotalTokens = u.PromptTokens + u.CompletionTokens
 	}
 	err := s.store.RecordUsage(ctx, store.Usage{
-		APIKeyID:         k.ID,
-		UserID:           k.UserID,
+		APIKeyID:         k.LegacyID,
+		UserID:           k.User.ID,
 		ProviderID:       p.ID,
+		TokenID:          k.TokenID,
 		Model:            model,
 		PromptTokens:     u.PromptTokens,
 		CompletionTokens: u.CompletionTokens,
@@ -326,10 +343,10 @@ func (s *Server) recordUsage(ctx context.Context, k *store.APIKey, p *store.Prov
 		StatusCode:       status,
 		LatencyMS:        int(time.Since(start).Milliseconds()),
 	})
-	if err == nil && k.ID > 0 {
-		err = s.store.TouchAPIKey(ctx, k.ID)
+	if err == nil && k.LegacyID > 0 {
+		err = s.store.TouchAPIKey(ctx, k.LegacyID)
 	}
 	if err != nil && !errors.Is(err, context.Canceled) {
-		s.log.Error("record usage", "key", k.ID, "err", err)
+		s.log.Error("record usage", "key", k.LegacyID, "token", k.TokenID, "err", err)
 	}
 }

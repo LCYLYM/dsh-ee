@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,49 +24,41 @@ import (
 // 给员工本机 DSH 用的接口：技能目录（/api/dsh/…）与企业连接的 MCP 网关（/mcp）。
 // 用接入令牌（ee_npm_…，接入指南里生成）或 API key（sk-ee-…）认证。
 
-// dshAuth 识别 DSH 带来的令牌。失败时已写好 401 / 403。
-func (s *Server) dshAuth(w http.ResponseWriter, r *http.Request) (viewer, bool) {
+// dshPrincipal 识别 DSH 带来的令牌，并按入口检查 hub / connections scope。
+func (s *Server) dshPrincipal(w http.ResponseWriter, r *http.Request) (*Principal, bool) {
 	token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-	token = strings.TrimSpace(token)
-	var u *store.User
-	var err error
-	switch {
-	case !ok || token == "":
-		err = store.ErrNotFound
-	case strings.HasPrefix(token, npmTokenPrefix):
-		var t *store.NpmToken
-		t, u, err = s.store.ActiveNpmToken(r.Context(), secret.Hash(token))
-		if err == nil {
-			_ = s.store.TouchNpmToken(r.Context(), t.ID)
-		}
-	case strings.HasPrefix(token, keyPrefix):
-		var k *store.APIKey
-		k, _, err = s.store.ActiveKeyByHash(r.Context(), secret.Hash(token))
-		if err == nil {
-			u, err = s.store.GetUser(r.Context(), k.UserID)
-		}
-	default:
-		err = store.ErrNotFound
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "企业账号登录已失效，在对话框输入 /ee-login 重新登录", "code": tokenInvalid})
+		return nil, false
 	}
-	if notFound(err) {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="dsh-ee"`)
-		writeErr(w, http.StatusUnauthorized, "缺少或无效的接入令牌：在 dsh-ee 的「接入指南」里生成，写进 DSH 的 .env（DSHEE_TOKEN）")
-		return viewer{}, false
-	}
+	p, err := s.resolveBearer(r.Context(), token)
 	if err != nil {
-		s.internalErr(w, r, err)
-		return viewer{}, false
+		var be bearerError
+		if errors.As(err, &be) {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="dsh-ee"`)
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "企业账号登录已失效，在对话框输入 /ee-login 重新登录", "code": string(be)})
+		} else {
+			s.internalErr(w, r, err)
+		}
+		return nil, false
 	}
-	a, err := s.store.UserAccess(r.Context(), u.ID)
-	if err != nil {
-		s.internalErr(w, r, err)
-		return viewer{}, false
+	required := rbac.ScopeHub
+	if r.URL.Path == "/mcp" {
+		required = rbac.ScopeConnections
 	}
-	if !a.Has(rbac.PortalView) {
+	if !p.Scopes.Has(required) || !p.Access.Has(rbac.PortalView) {
 		writeErr(w, http.StatusForbidden, "你的账号没有使用工作台的权限")
+		return nil, false
+	}
+	return p, true
+}
+
+func (s *Server) dshAuth(w http.ResponseWriter, r *http.Request) (viewer, bool) {
+	p, ok := s.dshPrincipal(w, r)
+	if !ok {
 		return viewer{}, false
 	}
-	return viewer{u, a}, true
+	return viewer{p.User, p.Access}, true
 }
 
 var serverNameRe = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
@@ -243,6 +236,23 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	}
 	c.Revision = hex.EncodeToString(h.Sum(nil))[:16]
 	return c, nil
+}
+
+// GET /api/dsh/whoami：/ee-status 显示当前账号、令牌范围与设备信息。
+func (s *Server) handleDshWhoami(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.dshPrincipal(w, r)
+	if !ok {
+		return
+	}
+	scopes := make([]string, 0, len(p.Scopes))
+	for scope := range p.Scopes {
+		scopes = append(scopes, scope)
+	}
+	sort.Strings(scopes)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"username": p.User.Username, "department": p.User.Department, "scopes": scopes,
+		"token_prefix": p.Prefix, "expires_at": p.ExpiresAt, "client_name": p.Client, "legacy": p.Legacy,
+	})
 }
 
 // GET /api/dsh/catalog：DSH 接入插件轮询这个接口；带 If-None-Match 时目录没变返回 304。
