@@ -26,11 +26,11 @@
 | S5 | 工具名与参数 schema 约束（长度、字符集、`enum`、嵌套对象）以及工具结果里结构化内容的展示 | 记录约束，写进生成器 | — |
 | S6 | 插件内 `fetch` 带令牌访问 `/api/dsh/*` 与 `/mcp`，以及 SSE 长连接在 web profile 热重载时的释放 | 热重载后无残留连接（dsh-ee 侧 SSE 连接数回落） | 改为轮询 `catalog` 的 `revision` |
 
-S1～S4 决定阶段 A、C 的实现路径，必须先做。
+S1～S4 决定阶段 A、C 的实现路径，必须先做。第二轮 S5～S10（含原 S5、S6）见 [阶段 A 实施规划](agent-connect-phase-a.md) §3。
 
 ### 实测结果（2026-10-31）
 
-已在 macOS arm64 / Node 24.22.1 上，用真实 DSH 0.2.1-rc.5、树外组合包和 fake LLM 完成 S1～S4。可复现脚本、运行方式和原始输出说明见 [e2e/dsh/spikes](../../e2e/dsh/spikes/README.md)。
+已在 macOS arm64 / Node 24.22.1 上，用真实 DSH 0.2.1-rc.5、树外组合包和 fake LLM 完成 S1～S4。可复现脚本、运行方式和原始输出说明见 [e2e/dsh/spikes](../e2e/dsh/spikes/README.md)。
 
 | 编号 | 结果 | 对实现的影响 |
 |---|---|---|
@@ -251,6 +251,8 @@ dsh-plugin/                       # 新目录，TypeScript 源码
 `apiKeyEnv` 是 `CredentialRef`，凭据库没有值时回落到环境变量与 `$DSH_HOME/.env`，所以老的 `setup.sh` 写 `.env` 的员工不受影响。
 
 ### 4.3 登录（`auth.ts`）
+
+> **已按 S1 实测修正**：DSH 没有展示 notice 的界面，模型又依赖令牌，所以登录不走 `authorization` flow 的界面，而是 setup 脚本里的设备码 + `/ee-login` 命令 + 报错文案引导。下面的流程保留作为插件内部的设备码实现；入口设计与第二轮验证 S5～S10 见 [阶段 A 实施规划](agent-connect-phase-a.md) §2、§3。
 
 - `ctx.authorization.registerFlow`，方法名「登录 <企业名>」：
   1. `POST /api/device/code`，带 `os.hostname()`、平台、DSH 版本。
