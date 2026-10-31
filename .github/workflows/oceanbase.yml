@@ -32,7 +32,12 @@ jobs:
         with:
           node-version: 22
       - run: corepack enable
-      - run: free -h && nproc
+      # 托管 runner 只剩 10 GB 左右磁盘，OceanBase 要十几 GB：删掉用不到的 SDK
+      - name: 腾出磁盘
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker image prune -af >/dev/null
+      - run: free -h && nproc && df -h /
       - run: scripts/test-oceanbase.sh
       - if: always()
         uses: actions/upload-artifact@v4

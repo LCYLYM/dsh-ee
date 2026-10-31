@@ -21,7 +21,9 @@ trap cleanup EXIT
 
 docker rm -f "$name" >/dev/null 2>&1 || true
 echo "· 启动 $image（首次 bootstrap 约 3–5 分钟）"
-docker run -d --name "$name" -p "127.0.0.1:$port:2881" -e MODE=mini -e OB_TENANT_PASSWORD="$pw" "$image" >/dev/null
+# 数据文件与日志盘默认各要 5 GB 以上，测试用不着：调小，2 核 8 GB、十几 GB 空闲磁盘的机器也能起来
+docker run -d --name "$name" -p "127.0.0.1:$port:2881" -e MODE=mini -e OB_TENANT_PASSWORD="$pw" \
+  -e OB_DATAFILE_SIZE="${OB_DATAFILE_SIZE:-2G}" -e OB_LOG_DISK_SIZE="${OB_LOG_DISK_SIZE:-4G}" "$image" >/dev/null
 
 for i in $(seq 1 120); do
   if docker logs "$name" 2>&1 | grep -q "boot success"; then break; fi
