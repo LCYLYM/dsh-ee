@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { Play } from "lucide-react";
-import { kindOf, me, microApps } from "../mock/data";
+import { me, microApps } from "../mock/data";
+import { kindOf } from "../lib/catalog";
 import type { TFunction } from "i18next";
 import { useStore } from "../lib/store";
 import { useAuth } from "../lib/auth";
@@ -48,7 +49,7 @@ export default function Workbench() {
   const updates = installed.filter((i) => i.update).length;
   const picks = me.teamPicks.flatMap((n) => {
     const p = byName(n);
-    return p && p.status === "approved" ? [p] : [];
+    return p && p.status === "published" ? [p] : [];
   });
   const mine = plugins.filter((p) => p.origin === "internal" && p.author === me.user);
 
@@ -118,7 +119,7 @@ export default function Workbench() {
                 </div>
                 <div className="text-sm text-neutral-600">
                   v{p.version} ·{" "}
-                  {p.status === "approved" ? (
+                  {p.status === "published" ? (
                     <span className="tabular-nums">{t("workbench.colleaguesUsing", { count: p.installs })}</span>
                   ) : (
                     t("workbench.awaitingReview")

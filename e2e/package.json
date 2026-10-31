@@ -1,0 +1,12 @@
+{
+  "name": "dsh-ee-e2e",
+  "private": true,
+  "type": "module",
+  "description": "浏览器端到端测试：node run.mjs [测试名…]",
+  "scripts": {
+    "test": "node run.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.64.1"
+  }
+}

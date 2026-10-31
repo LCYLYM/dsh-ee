@@ -1,2 +1,5 @@
 /bin/
 .env.local
+
+# npm 源的本地数据（tarball、上游缓存），DSH_EE_DATA_DIR 默认 ./data
+/data/

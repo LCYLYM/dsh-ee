@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,9 +16,17 @@ import (
 	"github.com/hikariming/dsh-ee/server/internal/config"
 	"github.com/hikariming/dsh-ee/server/internal/secret"
 	"github.com/hikariming/dsh-ee/server/internal/store"
+	"github.com/hikariming/dsh-ee/server/internal/webui"
 )
 
+// version 由构建时 -ldflags "-X main.version=…" 写入。
+var version = "dev"
+
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "version" || os.Args[1] == "--version") {
+		fmt.Println(version)
+		return
+	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	if err := run(log); err != nil {
 		log.Error("启动失败", "err", err)
@@ -33,7 +42,7 @@ func run(log *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	st, err := store.Open(ctx, cfg.DSN)
+	st, err := openStore(ctx, cfg, log)
 	if err != nil {
 		return err
 	}
@@ -56,9 +65,23 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	srv := api.New(st, box, api.Options{CookieSecure: cfg.CookieSecure, SessionTTL: cfg.SessionTTL}, log)
+	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
+		return fmt.Errorf("创建数据目录 %s: %w", cfg.DataDir, err)
+	}
+	if err := st.FailRunningJobs(ctx); err != nil {
+		return err
+	}
+	srv := api.New(st, box, api.Options{
+		CookieSecure: cfg.CookieSecure,
+		SessionTTL:   cfg.SessionTTL,
+		Version:      version,
+		Web:          webui.Handler(),
+		DataDir:      cfg.DataDir,
+		PublicURL:    cfg.PublicURL,
+	}, log)
 
 	go sweepSessions(ctx, st, log)
+	go srv.RunBackground(ctx)
 
 	httpSrv := &http.Server{
 		Addr:              cfg.Addr,
@@ -69,7 +92,7 @@ func run(log *slog.Logger) error {
 	}
 	errCh := make(chan error, 1)
 	go func() {
-		log.Info("dsh-ee 已启动", "addr", cfg.Addr)
+		log.Info("dsh-ee 已启动", "addr", cfg.Addr, "version", version)
 		errCh <- httpSrv.ListenAndServe()
 	}()
 
@@ -85,6 +108,26 @@ func run(log *slog.Logger) error {
 		return httpSrv.Shutdown(shutdownCtx)
 	}
 	return nil
+}
+
+// openStore 连接数据库；连不上时在 DBWait 内每 3 秒重试一次。
+func openStore(ctx context.Context, cfg *config.Config, log *slog.Logger) (*store.Store, error) {
+	deadline := time.Now().Add(cfg.DBWait)
+	for {
+		st, err := store.Open(ctx, cfg.DSN)
+		if err == nil {
+			return st, nil
+		}
+		if time.Now().After(deadline) || ctx.Err() != nil {
+			return nil, fmt.Errorf("连接数据库: %w", err)
+		}
+		log.Warn("数据库还没就绪，3 秒后重试", "err", err)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(3 * time.Second):
+		}
+	}
 }
 
 // sweepSessions 每小时清理过期会话。

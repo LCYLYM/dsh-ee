@@ -12,9 +12,11 @@ const (
 
 // 权限点。接口处理函数通过这些常量检查权限。
 const (
-	PortalView = "portal.view"
-	LLMUse     = "llm.use"
-	KeysSelf   = "keys.self"
+	PortalView      = "portal.view"
+	LLMUse          = "llm.use"
+	KeysSelf        = "keys.self"
+	RegistryUse     = "registry.use"
+	RegistryPublish = "registry.publish"
 
 	UsersView   = "users.view"
 	UsersManage = "users.manage"
@@ -47,6 +49,8 @@ var Catalog = []Permission{
 	{PortalView, "使用工作台", "工作台", "我的工作台、微应用、能力市场、下载与接入指南等员工页面", []string{RoleMember}},
 	{LLMUse, "调用大模型", "工作台", "用自己的 API key 通过 dsh-ee 调用模型", []string{RoleMember}},
 	{KeysSelf, "管理自己的 API key", "工作台", "查看额度，自助创建和吊销自己的 key", []string{RoleMember}},
+	{RegistryUse, "安装能力", "工作台", "从企业 npm 源安装插件与依赖，创建自己的 npm 令牌", []string{RoleMember}},
+	{RegistryPublish, "发布能力", "工作台", "向企业作用域发布插件（发布后进入审核），申请引入社区插件", []string{RoleMember}},
 
 	{UsersView, "查看用户", "用户与权限", "查看用户列表（分配额度、分发 key、分配角色时也需要）", nil},
 	{UsersManage, "管理用户", "用户与权限", "新建、编辑、禁用用户，重置密码", nil},

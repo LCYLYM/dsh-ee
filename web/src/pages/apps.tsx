@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { Play } from "lucide-react";
-import { kindOf, microApps } from "../mock/data";
+import { microApps } from "../mock/data";
+import { kindOf } from "../lib/catalog";
 import { useStore } from "../lib/store";
 import type { MicroApp } from "../lib/types";
 import { pluginPath } from "../components/plugin-card";

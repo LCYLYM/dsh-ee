@@ -1,228 +1,10 @@
 /**
- * 原型用的模拟数据。
- *
- * 上游插件（upstream.json）取自 dshfind 真实的 DSH 索引前 60 条，安装量、依赖闭包、
- * 审核状态等是确定性伪造的；内部插件、DSH 发行版与 sha256 全部是占位，
- * 包名与版本号接入真实后端前需按上游 deepseek-harness 核实。
+ * 原型用的模拟数据：微应用、审计日志、执行趋势、DSH 发行版与个人工作台视角。
+ * 能力、审核、npm 源与上游预载已经接入真实后端，不在这里。
+ * DSH 发行版的包名、版本号与 sha256 都是占位，接入真实分发前需按上游 deepseek-harness 核实。
  */
-import upstream from "./upstream.json";
-import { isZh } from "../i18n";
-import type { AuditEvent, DshRelease, MicroApp, Plugin, PluginKind, RegistryToken, ScanItem } from "../lib/types";
+import type { AuditEvent, DshRelease, MicroApp } from "../lib/types";
 
-const categoryTitles: Record<string, { title: { zh: string; en: string } }> = upstream.categories;
-
-/** 分类 id 列表（上游数据自带中英文名称）。 */
-export const categoryIds = Object.keys(categoryTitles);
-
-/** 按当前界面语言取分类名。 */
-export function categoryLabel(id: string): string | undefined {
-  const c = categoryTitles[id];
-  return c && (isZh() ? c.title.zh : c.title.en);
-}
-
-const day = 86400;
-const now = Math.floor(Date.UTC(2026, 9, 26) / 1000);
-
-const internal: Plugin[] = [
-  {
-    name: "@acme/dsh-gitlab-review",
-    kind: "skill" as const,
-    title: "GitLab MR 评审助手",
-    description: "对接公司自建 GitLab：拉取 MR diff、按团队规范逐条评审并回帖，支持只读模式。",
-    author: "zhang.wei",
-    department: "研发效能部",
-    category: "tools",
-    version: "1.4.0",
-    installs: 642,
-    rating: 4.7,
-    ratingCount: 58,
-  },
-  {
-    name: "@acme/dsh-wiki-memory",
-    kind: "knowledge" as const,
-    title: "Confluence 知识记忆",
-    description: "把指定空间的 Confluence 页面切片入库，作为 Agent 的长期记忆检索源，权限随原页面。",
-    author: "li.na",
-    department: "平台架构组",
-    category: "memory",
-    version: "0.9.2",
-    installs: 418,
-    rating: 4.4,
-    ratingCount: 31,
-  },
-  {
-    name: "@acme/dsh-feishu-notify",
-    kind: "connector" as const,
-    title: "飞书通知通道",
-    description: "任务完成、需要确认或出错时推送到飞书群或个人，带一键回到会话的链接。",
-    author: "wang.chao",
-    department: "研发效能部",
-    category: "channel",
-    version: "2.1.1",
-    installs: 389,
-    rating: 4.8,
-    ratingCount: 44,
-  },
-  {
-    name: "@acme/dsh-sso-llm",
-    kind: "connector" as const,
-    title: "内部大模型网关适配",
-    description: "通过公司 SSO 认证接入内部模型网关，按部门配额计费，替代直连外部 API。",
-    author: "chen.yu",
-    department: "AI 平台部",
-    category: "agent",
-    version: "1.0.3",
-    installs: 1203,
-    rating: 4.6,
-    ratingCount: 97,
-  },
-  {
-    name: "@acme/dsh-acme-theme",
-    kind: "plugin" as const,
-    title: "ACME 品牌主题",
-    description: "公司 VI 配色与字体的 DSH 皮肤，支持深浅色。",
-    author: "zhao.min",
-    department: "设计中心",
-    category: "skin",
-    version: "0.3.0",
-    installs: 211,
-    rating: 4.1,
-    ratingCount: 12,
-  },
-  {
-    name: "@acme/skill-expense-policy",
-    kind: "skill" as const,
-    title: "报销制度 Skill",
-    description: "财务部维护的差旅与报销制度：标准、票据要求与审批链，供报销助手逐条核对。",
-    author: "he.jing",
-    department: "财务部",
-    category: "agent",
-    version: "2.0.1",
-    installs: 1534,
-    rating: 4.5,
-    ratingCount: 120,
-  },
-  {
-    name: "@acme/skill-contract-review",
-    kind: "skill" as const,
-    title: "合同审查清单",
-    description: "法务部的合同审查要点：付款、违约、知识产权、保密条款的风险等级与标准表述。",
-    author: "qian.yi",
-    department: "法务部",
-    category: "agent",
-    version: "1.2.0",
-    installs: 287,
-    rating: 4.6,
-    ratingCount: 23,
-  },
-  {
-    name: "@acme/conn-crm",
-    kind: "connector" as const,
-    title: "CRM 只读连接器",
-    description: "按员工身份只读查询 CRM 的客户、商机与续约记录，字段级脱敏随 CRM 权限。",
-    author: "lin.feng",
-    department: "销售运营部",
-    category: "tools",
-    version: "1.1.4",
-    installs: 534,
-    rating: 4.3,
-    ratingCount: 41,
-  },
-  {
-    name: "@acme/kb-metrics",
-    kind: "knowledge" as const,
-    title: "指标口径知识包",
-    description: "数据中台发布的 240 个经营指标口径、取数表与负责人，回答「这个数怎么算」。",
-    author: "xu.ran",
-    department: "数据中台",
-    category: "memory",
-    version: "3.0.0",
-    installs: 776,
-    rating: 4.7,
-    ratingCount: 65,
-  },
-  {
-    name: "@acme/skill-oncall-runbook",
-    kind: "skill" as const,
-    title: "值班排障手册",
-    description: "研发效能部的线上排障 SOP：告警分级、常见故障的定位步骤与回滚流程。",
-    author: "zhang.wei",
-    department: "研发效能部",
-    category: "agent",
-    version: "0.1.0",
-    installs: 0,
-    status: "pending" as const,
-    submittedAt: now - 5 * 3600,
-  },
-  {
-    name: "@acme/dsh-jira-sync",
-    kind: "connector" as const,
-    title: "Jira 任务同步",
-    description: "把 Agent 的目标拆解同步为 Jira 子任务，并回写进度。",
-    author: "sun.hao",
-    department: "项目管理办公室",
-    category: "tools",
-    version: "0.1.0",
-    installs: 0,
-    status: "pending" as const,
-    hasInstallScript: true,
-    submittedAt: now - 2 * 3600,
-  },
-  {
-    name: "@acme/dsh-db-inspector",
-    kind: "connector" as const,
-    title: "只读数据库巡检",
-    description: "连接测试环境数据库做只读巡检，输出慢查询与索引建议。",
-    author: "zhou.lei",
-    department: "DBA 组",
-    category: "tools",
-    version: "0.2.0",
-    installs: 0,
-    status: "pending" as const,
-    submittedAt: now - 26 * 3600,
-  },
-].map((p, i) => ({
-  icon: null,
-  homepage: null,
-  repository: `https://git.acme.internal/${p.department}/${p.name.split("/")[1]}`,
-  featured: i === 3,
-  stars: 0,
-  score: null,
-  publishedAt: now - (i + 1) * 5 * day,
-  origin: "internal" as const,
-  depCount: 4 + i * 3,
-  sizeKb: 120 + i * 90,
-  offlineReady: true,
-  hasInstallScript: false,
-  status: "approved" as const,
-  visibility: "company" as const,
-  ...p,
-}));
-
-const upstreamPlugins: Plugin[] = (upstream.plugins as Plugin[]).map((p, i) => ({
-  ...p,
-  rating: p.status === "approved" ? Math.round((3.6 + (i % 7) * 0.2) * 10) / 10 : undefined,
-  ratingCount: p.status === "approved" ? 3 + ((i * 37) % 60) : undefined,
-  submittedAt: p.status === "pending" ? now - (i - 50) * 3 * 3600 : undefined,
-}));
-
-export const initialPlugins: Plugin[] = [...internal, ...upstreamPlugins];
-
-export const kindLabels: Record<PluginKind, string> = {
-  skill: "Skill",
-  connector: "系统连接器",
-  knowledge: "知识包",
-  plugin: "通用插件",
-};
-
-/** 上游社区插件一律算通用插件；内部插件没标形态时按分类推断。 */
-export function kindOf(p: Plugin): PluginKind {
-  if (p.kind) return p.kind;
-  if (p.origin === "upstream") return "plugin";
-  if (p.category === "memory") return "knowledge";
-  if (p.category === "channel" || p.category === "tools") return "connector";
-  return "plugin";
-}
 
 export const microApps: MicroApp[] = [
   {
@@ -313,39 +95,6 @@ export const auditLabels: Record<AuditEvent["action"], string> = {
 export const execTrend = [1120, 1284, 1310, 1402, 1536, 402, 318, 1488, 1622, 1590, 1701, 1785, 512, 436];
 
 /** 预载候选：已入库的（已上架的上游插件）加上游还没同步进来的。 */
-export const preloadCandidates = [
-  ...upstream.plugins.map((p) => ({ ...p, mirrored: p.status === "approved" })),
-  ...upstream.candidates.map((p) => ({ ...p, mirrored: false })),
-].map(({ name, title, category, score, stars, depCount, sizeKb, offlineReady, mirrored }) => ({
-  name,
-  title,
-  category,
-  score,
-  stars,
-  depCount,
-  sizeKb,
-  offlineReady,
-  mirrored,
-}));
-
-export function scanFor(p: Plugin): ScanItem[] {
-  return [
-    { label: "DSH 组合包声明", level: "pass", detail: "package.json 声明了 dsh.bundle" },
-    p.hasInstallScript
-      ? { label: "安装脚本", level: "warn", detail: "含 postinstall：安装时会在员工机器上执行代码，需人工确认" }
-      : { label: "安装脚本", level: "pass", detail: "无 preinstall / install / postinstall" },
-    p.offlineReady
-      ? { label: "离线可装", level: "pass", detail: `依赖闭包 ${p.depCount} 个包已全部入库` }
-      : { label: "离线可装", level: "warn", detail: "依赖在安装时会从 GitHub 下载预编译二进制，内网会失败" },
-    p.name.length % 5 === 0
-      ? { label: "依赖漏洞", level: "warn", detail: "1 个中危：transitive 依赖 semver@5.7.1（CVE-2022-25883）" }
-      : { label: "依赖漏洞", level: "pass", detail: "未发现已知漏洞" },
-    { label: "License", level: "pass", detail: "MIT" },
-    p.origin === "internal"
-      ? { label: "密钥泄露", level: "pass", detail: "未在包内发现 token / 私钥" }
-      : { label: "仓库回链", level: "pass", detail: "npm 包 repository 指回 GitHub 仓库" },
-  ];
-}
 
 const sha = (seed: string) => {
   let h = 2166136261;
@@ -430,11 +179,6 @@ export const initialReleases: DshRelease[] = [
   },
 ];
 
-export const offlineImports = [
-  { file: "dshfind-seed-2026-10.tar.zst", plugins: 500, sizeGb: 3.8, signedBy: "dshfind.com (ed25519 7F3A…C91E)", importedAt: "2026-10-03 14:20", result: "成功：新增 37，更新 112" },
-  { file: "dshfind-seed-2026-09.tar.zst", plugins: 500, sizeGb: 3.6, signedBy: "dshfind.com (ed25519 7F3A…C91E)", importedAt: "2026-09-04 10:02", result: "成功：新增 463" },
-  { file: "dmz-delta-2026-09-18.tar.zst", plugins: 12, sizeGb: 0.1, signedBy: "ee-dmz.acme.internal", importedAt: "2026-09-18 18:45", result: "成功：更新 12" },
-];
 
 export const activity = [
   { t: "10 分钟前", text: "sun.hao 提交了 @acme/dsh-jira-sync 0.1.0，等待审核" },
@@ -447,13 +191,6 @@ export const activity = [
 export const installTrend = [212, 248, 231, 296, 340, 188, 160, 305, 362, 351, 398, 420, 230, 205];
 
 
-/** registry 访问令牌：员工个人令牌由接入脚本自动生成，这里只列管理员建的服务令牌与部分个人令牌。 */
-export const initialTokens: RegistryToken[] = [
-  { id: "ci-gitlab", name: "GitLab CI 发布", owner: "zhang.wei", access: "publish", createdAt: "2026-08-12", lastUsed: "今天 17:56" },
-  { id: "dmz-sync", name: "DMZ 增量摆渡", owner: "admin", access: "read", createdAt: "2026-09-01", lastUsed: "2026-10-18" },
-  { id: "data-ci", name: "数据中台发布", owner: "xu.ran", access: "publish", createdAt: "2026-09-20", lastUsed: "2026-10-24" },
-  { id: "old-jenkins", name: "Jenkins（旧）", owner: "admin", access: "read", createdAt: "2026-03-02", lastUsed: "2026-06-30" },
-];
 
 /** 当前登录员工的视角（个人工作台）。 */
 export const me = {

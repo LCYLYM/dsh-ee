@@ -13,6 +13,7 @@ import market from "./market";
 import portal from "./portal";
 import keys from "./keys";
 import auth from "./auth";
+import registry from "./registry";
 
 export default {
   ...common,
@@ -28,4 +29,5 @@ export default {
   ...portal,
   ...keys,
   ...auth,
+  ...registry,
 } satisfies Messages<typeof zh>;

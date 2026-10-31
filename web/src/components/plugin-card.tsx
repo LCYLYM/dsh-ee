@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { Building2, Download, WifiOff } from "lucide-react";
-import { categoryLabel, kindOf } from "../mock/data";
+import { categoryLabel, kindOf } from "../lib/catalog";
 import { useScoring } from "../lib/store";
 import type { Plugin } from "../lib/types";
 import { Badge, Card, PluginIcon, Rating, ScoreBadge } from "./ui";

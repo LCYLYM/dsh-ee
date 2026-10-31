@@ -1,0 +1,23 @@
+# 单机 OceanBase 社区版（MySQL 模式租户 test）。
+# 官方镜像只用于测试与试点：宿主机至少 2 核 8 GB 内存；正式环境请用 OBD / OCP 部署集群，
+# 只用 compose.yml 并把 DSH_EE_DSN 指过去（形如 user@tenant:password@tcp(host:2881)/dsh_ee）。
+services:
+  oceanbase:
+    image: ${OB_IMAGE:-oceanbase/oceanbase-ce:4.3.5-lts}
+    restart: unless-stopped
+    environment:
+      MODE: ${OB_MODE:-mini}
+      OB_TENANT_PASSWORD: ${OB_TENANT_PASSWORD:?在 .env 里设置 OB_TENANT_PASSWORD}
+      OB_SYS_PASSWORD: ${OB_SYS_PASSWORD:?在 .env 里设置 OB_SYS_PASSWORD}
+    volumes:
+      - ob-data:/root/ob
+      - obd-cluster:/root/.obd/cluster
+
+  dsh-ee:
+    environment:
+      DSH_EE_DSN: root@test:${OB_TENANT_PASSWORD}@tcp(oceanbase:2881)/dsh_ee
+    depends_on: [oceanbase]
+
+volumes:
+  ob-data:
+  obd-cluster:

@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
-import { CheckCircle2, FileArchive, Loader2, PackageOpen, ShieldCheck, WifiOff } from "lucide-react";
-import { categoryIds, categoryLabel, offlineImports, preloadCandidates } from "../../mock/data";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FileArchive, Loader2, PackageOpen, RefreshCw, ShieldCheck, WifiOff } from "lucide-react";
+import { categoryIds, categoryLabel } from "../../lib/catalog";
 import { useScoring, useStore } from "../../lib/store";
-import { Badge, Button, Card, cx, Field, formatKb, inputCls, PageHeader, Segmented, Toggle } from "../../components/ui";
+import { api, formatBytes, formatTime, type ImportResult, type SyncJob } from "../../lib/api";
+import { useApi, useAction } from "../../lib/use-api";
+import { LoadState } from "../../components/api-ui";
+import { StatusBadge } from "../../components/status";
+import { Badge, Button, Card, cx, Field, PageHeader, Segmented, Toggle } from "../../components/ui";
 import { useTranslation } from "react-i18next";
-import { Combobox, DatePicker } from "@/components/pickers";
+import { DatePicker } from "@/components/pickers";
 
 type RankBy = "stars" | "score";
 
@@ -33,40 +37,58 @@ export default function AdminUpstream() {
   );
 }
 
+/** 轮询一个任务直到结束。 */
+function useJob(onFinish?: () => void) {
+  const [job, setJob] = useState<SyncJob | null>(null);
+  const finish = useRef(onFinish);
+  finish.current = onFinish;
+  useEffect(() => {
+    if (!job || job.status !== "running") return;
+    const timer = setTimeout(() => {
+      api.job(job.id).then((j) => {
+        setJob(j);
+        if (j.status !== "running") finish.current?.();
+      }, () => {});
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [job]);
+  return [job, setJob] as const;
+}
+
 function Online() {
   const { t } = useTranslation();
-  const { settings, notify } = useStore();
+  const { settings, notify, reloadPending, reloadPlugins } = useStore();
   const scoring = useScoring();
+  const feed = useApi(() => api.upstreamFeed());
+  const jobs = useApi(api.jobs);
+  const { busy, run } = useAction();
   const [rankByPref, setRankBy] = useState<RankBy>("score");
   const [topN, setTopN] = useState(60);
   const [hideMirrored, setHideMirrored] = useState(true);
   const [cats, setCats] = useState<string[]>([]);
-  const [offlineOnly, setOfflineOnly] = useState(true);
   const [minScore, setMinScore] = useState(scoring.minPreloadScore);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [syncing, setSyncing] = useState<number | null>(null);
+  const [publish, setPublish] = useState(false);
+  const [job, setJob] = useJob(() => {
+    feed.reload();
+    jobs.reload();
+    reloadPending();
+    reloadPlugins();
+  });
 
-  // 评分关闭时不能按评分排、也不能用评分门槛
   const rankBy: RankBy = scoring.upstream ? rankByPref : "stars";
-  const ranked = [...preloadCandidates]
-    .filter((c) => (!cats.length || cats.includes(c.category)) && (!offlineOnly || c.offlineReady))
-    .filter((c) => !scoring.upstream || (c.score ?? 0) >= minScore)
-    .sort((a, b) => (rankBy === "score" ? (b.score ?? 0) - (a.score ?? 0) : b.stars - a.stars))
-    .slice(0, topN);
-  const fresh = ranked.filter((c) => !c.mirrored);
+  const all = feed.data?.plugins ?? [];
+  const ranked = useMemo(
+    () =>
+      [...all]
+        .filter((c) => !cats.length || cats.includes(c.category ?? ""))
+        .filter((c) => !scoring.upstream || (c.score ?? 0) >= minScore)
+        .sort((a, b) => (rankBy === "score" ? (b.score ?? 0) - (a.score ?? 0) : (b.stars ?? 0) - (a.stars ?? 0)))
+        .slice(0, topN),
+    [all, cats, scoring.upstream, minScore, rankBy, topN],
+  );
+  const fresh = ranked.filter((c) => !c.local_version);
   const selected = picked.size ? ranked.filter((c) => picked.has(c.name)) : fresh;
-  const totalKb = selected.reduce((a, c) => a + c.sizeKb, 0);
-  const totalDeps = selected.reduce((a, c) => a + c.depCount, 0);
-
-  useEffect(() => {
-    if (syncing === null || syncing >= 100) return;
-    const timer = setTimeout(() => {
-      const next = Math.min(100, syncing + 7);
-      setSyncing(next);
-      if (next === 100) notify(t("upstreamAdmin.synced", { count: selected.length }));
-    }, 120);
-    return () => clearTimeout(timer);
-  }, [syncing, selected.length, notify, t]);
 
   const toggle = (name: string) =>
     setPicked((s) => {
@@ -75,6 +97,20 @@ function Online() {
       else n.add(name);
       return n;
     });
+
+  const start = async () => {
+    const r = await run(() => api.syncUpstream(selected.map((c) => c.name), publish));
+    if (!r.ok) return notify(r.error);
+    setJob(r.value);
+    setPicked(new Set());
+  };
+
+  const checkUpdates = async () => {
+    const r = await run(api.checkUpdates);
+    if (!r.ok) return notify(r.error);
+    if (r.value) setJob(r.value);
+    else notify(t("registry.upstream.noUpdates"));
+  };
 
   return (
     <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
@@ -92,7 +128,7 @@ function Online() {
             />
           </Field>
           <Field label={t("upstreamAdmin.topN", { n: topN })}>
-            <input type="range" min={10} max={140} step={10} value={topN} onChange={(e) => setTopN(+e.target.value)} className="w-full accent-brand-500" />
+            <input type="range" min={10} max={300} step={10} value={topN} onChange={(e) => setTopN(+e.target.value)} className="w-full accent-brand-500" />
           </Field>
           {scoring.upstream && (
             <Field label={t("upstreamAdmin.minScore", { n: minScore })}>
@@ -105,10 +141,7 @@ function Online() {
                 <button
                   key={id}
                   onClick={() => setCats((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]))}
-                  className={cx(
-                    "rounded-md border px-2 py-1 text-xs",
-                    cats.includes(id) ? "border-brand-300 bg-brand-50 text-brand-700" : "border-neutral-200 text-neutral-600",
-                  )}
+                  className={cx("rounded-md border px-2 py-1 text-xs", cats.includes(id) ? "border-brand-300 bg-brand-50 text-brand-700" : "border-neutral-200 text-neutral-600")}
                 >
                   {categoryLabel(id)}
                 </button>
@@ -116,13 +149,14 @@ function Online() {
             </div>
           </Field>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-neutral-700">{t("upstreamAdmin.offlineOnly")}</span>
-            <Toggle checked={offlineOnly} onChange={setOfflineOnly} />
-          </div>
-          <div className="flex items-center justify-between text-sm">
             <span className="text-neutral-700">{t("upstreamAdmin.hideMirrored")}</span>
             <Toggle checked={hideMirrored} onChange={setHideMirrored} />
           </div>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-neutral-700">{t("registry.upstream.publishDirectly")}</span>
+            <Toggle checked={publish} onChange={setPublish} />
+          </div>
+          {publish && <p className="text-xs text-amber-700">{t("registry.upstream.publishDirectlyHint")}</p>}
         </Card>
 
         <Card className="space-y-2 p-5 text-sm">
@@ -133,111 +167,211 @@ function Online() {
           </div>
           <div className="flex justify-between text-neutral-600">
             <span>{t("upstreamAdmin.npmSource")}</span>
-            <span>{settings.upstream.registry === "custom" ? settings.upstream.customRegistry || t("upstreamAdmin.custom") : settings.upstream.registry}</span>
+            <span className="truncate pl-3">{settings.upstream.registry === "custom" ? settings.upstream.customRegistry || t("upstreamAdmin.custom") : settings.upstream.registry}</span>
           </div>
           <div className="flex justify-between text-neutral-600">
             <span>{t("upstreamAdmin.newVersions")}</span>
             <span>{{ auto: t("upstreamAdmin.syncAuto"), review: t("upstreamAdmin.syncReview"), off: t("upstreamAdmin.syncOff") }[settings.upstream.autoSync]}</span>
           </div>
-          <p className="pt-1 text-xs text-neutral-500">{t("upstreamAdmin.coreMirrorNote")}</p>
+          <Button variant="secondary" size="sm" className="mt-2 w-full" disabled={busy || settings.upstream.autoSync === "off"} onClick={checkUpdates}>
+            {t("registry.upstream.checkUpdates")}
+          </Button>
+          <p className="pt-1 text-xs text-neutral-500">{t("registry.upstream.closureNote")}</p>
         </Card>
       </div>
 
       <div className="space-y-4">
+        {job && <JobCard job={job} />}
         <Card className="flex flex-wrap items-center gap-4 p-4">
           <div className="text-sm">
             <span className="font-medium text-neutral-800">
               {t("upstreamAdmin.willSync", { count: selected.length })}
               {picked.size ? t("upstreamAdmin.manual") : t("upstreamAdmin.allUnmirrored")}
             </span>
-            <span className="ml-2 text-neutral-500">
-              {t("upstreamAdmin.depsEstimate", { count: totalDeps, size: formatKb(totalKb) })}
-            </span>
+            <span className="ml-2 text-neutral-500">{t("registry.upstream.feedCount", { count: all.length, at: feed.data?.fetched_at ? formatTime(feed.data.fetched_at) : "—" })}</span>
           </div>
-          <div className="ml-auto">
-            {syncing !== null && syncing < 100 ? (
-              <div className="flex w-56 items-center gap-2 text-sm text-neutral-600">
-                <Loader2 size={16} className="animate-spin" />
-                <div className="h-2 flex-1 rounded-full bg-neutral-100">
-                  <div className="h-2 rounded-full bg-brand-500 transition-all" style={{ width: `${syncing}%` }} />
-                </div>
-                {syncing}%
-              </div>
-            ) : (
-              <Button disabled={!selected.length} onClick={() => setSyncing(0)}>
-                {t("upstreamAdmin.startSync")}
-              </Button>
-            )}
+          <div className="ml-auto flex gap-2">
+            <Button variant="secondary" size="sm" disabled={feed.loading} onClick={() => api.upstreamFeed(true).then(() => feed.reload())}>
+              <RefreshCw size={14} /> {t("registry.upstream.refreshFeed")}
+            </Button>
+            <Button disabled={!selected.length || busy || job?.status === "running"} onClick={start}>
+              {t("upstreamAdmin.startSync")}
+            </Button>
           </div>
         </Card>
 
-        <Card className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 text-left text-xs text-neutral-500">
-              <tr>
-                <th className="w-10 px-4 py-2.5" />
-                <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colPlugin")}</th>
-                <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colCategory")}</th>
-                <th className="px-4 py-2.5 text-right font-normal">Star</th>
-                {scoring.upstream && <th className="px-4 py-2.5 text-right font-normal">{t("upstreamAdmin.colScore")}</th>}
-                <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colDeps")}</th>
-                <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colStatus")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {ranked.filter((c) => !hideMirrored || !c.mirrored).map((c) => (
-                <tr key={c.name} className={cx(c.mirrored && "text-neutral-500")}>
-                  <td className="px-4 py-2">
-                    <input
-                      type="checkbox"
-                      disabled={c.mirrored}
-                      checked={picked.has(c.name)}
-                      onChange={() => toggle(c.name)}
-                      className="accent-brand-500"
-                    />
-                  </td>
-                  <td className="px-4 py-2">
-                    <div className="font-medium">{c.title}</div>
-                    <div className="font-mono text-xs text-neutral-500">{c.name}</div>
-                  </td>
-                  <td className="px-4 py-2">{categoryLabel(c.category)}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{c.stars.toLocaleString()}</td>
-                  {scoring.upstream && <td className="px-4 py-2 text-right tabular-nums">{c.score ?? "—"}</td>}
-                  <td className="px-4 py-2 text-xs">
-                    {t("upstreamAdmin.depsValue", { count: c.depCount, size: formatKb(c.sizeKb) })}
-                    {!c.offlineReady && (
-                      <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600">
-                        <WifiOff size={11} /> {t("upstreamAdmin.needsInternet")}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2">{c.mirrored ? <Badge tone="green">{t("upstreamAdmin.mirrored")}</Badge> : <Badge>{t("upstreamAdmin.notMirrored")}</Badge>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <LoadState loading={feed.loading && !feed.data} error={feed.error} onRetry={feed.reload}>
+          {feed.data?.disabled || feed.data?.error ? (
+            <Card className="p-8 text-center text-sm text-neutral-600">
+              {feed.data.disabled ? t("registry.upstream.feedDisabled") : t("registry.upstream.feedError", { msg: feed.data.error })}
+            </Card>
+          ) : (
+            <Card className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-neutral-100 text-left text-xs text-neutral-500">
+                  <tr>
+                    <th className="w-10 px-4 py-2.5" />
+                    <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colPlugin")}</th>
+                    <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colCategory")}</th>
+                    <th className="px-4 py-2.5 text-right font-normal">Star</th>
+                    {scoring.upstream && <th className="px-4 py-2.5 text-right font-normal">{t("upstreamAdmin.colScore")}</th>}
+                    <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colDeps")}</th>
+                    <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colStatus")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100">
+                  {ranked
+                    .filter((c) => !hideMirrored || !c.local_version)
+                    .map((c) => (
+                      <tr key={c.name} className={cx(c.local_version && "text-neutral-500")}>
+                        <td className="px-4 py-2">
+                          <input
+                            type="checkbox"
+                            aria-label={c.name}
+                            checked={picked.has(c.name)}
+                            onChange={() => toggle(c.name)}
+                            className="accent-brand-500"
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="font-medium">{c.title || c.name}</div>
+                          <div className="font-mono text-xs text-neutral-500">
+                            {c.name}
+                            {c.version && <span>@{c.version}</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2">{categoryLabel(c.category ?? "") ?? "—"}</td>
+                        <td className="px-4 py-2 text-right tabular-nums">{(c.stars ?? 0).toLocaleString()}</td>
+                        {scoring.upstream && <td className="px-4 py-2 text-right tabular-nums">{c.score ?? "—"}</td>}
+                        <td className="px-4 py-2 text-xs">
+                          {c.dep_count !== null ? t("upstreamAdmin.depsValue", { count: c.dep_count, size: formatBytes(c.closure_size ?? 0) }) : "—"}
+                          {c.offline_ready === false && (
+                            <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600">
+                              <WifiOff size={11} /> {t("upstreamAdmin.needsInternet")}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          {c.local_status ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <StatusBadge status={c.local_status} />
+                              {c.version && c.local_version !== c.version && <Badge tone="amber">{t("registry.upstream.newer", { version: c.version })}</Badge>}
+                            </span>
+                          ) : (
+                            <Badge>{t("upstreamAdmin.notMirrored")}</Badge>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </Card>
+          )}
+        </LoadState>
+        <JobHistory jobs={jobs.data ?? []} onPick={setJob} />
       </div>
     </div>
   );
 }
 
+function JobCard({ job }: { job: SyncJob }) {
+  const { t } = useTranslation();
+  const pct = job.total ? Math.round((job.done / job.total) * 100) : 0;
+  const running = job.status === "running";
+  return (
+    <Card className="p-4">
+      <div className="flex items-center gap-3 text-sm">
+        {running && <Loader2 size={16} className="animate-spin text-brand-500" />}
+        <span className="font-medium text-neutral-800">{t(`registry.jobs.kind.${job.kind}`)}</span>
+        <JobStatus job={job} />
+        <span className="text-neutral-500">
+          {job.done} / {job.total} · {formatBytes(job.bytes)}
+        </span>
+      </div>
+      {running && (
+        <div className="mt-2 h-2 rounded-full bg-neutral-100">
+          <div className="h-2 rounded-full bg-brand-500 transition-all" style={{ width: `${Math.max(pct, 3)}%` }} />
+        </div>
+      )}
+      {job.log && <pre className="mt-3 max-h-56 overflow-auto rounded-md bg-neutral-50 p-3 font-mono text-xs whitespace-pre-wrap text-neutral-700">{job.log}</pre>}
+    </Card>
+  );
+}
+
+function JobStatus({ job }: { job: SyncJob }) {
+  const { t } = useTranslation();
+  const tone = { running: "brand", succeeded: "green", partial: "amber", failed: "red", interrupted: "slate" } as const;
+  return <Badge tone={tone[job.status]}>{t(`registry.jobs.status.${job.status}`)}</Badge>;
+}
+
+function JobHistory({ jobs, onPick, kinds }: { jobs: SyncJob[]; onPick: (j: SyncJob) => void; kinds?: SyncJob["kind"][] }) {
+  const { t } = useTranslation();
+  const list = jobs.filter((j) => !kinds || kinds.includes(j.kind));
+  if (list.length === 0) return null;
+  return (
+    <Card>
+      <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">{t("upstreamAdmin.history")}</div>
+      <table className="w-full text-sm">
+        <thead className="text-left text-xs text-neutral-500">
+          <tr>
+            <th className="px-5 py-2 font-normal">{t("registry.jobs.colKind")}</th>
+            <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colResult")}</th>
+            <th className="px-5 py-2 font-normal">{t("registry.jobs.colCount")}</th>
+            <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colSize")}</th>
+            <th className="px-5 py-2 font-normal">{t("registry.jobs.colStarted")}</th>
+            <th className="px-5 py-2" />
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-neutral-100">
+          {list.slice(0, 10).map((j) => (
+            <tr key={j.id}>
+              <td className="px-5 py-2.5">{t(`registry.jobs.kind.${j.kind}`)}</td>
+              <td className="px-5 py-2.5">
+                <JobStatus job={j} />
+              </td>
+              <td className="px-5 py-2.5 tabular-nums">
+                {j.done - j.failed} / {j.total}
+              </td>
+              <td className="px-5 py-2.5">{formatBytes(j.bytes)}</td>
+              <td className="px-5 py-2.5 text-neutral-500 tabular-nums">{formatTime(j.created_at)}</td>
+              <td className="px-5 py-2.5 text-right">
+                <button type="button" className="text-sm text-neutral-600 hover:text-neutral-900" onClick={() => onPick(j)}>
+                  {t("registry.jobs.viewLog")}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
 function Offline() {
   const { t } = useTranslation();
-  const { notify } = useStore();
-  const [file, setFile] = useState("");
-  const [exportSince, setExportSince] = useState("2026-10-03");
-  const [step, setStep] = useState(0);
-  const steps = [t("upstreamAdmin.stepSignature"), t("upstreamAdmin.stepIntegrity"), t("upstreamAdmin.stepUnpack"), t("upstreamAdmin.stepManifest")];
+  const { notify, reloadPending, reloadPlugins } = useStore();
+  const jobs = useApi(api.jobs);
+  const { busy, run } = useAction();
+  const [file, setFile] = useState<File | null>(null);
+  const [exportSince, setExportSince] = useState("");
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [job, setJob] = useState<SyncJob | null>(null);
 
-  useEffect(() => {
-    if (step === 0 || step > steps.length) return;
-    const timer = setTimeout(() => setStep((s) => s + 1), 700);
-    return () => clearTimeout(timer);
-  }, [step, steps.length]);
-  useEffect(() => {
-    if (step === steps.length + 1) notify(t("upstreamAdmin.imported"));
-  }, [step, steps.length, notify, t]);
+  const doImport = async () => {
+    if (!file) return;
+    const r = await run(() => api.importBundle(file));
+    if (!r.ok) return notify(r.error);
+    setJob(r.value.job);
+    if (r.value.error) notify(r.value.error);
+    if (r.value.result) {
+      setResult(r.value.result);
+      notify(t("upstreamAdmin.imported"));
+    }
+    setFile(null);
+    jobs.reload();
+    reloadPending();
+    reloadPlugins();
+  };
 
   return (
     <div className="space-y-6">
@@ -246,32 +380,19 @@ function Offline() {
           <div className="mb-1 flex items-center gap-2 font-medium text-neutral-800">
             <PackageOpen size={18} /> {t("upstreamAdmin.importSeed")}
           </div>
-          <p className="mb-4 text-sm text-neutral-500">
-            {t("upstreamAdmin.importDesc")}
-          </p>
+          <p className="mb-4 text-sm text-neutral-500">{t("registry.upstream.importDesc")}</p>
           <label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-neutral-200 px-6 py-8 text-center hover:border-brand-300">
             <FileArchive size={28} className="text-brand-500" />
-            <span className="mt-2 text-sm font-medium text-neutral-700">{file || t("upstreamAdmin.chooseFile")}</span>
-            <input type="file" accept=".zst,.tar" className="hidden" onChange={(e) => setFile(e.target.files?.[0]?.name ?? "")} />
+            <span className="mt-2 text-sm font-medium text-neutral-700">{file ? `${file.name} · ${formatBytes(file.size)}` : t("upstreamAdmin.chooseFile")}</span>
+            <input type="file" accept=".tar" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </label>
-          <Button className="mt-4" disabled={!file || (step > 0 && step <= steps.length)} onClick={() => setStep(1)}>
-            {t("upstreamAdmin.startImport")}
+          <Button className="mt-4" disabled={!file || busy} onClick={doImport}>
+            {busy ? t("registry.upstream.importing") : t("upstreamAdmin.startImport")}
           </Button>
-          {step > 0 && (
-            <ul className="mt-4 space-y-2 text-sm">
-              {steps.map((s, i) => (
-                <li key={s} className="flex items-center gap-2">
-                  {step > i + 1 ? (
-                    <CheckCircle2 size={16} className="text-emerald-500" />
-                  ) : step === i + 1 ? (
-                    <Loader2 size={16} className="animate-spin text-brand-500" />
-                  ) : (
-                    <span className="h-4 w-4 rounded-full border border-neutral-300" />
-                  )}
-                  <span className={step > i ? "text-neutral-700" : "text-neutral-500"}>{s}</span>
-                </li>
-              ))}
-            </ul>
+          {result && (
+            <p className="mt-3 text-sm text-neutral-700">
+              {t("registry.upstream.importResult", { added: result.added, pending: result.pending, existing: result.existing, skipped: result.skipped.length })}
+            </p>
           )}
         </Card>
 
@@ -280,45 +401,19 @@ function Offline() {
             <ShieldCheck size={18} /> {t("upstreamAdmin.exportDelta")}
           </div>
           <p className="mb-4 text-sm text-neutral-500">{t("upstreamAdmin.exportDesc")}</p>
-          <Field label={t("upstreamAdmin.exportSince")}>
-            <DatePicker value={exportSince} onChange={setExportSince} clearable={false} />
+          <Field label={t("upstreamAdmin.exportSince")} hint={t("registry.upstream.exportAllHint")}>
+            <DatePicker value={exportSince} onChange={setExportSince} />
           </Field>
-          <label className="mt-3 flex items-center gap-2 text-sm text-neutral-600">
-            <input type="checkbox" defaultChecked className="accent-brand-500" /> {t("upstreamAdmin.includeDsh")}
-          </label>
-          <Button variant="secondary" className="mt-4" onClick={() => notify(t("upstreamAdmin.generating"))}>
+          <a
+            href={api.exportUrl(exportSince || undefined)}
+            className="mt-4 inline-flex h-9 items-center rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-800 hover:bg-neutral-50"
+          >
             {t("upstreamAdmin.generate")}
-          </Button>
+          </a>
         </Card>
       </div>
-
-      <Card>
-        <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">{t("upstreamAdmin.history")}</div>
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs text-neutral-500">
-            <tr>
-              <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colFile")}</th>
-              <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colSignature")}</th>
-              <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colPlugins")}</th>
-              <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colSize")}</th>
-              <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colImportedAt")}</th>
-              <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colResult")}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-100">
-            {offlineImports.map((r) => (
-              <tr key={r.file}>
-                <td className="px-5 py-2.5 font-mono text-xs">{r.file}</td>
-                <td className="px-5 py-2.5 text-xs text-neutral-500">{r.signedBy}</td>
-                <td className="px-5 py-2.5">{r.plugins}</td>
-                <td className="px-5 py-2.5">{r.sizeGb} GB</td>
-                <td className="px-5 py-2.5 text-neutral-500">{r.importedAt}</td>
-                <td className="px-5 py-2.5 text-emerald-600">{r.result}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+      {job && <JobCard job={job} />}
+      <JobHistory jobs={jobs.data ?? []} onPick={setJob} kinds={["import"]} />
     </div>
   );
 }

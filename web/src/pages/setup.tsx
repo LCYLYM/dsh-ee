@@ -1,62 +1,58 @@
 import { useState } from "react";
 import { Info, KeyRound } from "lucide-react";
 import { useStore } from "../lib/store";
-import { Button, Card, CopyBox, PageHeader, Segmented } from "../components/ui";
+import { useAuth } from "../lib/auth";
+import { api, formatTime } from "../lib/api";
+import { useApi, useAction } from "../lib/use-api";
+import { useConfirm } from "../lib/confirm";
+import { LoadState } from "../components/api-ui";
+import { Badge, Button, Card, CardHeader, CopyBox, cx, inputBase, PageHeader, Segmented } from "../components/ui";
 import { useTranslation } from "react-i18next";
 
 type Mode = "unix" | "windows" | "manual";
 
 export default function Setup() {
   const { t } = useTranslation();
-  const { settings, notify } = useStore();
+  const { settings, baseUrl, plugins } = useStore();
   const [mode, setMode] = useState<Mode>("unix");
-  const host = settings.baseUrl;
-  const indexUrl = `${host}/market/dsh-index.json`;
-  const registry = `${host}/npm/`;
+  // 刚创建的令牌只在本页显示这一次，下面的命令会自动填进去
+  const [token, setToken] = useState<string | null>(null);
+  const shown = token ?? t("registry.setup.tokenPlaceholder");
+  const indexUrl = `${baseUrl}/index/dsh-index.json`;
+  const registry = `${baseUrl}/npm/`;
   const registryKey = registry.replace(/^https?:/, "");
+  const scopes = [settings.scope, ...settings.registry.extraScopes];
+  const example = plugins.find((p) => p.origin === "internal")?.name ?? plugins[0]?.name ?? `${settings.scope}/hello`;
 
   return (
     <div className="max-w-4xl">
-      <PageHeader
-        title={t("setup.title")}
-        desc={t("setup.desc")}
-      />
+      <PageHeader title={t("setup.title")} desc={t("setup.desc")} />
 
-      <Card className="mb-6 flex items-center gap-4 p-5">
-        <KeyRound size={20} className="text-brand-500" />
-        <div className="flex-1 text-sm">
-          <div className="font-medium text-neutral-800">{t("setup.tokenTitle")}</div>
-          <div className="text-neutral-500">{t("setup.tokenDesc")}</div>
-        </div>
-        <Button variant="secondary" size="sm" onClick={() => notify(t("setup.regenerated"))}>
-          {t("setup.regenerate")}
-        </Button>
-      </Card>
+      <Tokens onCreated={setToken} />
 
-      <Segmented
-        value={mode}
-        onChange={setMode}
-        options={[
-          { value: "unix", label: "macOS / Linux" },
-          { value: "windows", label: "Windows" },
-          { value: "manual", label: t("setup.manual") },
-        ]}
-      />
+      <div className="mt-6">
+        <Segmented
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "unix", label: "macOS / Linux" },
+            { value: "windows", label: "Windows" },
+            { value: "manual", label: t("setup.manual") },
+          ]}
+        />
+      </div>
 
       <div className="mt-4 space-y-4">
         {mode === "unix" && (
           <>
-            <CopyBox label={t("setup.runInTerminal")} text={`curl -fsSL ${host}/setup.sh | sh -s -- --token ee_tok_••••••••`} />
-            <ScriptExplain />
+            <CopyBox label={t("setup.runInTerminal")} text={`curl -fsSL ${baseUrl}/setup.sh | sh -s -- ${shown}`} />
+            <ScriptExplain index={indexUrl} />
           </>
         )}
         {mode === "windows" && (
           <>
-            <CopyBox
-              label={t("setup.runInPowerShell")}
-              text={`iwr ${host}/setup.ps1 -UseBasicParsing | iex; Setup-DshEE -Token ee_tok_••••••••`}
-            />
-            <ScriptExplain />
+            <CopyBox label={t("setup.runInPowerShell")} text={`iwr ${baseUrl}/setup.ps1 -UseBasicParsing | iex; Setup-DshEE -Token ${shown}`} />
+            <ScriptExplain index={indexUrl} />
           </>
         )}
         {mode === "manual" && (
@@ -67,18 +63,16 @@ export default function Setup() {
             </Step>
             <Step n={2} title={t("setup.step2")}>
               <p className="mb-2 text-sm text-neutral-500">{t("setup.step2Desc")}</p>
-              <CopyBox
-                text={`registry=${registry}\n${registryKey}:_authToken=ee_tok_••••••••\n${settings.scope}:registry=${registry}`}
-              />
+              <CopyBox text={[`registry=${registry}`, `${registryKey}:_authToken=${shown}`, ...scopes.map((sc) => `${sc}:registry=${registry}`)].join("\n")} />
             </Step>
-            <Step n={3} title={t("setup.step3")}>
-              <p className="mb-2 text-sm text-neutral-500">{t("setup.step3Desc")}</p>
-              <CopyBox
-                text={`curl -fsSLo ~/.dsh-ee-ca.pem ${host}/ca.pem\necho "cafile=$HOME/.dsh-ee-ca.pem" >> ~/.npmrc\nexport NODE_EXTRA_CA_CERTS=$HOME/.dsh-ee-ca.pem   ${t("setup.shellComment")}`}
-              />
-            </Step>
-            <Step n={4} title={t("setup.step4")}>
-              <CopyBox text={`dsh plugin add ${settings.scope}/dsh-feishu-notify`} />
+            {baseUrl.startsWith("https:") && (
+              <Step n={3} title={t("setup.step3")}>
+                <p className="mb-2 text-sm text-neutral-500">{t("registry.setup.caDesc")}</p>
+                <CopyBox text={`echo "cafile=$HOME/.dsh-ee-ca.pem" >> ~/.npmrc\nexport NODE_EXTRA_CA_CERTS=$HOME/.dsh-ee-ca.pem   ${t("setup.shellComment")}`} />
+              </Step>
+            )}
+            <Step n={baseUrl.startsWith("https:") ? 4 : 3} title={t("setup.step4")}>
+              <CopyBox text={`dsh plugin add ${example}`} />
             </Step>
           </div>
         )}
@@ -86,24 +80,132 @@ export default function Setup() {
 
       <Card className="mt-8 flex gap-3 border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
         <Info size={18} className="mt-0.5 shrink-0" />
-        <div>
-          {t("setup.coexist")}
-        </div>
+        <div>{t("setup.coexist")}</div>
       </Card>
     </div>
   );
 }
 
-function ScriptExplain() {
+function Tokens({ onCreated }: { onCreated: (token: string) => void }) {
+  const { t } = useTranslation();
+  const { notify } = useStore();
+  const { can } = useAuth();
+  const confirm = useConfirm();
+  const { data, loading, error, reload } = useApi(api.myNpmTokens);
+  const { busy, run } = useAction();
+  const [name, setName] = useState("");
+  const [access, setAccess] = useState<"read" | "publish">("read");
+  const [issued, setIssued] = useState<string | null>(null);
+  const canPublish = can("registry.publish");
+
+  const create = async () => {
+    const r = await run(() => api.createNpmToken({ name: name.trim(), access }));
+    if (!r.ok) return notify(r.error);
+    setIssued(r.value.token);
+    onCreated(r.value.token);
+    setName("");
+    reload();
+  };
+
+  return (
+    <Card>
+      <CardHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            <KeyRound size={16} className="text-brand-500" /> {t("setup.tokenTitle")}
+          </span>
+        }
+        aside={t("registry.setup.tokenCount", { count: data?.length ?? 0 })}
+      />
+      <p className="px-5 text-sm text-neutral-600">{t("setup.tokenDesc")}</p>
+      <LoadState loading={loading && !data} error={error} onRetry={reload}>
+        {(data ?? []).length > 0 && (
+          <table className="mt-3 w-full text-sm">
+            <thead className="text-left text-xs text-neutral-600">
+              <tr>
+                <th className="px-5 py-2 font-normal">{t("registryAdmin.colName")}</th>
+                <th className="px-5 py-2 font-normal">{t("registryAdmin.colAccess")}</th>
+                <th className="px-5 py-2 font-normal">{t("registry.setup.prefix")}</th>
+                <th className="px-5 py-2 text-right font-normal">{t("registryAdmin.colLastUsed")}</th>
+                <th className="px-5 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {(data ?? []).map((tk) => (
+                <tr key={tk.id} className="border-t border-neutral-100">
+                  <td className="px-5 py-2.5 text-neutral-900">{tk.name}</td>
+                  <td className="px-5 py-2.5">
+                    <Badge tone={tk.access === "publish" ? "amber" : "slate"}>{tk.access === "publish" ? t("registryAdmin.readPublish") : t("registryAdmin.readOnly")}</Badge>
+                  </td>
+                  <td className="px-5 py-2.5 font-mono text-xs text-neutral-600">{tk.prefix}…</td>
+                  <td className="px-5 py-2.5 text-right text-neutral-600 tabular-nums">{tk.last_used_at ? formatTime(tk.last_used_at) : t("registry.setup.never")}</td>
+                  <td className="px-5 py-2.5 text-right">
+                    <button
+                      type="button"
+                      className="text-sm text-neutral-600 hover:text-red-700"
+                      onClick={async () => {
+                        if (!(await confirm({ kind: "revoke", description: t("registry.setup.revokeConfirm", { name: tk.name }) }))) return;
+                        const r = await run(() => api.revokeMyNpmToken(tk.id));
+                        if (!r.ok) return notify(r.error);
+                        notify(t("registryAdmin.tokenRevoked", { name: tk.name }));
+                        reload();
+                      }}
+                    >
+                      {t("registryAdmin.revoke")}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </LoadState>
+      <div className="mt-3 border-t border-neutral-100 px-5 py-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            aria-label={t("registryAdmin.tokenName")}
+            className={cx(inputBase, "w-56")}
+            placeholder={t("registry.setup.tokenNamePlaceholder")}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && name.trim() && create()}
+          />
+          {canPublish && (
+            <Segmented
+              value={access}
+              onChange={setAccess}
+              options={[
+                { value: "read", label: t("registryAdmin.readOnly") },
+                { value: "publish", label: t("registryAdmin.readPublish") },
+              ]}
+            />
+          )}
+          <Button size="sm" disabled={busy || !name.trim()} onClick={create}>
+            {t("registryAdmin.newToken")}
+          </Button>
+        </div>
+        {issued && (
+          <div className="mt-4">
+            <p className="mb-2 text-sm text-neutral-700">{t("registry.setup.tokenOnce")}</p>
+            <CopyBox text={issued} />
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function ScriptExplain({ index }: { index: string }) {
   const { t } = useTranslation();
   return (
     <Card className="p-5 text-sm text-neutral-600">
       <div className="mb-2 font-medium text-neutral-800">{t("setup.scriptTitle")}</div>
       <ol className="list-decimal space-y-1 pl-5">
-        <li>{t("setup.scriptCa")}</li>
-        <li>{t("setup.scriptNpmrc")}</li>
-        <li>{t("setup.scriptIndex")}</li>
+        <li>{t("registry.setup.scriptNpmrc")}</li>
         <li>{t("setup.scriptCheck")}</li>
+        <li>
+          {t("registry.setup.scriptIndex")} <code className="font-mono text-xs text-neutral-800">{index}</code>
+        </li>
       </ol>
     </Card>
   );
@@ -112,9 +214,7 @@ function ScriptExplain() {
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-4">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-500 text-sm font-medium text-white">
-        {n}
-      </span>
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-500 text-sm font-medium text-white">{n}</span>
       <div className="min-w-0 flex-1">
         <div className="mb-2 font-medium text-neutral-800">{title}</div>
         {children}

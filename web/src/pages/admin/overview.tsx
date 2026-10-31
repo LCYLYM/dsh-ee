@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 export default function AdminOverview() {
   const { t } = useTranslation();
   const { plugins, releases, settings } = useStore();
-  const approved = plugins.filter((p) => p.status === "approved");
+  const approved = plugins.filter((p) => p.status === "published");
   const pending = plugins.filter((p) => p.status === "pending");
   const internal = approved.filter((p) => p.origin === "internal").length;
   const storageKb = approved.reduce((a, p) => a + p.sizeKb, 0);

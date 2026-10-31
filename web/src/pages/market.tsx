@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { Download, Search, Terminal } from "lucide-react";
-import { categoryIds, categoryLabel, kindOf } from "../mock/data";
+import { categoryIds, categoryLabel, kindOf } from "../lib/catalog";
 import type { PluginKind } from "../lib/types";
 import { useScoring, useStore } from "../lib/store";
 import { PluginCard } from "../components/plugin-card";
@@ -16,7 +16,7 @@ type Origin = "all" | "internal" | "upstream";
 
 export default function Market() {
   const { t } = useTranslation();
-  const { plugins, settings, releases } = useStore();
+  const { plugins, pluginsLoading, settings, releases } = useStore();
   const scoring = useScoring();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
@@ -28,7 +28,7 @@ export default function Market() {
   const sort: Sort =
     (sortPref === "score" && !scoring.upstream) || (sortPref === "rating" && !scoring.rating) ? "installs" : sortPref;
 
-  const visible = plugins.filter((p) => p.status === "approved");
+  const visible = plugins;
   const list = useMemo(() => {
     const kw = q.trim().toLowerCase();
     const xs = visible.filter(
@@ -121,7 +121,9 @@ export default function Market() {
       </div>
 
       <div className="mb-3 text-sm text-neutral-600">{t("market.count", { count: list.length })}</div>
-      {list.length === 0 ? (
+      {pluginsLoading && plugins.length === 0 ? (
+        <Card className="p-12 text-center text-sm text-neutral-600">{t("common.loading")}</Card>
+      ) : list.length === 0 ? (
         <Card className="p-12 text-center text-sm text-neutral-600">
           <Trans i18nKey="market.empty" components={{ link: <PageLink page="publish" className="font-medium text-neutral-900 hover:underline" /> }} />
         </Card>

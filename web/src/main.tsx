@@ -73,8 +73,8 @@ function AppRoutes() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <StoreProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <StoreProvider>
         <MenuProvider>
           <TooltipProvider delayDuration={300}>
             <ConfirmProvider>
@@ -85,7 +85,7 @@ createRoot(document.getElementById("root")!).render(
             </ConfirmProvider>
           </TooltipProvider>
         </MenuProvider>
-      </AuthProvider>
-    </StoreProvider>
+      </StoreProvider>
+    </AuthProvider>
   </StrictMode>,
 );

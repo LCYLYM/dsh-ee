@@ -1,0 +1,48 @@
+# 最小 TiDB 集群：PD + TiKV + TiDB 各一个，数据持久化在卷里。
+# 数据库端口不对外暴露，只在 compose 网络内可达；root 无密码，生产环境请改用独立部署的集群。
+services:
+  pd:
+    image: ${TIDB_REGISTRY:-pingcap}/pd:${TIDB_VERSION:-v8.5.8}
+    restart: unless-stopped
+    command:
+      - --name=pd0
+      - --client-urls=http://0.0.0.0:2379
+      - --peer-urls=http://0.0.0.0:2380
+      - --advertise-client-urls=http://pd:2379
+      - --advertise-peer-urls=http://pd:2380
+      - --initial-cluster=pd0=http://pd:2380
+      - --data-dir=/data/pd
+    volumes:
+      - tidb-data:/data
+
+  tikv:
+    image: ${TIDB_REGISTRY:-pingcap}/tikv:${TIDB_VERSION:-v8.5.8}
+    restart: unless-stopped
+    command:
+      - --addr=0.0.0.0:20160
+      - --advertise-addr=tikv:20160
+      - --status-addr=0.0.0.0:20180
+      - --data-dir=/data/tikv
+      - --pd=pd:2379
+    ulimits:
+      nofile: { soft: 1048576, hard: 1048576 }
+    depends_on: [pd]
+    volumes:
+      - tidb-data:/data
+
+  tidb:
+    image: ${TIDB_REGISTRY:-pingcap}/tidb:${TIDB_VERSION:-v8.5.8}
+    restart: unless-stopped
+    command:
+      - --store=tikv
+      - --path=pd:2379
+      - --advertise-address=tidb
+    depends_on: [tikv]
+
+  dsh-ee:
+    environment:
+      DSH_EE_DSN: root:@tcp(tidb:4000)/dsh_ee
+    depends_on: [tidb]
+
+volumes:
+  tidb-data:

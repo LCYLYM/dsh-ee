@@ -1,0 +1,26 @@
+# dsh-ee 本体。单独使用时连接已有的数据库（DSH_EE_DSN 写在 .env 里）；
+# 和 compose.tidb.yml / compose.oceanbase.yml 叠加使用时，数据库也一起起：
+#
+#   docker compose -f compose.yml -f compose.tidb.yml up -d
+#   docker compose -f compose.yml -f compose.oceanbase.yml up -d
+#
+# 首次部署用 ./install.sh，它会生成 .env（主密钥与管理员密码）。
+name: dsh-ee
+
+services:
+  dsh-ee:
+    image: ${DSH_EE_IMAGE:-dsh-ee:latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DSH_EE_ADDR: 0.0.0.0:8080
+      DSH_EE_DATA_DIR: /data
+      # 数据库容器第一次启动要几分钟（OceanBase 约 5 分钟），这段时间内反复重试
+      DSH_EE_DB_WAIT: ${DSH_EE_DB_WAIT:-15m}
+    ports:
+      - "${DSH_EE_PORT:-8080}:8080"
+    volumes:
+      - dsh-ee-data:/data
+
+volumes:
+  dsh-ee-data:

@@ -1,0 +1,128 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TIDB_IMAGE: pingcap/tidb:v8.5.8
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+        working-directory: web
+      # tsc + vite build；缺英文翻译的键会在这里报错
+      - run: pnpm build
+        working-directory: web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          retention-days: 3
+
+  server:
+    runs-on: ubuntu-latest
+    services:
+      tidb:
+        image: pingcap/tidb:v8.5.8
+        ports: ["4000:4000"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - name: 等待 TiDB
+        run: |
+          for i in $(seq 1 60); do mysql -h127.0.0.1 -P4000 -uroot -e 'select 1' >/dev/null 2>&1 && exit 0; sleep 2; done
+          echo "TiDB 没起来" && exit 1
+      - run: go vet ./...
+        working-directory: server
+      - run: go test -count=1 ./...
+        working-directory: server
+        env:
+          DSH_EE_TEST_DSN: root:@tcp(127.0.0.1:4000)/
+
+  e2e:
+    needs: web
+    runs-on: ubuntu-latest
+    services:
+      tidb:
+        image: pingcap/tidb:v8.5.8
+        ports: ["4000:4000"]
+    env:
+      ADMIN_PW: e2e-admin-password-1
+      E2E_BASE: http://127.0.0.1:8080
+      CHROME: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: server/internal/webui/build
+      - name: 构建单文件服务端
+        working-directory: server
+        run: CGO_ENABLED=0 go build -trimpath -ldflags "-X main.version=${GITHUB_SHA::8}" -o ../dist/dsh-ee ./cmd/dsh-ee
+      - name: 等待 TiDB
+        run: |
+          for i in $(seq 1 60); do mysql -h127.0.0.1 -P4000 -uroot -e 'select 1' >/dev/null 2>&1 && exit 0; sleep 2; done
+          exit 1
+      - name: 启动 dsh-ee
+        run: |
+          mkdir -p /tmp/dsh-ee
+          DSH_EE_DSN='root:@tcp(127.0.0.1:4000)/dsh_ee' \
+          DSH_EE_SECRET_KEY="$(openssl rand -base64 32)" \
+          DSH_EE_BOOTSTRAP_ADMIN_PASSWORD="$ADMIN_PW" \
+          DSH_EE_DATA_DIR=/tmp/dsh-ee/data \
+            nohup ./dist/dsh-ee > /tmp/dsh-ee/server.log 2>&1 &
+          for i in $(seq 1 60); do curl -fs "$E2E_BASE/healthz" && exit 0; sleep 1; done
+          cat /tmp/dsh-ee/server.log && exit 1
+      - run: npm ci --no-audit --no-fund
+        working-directory: e2e
+      - run: node run.mjs
+        working-directory: e2e
+      - if: failure()
+        run: tail -200 /tmp/dsh-ee/server.log
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-shots
+          path: e2e/shots
+          retention-days: 7
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: 校验 compose 文件
+        working-directory: deploy
+        run: |
+          printf 'DSH_EE_SECRET_KEY=x\nOB_TENANT_PASSWORD=x\nOB_SYS_PASSWORD=x\n' > .env
+          docker compose -f compose.yml config -q
+          docker compose -f compose.yml -f compose.tidb.yml config -q
+          docker compose -f compose.yml -f compose.oceanbase.yml config -q
+          sh -n install.sh
+      - name: 构建镜像
+        run: docker build --build-arg VERSION="${GITHUB_SHA::8}" -t dsh-ee:ci .
+      - name: 镜像能启动（不连数据库，只看配置校验）
+        run: |
+          out="$(docker run --rm dsh-ee:ci version)"
+          echo "$out" && test "$out" = "${GITHUB_SHA::8}"

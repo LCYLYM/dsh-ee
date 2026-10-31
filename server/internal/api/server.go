@@ -9,10 +9,12 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/hikariming/dsh-ee/server/internal/rbac"
+	"github.com/hikariming/dsh-ee/server/internal/registry"
 	"github.com/hikariming/dsh-ee/server/internal/secret"
 	"github.com/hikariming/dsh-ee/server/internal/store"
 )
@@ -22,6 +24,20 @@ type Options struct {
 	SessionTTL   time.Duration
 	// 访问上游模型服务的客户端；测试里可替换。
 	Upstream *http.Client
+	// 构建版本，/healthz 返回。
+	Version string
+	// 嵌入的前端；为空时只提供接口（测试、或前端单独部署）。
+	Web http.Handler
+	// npm 源的数据目录（tarball、上游缓存）；为空时用临时目录（测试）。
+	DataDir string
+	// 对外地址，用于生成 tarball 下载地址；为空时按请求推断。
+	PublicURL string
+	// 访问上游 npm registry 与 dshfind 目录的客户端；测试里可替换。
+	NpmUpstream *http.Client
+	// 上游 packument 缓存时间，默认 5 分钟。
+	UpstreamTTL time.Duration
+	// dshfind 插件目录地址；为空时用默认的 api.dshfind.com。
+	FeedURL string
 }
 
 type Server struct {
@@ -31,6 +47,8 @@ type Server struct {
 	log      *slog.Logger
 	limiter  *loginLimiter
 	upstream *http.Client
+	registry *registry.Service
+	settings settingsCache
 }
 
 func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Server {
@@ -46,12 +64,56 @@ func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Serv
 			MaxIdleConnsPerHost:   32,
 		}}
 	}
-	return &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), upstream: up}
+	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), upstream: up}
+	s.registry = s.newRegistry()
+	return s
+}
+
+// newRegistry 初始化 npm 源。数据目录建不了时 npm 相关接口返回 503，其余功能不受影响。
+func (s *Server) newRegistry() *registry.Service {
+	dir := s.opts.DataDir
+	if dir == "" {
+		var err error
+		if dir, err = os.MkdirTemp("", "dsh-ee-data-"); err != nil {
+			s.log.Error("创建临时数据目录失败", "err", err)
+			return nil
+		}
+	}
+	hc := s.opts.NpmUpstream
+	if hc == nil {
+		hc = &http.Client{Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			ResponseHeaderTimeout: time.Minute,
+			IdleConnTimeout:       90 * time.Second,
+			MaxIdleConnsPerHost:   16,
+		}}
+	}
+	ttl := s.opts.UpstreamTTL
+	if ttl == 0 {
+		ttl = 5 * time.Minute
+	}
+	blobs, err := registry.NewBlobs(dir)
+	if err != nil {
+		s.log.Error("npm 源不可用", "err", err)
+		return nil
+	}
+	up, err := registry.NewUpstream(hc, dir, ttl)
+	if err != nil {
+		s.log.Error("npm 源不可用", "err", err)
+		return nil
+	}
+	svc := registry.NewService(s.store, blobs, up, s.appSettings, s.log)
+	if s.opts.FeedURL != "" {
+		svc.FeedURL = s.opts.FeedURL
+	}
+	return svc
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]string{"status": "ok"}) })
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]string{"status": "ok", "version": s.opts.Version})
+	})
 
 	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
 	mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
@@ -108,9 +170,59 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/admin/keys", perm(s.handleIssueKey, rbac.KeysManage))
 	mux.Handle("DELETE /api/admin/keys/{id}", perm(s.handleRevokeKey, rbac.KeysManage))
 
+	// 系统设置：登录即可读（前端要用组织名、作用域、评分开关），按段落校验写权限
+	mux.Handle("GET /api/settings", user(s.handleGetSettings))
+	mux.Handle("PUT /api/admin/settings", perm(s.handlePutSettings, rbac.SettingsManage, rbac.RegistryManage, rbac.UpstreamManage))
+
+	// 能力市场与发布（员工）
+	mux.Handle("GET /api/catalog", perm(s.handleCatalog, rbac.PortalView))
+	mux.Handle("GET /api/catalog/{name...}", perm(s.handleCatalogDetail, rbac.PortalView))
+	mux.Handle("GET /api/me/packages", perm(s.handleMyPackages, rbac.RegistryPublish))
+	mux.Handle("POST /api/me/packages", perm(s.handleUploadPackage, rbac.RegistryPublish))
+	mux.Handle("POST /api/me/import-requests", perm(s.handleImportRequest, rbac.RegistryPublish))
+	mux.Handle("GET /api/me/npm-tokens", perm(s.handleMyNpmTokens, rbac.RegistryUse, rbac.RegistryPublish))
+	mux.Handle("POST /api/me/npm-tokens", perm(s.handleCreateMyNpmToken, rbac.RegistryUse, rbac.RegistryPublish))
+	mux.Handle("DELETE /api/me/npm-tokens/{id}", perm(s.handleRevokeMyNpmToken, rbac.RegistryUse, rbac.RegistryPublish))
+
+	// 能力管理与审核
+	mux.Handle("GET /api/admin/packages", perm(s.handleAdminPackages, rbac.PluginsManage, rbac.RegistryManage, rbac.DashboardView))
+	mux.Handle("GET /api/admin/packages/{name...}", perm(s.handleAdminPackageDetail, rbac.PluginsManage, rbac.RegistryManage))
+	mux.Handle("PATCH /api/admin/packages/{name...}", perm(s.handlePatchPackage, rbac.PluginsManage))
+	mux.Handle("GET /api/admin/review", perm(s.handleReviewQueue, rbac.PluginsManage))
+	mux.Handle("POST /api/admin/review", perm(s.handleReview, rbac.PluginsManage))
+	mux.Handle("GET /api/admin/tarball", perm(s.handleAdminTarball, rbac.PluginsManage))
+
+	// npm 源与上游预载
+	mux.Handle("GET /api/admin/registry", perm(s.handleRegistryOverview, rbac.RegistryManage, rbac.UpstreamManage, rbac.DashboardView))
+	mux.Handle("POST /api/admin/registry/check", perm(s.handleRegistryCheck, rbac.RegistryManage))
+	mux.Handle("GET /api/admin/npm-tokens", perm(s.handleAllNpmTokens, rbac.RegistryManage))
+	mux.Handle("DELETE /api/admin/npm-tokens/{id}", perm(s.handleRevokeNpmToken, rbac.RegistryManage))
+	mux.Handle("GET /api/admin/upstream/feed", perm(s.handleUpstreamFeed, rbac.UpstreamManage))
+	mux.Handle("POST /api/admin/upstream/sync", perm(s.handleUpstreamSync, rbac.UpstreamManage))
+	mux.Handle("GET /api/admin/upstream/jobs", perm(s.handleListJobs, rbac.UpstreamManage))
+	mux.Handle("GET /api/admin/upstream/jobs/{id}", perm(s.handleGetJob, rbac.UpstreamManage))
+	mux.Handle("POST /api/admin/upstream/check-updates", perm(s.handleCheckUpdates, rbac.UpstreamManage))
+	mux.Handle("GET /api/admin/upstream/export", perm(s.handleExportBundle, rbac.UpstreamManage))
+	mux.Handle("POST /api/admin/upstream/import", perm(s.handleImportBundle, rbac.UpstreamManage))
+
+	// npm 协议与 DSH 插件索引
+	mux.HandleFunc("/npm/", s.handleNpm)
+	mux.HandleFunc("GET /index/dsh-index.json", s.handleDshIndex)
+	mux.HandleFunc("GET /setup.sh", s.handleSetupSh)
+	mux.HandleFunc("GET /setup.ps1", s.handleSetupPs1)
+
 	// OpenAI 兼容网关，用个人 key 鉴权
 	mux.HandleFunc("GET /v1/models", s.handleModels)
 	mux.HandleFunc("POST /v1/chat/completions", s.handleChatCompletions)
+
+	// 没匹配上的接口返回 JSON 404，不要落到前端的 index.html
+	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { writeErr(w, http.StatusNotFound, "接口不存在") })
+	mux.HandleFunc("/v1/", func(w http.ResponseWriter, r *http.Request) {
+		writeOpenAIErr(w, http.StatusNotFound, "invalid_request_error", "not_found", "接口不存在")
+	})
+	if s.opts.Web != nil {
+		mux.Handle("/", s.opts.Web)
+	}
 
 	return s.logRequests(mux)
 }
@@ -213,3 +325,25 @@ func currentAccess(r *http.Request) *rbac.Access {
 }
 
 func notFound(err error) bool { return errors.Is(err, store.ErrNotFound) }
+
+// RunBackground 跑定时任务：每 6 小时检查已预载插件的新版本（按系统设置自动同步或进入审核）。
+func (s *Server) RunBackground(ctx context.Context) {
+	if s.registry == nil {
+		return
+	}
+	t := time.NewTicker(6 * time.Hour)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			j, err := s.registry.CheckUpdates(ctx, 0)
+			if err != nil {
+				s.log.Warn("检查上游新版本失败", "err", err)
+			} else if j != nil {
+				s.log.Info("发现上游新版本，已开始同步", "job", j.ID, "count", j.Total)
+			}
+		}
+	}
+}

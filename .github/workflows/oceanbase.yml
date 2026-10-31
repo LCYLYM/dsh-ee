@@ -1,0 +1,42 @@
+# 在 OceanBase 上跑一遍 Go 集成测试和浏览器端到端测试。
+# OceanBase 单机 mini 模式要 6 GB 内存，所以不随每次推送跑：手动触发或每周一次。
+# 默认 GitHub 托管的 ubuntu-latest；内存不够时在 runner 参数里填更大的 runner 标签（或自托管 runner）。
+name: oceanbase
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: runner 标签
+        default: ubuntu-latest
+      ob_image:
+        description: OceanBase 镜像
+        default: oceanbase/oceanbase-ce:4.3.5-lts
+  schedule:
+    - cron: "0 18 * * 0"
+
+jobs:
+  test:
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    env:
+      OB_IMAGE: ${{ inputs.ob_image || 'oceanbase/oceanbase-ce:4.3.5-lts' }}
+      CHROME: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: free -h && nproc
+      - run: scripts/test-oceanbase.sh
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-shots-oceanbase
+          path: e2e/shots
+          retention-days: 7

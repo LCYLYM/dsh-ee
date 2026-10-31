@@ -1,8 +1,8 @@
 /** 插件在私有市场里的来源：从上游（dshfind / npm）预载，或企业员工内部发布。 */
 export type PluginOrigin = "upstream" | "internal";
 
-/** 审核状态：pending 待审 / approved 已上架 / rejected 已驳回 / yanked 已下架。 */
-export type PluginStatus = "pending" | "approved" | "rejected" | "yanked";
+/** 审核状态（与 npm 源一致）：pending 待审 / published 已上架 / rejected 已驳回 / unpublished 已下架。 */
+export type PluginStatus = "pending" | "published" | "rejected" | "unpublished";
 
 export type Visibility = "company" | "department" | "private";
 
@@ -39,20 +39,16 @@ export interface Plugin {
   offlineReady: boolean;
   hasInstallScript: boolean;
   status: PluginStatus;
+  /** 企业托管包的负责人（用户名）。 */
+  owner?: string;
+  /** 待审核的版本数（管理端）。 */
+  pending?: number;
   visibility?: Visibility;
   department?: string;
   /** 员工评分（1-5），仅在开启员工评分时展示。 */
   rating?: number;
   ratingCount?: number;
   submittedAt?: number;
-}
-
-export type ScanLevel = "pass" | "warn" | "fail";
-
-export interface ScanItem {
-  label: string;
-  level: ScanLevel;
-  detail: string;
 }
 
 export type ReleaseChannel = "stable" | "alpha" | "legacy";
@@ -112,15 +108,6 @@ export interface Settings {
     /** 安装（读取）也要求令牌；关闭后只有发布需要令牌。 */
     requireToken: boolean;
   };
-}
-
-export interface RegistryToken {
-  id: string;
-  name: string;
-  owner: string;
-  access: "read" | "publish";
-  createdAt: string;
-  lastUsed: string;
 }
 
 /** 基于 DSH 运行的企业微应用：界面由 dsh-ee 托管，推理与工具调用交给员工本机 DSH。 */

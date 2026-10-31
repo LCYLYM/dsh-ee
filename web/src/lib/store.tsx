@@ -1,12 +1,16 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { initialPlugins, initialReleases, initialTokens } from "../mock/data";
-import type { DshRelease, Plugin, PluginStatus, RegistryToken, Settings } from "./types";
+import { initialReleases } from "../mock/data";
+import { api, toPlugin } from "./api";
+import { useAuth } from "./auth";
+import type { DshRelease, Plugin, Settings } from "./types";
+import i18n from "../i18n";
 
+/** 与服务端 store.DefaultSettings 一致；登录前、或接口还没返回时用它。 */
 export const defaultSettings: Settings = {
-  orgName: "ACME 科技",
-  baseUrl: "https://dsh.acme.internal",
-  scope: "@acme",
+  orgName: "",
+  baseUrl: "",
+  scope: "@company",
   admissionMode: "allowlist",
   scoring: {
     enabled: true,
@@ -26,72 +30,112 @@ export const defaultSettings: Settings = {
     allowAlpha: false,
     allowCommunityDesktop: true,
   },
-  auth: "ldap",
+  auth: "local",
   registry: {
-    proxyMode: "preloaded",
-    extraScopes: ["@acme-data"],
+    proxyMode: "cache",
+    extraScopes: [],
     requireToken: true,
   },
 };
 
-const SETTINGS_KEY = "dsh-ee:settings";
-
-function loadSettings(): Settings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return defaultSettings;
-    const saved = JSON.parse(raw) as Partial<Settings>;
-    // 逐段合并：原型迭代中新增的字段不会因为旧存档缺失而变成 undefined
-    return {
-      ...defaultSettings,
-      ...saved,
-      scoring: { ...defaultSettings.scoring, ...saved.scoring },
-      upstream: { ...defaultSettings.upstream, ...saved.upstream },
-      distribution: { ...defaultSettings.distribution, ...saved.distribution },
-      registry: { ...defaultSettings.registry, ...saved.registry },
-    };
-  } catch {
-    return defaultSettings;
-  }
-}
-
 interface Store {
+  /** 系统设置（服务端）；修改后约 0.6 秒合并保存。 */
   settings: Settings;
   updateSettings: (patch: (s: Settings) => Settings) => void;
   resetSettings: () => void;
+  /** 员工可见的已上架能力（/api/catalog）。 */
   plugins: Plugin[];
-  setStatus: (name: string, status: PluginStatus) => void;
-  addPlugin: (p: Plugin) => void;
+  pluginsLoading: boolean;
+  reloadPlugins: () => void;
+  /** 审核队列里的版本数（有审核权限时）。 */
+  pendingCount: number;
+  reloadPending: () => void;
+  /** 员工访问 dsh-ee 的地址：设置里填了就用它，否则用当前页面地址。 */
+  baseUrl: string;
   releases: DshRelease[];
   setRecommended: (product: DshRelease["product"], distro: string, version: string) => void;
   toggleMirrored: (distro: string, version: string) => void;
-  tokens: RegistryToken[];
-  createToken: (name: string, access: RegistryToken["access"]) => string;
-  revokeToken: (id: string) => void;
   notify: (msg: string) => void;
 }
 
 const Ctx = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<Settings>(loadSettings);
-  const [plugins, setPlugins] = useState<Plugin[]>(initialPlugins);
+  const { user, can } = useAuth();
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [plugins, setPlugins] = useState<Plugin[]>([]);
+  const [pluginsLoading, setPluginsLoading] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
   const [releases, setReleases] = useState<DshRelease[]>(initialReleases);
-  const [tokens, setTokens] = useState<RegistryToken[]>(initialTokens);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latest = useRef(settings);
+  latest.current = settings;
+
+  const userId = user?.id ?? 0;
+  const canPortal = can("portal.view");
+  const canReview = can("plugins.manage");
 
   useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  }, [settings]);
+    if (!userId) return;
+    api.settings().then(setSettings, () => {});
+  }, [userId]);
 
+  const reloadPlugins = useCallback(() => {
+    if (!userId || !canPortal) {
+      setPlugins([]);
+      setPluginsLoading(false);
+      return;
+    }
+    setPluginsLoading(true);
+    api
+      .catalog()
+      .then((cs) => setPlugins(cs.map(toPlugin)))
+      .catch(() => setPlugins([]))
+      .finally(() => setPluginsLoading(false));
+  }, [userId, canPortal]);
+
+  const reloadPending = useCallback(() => {
+    if (!userId || !canReview) {
+      setPendingCount(0);
+      return;
+    }
+    api.reviewQueue().then((q) => setPendingCount(q.length), () => {});
+  }, [userId, canReview]);
+
+  useEffect(reloadPlugins, [reloadPlugins]);
+  useEffect(reloadPending, [reloadPending]);
+
+  const save = useCallback((next: Settings) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      api.saveSettings(next).then(
+        (saved) => {
+          // 期间又改了别的就不覆盖，等下一次保存
+          if (latest.current === next) setSettings(saved);
+        },
+        (e: Error) => toast(i18n.t("registry.settingsSaveFailed", { msg: e.message })),
+      );
+    }, 600);
+  }, []);
 
   const store: Store = {
     settings,
-    updateSettings: (patch) => setSettings((s) => patch(s)),
-    resetSettings: () => setSettings(defaultSettings),
+    updateSettings: (patch) =>
+      setSettings((s) => {
+        const next = patch(s);
+        save(next);
+        return next;
+      }),
+    resetSettings: () => {
+      setSettings(defaultSettings);
+      save(defaultSettings);
+    },
     plugins,
-    setStatus: (name, status) =>
-      setPlugins((ps) => ps.map((p) => (p.name === name ? { ...p, status } : p))),
-    addPlugin: (p) => setPlugins((ps) => [p, ...ps.filter((x) => x.name !== p.name)]),
+    pluginsLoading,
+    reloadPlugins,
+    pendingCount,
+    reloadPending,
+    baseUrl: (settings.baseUrl || window.location.origin).replace(/\/$/, ""),
     releases,
     setRecommended: (product, distro, version) =>
       setReleases((rs) =>
@@ -105,14 +149,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setReleases((rs) =>
         rs.map((r) => (r.distro === distro && r.version === version ? { ...r, mirrored: !r.mirrored } : r)),
       ),
-    tokens,
-    createToken: (name, access) => {
-      const id = Math.random().toString(36).slice(2, 10);
-      setTokens((ts) => [{ id, name, owner: "zhang.wei", access, createdAt: "2026-10-26", lastUsed: "从未" }, ...ts]);
-      // 原型：明文令牌只在创建时展示一次
-      return `ee_${access === "publish" ? "pub" : "tok"}_${id}${Math.random().toString(36).slice(2, 14)}`;
-    },
-    revokeToken: (id) => setTokens((ts) => ts.filter((t) => t.id !== id)),
     notify: (msg) => void toast(msg),
   };
 

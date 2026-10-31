@@ -1,4 +1,4 @@
-/** 管理总览、运营数据、能力管理、审核队列（模拟数据页面）。 */
+/** 管理总览、运营数据（模拟数据）、能力管理与审核队列。 */
 export default {
   dashboard: {
     title: "总览",
@@ -73,7 +73,6 @@ export default {
     colVersion: "版本",
     colInstalls: "安装",
     colScore: "评分",
-    colRating: "员工评分",
     colSize: "体积",
     colStatus: "状态",
     upstream: "上游",
@@ -94,10 +93,7 @@ export default {
     upstreamVersion: "上游新版本",
     warnings: "{{count}} 项警告",
     author: "作者 {{name}}",
-    deptOnly: "仅本部门",
-    selfOnly: "仅自己",
     autoChecks: "自动检查",
-    deps: "依赖闭包 {{count}} 个包 · {{size}}",
     commentPlaceholder: "审核意见（驳回时必填，会通知提交人）",
     approve: "通过并上架",
     reject: "驳回",

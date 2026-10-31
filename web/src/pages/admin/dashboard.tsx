@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { ArrowRight } from "lucide-react";
-import { auditLog, clientPlatforms, execTrend, kindOf, microApps } from "../../mock/data";
+import { auditLog, clientPlatforms, execTrend, microApps } from "../../mock/data";
+import { kindOf } from "../../lib/catalog";
 import { useStore } from "../../lib/store";
 import type { AuditEvent, PluginKind } from "../../lib/types";
 import { BarList, DailyBars } from "../../components/charts";
@@ -62,7 +63,7 @@ function KeyValue({ rows }: { rows: [string, React.ReactNode][] }) {
 export default function AdminDashboard() {
   const { t } = useTranslation();
   const { plugins, releases, settings } = useStore();
-  const approved = plugins.filter((p) => p.status === "approved");
+  const approved = plugins.filter((p) => p.status === "published");
   const pending = plugins.filter((p) => p.status === "pending");
   const count = (s: string) => plugins.filter((p) => p.status === s).length;
 

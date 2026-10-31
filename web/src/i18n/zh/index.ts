@@ -11,6 +11,7 @@ import market from "./market";
 import portal from "./portal";
 import keys from "./keys";
 import auth from "./auth";
+import registry from "./registry";
 
 /** 中文文案（源语言）。按页面分模块，这里合并成一棵树。 */
 export default {
@@ -27,4 +28,5 @@ export default {
   ...portal,
   ...keys,
   ...auth,
+  ...registry,
 };

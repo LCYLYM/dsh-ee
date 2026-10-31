@@ -1,5 +1,6 @@
 /** 与 server/ 对接的接口层。类型与 server/internal/store 的 JSON 字段一一对应。 */
 import i18n from "../i18n";
+import type { Plugin, PluginKind, PluginStatus, Settings } from "./types";
 
 export interface RoleRef {
   id: number;
@@ -131,6 +132,202 @@ export interface ApiKey {
   month_tokens: number;
 }
 
+// ---- npm 源与能力 ----
+
+/** 自动检查的一项：key 与 params 交给 i18n 渲染（registry.scan.*）。 */
+export interface ScanItem {
+  key: string;
+  level: "pass" | "warn" | "fail";
+  params?: Record<string, string | number>;
+}
+
+/** 能力列表里的一项（server/internal/api/catalog.go 的 catalogItem）。 */
+export interface CatalogPlugin {
+  name: string;
+  title: string;
+  description: string;
+  author: string;
+  icon: string;
+  homepage: string;
+  repository: string;
+  category: string;
+  kind: string;
+  featured: boolean;
+  is_plugin: boolean;
+  origin: "internal" | "upstream";
+  stars: number | null;
+  score: number | null;
+  version: string;
+  published_at: string | null;
+  installs: number;
+  dep_count: number | null;
+  size: number;
+  closure_size: number | null;
+  offline_ready: boolean | null;
+  has_install_script: boolean;
+  status: PluginStatus;
+  pending: number;
+  owner: string;
+  owner_name: string;
+  department: string;
+  updated_at: string;
+}
+
+export interface PackageVersion {
+  name: string;
+  version: string;
+  integrity: string;
+  shasum: string;
+  size: number;
+  is_plugin: boolean;
+  has_install_script: boolean;
+  status: PluginStatus;
+  scan: ScanItem[] | null;
+  publisher_id: number | null;
+  publisher?: string;
+  review_note: string;
+  reviewed_by: number | null;
+  reviewer?: string;
+  reviewed_at: string | null;
+  deprecated: string | null;
+  created_at: string;
+  published_at: string | null;
+}
+
+export interface PackageDetail extends CatalogPlugin {
+  versions: PackageVersion[];
+  dist_tags: Record<string, string>;
+  scan: ScanItem[] | null;
+  readme: string;
+  engines: Record<string, string> | null;
+  peer_dependencies: Record<string, string> | null;
+  dependencies: Record<string, string> | null;
+  deprecated: string | null;
+}
+
+export interface ReviewItem extends PackageVersion {
+  package: CatalogPlugin;
+  publisher: string;
+  publisher_name: string;
+  department: string;
+  previous: string;
+  engines: Record<string, string> | null;
+  dependencies: Record<string, string> | null;
+  peer_dependencies: Record<string, string> | null;
+  scripts: Record<string, string> | null;
+}
+
+export type ReviewAction = "approve" | "reject" | "unpublish" | "restore";
+
+export interface MyPackage extends CatalogPlugin {
+  versions: PackageVersion[];
+}
+
+export interface NpmToken {
+  id: number;
+  user_id: number;
+  username: string;
+  name: string;
+  prefix: string;
+  access: "read" | "publish";
+  last_used_at: string | null;
+  created_at: string;
+}
+
+export interface RegistryOverview {
+  stats: {
+    hosted_packages: number;
+    upstream_packages: number;
+    upstream_plugins: number;
+    versions: number;
+    pending: number;
+    storage_bytes: number;
+    downloads_30d: number;
+  };
+  scopes: string[];
+  upstream: string;
+  proxying: boolean;
+  registry_url: string;
+  index_url: string;
+}
+
+export interface SyncJob {
+  id: number;
+  kind: "preload" | "request" | "update" | "import";
+  status: "running" | "succeeded" | "partial" | "failed" | "interrupted";
+  total: number;
+  done: number;
+  failed: number;
+  bytes: number;
+  log: string;
+  created_at: string;
+  finished_at: string | null;
+}
+
+export interface FeedPlugin {
+  name: string;
+  title?: string;
+  description?: string;
+  author?: string;
+  icon?: string;
+  homepage?: string;
+  repository?: string;
+  category?: string;
+  featured?: boolean;
+  stars?: number;
+  score?: number;
+  version?: string;
+  published_at?: number;
+  local_version: string;
+  local_status: PluginStatus | "";
+  dep_count: number | null;
+  closure_size: number | null;
+  offline_ready: boolean | null;
+}
+
+export interface ImportResult {
+  packages: number;
+  added: number;
+  existing: number;
+  pending: number;
+  skipped: string[];
+}
+
+const kinds: PluginKind[] = ["skill", "connector", "knowledge", "plugin"];
+
+/** 接口里的能力 → 页面组件用的 Plugin。 */
+export function toPlugin(c: CatalogPlugin): Plugin {
+  const t = c.published_at ?? c.updated_at;
+  return {
+    name: c.name,
+    title: c.title || c.name,
+    description: c.description,
+    author: c.origin === "internal" ? c.owner_name || c.owner || c.author : c.author,
+    icon: c.icon || null,
+    homepage: c.homepage || null,
+    repository: c.repository || null,
+    category: c.category,
+    kind: kinds.includes(c.kind as PluginKind) ? (c.kind as PluginKind) : undefined,
+    featured: c.featured,
+    stars: c.stars ?? 0,
+    score: c.score,
+    version: c.version,
+    publishedAt: t ? Math.floor(new Date(t).getTime() / 1000) : 0,
+    origin: c.origin,
+    installs: c.installs,
+    depCount: c.dep_count ?? 0,
+    sizeKb: Math.round((c.closure_size ?? c.size) / 1024),
+    offlineReady: c.offline_ready ?? !c.has_install_script,
+    hasInstallScript: c.has_install_script,
+    status: c.status,
+    department: c.department || undefined,
+    owner: c.owner || undefined,
+    pending: c.pending,
+  };
+}
+
+const encName = (name: string) => encodeURIComponent(name);
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -146,14 +343,19 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
   onUnauthorized = fn;
 }
 
-async function request<T>(method: string, path: string, body?: unknown, opts: { silent401?: boolean } = {}): Promise<T> {
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  opts: { silent401?: boolean; raw?: { body: Blob | ArrayBuffer; type: string } } = {},
+): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
       method,
       credentials: "same-origin",
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: opts.raw ? { "Content-Type": opts.raw.type } : body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: opts.raw ? opts.raw.body : body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
     throw new ApiError(0, i18n.t("api.unreachable"));
@@ -244,7 +446,66 @@ export const api = {
   issueKey: (k: { user_id: number; name: string; expires_at?: string }) =>
     request<{ key: string; api_key: ApiKey }>("POST", "/api/admin/keys", k),
   revokeKey: (id: number) => request<void>("DELETE", `/api/admin/keys/${id}`),
+
+  /** 系统设置：未登录时返回 401（静默），调用方保留默认值。 */
+  settings: () => request<Settings>("GET", "/api/settings", undefined, { silent401: true }),
+  saveSettings: (s: Settings) => request<Settings>("PUT", "/api/admin/settings", s),
+
+  catalog: () => request<{ plugins: CatalogPlugin[] }>("GET", "/api/catalog").then((r) => r.plugins),
+  catalogDetail: (name: string) => request<PackageDetail>("GET", `/api/catalog/${encName(name)}`),
+  myPackages: () => request<{ packages: MyPackage[] }>("GET", "/api/me/packages").then((r) => r.packages),
+  /** 网页发布：请求体就是 npm pack 生成的 .tgz。 */
+  uploadPackage: (file: Blob, tag?: string) =>
+    request<{ name: string; version: string; status: PluginStatus; created: boolean }>(
+      "POST",
+      `/api/me/packages${tag ? `?tag=${encodeURIComponent(tag)}` : ""}`,
+      undefined,
+      { raw: { body: file, type: "application/octet-stream" } },
+    ),
+  requestImport: (r: { name: string; version?: string; reason: string }) => request<SyncJob>("POST", "/api/me/import-requests", r),
+
+  myNpmTokens: () => request<{ tokens: NpmToken[] }>("GET", "/api/me/npm-tokens").then((r) => r.tokens),
+  createNpmToken: (t: { name: string; access: "read" | "publish" }) =>
+    request<{ token: string; info: NpmToken }>("POST", "/api/me/npm-tokens", t),
+  revokeMyNpmToken: (id: number) => request<void>("DELETE", `/api/me/npm-tokens/${id}`),
+  allNpmTokens: () => request<{ tokens: NpmToken[] }>("GET", "/api/admin/npm-tokens").then((r) => r.tokens),
+  revokeNpmToken: (id: number) => request<void>("DELETE", `/api/admin/npm-tokens/${id}`),
+
+  adminPackages: () => request<{ plugins: CatalogPlugin[] }>("GET", "/api/admin/packages").then((r) => r.plugins),
+  adminPackage: (name: string) => request<PackageDetail>("GET", `/api/admin/packages/${encName(name)}`),
+  patchPackage: (name: string, p: Partial<{ title: string; description: string; category: string; kind: string; icon: string; featured: boolean }>) =>
+    request<PackageDetail>("PATCH", `/api/admin/packages/${encName(name)}`, p),
+  reviewQueue: () => request<{ items: ReviewItem[] }>("GET", "/api/admin/review").then((r) => r.items),
+  review: (r: { name: string; version?: string; action: ReviewAction; note?: string }) =>
+    request<{ changed: number }>("POST", "/api/admin/review", { version: "", note: "", ...r }),
+  tarballUrl: (name: string, version: string) => `/api/admin/tarball?name=${encName(name)}&version=${encodeURIComponent(version)}`,
+
+  registryOverview: () => request<RegistryOverview>("GET", "/api/admin/registry"),
+  checkRegistry: () =>
+    request<{ ok: boolean; latency_ms?: number; status?: number; message?: string; upstream?: string }>("POST", "/api/admin/registry/check"),
+
+  upstreamFeed: (refresh = false) =>
+    request<{ plugins: FeedPlugin[]; fetched_at?: string; error?: string; disabled?: boolean }>(
+      "GET",
+      `/api/admin/upstream/feed${refresh ? "?refresh=1" : ""}`,
+    ),
+  syncUpstream: (names: string[], publish: boolean) => request<SyncJob>("POST", "/api/admin/upstream/sync", { names, publish }),
+  jobs: () => request<{ jobs: SyncJob[] }>("GET", "/api/admin/upstream/jobs").then((r) => r.jobs),
+  job: (id: number) => request<SyncJob>("GET", `/api/admin/upstream/jobs/${id}`),
+  checkUpdates: () => request<{ job: SyncJob | null }>("POST", "/api/admin/upstream/check-updates").then((r) => r.job),
+  exportUrl: (since?: string) => `/api/admin/upstream/export${since ? `?since=${encodeURIComponent(since)}` : ""}`,
+  importBundle: (file: Blob) =>
+    request<{ result?: ImportResult; error?: string; job: SyncJob }>("POST", "/api/admin/upstream/import", undefined, {
+      raw: { body: file, type: "application/x-tar" },
+    }),
 };
+
+export function formatBytes(n: number) {
+  if (n >= 1 << 30) return `${(n / (1 << 30)).toFixed(1)} GB`;
+  if (n >= 1 << 20) return `${(n / (1 << 20)).toFixed(1)} MB`;
+  if (n >= 1024) return `${Math.round(n / 1024)} KB`;
+  return `${n} B`;
+}
 
 export function keyState(k: ApiKey): "active" | "revoked" | "expired" {
   if (k.revoked_at) return "revoked";

@@ -7,4 +7,7 @@ require (
 	golang.org/x/crypto v0.58.0
 )
 
-require filippo.io/edwards25519 v1.2.0 // indirect
+require (
+	filippo.io/edwards25519 v1.2.0 // indirect
+	github.com/Masterminds/semver/v3 v3.5.0 // indirect
+)

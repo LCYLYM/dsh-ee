@@ -1,0 +1,12 @@
+.git
+.tools
+dist
+e2e/node_modules
+web/node_modules
+web/dist
+server/bin
+server/data
+server/.env.local
+server/internal/webui/build/*
+!server/internal/webui/build/.gitignore
+deploy/out

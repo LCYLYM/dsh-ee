@@ -15,8 +15,7 @@ import { Tip } from "@/components/tip";
 
 /** 个别页面在侧边栏上的附加状态（计数、已关闭、按设置隐藏），按 page_key 挂接。 */
 function useNavExtras() {
-  const { plugins, settings } = useStore();
-  const pending = plugins.filter((p) => p.status === "pending").length;
+  const { pendingCount: pending, settings } = useStore();
   return (pageKey: string): { count?: number; off?: boolean; hidden?: boolean } => {
     switch (pageKey) {
       case "admin-review":

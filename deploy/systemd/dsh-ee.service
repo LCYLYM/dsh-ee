@@ -1,0 +1,24 @@
+# 不用 docker 时的部署方式：
+#   install -m 755 dsh-ee /usr/local/bin/dsh-ee
+#   useradd --system --home /var/lib/dsh-ee --create-home dsh-ee
+#   install -d -m 700 /etc/dsh-ee && install -m 600 dsh-ee.env.example /etc/dsh-ee/dsh-ee.env  # 再编辑
+#   cp dsh-ee.service /etc/systemd/system/ && systemctl enable --now dsh-ee
+[Unit]
+Description=dsh-ee
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=dsh-ee
+EnvironmentFile=/etc/dsh-ee/dsh-ee.env
+ExecStart=/usr/local/bin/dsh-ee
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dsh-ee
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
