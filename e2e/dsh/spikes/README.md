@@ -51,3 +51,13 @@ npm test         # 全部场景
 | S7 | **部分通过** | 401 / 403 在无头 CLI 中均显示响应体里的中文 `/ee-login` 文案；Web 均改显 `API key is invalid`，需要插件在模型失败时补充提示。 |
 | S8 | **部分通过** | Web 能补全并执行 `/ee-login`，命令立即返回、后台任务继续，下一次模型请求使用 `Bearer token-two`；但页面未显示 CommandResult 文本、可点击链接或成功提示。rc.5 默认模板没有 TUI。 |
 | S9 | **通过** | `ctx.effect` 中导入 pending 文件后，首个模型请求即带 `Bearer token-pending`，文件被删除，无启动竞态。 |
+
+## 2026-11-01 第二轮复核（Linux）
+
+环境：Linux x86_64、Node 24.19.0、DSH 0.2.1-rc.5、Playwright 自带 Chromium（`CHROME=~/.cache/ms-playwright/chromium-*/chrome-linux*/chrome`）。全新的 `DSH_HOME` 在 Linux 上首页要求先选工作区，脚本会自动点仓库目录；仓库不在主目录下一层时用 `SPIKE_WORKSPACE_LABEL` 指定。
+
+| 场景 | 结果 | 实测行为 |
+|---|---|---|
+| S7-400 / S7-400-web | **通过** | 网关返回 400 + 中文 `error.message`：Web 原样显示文案（错误码 `INVALID_REQUEST`），CLI 同样显示，且不重试（假模型只收到 1 次请求）；`llm-pi-ai` 的 `headers` 配置生效，请求带 `X-DshEE-Client`。401 / 403 仍被 Web 显示为 `API key is invalid`（上游按错误文本里的 401/403 归类） |
+| S8-web | **通过** | 先跑一轮对话后再执行，`/ee-login`、`/ee-status` 的返回文本以命令记录显示在对话里；链接不可点击；后台登录完成无自动提示；下一次模型请求带 `Bearer token-two`。原脚本在尚无会话的首页执行，所以看不到结果 |
+| S9 | **通过** | 与 macOS 结果一致 |

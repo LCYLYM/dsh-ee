@@ -4,6 +4,8 @@
     providers:
       spike:
         apiKeyEnv: DSHEE_TOKEN
+        headers:
+          X-DshEE-Client: dsh-connect/spike
         api: openai-completions
         baseURL: !!js process.env.SPIKE_LLM_URL
         retryPolicy:

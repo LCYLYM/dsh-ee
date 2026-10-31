@@ -41,7 +41,11 @@ const scripts = {
     status: 403,
     body: { error: { code: 'token_expired', message: '企业账号登录已失效，在对话框输入 /ee-login 重新登录' } },
   }],
-  s8: [textResponse('S8 finished')],
+  's7-400': [{
+    status: 400,
+    body: { error: { message: '企业账号登录已失效，在对话框输入 /ee-login 重新登录', type: 'invalid_request_error', code: 'token_revoked' } },
+  }],
+  s8: [textResponse('S8 first turn'), textResponse('S8 finished')],
   s9: [textResponse('S9 finished')],
 }
 

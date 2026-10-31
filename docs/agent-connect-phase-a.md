@@ -44,8 +44,8 @@
 | 入口 | 场景 | 流程 |
 |---|---|---|
 | **E1 setup 脚本里登录**（首次接入） | 新员工、换电脑 | `setup.sh` / `setup.ps1` 发起设备码 → 终端显示确认码并打开浏览器 → 员工在网页上授权 → 脚本拿到令牌 → 写 `~/.npmrc`；把令牌放到**待导入文件** `$DSH_HOME/dsh-ee/token.pending`（0600）→ `dsh plugin add` 接入插件。DSH 启动时接入插件把它 `credentials.set('DSHEE_TOKEN', …)` 后删除文件 |
-| **E2 `/ee-login` 命令**（重新登录） | 令牌被吊销、过期，或换账号 | 在 DSH 对话框输入 `/ee-login` → 插件发起设备码、尽量自动打开浏览器，命令**立即返回**「请在浏览器确认，确认码 KQ7M-4XPD，链接 …」→ 插件后台轮询 → 成功后 `credentials.set`，下一次模型请求即用新令牌（S2）。另有 `/ee-status`（登录状态、账号、过期时间、插件版本）与 `/ee-logout` |
-| **E3 报错文案引导** | 令牌失效后员工第一次碰到问题 | 网关对失效令牌返回的错误消息写成「企业账号登录已失效，在对话框输入 /ee-login 重新登录」；`/api/dsh/*`、`/mcp` 同理。插件检测到失效时清掉凭据库里的旧值（仅当值与失败的令牌一致） |
+| **E2 `/ee-login` 命令**（重新登录） | 令牌被吊销、过期，或换账号 | 在**当前对话**里输入 `/ee-login` → 插件发起设备码并**自动打开浏览器**到确认页，命令**立即返回**「请在浏览器确认，确认码 KQ7M-4XPD，链接 …」（显示为对话里的一行命令记录）→ 插件后台轮询 → 成功后 `credentials.set`，下一次模型请求即用新令牌（S2）。浏览器确认页本身显示「已授权，回到 DSH 继续」，作为成功提示。另有 `/ee-status`（登录状态、账号、过期时间、插件版本）与 `/ee-logout` |
+| **E3 报错文案引导** | 令牌失效后员工第一次碰到问题 | 接入插件给 `llm-pi-ai` 提供方加请求头 `X-DshEE-Client: dsh-connect/<版本>`；网关识别到该头时，把令牌失效、无权限、额度用完等错误**改用 400** 返回，`error.message` 写「企业账号登录已失效，在对话框输入 /ee-login 重新登录」这类中文说明，DSH Web 会原样显示（S7 复核）。没有该头的其它客户端仍按 OpenAI 惯例返回 401 / 403 / 429。`/api/dsh/*`、`/mcp` 只有接入插件在调，直接用 401 + `code`，由插件处理。插件检测到失效时清掉凭据库里的旧值（仅当值与失败的令牌一致） |
 
 另：**E4 Web 客户端插件**（DSH Web 页面上的登录横幅 / 按钮）需要打包上游的客户端插件（`package.json` 的 `dsh.client` 字段），工作量和上游耦合都更大，放到阶段 D 视 S10 结果再定。
 
@@ -86,6 +86,17 @@ S7、S8、S9 决定 E1～E3 的细节，**阶段 A 编码前必须完成**；S5�
 
 A0 已完成：`server/internal/api/legacy_auth_test.go` 固化 9 类身份 × 8 个协议入口，包括 `sk-ee` 可访问 `/mcp`、key 级月度额度当前未参与限流等现状；TiDB 集成测试通过。
 
+### 第二轮复核（2026-11-01，Linux x86_64 + DSH 0.2.1-rc.5）
+
+在 Linux 上复现 S7、S8 并读了上游对应源码，两项都找到了可行路径，**结论由「部分通过」改为「通过（按调整后的方案）」**。脚本已更新（`npm run s7` 新增 `s7-400`、`s7-400-web`；`s8-web` 改为在已有对话里执行命令），可在 macOS 上重跑确认。
+
+| 编号 | 原因 | 复核结果 | 方案调整 |
+|---|---|---|---|
+| S7 | Web 的失败文案来自 `ui-chat` 的 `failureMessage`：错误码为 `AUTH` 时固定显示 `message.failure.auth`（API key is invalid），`QUOTA` 时固定显示「Request quota exhausted.」，其余错误码原样显示错误文本。而 `llm-pi-ai` 的 `classifyPiAiError` 是**按错误文本做正则**归类的：含 `401` / `403` → `AUTH`；含 `insufficient_quota`、`quota_exceeded` 等 → `QUOTA`；含 `429` → `RATE_LIMIT`（默认会重试） | 网关返回 **400** + `error.message` 中文文案：Web 显示「This turn failed 400: {"message":"企业账号登录已失效，在对话框输入 /ee-login 重新登录", …}」，错误码 `INVALID_REQUEST`，**不重试**（假模型只收到 1 次请求）；无头 CLI 同样显示。`llm-pi-ai` 的 `headers` 配置项生效，网关能收到 `X-DshEE-Client` | E3 改为「识别接入插件请求头 → 改用 400」。文案和 `code` **不能**含 `401`、`403`、`429`、`quota_exceeded`、`insufficient_quota`、`rate limit` 等会被上游正则命中的词；现有额度错误（429 + `insufficient_quota`）对接入插件也要改走这条路，否则员工只看到英文的「Request quota exhausted.」，分不清「没分配额度」和「本月用完」 |
+| S8 | 命令结果由 `ui-chat` 的 `GenericCommandCard` 渲染在**会话的对话流**里。原脚本在「New Session」首页（尚无会话）直接执行 `/ee-login`，命令执行了，但页面停留在首页，没有对话流可渲染 | 先跑一轮普通对话再执行：`/ee-login` 与 `/ee-status` 都以「ee-login · 请在浏览器确认，确认码 KQ7M-4XPD，链接 …」的命令行记录显示在对话里；链接是纯文本、不可点击；后台登录完成后没有自动提示，`/ee-status` 可确认；下一次模型请求带新令牌 | E2 保留。员工令牌失效时一定已在一个失败的对话里，命令结果可见；在空白首页执行时看不到结果，靠**插件自动打开浏览器**兜底（确认页即反馈）。多行文本会折叠成可展开的一行，所以返回文本保持单行。CLI（TUI）入口 rc.5 未提供，暂不验收 |
+
+由此，**E4（DSH Web 客户端插件）不再是阶段 A 的前置条件**，S10 继续保留为阶段 D 的可选项。
+
 ## 4. 任务拆分
 
 按依赖顺序排列，每个任务一个提交（或一个 PR），提交前跑完对应的测试。
@@ -111,6 +122,8 @@ A0 已完成：`server/internal/api/legacy_auth_test.go` 固化 9 类身份 × 8
 - `rbac` 包里给每个权限点登记所属 scope；`Access` 的求交函数放在 `rbac` 包，便于单测。
 - 替换四处鉴权：`authKey`（网关）、`dshAuth`、npm 源、`tokenAsKey`（删除）；会话鉴权不变。
 - 失效令牌统一返回 401，错误体 `{error, code}`；网关的 OpenAI 格式错误体里 `error.code` 用 `token_revoked / token_expired / token_invalid`，`error.message` 用 §2.2 E3 的文案。
+- **接入插件请求的错误改写**（S7 复核）：请求带 `X-DshEE-Client: dsh-connect/…` 时，网关把「令牌无效 / 吊销 / 过期」「没有调用大模型的权限」「模型不在允许范围」「额度未分配 / 本月用完 / 额度过期」统一改为 **400**、`type: invalid_request_error`，`code` 用 `dshee_login_required`、`dshee_forbidden`、`dshee_model_denied`、`dshee_no_allowance`、`dshee_monthly_limit_reached`（刻意避开上游正则），`message` 为中文说明且把最该做的事放在最前面（如「企业账号登录已失效，在对话框输入 /ee-login 重新登录」）。上游故障转发出来的 401 / 429 / 5xx 不改写（那是企业上游的问题，DSH 的重试逻辑应当生效）。
+- 单元测试 `gateway_dsh_errors_test.go`：把上游 `classifyPiAiError` 与 `isQuotaExceededError` 的正则抄进测试，断言上述每种错误体在带头时都不会被归为 `AUTH` / `QUOTA` / `RATE_LIMIT`，不带头时保持原状态码（与 A0 基线一致）。上游升级时对照更新这份正则。
 - 网关额度：账号额度检查之后再查令牌额度；`usage_logs` 写 `token_id`。
 - 跑 A0 基线，全部通过（有意改变的除外）。
 
@@ -161,7 +174,8 @@ A0 已完成：`server/internal/api/legacy_auth_test.go` 固化 9 类身份 × 8
   - `http.ts`：带令牌的 `fetch`；401 带 `token_*` → `invalidate`；网络错误重试策略。
   - `skills.ts`、`plugins.ts`：从现有 `index.js` 搬过来，改用 `http.ts`。
   - `bridge.ts`：MCP 桥（只接企业连接工具；`ee_*` 工具在阶段 B 才有），替换 `dsh-mcp-client` 那一行。工具名保持 `mcp__<serverName>__<tool>` 不变，避免员工已有的习惯与提示词失效（S5 确认这个名字在 `ctx.tools` 下合法）。
-- `connect.go`：`cordis.patch.yml` 去掉 `dsh-ee-mcp` 行；`llm-pi-ai` 提供方改为 `apiKeyEnv: DSHEE_TOKEN`；接入插件行加 `tokenRef`。内容哈希变化会自动发布新版本。
+- `connect.go`：`cordis.patch.yml` 去掉 `dsh-ee-mcp` 行；`llm-pi-ai` 提供方改为 `apiKeyEnv: DSHEE_TOKEN`，并加 `headers: {X-DshEE-Client: dsh-connect/<插件版本>}`（S7 复核）；接入插件行加 `tokenRef`。
+- `/ee-login`：命令返回文本保持单行（多行会被折叠）；发起后立即调用 `openBrowser`；同一进程内已有进行中的登录时返回同一个确认码，不再开新的浏览器页。内容哈希变化会自动发布新版本。
 - 单元测试 `dsh-plugin/test/`：假 `ctx`（credentials / commands / tools / on / effect）+ 假 dsh-ee（node http）：登录全流程、`slow_down`、超时、重复 `/ee-login`、失效清理（值已被换掉时不清）、`.npmrc` 只改一行、待导入文件导入后删除、桥在 `list_changed` 后增删工具。
 
 ### A7 setup 脚本（约 1 天）
@@ -233,7 +247,7 @@ A0 已完成：`server/internal/api/legacy_auth_test.go` 固化 9 类身份 × 8
 | 场景 | 步骤 | 断言 |
 |---|---|---|
 | A1 首次接入 | 隔离 `DSH_HOME`；运行 `setup.sh`（无参数）；脚本输出确认码后，测试代替人调用批准接口；启动 DSH 跑一轮对话 | `.credentials.yaml` 里有 `DSHEE_TOKEN`；`token.pending` 已删除；`.env` 里没有令牌；假模型收到的 Authorization 是新令牌；技能与连接工具出现在请求里 |
-| A2 重新登录 | 网页吊销该令牌 → 跑一轮对话（失败）→ `/ee-login` → 批准 → 再跑一轮 | 失败时展示的文案含 `/ee-login`（S7 决定断言方式）；不重启 DSH，第二轮成功且带新令牌；`.npmrc` 的令牌同步更新 |
+| A2 重新登录 | 网页吊销该令牌 → 跑一轮对话（失败）→ `/ee-login` → 批准 → 再跑一轮 | 失败时 Web 页面上显示的文案含 `/ee-login`（S7 复核：断言页面文本，不再只断言 CLI）；不重启 DSH，第二轮成功且带新令牌；`.npmrc` 的令牌同步更新 |
 | A3 旧方式兼容 | `setup.sh --token ee_npm_…` | 与改造前行为一致 |
 | A4 状态命令 | `/ee-status` | 显示账号、部门、范围、过期时间、插件版本、`.npmrc` 是否一致 |
 | A5 无头 / CI | 只设 `DSHEE_TOKEN` 环境变量（机器人令牌）跑无头任务 | 模型请求成功，用量记在机器人账号上 |
@@ -250,7 +264,9 @@ A0 已完成：`server/internal/api/legacy_auth_test.go` 固化 9 类身份 × 8
 
 | 项 | 说明 | 处理 |
 |---|---|---|
-| 命令执行完后的成功提示 | `CommandResult` 只返回一次，后台登录成功后可能没有界面提示 | S8 验证；不行则约定员工再输入 `/ee-status` 确认 |
+| 命令执行完后的成功提示 | `CommandResult` 只返回一次，后台登录成功后 DSH 里没有提示（S8 复核确认） | 浏览器确认页显示成功；员工可再输入 `/ee-status` 确认 |
+| 依赖上游的错误分类正则 | E3 的 400 改写依赖 `classifyPiAiError` 的现有行为 | 测试里固化正则；升级上游时重跑 `npm run s7` |
+| 空白首页执行命令看不到结果 | 命令结果只渲染在已有会话的对话流里 | 自动打开浏览器兜底；接入指南写明「在对话里输入 /ee-login」 |
 | 插件启动与首个模型请求的顺序 | 待导入令牌可能晚于首个请求写入 | S9 验证；最坏情况第一次请求失败并提示 `/ee-login` |
 | `.npmrc` 是全局 npm 配置 | 换令牌时改写员工的 `~/.npmrc` | 只改 `<registry>:_authToken` 一行；`/ee-status` 报告；有 `NPM_CONFIG_USERCONFIG` 时跟随 |
 | 上游 rc 版本变化 | `dsh-commands`、`credentials` 接口可能调整 | 接入插件只用 S1～S9 验证过的接口；升级上游前重跑 spikes 与 A1～A5 |

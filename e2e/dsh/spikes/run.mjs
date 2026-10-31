@@ -101,7 +101,24 @@ async function openPage(url) {
     await previewContinue.click({ force: true })
     await waitFor(async () => !(await previewContinue.isVisible()), 'preview notice dismissal', 10_000)
   }
+  await chooseWorkspace(page)
   return { browser, page }
+}
+
+// 全新的 DSH_HOME 在部分平台（实测 Linux）首页要求先选工作区，输入框才会出现。
+// 目录浏览器从用户主目录开始，点仓库所在的那一级目录名再「Open」；
+// 仓库不在主目录下一层时，用 SPIKE_WORKSPACE_LABEL 指定要点的目录名。
+async function chooseWorkspace(page) {
+  const chooser = page.getByText('Choose workspace', { exact: true })
+  try {
+    await chooser.waitFor({ state: 'visible', timeout: 3_000 })
+  } catch {
+    return
+  }
+  await chooser.click()
+  await page.getByText(process.env.SPIKE_WORKSPACE_LABEL ?? path.basename(repo), { exact: true }).click()
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await waitFor(() => page.locator('textarea:visible, [contenteditable=true]:visible').first().isVisible(), 'chat input after choosing workspace')
 }
 
 async function submitTask(page, task) {
@@ -225,8 +242,19 @@ async function runS7(work, fake, state, webMode) {
       const body = await page.locator('body').innerText()
       await page.screenshot({ path: path.join(work, 's7-error.png'), fullPage: true })
       fs.writeFileSync(path.join(work, 's7-error-body.txt'), body)
-      assert.ok(body.includes('API key is invalid'))
-      result = { status: 'pass', web: 'provider-message-masked', displayedMessage: 'API key is invalid', expectedMessageVisible: body.includes(expected) }
+      const masked = body.includes('API key is invalid')
+      const visible = body.includes(expected)
+      // 401 / 403：上游按错误文本里的 401/403 归为 AUTH，Web 固定显示 API key is invalid。
+      // 400（dsh-ee 对接入插件的请求改用 400）：Web 原样显示响应体里的文案。
+      if (webMode === '400') assert.ok(visible && !masked, 'S7-400 web should show the dsh-ee message')
+      else assert.ok(masked)
+      result = {
+        status: 'pass',
+        web: masked ? 'provider-message-masked' : 'provider-message-visible',
+        expectedMessageVisible: visible,
+        requests: fake.requests.length,
+        clientHeader: fake.requests[0]?.headers['x-dshee-client'] ?? null,
+      }
     } finally {
       await browser?.close()
       await stopWeb(web)
@@ -254,8 +282,12 @@ async function runS8Web(work, fake, state) {
     const completion = await page.locator('body').innerText()
     await page.screenshot({ path: path.join(work, 's8-completion.png'), fullPage: true })
     fs.writeFileSync(path.join(work, 's8-completion-body.txt'), completion)
+    await input.fill('')
+    // 命令结果卡片只渲染在已有会话的对话里：先跑一轮普通对话（员工令牌失效时也总是在一个失败的对话里）。
+    await submitTask(page, 'First turn before login')
+    await waitFor(async () => (await page.locator('body').innerText()).includes('S8 first turn'), 'first turn reply')
     await submitTask(page, '/ee-login')
-    await page.waitForTimeout(2000)
+    await waitFor(async () => (await page.locator('body').innerText()).includes('KQ7M-4XPD'), 'command result row', 10_000).catch(() => {})
     const commandBody = await page.locator('body').innerText()
     await page.screenshot({ path: path.join(work, 's8-command.png'), fullPage: true })
     fs.writeFileSync(path.join(work, 's8-command-body.txt'), commandBody)
@@ -266,19 +298,24 @@ async function runS8Web(work, fake, state) {
     const completed = events.findIndex((event) => event.type === 's8-background-completed')
     assert.ok(returned >= 0 && completed > returned)
     await submitTask(page, '/ee-status')
-    await page.waitForTimeout(500)
+    await waitFor(async () => (await page.locator('body').innerText()).includes('已登录'), 'status result row', 10_000).catch(() => {})
+    const statusBody = await page.locator('body').innerText()
+    await page.screenshot({ path: path.join(work, 's8-status.png'), fullPage: true })
     await submitTask(page, 'Run the model after login')
-    await waitFor(() => fake.requests.length >= 1, 'model request with rotated credential')
-    assert.equal(fake.requests[0].headers.authorization, 'Bearer token-two')
+    await waitFor(() => fake.requests.length >= 2, 'model request with rotated credential')
+    const last = fake.requests.at(-1).headers.authorization
+    assert.equal(last, 'Bearer token-two')
     const result = {
       status: 'pass',
       completion: completion.includes('ee-login'),
       commandReturnedBeforeCompletion: true,
       backgroundContinued: true,
       commandResultVisible: commandBody.includes('KQ7M-4XPD'),
+      statusResultVisible: statusBody.includes('已登录'),
       linkClickable,
-      successNoticeVisible: commandBody.includes('登录成功'),
-      nextRequestAuthorization: fake.requests[0].headers.authorization,
+      successNoticeVisible: statusBody.includes('登录成功'),
+      firstRequestAuthorization: fake.requests[0].headers.authorization,
+      nextRequestAuthorization: last,
     }
     fs.writeFileSync(path.join(work, 'result.json'), JSON.stringify(result, null, 2))
     console.log(JSON.stringify(result, null, 2))
@@ -370,7 +407,7 @@ async function run(scenario) {
   try {
     if (scenario === 's1') return await runS1(work, fake, state)
     if (scenario === 's4-web') return await runS4Web(work, fake, state)
-    if (scenario.startsWith('s7')) return await runS7(work, fake, state, scenario.endsWith('-web'))
+    if (scenario.startsWith('s7')) return await runS7(work, fake, state, scenario.endsWith('-web') && (scenario.startsWith('s7-400') ? '400' : true))
     if (scenario === 's8-web') return await runS8Web(work, fake, state)
     if (scenario === 's8-cli') return await runS8Cli(work, fake, state)
     if (scenario === 's9') return await runS9(work, fake, state)
@@ -384,9 +421,9 @@ async function run(scenario) {
 }
 
 const requested = process.argv[2] ?? 'all'
-const scenarios = requested === 'all' ? ['s1', 's2', 's3', 's4', 's4-web', 's7', 's7-web', 's7-403', 's7-403-web', 's8-web', 's8-cli', 's9'] : [requested]
+const scenarios = requested === 'all' ? ['s1', 's2', 's3', 's4', 's4-web', 's7', 's7-web', 's7-403', 's7-403-web', 's7-400', 's7-400-web', 's8-web', 's8-cli', 's9'] : [requested]
 for (const scenario of scenarios) {
-  assert.ok(['s1', 's2', 's3', 's4', 's4-web', 's7', 's7-web', 's7-403', 's7-403-web', 's8-web', 's8-cli', 's9'].includes(scenario), `unknown scenario ${scenario}`)
+  assert.ok(['s1', 's2', 's3', 's4', 's4-web', 's7', 's7-web', 's7-403', 's7-403-web', 's7-400', 's7-400-web', 's8-web', 's8-cli', 's9'].includes(scenario), `unknown scenario ${scenario}`)
   console.log(`\n=== ${scenario.toUpperCase()} ===`)
   await run(scenario)
 }
