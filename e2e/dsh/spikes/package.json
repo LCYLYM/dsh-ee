@@ -7,6 +7,9 @@
     "s2": "node run.mjs s2",
     "s3": "node run.mjs s3",
     "s4": "node run.mjs s4 && node run.mjs s4-web",
+    "s7": "node run.mjs s7 && node run.mjs s7-web && node run.mjs s7-403 && node run.mjs s7-403-web",
+    "s8": "node run.mjs s8-web && node run.mjs s8-cli",
+    "s9": "node run.mjs s9",
     "test": "node run.mjs all"
   }
 }

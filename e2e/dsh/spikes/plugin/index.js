@@ -8,6 +8,7 @@ export const inject = {
   tools: { required: true },
   authorization: { required: false },
   credentials: { required: false },
+  commands: { required: false },
 }
 
 const output = {
@@ -38,6 +39,15 @@ export function apply(ctx) {
     const dispose = ctx.tools.register(tool)
     ctx.effect(() => dispose)
     return dispose
+  }
+
+  if (runtime.pendingPath && fs.existsSync(runtime.pendingPath)) {
+    ctx.effect(async () => {
+      const token = fs.readFileSync(runtime.pendingPath, 'utf8').trim()
+      await ctx.get('credentials').set('DSHEE_TOKEN', token)
+      fs.unlinkSync(runtime.pendingPath)
+      record('s9-imported')
+    })
   }
 
   const authorization = ctx.get('authorization')
@@ -114,4 +124,41 @@ export function apply(ctx) {
       displayReason: { en: 'Run the spike write operation', zh: '执行 spike 写操作' },
     }
   })
+
+  const commands = ctx.get('commands')
+  if (commands) {
+    const credentials = ctx.get('credentials')
+    let pending
+    const registerCommand = (definition) => {
+      const dispose = commands.register(definition)
+      ctx.effect(() => dispose)
+    }
+    registerCommand({
+      name: 'ee-login',
+      description: 'Log in to the enterprise account',
+      handler: () => {
+        if (!pending) {
+          record('s8-background-started')
+          pending = (async () => {
+            await new Promise((resolve) => setTimeout(resolve, 1500))
+            await credentials.set('DSHEE_TOKEN', 'token-two')
+            record('s8-background-completed')
+          })()
+        }
+        record('s8-command-returned')
+        return {
+          kind: 'success',
+          text: '请在浏览器确认，确认码 KQ7M-4XPD，链接 http://127.0.0.1/device?code=KQ7M-4XPD',
+        }
+      },
+    })
+    registerCommand({
+      name: 'ee-status',
+      description: 'Show enterprise login status',
+      handler: async () => {
+        const resolved = await credentials.resolve('DSHEE_TOKEN')
+        return { kind: 'success', text: resolved ? `已登录，凭据来源 ${resolved.source}` : '未登录，请运行 /ee-login' }
+      },
+    })
+  }
 }

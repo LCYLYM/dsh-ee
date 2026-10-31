@@ -6,6 +6,9 @@
         apiKeyEnv: DSHEE_TOKEN
         api: openai-completions
         baseURL: !!js process.env.SPIKE_LLM_URL
+        retryPolicy:
+          mode: normal
+          maxRetries: 0
         models:
           - id: spike-model
 

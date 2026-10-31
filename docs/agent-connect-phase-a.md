@@ -74,6 +74,18 @@ npm / pnpm 只认 `.npmrc` 里的 `_authToken`，所以设备令牌同时写进 
 
 S7、S8、S9 决定 E1～E3 的细节，**阶段 A 编码前必须完成**；S5、S6 在任务 A6 之前完成即可。
 
+### 第二轮实测（2026-11-01）
+
+| 编号 | 结果 | 实测结论与调整 |
+|---|---|---|
+| S7 | 部分通过 | 401 / 403 在无头 CLI 都会显示响应体里的中文 `/ee-login` 文案；Web 均改显 `API key is invalid`。E3 不能只靠上游 Web 错误页，需要插件在模型失败时补充提示。 |
+| S8 | 部分通过 | Web 能补全并执行 `/ee-login`，命令立即返回、后台任务继续，下一次模型请求使用新令牌；但页面未显示 CommandResult 文本、链接或成功提示。rc.5 默认模板只有 `acp / headless / sdk / sdk-minimal / web`，没有 TUI，无法验收 CLI 命令入口。`/ee-status` 同样受 CommandResult 不显示影响，E2 需要可见的 Web 登录入口或保留 setup 终端入口。 |
+| S9 | 通过 | 在 `ctx.effect` 中读取 pending 文件并 `credentials.set`，首个模型请求即带 `Bearer token-pending`，文件随后删除，无启动竞态。 |
+
+复现命令为 `cd e2e/dsh/spikes && npm run s7 && npm run s8 && npm run s9`。
+
+A0 已完成：`server/internal/api/legacy_auth_test.go` 固化 9 类身份 × 8 个协议入口，包括 `sk-ee` 可访问 `/mcp`、key 级月度额度当前未参与限流等现状；TiDB 集成测试通过。
+
 ## 4. 任务拆分
 
 按依赖顺序排列，每个任务一个提交（或一个 PR），提交前跑完对应的测试。

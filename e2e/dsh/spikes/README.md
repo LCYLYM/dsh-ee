@@ -1,6 +1,6 @@
 # DSH 深度联动前置验证
 
-这些脚本使用真实 DSH `0.2.1-rc.5`、树外组合包和本地假 OpenAI 服务验证 S1～S4，不需要真实模型密钥，也不会修改全局 DSH 配置。每个场景使用独立的临时 `DSH_HOME`。
+这些脚本使用真实 DSH `0.2.1-rc.5`、树外组合包和本地假 OpenAI 服务验证 S1～S9，不需要真实模型密钥，也不会修改全局 DSH 配置。每个场景使用独立的临时 `DSH_HOME`。
 
 ## 准备
 
@@ -23,6 +23,9 @@ npm run s1       # 授权 flow 与 Web UI
 npm run s2       # 凭据热更新
 npm run s3       # 动态工具注册与销毁
 npm run s4       # 无头拒绝 + Web 审批后执行
+npm run s7       # 401 / 403 在 CLI 与 Web 的错误文案
+npm run s8       # /ee-login 补全、执行与后台换令牌
+npm run s9       # 启动时导入 token.pending
 npm test         # 全部场景
 ```
 
@@ -40,3 +43,11 @@ npm test         # 全部场景
 | S4 | **通过** | Web 显示 `Run the spike write operation` 审批卡和 `Allow once`，批准后工具执行。无头模式没有审批通道，返回 `requires approval, but no approval channel is available`，工具未执行。 |
 
 发布版 rc.5 的无头 CLI 不接受 `--approval-policy`，S4 无头场景验证的是默认策略。组合包需要通过 `insert` 显式挂载测试插件自身，并通过 `llm-pi-ai` 配置独立的假模型提供方。
+
+## 2026-11-01 第二轮实测结果
+
+| 场景 | 结果 | 实测行为 |
+|---|---|---|
+| S7 | **部分通过** | 401 / 403 在无头 CLI 中均显示响应体里的中文 `/ee-login` 文案；Web 均改显 `API key is invalid`，需要插件在模型失败时补充提示。 |
+| S8 | **部分通过** | Web 能补全并执行 `/ee-login`，命令立即返回、后台任务继续，下一次模型请求使用 `Bearer token-two`；但页面未显示 CommandResult 文本、可点击链接或成功提示。rc.5 默认模板没有 TUI。 |
+| S9 | **通过** | `ctx.effect` 中导入 pending 文件后，首个模型请求即带 `Bearer token-pending`，文件被删除，无启动竞态。 |

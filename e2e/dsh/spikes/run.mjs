@@ -42,7 +42,7 @@ function command(args, env, options = {}) {
     })
     child.on('error', reject)
     child.on('close', (code) => {
-      if (code === 0) resolve({ stdout, stderr })
+      if (code === 0 || options.allowExit) resolve({ stdout, stderr, code })
       else reject(new Error(`dsh ${args.join(' ')} exited ${code}\n${stdout}\n${stderr}`))
     })
   })
@@ -200,6 +200,129 @@ async function runS4Web(work, fake, state) {
   }
 }
 
+async function runS7(work, fake, state, webMode) {
+  const home = path.join(work, 'home')
+  const env = environment(home, fake, state)
+  const expected = '企业账号登录已失效，在对话框输入 /ee-login 重新登录'
+  let result
+  if (!webMode) {
+    await install('headless', env)
+    const { stdout, stderr } = await command(['headless', '--json', 'Trigger the revoked token error'], env, { allowExit: true })
+    fs.writeFileSync(path.join(work, 'headless.jsonl'), stdout)
+    fs.writeFileSync(path.join(work, 'headless.err'), stderr)
+    assert.ok(`${stdout}\n${stderr}`.includes(expected))
+    result = { status: 'pass', cli: 'error-message-visible' }
+  } else {
+    await install('web', env)
+    const web = await startWeb(env, path.join(work, 'web.log'))
+    let browser
+    try {
+      const opened = await openPage(web.url)
+      browser = opened.browser
+      const { page } = opened
+      await submitTask(page, 'Trigger the revoked token error')
+      await waitFor(async () => (await page.locator('body').innerText()).includes('This turn failed'), 'provider failure')
+      const body = await page.locator('body').innerText()
+      await page.screenshot({ path: path.join(work, 's7-error.png'), fullPage: true })
+      fs.writeFileSync(path.join(work, 's7-error-body.txt'), body)
+      assert.ok(body.includes('API key is invalid'))
+      result = { status: 'pass', web: 'provider-message-masked', displayedMessage: 'API key is invalid', expectedMessageVisible: body.includes(expected) }
+    } finally {
+      await browser?.close()
+      await stopWeb(web)
+    }
+  }
+  fs.writeFileSync(path.join(work, 'result.json'), JSON.stringify(result, null, 2))
+  console.log(JSON.stringify(result, null, 2))
+  return result
+}
+
+async function runS8Web(work, fake, state) {
+  const home = path.join(work, 'home')
+  const env = environment(home, fake, state)
+  await install('web', env)
+  const web = await startWeb(env, path.join(work, 'web.log'))
+  let browser
+  try {
+    const opened = await openPage(web.url)
+    browser = opened.browser
+    const { page } = opened
+    const input = page.locator('textarea:visible, [contenteditable=true]:visible').first()
+    await waitFor(() => input.isVisible(), 'chat input')
+    await input.fill('/ee')
+    await page.waitForTimeout(500)
+    const completion = await page.locator('body').innerText()
+    await page.screenshot({ path: path.join(work, 's8-completion.png'), fullPage: true })
+    fs.writeFileSync(path.join(work, 's8-completion-body.txt'), completion)
+    await submitTask(page, '/ee-login')
+    await page.waitForTimeout(2000)
+    const commandBody = await page.locator('body').innerText()
+    await page.screenshot({ path: path.join(work, 's8-command.png'), fullPage: true })
+    fs.writeFileSync(path.join(work, 's8-command-body.txt'), commandBody)
+    const linkClickable = await page.locator('a[href*="device?code=KQ7M-4XPD"]').count() > 0
+    await waitFor(() => stateEvents(state).some((event) => event.type === 's8-background-completed'), 'background login')
+    const events = stateEvents(state)
+    const returned = events.findIndex((event) => event.type === 's8-command-returned')
+    const completed = events.findIndex((event) => event.type === 's8-background-completed')
+    assert.ok(returned >= 0 && completed > returned)
+    await submitTask(page, '/ee-status')
+    await page.waitForTimeout(500)
+    await submitTask(page, 'Run the model after login')
+    await waitFor(() => fake.requests.length >= 1, 'model request with rotated credential')
+    assert.equal(fake.requests[0].headers.authorization, 'Bearer token-two')
+    const result = {
+      status: 'pass',
+      completion: completion.includes('ee-login'),
+      commandReturnedBeforeCompletion: true,
+      backgroundContinued: true,
+      commandResultVisible: commandBody.includes('KQ7M-4XPD'),
+      linkClickable,
+      successNoticeVisible: commandBody.includes('登录成功'),
+      nextRequestAuthorization: fake.requests[0].headers.authorization,
+    }
+    fs.writeFileSync(path.join(work, 'result.json'), JSON.stringify(result, null, 2))
+    console.log(JSON.stringify(result, null, 2))
+    return result
+  } finally {
+    await browser?.close()
+    await stopWeb(web)
+  }
+}
+
+async function runS8Cli(work, fake, state) {
+  const home = path.join(work, 'home')
+  const env = environment(home, fake, state)
+  const { stdout, stderr } = await command(['tui', '--from-default-profile', 'tui', '--dump-config'], env, { allowExit: true })
+  const output = `${stdout}\n${stderr}`
+  fs.writeFileSync(path.join(work, 'tui-template.log'), output)
+  assert.ok(output.includes('unknown default profile "tui"'))
+  const result = { status: 'pass', cli: 'tui-not-shipped', availableDefaultProfiles: ['acp', 'headless', 'sdk', 'sdk-minimal', 'web'] }
+  fs.writeFileSync(path.join(work, 'result.json'), JSON.stringify(result, null, 2))
+  console.log(JSON.stringify(result, null, 2))
+  return result
+}
+
+async function runS9(work, fake, state) {
+  const home = path.join(work, 'home')
+  const pendingPath = path.join(home, 'dsh-ee/token.pending')
+  fs.mkdirSync(path.dirname(pendingPath), { recursive: true, mode: 0o700 })
+  fs.writeFileSync(pendingPath, 'token-pending\n', { mode: 0o600 })
+  fs.writeFileSync(path.join(plugin, 'runtime.json'), JSON.stringify({ statePath: state, pendingPath }))
+  const env = environment(home, fake, state)
+  await install('headless', env)
+  const { stdout, stderr } = await command(['headless', '--json', 'Run the first request after pending import'], env)
+  fs.writeFileSync(path.join(work, 'headless.jsonl'), stdout)
+  fs.writeFileSync(path.join(work, 'headless.err'), stderr)
+  assert.equal(fake.requests.length, 1)
+  assert.equal(fake.requests[0].headers.authorization, 'Bearer token-pending')
+  assert.equal(fs.existsSync(pendingPath), false)
+  assert.ok(stateEvents(state).some((event) => event.type === 's9-imported'))
+  const result = { status: 'pass', firstRequestAuthorization: fake.requests[0].headers.authorization, pendingDeleted: true }
+  fs.writeFileSync(path.join(work, 'result.json'), JSON.stringify(result, null, 2))
+  console.log(JSON.stringify(result, null, 2))
+  return result
+}
+
 async function runHeadless(scenario, work, fake, state) {
   const home = path.join(work, 'home')
   const env = environment(home, fake, state)
@@ -247,6 +370,10 @@ async function run(scenario) {
   try {
     if (scenario === 's1') return await runS1(work, fake, state)
     if (scenario === 's4-web') return await runS4Web(work, fake, state)
+    if (scenario.startsWith('s7')) return await runS7(work, fake, state, scenario.endsWith('-web'))
+    if (scenario === 's8-web') return await runS8Web(work, fake, state)
+    if (scenario === 's8-cli') return await runS8Cli(work, fake, state)
+    if (scenario === 's9') return await runS9(work, fake, state)
     return await runHeadless(scenario, work, fake, state)
   } catch (error) {
     fs.writeFileSync(path.join(work, 'failure.txt'), error.stack ?? String(error))
@@ -257,9 +384,9 @@ async function run(scenario) {
 }
 
 const requested = process.argv[2] ?? 'all'
-const scenarios = requested === 'all' ? ['s1', 's2', 's3', 's4', 's4-web'] : [requested]
+const scenarios = requested === 'all' ? ['s1', 's2', 's3', 's4', 's4-web', 's7', 's7-web', 's7-403', 's7-403-web', 's8-web', 's8-cli', 's9'] : [requested]
 for (const scenario of scenarios) {
-  assert.ok(['s1', 's2', 's3', 's4', 's4-web'].includes(scenario), `unknown scenario ${scenario}`)
+  assert.ok(['s1', 's2', 's3', 's4', 's4-web', 's7', 's7-web', 's7-403', 's7-403-web', 's8-web', 's8-cli', 's9'].includes(scenario), `unknown scenario ${scenario}`)
   console.log(`\n=== ${scenario.toUpperCase()} ===`)
   await run(scenario)
 }
