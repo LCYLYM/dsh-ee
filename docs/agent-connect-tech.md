@@ -28,6 +28,19 @@
 
 S1～S4 决定阶段 A、C 的实现路径，必须先做。
 
+### 实测结果（2026-10-31）
+
+已在 macOS arm64 / Node 24.22.1 上，用真实 DSH 0.2.1-rc.5、树外组合包和 fake LLM 完成 S1～S4。可复现脚本、运行方式和原始输出说明见 [e2e/dsh/spikes](../../e2e/dsh/spikes/README.md)。
+
+| 编号 | 结果 | 对实现的影响 |
+|---|---|---|
+| S1 | **部分通过** | `registerFlow`、notice 和 `authorized` 均可用；但 Web 聊天页不会自动展示 notice，设置页也没有通用授权入口。接入插件必须自己提供登录入口和 notice 展示，不能依赖现有设置页。 |
+| S2 | **通过** | 同一进程的两次模型请求依次为 `Bearer token-one` / `Bearer token-two`，凭据更新无需重启，按原方案使用 `apiKeyEnv`。 |
+| S3 | **通过** | 动态工具在三轮请求中的可见性为 `false → true → false`，可以按原方案动态注册 / 销毁。 |
+| S4 | **通过** | Web 显示审批卡，`Allow once` 后才执行；无头模式没有审批通道时拒绝且工具体未执行，E2E 应断言 fail closed。 |
+
+发布版 rc.5 的无头 CLI 不接受 `--approval-policy`，无头 S4 验证的是默认策略。阶段 A 仍可采用设备码 + 凭据库，但 S1 的 Web 登录入口需要按备选方案由插件自行实现。
+
 ## 2. 总体结构
 
 ```

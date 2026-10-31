@@ -1,0 +1,42 @@
+# DSH 深度联动前置验证
+
+这些脚本使用真实 DSH `0.2.1-rc.5`、树外组合包和本地假 OpenAI 服务验证 S1～S4，不需要真实模型密钥，也不会修改全局 DSH 配置。每个场景使用独立的临时 `DSH_HOME`。
+
+## 准备
+
+在仓库根目录执行：
+
+```bash
+npm install --prefix .tools/dsh-rc5 @deepseek-ai/dsh@0.2.1-rc.5
+git clone --filter=blob:none https://github.com/deepseek-ai/deepseek-harness.git .tools/upstream/deepseek-harness
+git -C .tools/upstream/deepseek-harness checkout ce7073d5
+cd e2e && npm install
+```
+
+macOS 默认使用 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`。其它平台通过 `CHROME` 指定浏览器；通过 `DSH_BIN` 可以改用另一个 rc.5 二进制。
+
+## 运行
+
+```bash
+cd e2e/dsh/spikes
+npm run s1       # 授权 flow 与 Web UI
+npm run s2       # 凭据热更新
+npm run s3       # 动态工具注册与销毁
+npm run s4       # 无头拒绝 + Web 审批后执行
+npm test         # 全部场景
+```
+
+输出写入 `.tools/dsh-spikes/<场景>/`，包括 `result.json`、假模型请求、插件事件、DSH 日志和 Web 截图；该目录已被 `.gitignore` 排除。`SPIKE_WORK` 可改变输出位置。
+
+## 2026-10-31 实测结果
+
+环境：macOS arm64、Node 24.22.1、DSH 0.2.1-rc.5、上游源码 ce7073d51254c26cd63b22a60835b8f948deb447。
+
+| 场景 | 结果 | 实测行为 |
+|---|---|---|
+| S1 | **部分通过** | 树外插件成功注册 flow；真实工具调用返回 `authorized`，notice 含 URL 与 `KQ7M-4XPD`。聊天页不显示 notice，设置页也没有通用授权入口；只有 General、Models、Built-in plugins、Agent presets。阶段 A 必须由接入插件自己提供登录入口和 notice 展示。 |
+| S2 | **通过** | 同一进程内第一次模型请求为 `Bearer token-one`，工具调用 `credentials.set` 后，下一次请求为 `Bearer token-two`，无需重启。 |
+| S3 | **通过** | 三轮模型请求中动态工具可见性为 `false → true → false`；运行中注册和 dispose 都会影响下一轮工具列表。 |
+| S4 | **通过** | Web 显示 `Run the spike write operation` 审批卡和 `Allow once`，批准后工具执行。无头模式没有审批通道，返回 `requires approval, but no approval channel is available`，工具未执行。 |
+
+发布版 rc.5 的无头 CLI 不接受 `--approval-policy`，S4 无头场景验证的是默认策略。组合包需要通过 `insert` 显式挂载测试插件自身，并通过 `llm-pi-ai` 配置独立的假模型提供方。

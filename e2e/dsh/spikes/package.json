@@ -1,0 +1,12 @@
+{
+  "name": "dsh-ee-agent-connect-spikes",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "s1": "node run.mjs s1",
+    "s2": "node run.mjs s2",
+    "s3": "node run.mjs s3",
+    "s4": "node run.mjs s4 && node run.mjs s4-web",
+    "test": "node run.mjs all"
+  }
+}
