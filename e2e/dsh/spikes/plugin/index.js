@@ -125,6 +125,55 @@ export function apply(ctx) {
     }
   })
 
+  if (runtime.s5) {
+    const complex = definition('mcp__acme__get_user', async () => ({ answer: 42, nested: { values: [1, 2] } }))
+    complex.parameters = {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', enum: ['read', 'write'] },
+        nested: {
+          type: 'object',
+          properties: { items: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'], additionalProperties: false } } },
+          additionalProperties: false,
+        },
+        choice: { oneOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['mode'],
+      additionalProperties: false,
+    }
+    for (const tool of [complex, definition('bad.name', async () => ({ ok: true })), definition(`x${'y'.repeat(80)}`, async () => ({ ok: true }))]) {
+      try {
+        register(tool)
+        record('s5-registered', { name: tool.name, length: tool.name.length })
+      } catch (error) {
+        record('s5-register-failed', { name: tool.name, error: String(error) })
+      }
+    }
+  }
+
+  if (runtime.sseUrl) {
+    ctx.effect(() => {
+      const controller = new AbortController()
+      void (async () => {
+        try {
+          const response = await fetch(runtime.sseUrl, { signal: controller.signal })
+          record('s6-sse-opened')
+          await response.text()
+        } catch (error) {
+          record('s6-sse-closed', { aborted: controller.signal.aborted })
+        }
+      })()
+      const timer = setInterval(() => {
+        if (!controller.signal.aborted) void fetch(`${runtime.sseUrl}?poll=1`, { signal: controller.signal }).catch(() => {})
+      }, 1000)
+      return () => {
+        clearInterval(timer)
+        controller.abort()
+        record('s6-disposed')
+      }
+    })
+  }
+
   const commands = ctx.get('commands')
   if (commands) {
     const credentials = ctx.get('credentials')

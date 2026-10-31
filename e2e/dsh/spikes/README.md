@@ -23,6 +23,8 @@ npm run s1       # 授权 flow 与 Web UI
 npm run s2       # 凭据热更新
 npm run s3       # 动态工具注册与销毁
 npm run s4       # 无头拒绝 + Web 审批后执行
+npm run s5       # 工具名与参数 schema 约束
+npm run s6       # SSE 热重载与停用释放
 npm run s7       # 401 / 403 在 CLI 与 Web 的错误文案
 npm run s8       # /ee-login 补全、执行与后台换令牌
 npm run s9       # 启动时导入 token.pending
@@ -61,3 +63,10 @@ npm test         # 全部场景
 | S7-400 / S7-400-web | **通过** | 网关返回 400 + 中文 `error.message`：Web 原样显示文案（错误码 `INVALID_REQUEST`），CLI 同样显示，且不重试（假模型只收到 1 次请求）；`llm-pi-ai` 的 `headers` 配置生效，请求带 `X-DshEE-Client`。401 / 403 仍被 Web 显示为 `API key is invalid`（上游按错误文本里的 401/403 归类） |
 | S8-web | **通过** | 先跑一轮对话后再执行，`/ee-login`、`/ee-status` 的返回文本以命令记录显示在对话里；链接不可点击；后台登录完成无自动提示；下一次模型请求带 `Bearer token-two`。原脚本在尚无会话的首页执行，所以看不到结果 |
 | S9 | **通过** | 与 macOS 结果一致 |
+
+## 2026-11-01 S5、S6 实测结果
+
+| 场景 | 结果 | 实测行为与约束 |
+|---|---|---|
+| S5 | **通过** | `mcp__acme__get_user`（19 字符）、`bad.name`（点号）和 81 字符名称均能注册并被模型调用。`enum`、嵌套 object、array of object、`oneOf` 均可使用。结构化结果以 JSON 文本返回，Web 默认折叠，不应依赖富文本展示。 |
+| S6 | **通过** | `hmr.root` 指向树外插件目录后，修改插件会真实重载：连接数 `opened=2 / closed=1 / active=1`，没有重复连接。停用后 `active=0`。`ctx.effect` 返回清理函数，在函数里 `AbortController.abort()` 可可靠释放 SSE 与定时任务。 |

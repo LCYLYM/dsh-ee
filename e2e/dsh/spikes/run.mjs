@@ -23,6 +23,7 @@ function environment(home, fake, state) {
     DSHEE_TOKEN: 'token-one',
     SPIKE_LLM_URL: fake.url,
     SPIKE_STATE: state,
+    SPIKE_PLUGIN_ROOT: plugin,
     DSH_PERMISSION_MODE: 'workspace-write',
   }
 }
@@ -360,6 +361,73 @@ async function runS9(work, fake, state) {
   return result
 }
 
+async function runS5(work, fake, state) {
+  const home = path.join(work, 'home')
+  fs.writeFileSync(path.join(plugin, 'runtime.json'), JSON.stringify({ statePath: state, s5: true }))
+  const env = environment(home, fake, state)
+  await install('web', env)
+  const web = await startWeb(env, path.join(work, 'web.log'))
+  let browser
+  try {
+    const opened = await openPage(web.url)
+    browser = opened.browser
+    const { page } = opened
+    await submitTask(page, 'Run all schema tools')
+    await waitFor(() => fake.requests.length >= 4, 'schema tool calls')
+    const body = await page.locator('body').innerText()
+    await page.screenshot({ path: path.join(work, 's5-tools.png'), fullPage: true })
+    fs.writeFileSync(path.join(work, 's5-body.txt'), body)
+    fs.writeFileSync(path.join(work, 'fake-requests.json'), JSON.stringify(fake.requests, null, 2))
+    const events = stateEvents(state)
+    const result = {
+      status: 'pass',
+      registrations: events.filter((event) => event.type.startsWith('s5-')),
+      validToolResultVisible: body.includes('42'),
+      badNameResults: fake.requests.slice(1, 3).map((request) => request.body.messages.find((message) => message.role === 'tool')?.content),
+    }
+    fs.writeFileSync(path.join(work, 'result.json'), JSON.stringify(result, null, 2))
+    console.log(JSON.stringify(result, null, 2))
+    return result
+  } finally {
+    await browser?.close()
+    await stopWeb(web)
+  }
+}
+
+async function runS6(work, fake, state) {
+  const home = path.join(work, 'home')
+  const env = environment(home, fake, state)
+  fs.writeFileSync(path.join(plugin, 'runtime.json'), JSON.stringify({ statePath: state, sseUrl: fake.url.replace(/\/v1$/, '/sse') }))
+  await install('web', env)
+  const web = await startWeb(env, path.join(work, 'web.log'))
+  try {
+    await waitFor(() => stateEvents(state).some((event) => event.type === 's6-sse-opened'), 'initial SSE connection')
+    const initial = { ...fake.sse }
+    fs.writeFileSync(path.join(work, 'initial.json'), JSON.stringify(initial, null, 2))
+    fs.appendFileSync(path.join(plugin, 'index.js'), '\n// Trigger module hot reload for S6.\n')
+    await waitFor(() => stateEvents(state).some((event) => event.type === 's6-disposed'), 'plugin disposal during HMR', 10_000)
+    const events = stateEvents(state)
+    const afterReload = { ...fake.sse }
+    assert.equal(afterReload.active, 1)
+    assert.equal(afterReload.opened, 2)
+    assert.equal(afterReload.closed, 1)
+    assert.ok(events.some((event) => event.type === 's6-disposed'))
+    await command(['plugin', '--profile', 'web', 'remove', '@dsh-ee/agent-connect-spikes'], env)
+    await waitFor(() => fake.sse.active === 0, 'SSE release after plugin removal')
+    const result = {
+      status: 'pass',
+      afterReload,
+      afterRemove: { ...fake.sse },
+      disposedEvents: events.filter((event) => event.type === 's6-disposed').length,
+    }
+    fs.writeFileSync(path.join(work, 'result.json'), JSON.stringify(result, null, 2))
+    console.log(JSON.stringify(result, null, 2))
+    return result
+  } finally {
+    await stopWeb(web)
+  }
+}
+
 async function runHeadless(scenario, work, fake, state) {
   const home = path.join(work, 'home')
   const env = environment(home, fake, state)
@@ -411,6 +479,8 @@ async function run(scenario) {
     if (scenario === 's8-web') return await runS8Web(work, fake, state)
     if (scenario === 's8-cli') return await runS8Cli(work, fake, state)
     if (scenario === 's9') return await runS9(work, fake, state)
+    if (scenario === 's5') return await runS5(work, fake, state)
+    if (scenario === 's6') return await runS6(work, fake, state)
     return await runHeadless(scenario, work, fake, state)
   } catch (error) {
     fs.writeFileSync(path.join(work, 'failure.txt'), error.stack ?? String(error))
@@ -421,9 +491,9 @@ async function run(scenario) {
 }
 
 const requested = process.argv[2] ?? 'all'
-const scenarios = requested === 'all' ? ['s1', 's2', 's3', 's4', 's4-web', 's7', 's7-web', 's7-403', 's7-403-web', 's7-400', 's7-400-web', 's8-web', 's8-cli', 's9'] : [requested]
+const scenarios = requested === 'all' ? ['s1', 's2', 's3', 's4', 's4-web', 's5', 's6', 's7', 's7-web', 's7-403', 's7-403-web', 's7-400', 's7-400-web', 's8-web', 's8-cli', 's9'] : [requested]
 for (const scenario of scenarios) {
-  assert.ok(['s1', 's2', 's3', 's4', 's4-web', 's7', 's7-web', 's7-403', 's7-403-web', 's7-400', 's7-400-web', 's8-web', 's8-cli', 's9'].includes(scenario), `unknown scenario ${scenario}`)
+  assert.ok(['s1', 's2', 's3', 's4', 's4-web', 's5', 's6', 's7', 's7-web', 's7-403', 's7-403-web', 's7-400', 's7-400-web', 's8-web', 's8-cli', 's9'].includes(scenario), `unknown scenario ${scenario}`)
   console.log(`\n=== ${scenario.toUpperCase()} ===`)
   await run(scenario)
 }

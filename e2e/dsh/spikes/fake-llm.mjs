@@ -13,12 +13,12 @@ function textResponse(text) {
   ]
 }
 
-function toolResponse(name) {
+function toolResponse(name, args = {}) {
   return [
     { choices: [{ delta: { role: 'assistant', content: '' }, index: 0, finish_reason: null }] },
     {
       choices: [{
-        delta: { tool_calls: [{ index: 0, id: `call_${name}`, type: 'function', function: { name, arguments: '{}' } }] },
+        delta: { tool_calls: [{ index: 0, id: `call_${name}`, type: 'function', function: { name, arguments: JSON.stringify(args) } }] },
         index: 0,
         finish_reason: null,
       }],
@@ -47,17 +47,36 @@ const scripts = {
   }],
   s8: [textResponse('S8 first turn'), textResponse('S8 finished')],
   s9: [textResponse('S9 finished')],
+  s5: [
+    toolResponse('mcp__acme__get_user', { mode: 'read', nested: { items: [{ id: '1' }] }, choice: 'x' }),
+    toolResponse('bad.name'),
+    toolResponse(`x${'y'.repeat(80)}`),
+    textResponse('S5 finished'),
+  ],
 }
 
 export async function startFakeLlm(scenario) {
   const selected = scenario === 's8-cli' ? 's8' : scenario.endsWith('-web') ? scenario.slice(0, -4) : scenario
   const script = [...(scripts[selected] ?? scripts.s4)]
   const requests = []
+  const sse = { active: 0, opened: 0, closed: 0, maxActive: 0 }
   const server = http.createServer((req, res) => {
     const chunks = []
     req.on('data', (chunk) => chunks.push(chunk))
     req.on('end', () => {
       const text = Buffer.concat(chunks).toString('utf8')
+      if (req.method === 'GET' && req.url === '/sse') {
+        sse.active += 1
+        sse.opened += 1
+        sse.maxActive = Math.max(sse.maxActive, sse.active)
+        res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+        res.write('data: {"ready":true}\n\n')
+        res.on('close', () => {
+          sse.active -= 1
+          sse.closed += 1
+        })
+        return
+      }
       if (req.method === 'GET' && req.url === '/v1/models') {
         res.writeHead(200, { 'content-type': 'application/json' })
         res.end(JSON.stringify({ object: 'list', data: [{ id: 'spike-model', object: 'model' }] }))
@@ -84,6 +103,7 @@ export async function startFakeLlm(scenario) {
   const address = server.address()
   return {
     requests,
+    sse,
     url: `http://127.0.0.1:${address.port}/v1`,
     async close() {
       await new Promise((resolve) => server.close(resolve))
