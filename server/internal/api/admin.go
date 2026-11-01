@@ -42,8 +42,10 @@ type createUserReq struct {
 	RoleIDs           *[]int64      `json:"role_ids"`
 	MonthlyTokenLimit nullableInt64 `json:"monthly_token_limit"`
 	// local（默认）/ ldap：预先建好的目录账号，不设密码，首次登录时由目录验证并补全资料
-	AuthSource string `json:"auth_source"`
-	Email      string `json:"email"`
+	AuthSource  string `json:"auth_source"`
+	Email       string `json:"email"`
+	AccountType string `json:"account_type"`
+	OwnerID     *int64 `json:"owner_id"`
 }
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -81,24 +83,37 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	var hash string
-	switch req.AuthSource {
-	case "", store.AuthLocal:
-		req.AuthSource = store.AuthLocal
-		h, err := HashPassword(req.Password)
-		if err != nil {
-			writeErr(w, http.StatusBadRequest, err.Error())
-			return
-		}
-		hash = h
-	case store.AuthLDAP:
-		if req.Password != "" {
-			writeErr(w, http.StatusBadRequest, "LDAP 账号不设本地密码")
-			return
-		}
-	default:
-		writeErr(w, http.StatusBadRequest, "auth_source 只能是 local 或 ldap")
+	if req.AccountType == "" {
+		req.AccountType = store.AccountHuman
+	}
+	if req.AccountType != store.AccountHuman && req.AccountType != store.AccountBot {
+		writeErr(w, http.StatusBadRequest, "account_type 只能是 human 或 bot")
 		return
+	}
+	if req.AccountType == store.AccountBot && (req.AuthSource != "" && req.AuthSource != store.AuthLocal || req.Password != "") {
+		writeErr(w, http.StatusBadRequest, "机器人账号不能设置密码或 LDAP 登录")
+		return
+	}
+	var hash string
+	if req.AccountType == store.AccountHuman {
+		switch req.AuthSource {
+		case "", store.AuthLocal:
+			req.AuthSource = store.AuthLocal
+			h, err := HashPassword(req.Password)
+			if err != nil {
+				writeErr(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			hash = h
+		case store.AuthLDAP:
+			if req.Password != "" {
+				writeErr(w, http.StatusBadRequest, "LDAP 账号不设本地密码")
+				return
+			}
+		default:
+			writeErr(w, http.StatusBadRequest, "auth_source 只能是 local 或 ldap")
+			return
+		}
 	}
 	// 新用户默认 0：管理员分配额度后才能调用模型。显式传 null 表示不限额。
 	limit := int64(0)
@@ -119,6 +134,8 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		PasswordHash:      hash,
 		MonthlyTokenLimit: &limit,
 		AuthSource:        req.AuthSource,
+		AccountType:       req.AccountType,
+		OwnerID:           req.OwnerID,
 	}
 	if req.MonthlyTokenLimit.Set && req.MonthlyTokenLimit.Value == nil {
 		u.MonthlyTokenLimit = nil
@@ -135,7 +152,11 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
-	s.audit(r, auditUserCreate, u.Username, map[string]any{"id": u.ID, "source": u.AuthSource, "roles": dedupe(roleIDs)})
+	action := auditUserCreate
+	if u.AccountType == store.AccountBot {
+		action = "user.create_bot"
+	}
+	s.audit(r, action, u.Username, map[string]any{"id": u.ID, "source": u.AuthSource, "roles": dedupe(roleIDs), "owner_id": u.OwnerID})
 	writeJSON(w, http.StatusCreated, u)
 }
 

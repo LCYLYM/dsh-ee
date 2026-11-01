@@ -144,6 +144,33 @@ func (s *Store) TopModels(ctx context.Context, from time.Time, limit int) ([]Mod
 	return out, rows.Err()
 }
 
+type TokenStat struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Username    string `json:"username"`
+	AccountType string `json:"account_type"`
+	Tokens      int64  `json:"tokens"`
+}
+
+func (s *Store) TokenStats(ctx context.Context, from time.Time, limit int) ([]TokenStat, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT t.id, t.name, u.username, u.account_type, COALESCE(SUM(l.total_tokens), 0) AS tokens
+		FROM usage_logs l JOIN access_tokens t ON t.id = l.token_id JOIN users u ON u.id = t.user_id
+		WHERE l.created_at >= ? GROUP BY t.id, t.name, u.username, u.account_type ORDER BY tokens DESC, t.id LIMIT ?`, from, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []TokenStat{}
+	for rows.Next() {
+		var stat TokenStat
+		if err := rows.Scan(&stat.ID, &stat.Name, &stat.Username, &stat.AccountType, &stat.Tokens); err != nil {
+			return nil, err
+		}
+		out = append(out, stat)
+	}
+	return out, rows.Err()
+}
+
 type DepartmentStat struct {
 	Department  string `json:"department"`
 	Users       int    `json:"users"`

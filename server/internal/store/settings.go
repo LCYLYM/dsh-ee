@@ -50,7 +50,9 @@ type AppSettings struct {
 		// 自动安装设为「自动安装」的插件与微应用依赖的插件
 		InstallRequired bool `json:"installRequired"`
 		// 多久检查一次能力目录的变化
-		PollSeconds int `json:"pollSeconds"`
+		PollSeconds       int  `json:"pollSeconds"`
+		DeviceTokenDays   int  `json:"deviceTokenDays"`
+		AllowManualTokens bool `json:"allowManualTokens"`
 	} `json:"connect"`
 	Registry struct {
 		// cache：企业作用域之外的包按需回源并缓存 / preloaded：只提供已预载的包
@@ -84,6 +86,8 @@ func DefaultSettings() *AppSettings {
 	s.Connect.Market = true
 	s.Connect.InstallRequired = true
 	s.Connect.PollSeconds = 60
+	s.Connect.DeviceTokenDays = 90
+	s.Connect.AllowManualTokens = true
 	s.Registry.ProxyMode = "cache"
 	s.Registry.ExtraScopes = []string{}
 	s.Registry.RequireToken = true

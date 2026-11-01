@@ -12,23 +12,25 @@ import (
 const userCodeAlphabet = "BCDFGHJKLMNPQRSTVWXZ23456789"
 
 type DeviceCode struct {
-	ID            int64      `json:"id"`
-	DeviceHash    string     `json:"-"`
-	UserCode      string     `json:"user_code"`
-	ClientName    string     `json:"client_name"`
-	ClientOS      string     `json:"client_os"`
-	ClientVersion string     `json:"client_version"`
-	Scopes        string     `json:"scopes"`
-	Status        string     `json:"status"`
-	UserID        *int64     `json:"user_id"`
-	TokenID       *int64     `json:"token_id"`
-	TokenSealed   []byte     `json:"-"`
-	LastPollAt    *time.Time `json:"last_poll_at"`
-	ExpiresAt     time.Time  `json:"expires_at"`
-	CreatedAt     time.Time  `json:"created_at"`
+	ID              int64      `json:"id"`
+	DeviceHash      string     `json:"-"`
+	UserCode        string     `json:"user_code"`
+	ClientName      string     `json:"client_name"`
+	ClientOS        string     `json:"client_os"`
+	ClientVersion   string     `json:"client_version"`
+	ClientIP        string     `json:"client_ip"`
+	IntervalSeconds int        `json:"interval_seconds"`
+	Scopes          string     `json:"scopes"`
+	Status          string     `json:"status"`
+	UserID          *int64     `json:"user_id"`
+	TokenID         *int64     `json:"token_id"`
+	TokenSealed     []byte     `json:"-"`
+	LastPollAt      *time.Time `json:"last_poll_at"`
+	ExpiresAt       time.Time  `json:"expires_at"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
-const deviceColumns = `id, device_hash, user_code, client_name, client_os, client_version, scopes,
+const deviceColumns = `id, device_hash, user_code, client_name, client_os, client_version, client_ip, interval_seconds, scopes,
 	status, user_id, token_id, token_sealed, last_poll_at, expires_at, created_at`
 
 func scanDevice(row interface{ Scan(...any) error }) (*DeviceCode, error) {
@@ -36,7 +38,7 @@ func scanDevice(row interface{ Scan(...any) error }) (*DeviceCode, error) {
 	var userID, tokenID sql.NullInt64
 	var sealed []byte
 	var poll sql.NullTime
-	err := row.Scan(&d.ID, &d.DeviceHash, &d.UserCode, &d.ClientName, &d.ClientOS, &d.ClientVersion, &d.Scopes,
+	err := row.Scan(&d.ID, &d.DeviceHash, &d.UserCode, &d.ClientName, &d.ClientOS, &d.ClientVersion, &d.ClientIP, &d.IntervalSeconds, &d.Scopes,
 		&d.Status, &userID, &tokenID, &sealed, &poll, &d.ExpiresAt, &d.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -86,9 +88,12 @@ func (s *Store) CreateDeviceCode(ctx context.Context, d *DeviceCode, deviceHash 
 	d.DeviceHash = deviceHash
 	d.UserCode = NormalizeUserCode(d.UserCode)
 	d.CreatedAt = now()
-	res, err := s.db.ExecContext(ctx, `INSERT INTO device_codes (device_hash, user_code, client_name, client_os, client_version, scopes,
-		status, user_id, token_id, token_sealed, last_poll_at, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		deviceHash, d.UserCode, d.ClientName, d.ClientOS, d.ClientVersion, d.Scopes,
+	if d.IntervalSeconds == 0 {
+		d.IntervalSeconds = 5
+	}
+	res, err := s.db.ExecContext(ctx, `INSERT INTO device_codes (device_hash, user_code, client_name, client_os, client_version, client_ip, interval_seconds, scopes,
+		status, user_id, token_id, token_sealed, last_poll_at, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		deviceHash, d.UserCode, d.ClientName, d.ClientOS, d.ClientVersion, d.ClientIP, d.IntervalSeconds, d.Scopes,
 		d.Status, d.UserID, d.TokenID, d.TokenSealed, d.LastPollAt, d.ExpiresAt, d.CreatedAt)
 	if err != nil {
 		return err
@@ -112,6 +117,7 @@ func (s *Store) PollDevice(ctx context.Context, code string, interval time.Durat
 	}
 	t := now()
 	if d.LastPollAt != nil && d.LastPollAt.Add(interval).After(t) {
+		_, _ = s.db.ExecContext(ctx, "UPDATE device_codes SET interval_seconds = interval_seconds + 5 WHERE id = ?", d.ID)
 		return true, nil
 	}
 	_, err = s.db.ExecContext(ctx, "UPDATE device_codes SET last_poll_at = ? WHERE id = ?", t, d.ID)
@@ -129,7 +135,7 @@ func (s *Store) ApproveDevice(ctx context.Context, code string, userID int64, to
 	var sealedExisting []byte
 	var poll sql.NullTime
 	err = tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM device_codes WHERE user_code = ? AND status = 'pending' AND expires_at > ? FOR UPDATE`,
-		NormalizeUserCode(code), now()).Scan(&d.ID, &d.DeviceHash, &d.UserCode, &d.ClientName, &d.ClientOS, &d.ClientVersion, &d.Scopes,
+		NormalizeUserCode(code), now()).Scan(&d.ID, &d.DeviceHash, &d.UserCode, &d.ClientName, &d.ClientOS, &d.ClientVersion, &d.ClientIP, &d.IntervalSeconds, &d.Scopes,
 		&d.Status, &userIDNull, &tokenIDNull, &sealedExisting, &poll, &d.ExpiresAt, &d.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound

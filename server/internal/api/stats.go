@@ -108,7 +108,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	payload := map[string]any{
 		"from":        rg.From,
 		"daily":       series,
 		"totals":      totals,
@@ -117,7 +117,16 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		"departments": nonNil(depts),
 		"platforms":   platforms,
 		"storage":     storage,
-	})
+	}
+	if r.URL.Query().Get("group_by") == "token" {
+		tokenStats, err := s.store.TokenStats(ctx, rg.From, 100)
+		if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		payload["token_stats"] = nonNil(tokenStats)
+	}
+	writeJSON(w, http.StatusOK, payload)
 }
 
 type installedItem struct {

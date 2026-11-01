@@ -146,6 +146,8 @@ A2 已完成（2026-11-01）：统一三种前缀与 scope 求交，新增 `/api
 
 审计动作：`token.create`、`token.revoke`、`token.revoke_bulk`、`token.issue`、`user.create_bot`。
 
+A3 已完成（2026-11-01）：个人/管理员/部门令牌接口、bot 账号与登录限制、批量吊销、`group_by=token` 统计和审计均实现；`tokens_test.go` 覆盖管理员与部门权限、bot 调用和批量计数。
+
 ### A4 设备码（约 1 天）
 
 - 接口按技术规划 §3.5：`POST /api/device/code`、`POST /api/device/token`、`GET|POST /api/device/{user_code}`。
@@ -154,6 +156,8 @@ A2 已完成（2026-11-01）：统一三种前缀与 scope 求交，新增 `/api
 - `client_name` 等字段只做长度限制与控制字符过滤，确认页按纯文本渲染。
 - 前端 `pages/device.tsx`：未登录跳登录页并回跳；显示设备名、系统、DSH 版本、来源 IP、申请的范围、过期倒计时；「授权」「拒绝」；授权后提示「可以回到终端 / DSH 了」。也支持手动输入确认码（`/device` 不带参数时）。
 - 审计：`device.approve`、`device.deny`。
+
+A4 已完成（2026-11-01）：设备码发起、限流与 slow_down、确认页接口、一次性领取、同设备替换和自吊销均实现；`device_test.go` 覆盖 pending → 批准 → 领取 → 重复领取失效、同设备吊销旧令牌及拒绝场景。
 
 ### A5 网页（约 1.5 天）
 

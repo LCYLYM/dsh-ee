@@ -41,14 +41,15 @@ type Options struct {
 }
 
 type Server struct {
-	store    *store.Store
-	box      *secret.Box
-	opts     Options
-	log      *slog.Logger
-	limiter  *loginLimiter
-	upstream *http.Client
-	registry *registry.Service
-	settings settingsCache
+	store      *store.Store
+	box        *secret.Box
+	opts       Options
+	log        *slog.Logger
+	limiter    *loginLimiter
+	deviceRate *ipRate
+	upstream   *http.Client
+	registry   *registry.Service
+	settings   settingsCache
 	// 能力目录变化的通知（DSH 的 MCP 长连接据此刷新工具）
 	hub hubBroker
 	// 上游 MCP 连接的缓存，按资产 id
@@ -70,7 +71,7 @@ func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Serv
 			MaxIdleConnsPerHost:   32,
 		}}
 	}
-	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), upstream: up, connectKick: make(chan struct{}, 1)}
+	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), deviceRate: newIPRate(), upstream: up, connectKick: make(chan struct{}, 1)}
 	s.registry = s.newRegistry()
 	return s
 }
@@ -126,18 +127,25 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
 	mux.Handle("GET /api/auth/me", s.requireUser(http.HandlerFunc(s.handleMe)))
 	mux.Handle("POST /api/auth/password", s.requireUser(http.HandlerFunc(s.handleChangePassword)))
-
 	// 登录即可；每个接口按权限点校验，菜单只是前端的展示配置
 	user := func(h http.HandlerFunc) http.Handler { return s.requireUser(h) }
 	perm := func(h http.HandlerFunc, codes ...string) http.Handler {
 		return s.requireUser(s.requirePerm(codes...)(h))
 	}
+	mux.HandleFunc("POST /api/device/code", s.handleDeviceCode)
+	mux.HandleFunc("POST /api/device/token", s.handleDeviceToken)
+	mux.Handle("GET /api/device/{user_code}", user(s.handleDeviceInfo))
+	mux.Handle("POST /api/device/{user_code}", user(s.handleDeviceApprove))
+	mux.HandleFunc("POST /api/dsh/logout", s.handleDshLogout)
 	mux.Handle("GET /api/me/menus", user(s.handleMyMenus))
 
 	// 员工：额度、查看并自助创建 / 吊销自己的 key
 	mux.Handle("GET /api/me/keys", perm(s.handleMyKeys, rbac.KeysSelf))
 	mux.Handle("POST /api/me/keys", perm(s.handleCreateMyKey, rbac.KeysSelf))
 	mux.Handle("DELETE /api/me/keys/{id}", perm(s.handleRevokeMyKey, rbac.KeysSelf))
+	mux.Handle("GET /api/me/tokens", perm(s.handleMyTokens, rbac.KeysSelf, rbac.RegistryUse))
+	mux.Handle("POST /api/me/tokens", perm(s.handleCreateMyToken, rbac.KeysSelf, rbac.RegistryUse))
+	mux.Handle("DELETE /api/me/tokens/{id}", perm(s.handleRevokeMyToken, rbac.KeysSelf, rbac.RegistryUse))
 
 	// 用户（分配额度、分发 key、分配角色的页面也需要列出用户）
 	mux.Handle("GET /api/admin/users", perm(s.handleListUsers, rbac.UsersView, rbac.UsersManage, rbac.QuotasManage, rbac.KeysManage, rbac.RolesManage))
@@ -176,6 +184,9 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/admin/keys", perm(s.handleListKeys, rbac.KeysManage))
 	mux.Handle("POST /api/admin/keys", perm(s.handleIssueKey, rbac.KeysManage))
 	mux.Handle("DELETE /api/admin/keys/{id}", perm(s.handleRevokeKey, rbac.KeysManage))
+	mux.Handle("GET /api/admin/tokens", user(s.handleAdminTokens))
+	mux.Handle("POST /api/admin/tokens", user(s.handleIssueToken))
+	mux.Handle("POST /api/admin/tokens/revoke", user(s.handleRevokeTokens))
 
 	// 系统设置：登录即可读（前端要用组织名、作用域、评分开关），按段落校验写权限
 	mux.Handle("GET /api/settings", user(s.handleGetSettings))

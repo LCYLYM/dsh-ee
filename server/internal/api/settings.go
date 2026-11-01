@@ -160,6 +160,9 @@ func validateSettings(v *store.AppSettings) string {
 	if v.Connect.PollSeconds < 15 || v.Connect.PollSeconds > 3600 {
 		return "DSH 接入插件的检查间隔应在 15–3600 秒之间"
 	}
+	if v.Connect.DeviceTokenDays < 1 || v.Connect.DeviceTokenDays > 3650 {
+		return "设备登录令牌有效天数应在 1–3650 天之间"
+	}
 	v.Connect.DefaultModel = strings.TrimSpace(v.Connect.DefaultModel)
 	if v.Scoring.MinPreloadScore < 0 || v.Scoring.MinPreloadScore > 100 {
 		return "预载最低评分应在 0–100 之间"

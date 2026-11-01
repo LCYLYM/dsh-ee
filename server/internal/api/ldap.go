@@ -331,6 +331,9 @@ func (s *Server) authenticate(ctx context.Context, username, password string) (*
 	if err != nil && !notFound(err) {
 		return nil, err
 	}
+	if u != nil && u.AccountType != store.AccountHuman {
+		return nil, errBadCredentials
+	}
 	if u != nil && u.AuthSource != store.AuthLDAP {
 		if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil || u.Disabled {
 			return nil, errBadCredentials

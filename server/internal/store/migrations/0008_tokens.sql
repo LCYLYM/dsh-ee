@@ -35,6 +35,8 @@ CREATE TABLE device_codes (
   client_name      VARCHAR(128)  NOT NULL DEFAULT '',
   client_os        VARCHAR(64)   NOT NULL DEFAULT '',
   client_version   VARCHAR(64)   NOT NULL DEFAULT '',
+  client_ip        VARCHAR(64)   NOT NULL DEFAULT '',
+  interval_seconds INT           NOT NULL DEFAULT 5,
   scopes           VARCHAR(255)  NOT NULL,
   status           VARCHAR(16)   NOT NULL,
   user_id          BIGINT        NULL,
