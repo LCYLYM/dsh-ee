@@ -1,6 +1,6 @@
-// 命令 seed 给开发 / 演示环境补一份可用的数据：角色、员工、额度、上游模型与 key。
+// 命令 seed 给开发 / 演示环境补一份可用的数据：角色、员工、机器人、额度、上游模型与凭据。
 //
-// 通过服务端 HTTP 接口写入（不直接动库）。重复执行是幂等的：角色、用户、上游、模型、key
+// 通过服务端 HTTP 接口写入（不直接动库）。重复执行是幂等的：角色、用户、上游、模型与凭据
 // 都不会重复创建；已存在用户的额度会被重新设置为下面的演示值。
 //
 // 用法：
@@ -57,10 +57,10 @@ func (u demoUser) quotaText() string {
 // 演示员工：覆盖普通员工、审核员、运维，以及一个没分配额度的账号。
 var demoUsers = []demoUser{
 	{"zhang.wei", "张伟", "研发效能部", []string{"member"}, 5_000_000, []string{"deepseek-chat", "deepseek-reasoner"}, true},
-	{"li.na", "李娜", "财务部", []string{"member"}, 2_000_000, nil, true},
-	{"sun.hao", "孙浩", "研发效能部", []string{"member", "reviewer"}, 3_000_000, []string{"deepseek-chat"}, true},
-	{"chen.yu", "陈宇", "数据中台", []string{"member", "ops"}, 8_000_000, nil, true},
-	{"zhou.lei", "周磊", "平台架构部", []string{"member", "ops"}, 3_000_000, nil, true},
+	{"li.na", "李娜", "财务部", []string{"member"}, 2_000_000, nil, false},
+	{"sun.hao", "孙浩", "研发效能部", []string{"member", "reviewer"}, 3_000_000, []string{"deepseek-chat"}, false},
+	{"chen.yu", "陈宇", "数据中台", []string{"member", "ops"}, 8_000_000, nil, false},
+	{"zhou.lei", "周磊", "平台架构部", []string{"member", "ops"}, 3_000_000, nil, false},
 	{"wang.fang", "王芳", "市场部", []string{"member"}, 0, nil, false},
 }
 
@@ -118,20 +118,37 @@ func main() {
 
 	check(c.ensureProviders())
 
-	issued, err := c.ensureKeys(users)
+	botID, err := c.ensureBot(users["zhang.wei"], roles["member"])
+	check(err)
+	users["rd-ci"] = botID
+
+	check(c.ensureProviders())
+
+	keys, err := c.ensureKeys(users)
+	check(err)
+	tokens, err := c.ensureTokens(users, botID)
 	check(err)
 
 	fmt.Println("\n演示账号（初始密码 " + userPass + "，登录后请修改）：")
 	for _, u := range demoUsers {
 		fmt.Printf("  %-10s %-4s %-8s %s\n", u.Username, u.DisplayName, u.Department, u.quotaText())
 	}
-	if len(issued) == 0 {
-		fmt.Println("\n所有演示账号都已有可用的 key（「我的 DSH」）。")
+	fmt.Println("  rd-ci      研发效能部 CI（机器人，负责人 zhang.wei，每月 500 万 token）")
+	if len(keys) == 0 && len(tokens) == 0 {
+		fmt.Println("\n所有演示账号与机器人都已有可用的演示凭据。")
 		return
 	}
-	fmt.Println("\n新建的 API key（明文只显示这一次，请及时保存）：")
-	for _, k := range issued {
-		fmt.Printf("  %-10s %s\n", k.user, k.key)
+	if len(keys) > 0 {
+		fmt.Println("\n新建的旧版 API key（明文只显示这一次，请及时保存）：")
+		for _, k := range keys {
+			fmt.Printf("  %-10s %s\n", k.user, k.key)
+		}
+	}
+	if len(tokens) > 0 {
+		fmt.Println("\n新建的 ee_at_ 接入令牌（明文只显示这一次，请及时保存）：")
+		for _, k := range tokens {
+			fmt.Printf("  %-10s %s\n", k.user, k.key)
+		}
 	}
 }
 
@@ -226,6 +243,41 @@ func (c *client) ensureUsers(roles map[string]int64, password string) (map[strin
 	return byName, nil
 }
 
+func (c *client) ensureBot(ownerID, memberRoleID int64) (int64, error) {
+	if ownerID == 0 || memberRoleID == 0 {
+		return 0, errors.New("机器人负责人或员工角色不存在")
+	}
+	var out struct {
+		Users []struct {
+			ID       int64  `json:"id"`
+			Username string `json:"username"`
+		} `json:"users"`
+	}
+	if err := c.do("GET", "/api/admin/users", nil, &out); err != nil {
+		return 0, err
+	}
+	for _, u := range out.Users {
+		if u.Username == "rd-ci" {
+			if err := c.do("PATCH", "/api/admin/users/"+fmt.Sprint(u.ID)+"/quota", map[string]any{"monthly_token_limit": 5_000_000, "allowed_models": nil, "quota_expires_at": nil}, nil); err != nil {
+				return 0, fmt.Errorf("设置机器人额度：%w", err)
+			}
+			return u.ID, nil
+		}
+	}
+	body := map[string]any{
+		"username": "rd-ci", "display_name": "研发效能部 CI", "department": "研发效能部",
+		"account_type": "bot", "owner_id": ownerID, "role_ids": []int64{memberRoleID}, "monthly_token_limit": 5_000_000,
+	}
+	var created struct {
+		ID int64 `json:"id"`
+	}
+	if err := c.do("POST", "/api/admin/users", body, &created); err != nil {
+		return 0, fmt.Errorf("创建机器人：%w", err)
+	}
+	fmt.Println("机器人 + 研发效能部 CI（rd-ci · 负责人 zhang.wei）")
+	return created.ID, nil
+}
+
 // ---- 上游与模型 ----
 
 func (c *client) ensureProviders() error {
@@ -295,6 +347,55 @@ func (c *client) ensureKeys(users map[string]int64) ([]issuedKey, error) {
 			return nil, fmt.Errorf("给 %s 发 key：%w", u.Username, err)
 		}
 		issued = append(issued, issuedKey{user: u.Username, key: created.Key})
+	}
+	return issued, nil
+}
+
+func (c *client) ensureTokens(users map[string]int64, botID int64) ([]issuedKey, error) {
+	owners := make([]struct {
+		name string
+		id   int64
+	}, 0, len(demoUsers)+1)
+	for _, u := range demoUsers {
+		owners = append(owners, struct {
+			name string
+			id   int64
+		}{u.Username, users[u.Username]})
+	}
+	owners = append(owners, struct {
+		name string
+		id   int64
+	}{"rd-ci", botID})
+
+	var issued []issuedKey
+	for _, owner := range owners {
+		var out struct {
+			Tokens []struct {
+				Name      string `json:"name"`
+				RevokedAt any    `json:"revoked_at"`
+			} `json:"tokens"`
+		}
+		path := fmt.Sprintf("/api/admin/tokens?user_id=%d&status=active", owner.id)
+		if err := c.do("GET", path, nil, &out); err != nil {
+			return nil, fmt.Errorf("读取 %s 的接入令牌：%w", owner.name, err)
+		}
+		has := false
+		for _, token := range out.Tokens {
+			if token.Name == "演示接入" && token.RevokedAt == nil {
+				has = true
+			}
+		}
+		if has {
+			continue
+		}
+		var created struct {
+			Token string `json:"token"`
+		}
+		body := map[string]any{"user_id": owner.id, "name": "演示接入"}
+		if err := c.do("POST", "/api/admin/tokens", body, &created); err != nil {
+			return nil, fmt.Errorf("给 %s 发接入令牌：%w", owner.name, err)
+		}
+		issued = append(issued, issuedKey{user: owner.name, key: created.Token})
 	}
 	return issued, nil
 }

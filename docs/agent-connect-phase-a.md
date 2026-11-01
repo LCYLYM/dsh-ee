@@ -171,6 +171,8 @@ A4 已完成（2026-11-01）：设备码发起、限流与 slow_down、确认页
 | `pages/admin/dashboard.tsx` | 用量榜可切换「按人 / 按令牌」，机器人账号单独标识 |
 | i18n | 新增 `i18n/{zh,en}/tokens.ts`，`06-i18n` 覆盖新页面 |
 
+A5 已完成（2026-11-01）：沿用 `my-keys.tsx` 与 `admin/keys.tsx` 文件名，保留 PageKey；统一令牌视图、设备确认、bot 创建、批量吊销、来源审计、按令牌统计和接入设置均完成，前端 `pnpm build` 通过。浏览器 E2E 在 A9 收口。
+
 ### A6 接入插件源码化与登录（约 2.5 天，依赖 S5～S9）
 
 - 新目录 `dsh-plugin/`（TypeScript，esbuild 打成单文件）→ 输出 `server/internal/api/connectpkg/index.js`（`go:embed` 不变）。`make plugin` 构建；CI 的 `web` 任务里加「构建插件后 `git diff --exit-code`」。
@@ -186,6 +188,8 @@ A4 已完成（2026-11-01）：设备码发起、限流与 slow_down、确认页
 - `/ee-login`：命令返回文本保持单行（多行会被折叠）；发起后立即调用 `openBrowser`；同一进程内已有进行中的登录时返回同一个确认码，不再开新的浏览器页。内容哈希变化会自动发布新版本。
 - 单元测试 `dsh-plugin/test/`：假 `ctx`（credentials / commands / tools / on / effect）+ 假 dsh-ee（node http）：登录全流程、`slow_down`、超时、重复 `/ee-login`、失效清理（值已被换掉时不清）、`.npmrc` 只改一行、待导入文件导入后删除、桥在 `list_changed` 后增删工具。
 
+A6 已完成（2026-11-01）：TypeScript 源码、6 个插件测试、单文件构建和 CI 产物一致性检查已完成；模型提供方改用凭据引用与 DSH 客户端头，插件内 MCP 桥替代 `dsh-mcp-client`。真实 DSH 场景在 A9 验证。
+
 ### A7 setup 脚本（约 1 天）
 
 - `setup.sh`：
@@ -196,10 +200,14 @@ A4 已完成（2026-11-01）：设备码发起、限流与 slow_down、确认页
 - `setup.ps1`：同样逻辑，用 `Invoke-RestMethod`、`Start-Process` 打开浏览器、`icacls` 收紧待导入文件权限。
 - 设备码请求里的 `client_name`：`$(hostname)`，`client_os`：`uname -sr` / PowerShell 版本，`client_version`：已装 DSH 的版本（未装时空）。
 
+A7 已完成（2026-11-01）：Shell 与 PowerShell 均支持设备码和手动令牌；Shell 增加 `DSH_EE_SETUP_INTERACTIVE=1` 供无 TTY 自动化验证，PowerShell 下载后直接执行。特殊引号与 `sh -n` 测试通过，真实流程在 A9 验证。
+
 ### A8 收尾（约 0.5 天）
 
 - `cmd/seed`：建一个机器人账号「研发效能部 CI」并下发令牌；演示员工改为新令牌（旧 key 保留一个用于演示兼容）。
 - 文档：`README.md`、`server/README.md`（令牌与设备登录、`/ee-login`、兼容说明、回滚注意）；技术规划里登记 S5～S10 结论。
+
+A8 已完成（2026-11-01）：种子数据包含员工统一令牌、一个旧 key 和研发效能部 CI 机器人；接入、升级与回滚文档已更新。S10 是阶段 D 的可选验证，本阶段不实施。
 
 ### A9 验证（贯穿，集中收口约 1 天）
 

@@ -6,7 +6,7 @@
 
 | 问题 | 方案 |
 |---|---|
-| 令牌怎么到 DSH | 接入插件注册 `ctx.authorization` 登录方式，走设备码流程；令牌存进 `ctx.credentials`（名字 `DSHEE_TOKEN`），配置里只引用名字 |
+| 令牌怎么到 DSH | setup 脚本或 `/ee-login` 走设备码流程；令牌存进 `ctx.credentials`（名字 `DSHEE_TOKEN`），配置里只引用名字。S1 已证明通用授权界面不可用，因此不依赖 `ctx.authorization` 展示登录入口 |
 | 模型怎么用令牌 | `llm-pi-ai` 提供方配置 `apiKeyEnv: DSHEE_TOKEN`。它是 `CredentialRef`：先读凭据库，再回落到环境变量与 `.env`，每次请求重新解析，换令牌不用重启 |
 | 企业连接与 dsh-ee 工具怎么用令牌 | **不再使用 `dsh-mcp-client` 那一行**：它的 HTTP 请求头是配置时写死的（`transport.ts` 里 `requestInit.headers` 静态传入），读不到凭据库。改由接入插件自带一个轻量 MCP 桥：连 dsh-ee 的 `/mcp`，把工具用 `ctx.tools.register` 注册给 DSH，每次调用现解析令牌 |
 | 写操作怎么确认 | 插件监听 `tools/pre-execute`，对 dsh-ee 的写工具返回 `{kind:'ask'}`，DSH 自带审批框；危险操作另有服务端两步确认，与客户端无关 |
@@ -27,6 +27,17 @@
 | S6 | 插件内 `fetch` 带令牌访问 `/api/dsh/*` 与 `/mcp`，以及 SSE 长连接在 web profile 热重载时的释放 | 热重载后无残留连接（dsh-ee 侧 SSE 连接数回落） | 改为轮询 `catalog` 的 `revision` |
 
 S1～S4 决定阶段 A、C 的实现路径，必须先做。第二轮 S5～S10（含原 S5、S6）见 [阶段 A 实施规划](agent-connect-phase-a.md) §3。
+
+### 第二轮实测结果（2026-11-01）
+
+| 编号 | 结果 | 对实现的影响 |
+|---|---|---|
+| S5 | **通过** | `mcp__acme__get_user`、点号、连字符和 81 字符工具名均可注册调用；嵌套 schema 可用，Web 默认折叠 JSON 结果。 |
+| S6 | **通过** | `ctx.effect` 返回 abort 清理函数；热重载只保留一个活动连接，停用后归零。 |
+| S7 | **通过（调整方案）** | DSH 请求带 `X-DshEE-Client` 时，鉴权、权限和额度错误改为 400 中文文案，避免上游固定英文错误和重试。 |
+| S8 | **通过（调整方案）** | `/ee-login`、`/ee-status` 必须在已有对话中执行才有可见命令记录；后台登录继续运行，但不提供完成后的二次通知。 |
+| S9 | **通过** | 插件启动时从 pending 文件写入凭据库，首个模型请求即使用新令牌，随后删除文件。 |
+| S10 | **本阶段不做** | Web 客户端插件属于阶段 D 可选项，不是统一登录的前置条件。 |
 
 ### 实测结果（2026-10-31）
 

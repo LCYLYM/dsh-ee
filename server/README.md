@@ -37,10 +37,13 @@ Go 写的 dsh-ee 服务端。目前实现：
 
 设计依据与取舍见 [docs/capability-hub.md](../docs/capability-hub.md)。
 
-- **接入令牌**：员工在「接入指南」生成的 `ee_npm_…` 令牌同时用于 npm 源、模型网关（`/v1`，额度按账号）、技能目录（`/api/dsh/*`）与企业连接（`/mcp`）。
+- **统一接入令牌**：`ee_at_…` 同时用于 npm 源、模型网关（`/v1`）、技能目录（`/api/dsh/*`）与企业连接（`/mcp`）。每次请求按账号 RBAC 与令牌 scope 求交集，可配置令牌级月度额度、模型范围和有效期；明文只显示一次，服务端只存 sha256。旧 `ee_npm_…`、`sk-ee-…` 保持原有权限与额度行为。
+- **设备登录**：`POST /api/device/code` 发起 RFC 8628 设备码流程，员工在 `/device` 登录并确认；设备令牌只能领取一次，默认滑动有效 90 天，同账号同设备再次登录会吊销旧令牌。机器人账号由管理员创建并指定负责人，不能会话登录。
 - **技能、提示词、微应用**：存在 `assets` / `asset_versions`；员工提交的版本在白名单模式下要审核。DSH 通过 `GET /api/dsh/catalog`（带 ETag，没变化回 304）拿到自己此刻应有的目录，`GET /api/dsh/skills/{name}` 取正文。提示词与微应用以「只给人调用」的 skill 下发（DSH 里输入 `/名字`）。
 - **企业连接（MCP 网关）**：`/mcp` 是一个 Streamable HTTP MCP 服务，聚合员工有权使用的全部连接，工具名 `<连接>__<工具>`。上游可以是 MCP 服务，也可以是导入的 OpenAPI 文档（每个操作一个工具，写操作默认关闭）。凭据用主密钥加密存在 dsh-ee，按员工逐次校验后带上凭据转发，调用记入 `connection_calls`。GET `/mcp` 打开事件流，能力目录变化时推 `notifications/tools/list_changed`。
-- **DSH 接入插件**：dsh-ee 按系统设置生成 `<主作用域>/dsh-connect`（DSH 组合包：远程技能来源、`dsh-mcp-client` 指向 `/mcp`、可选的模型提供方与插件索引、自动安装必装插件），内容变化时自动发布新版本到自己的 npm 源。`setup.sh` / `setup.ps1` 把令牌写进 `$DSH_HOME/.env`（`DSHEE_TOKEN`）并 `dsh plugin --profile web add` 它。需要员工能访问的地址：系统设置的「访问地址」或 `DSH_EE_PUBLIC_URL`。
+- **DSH 接入插件**：dsh-ee 按系统设置生成 `<主作用域>/dsh-connect`（远程技能来源、插件内 MCP 桥、可选模型提供方与插件索引、自动安装必装插件），内容变化时自动发布新版本。插件每次请求现取 DSH 凭据库中的 `DSHEE_TOKEN`，支持 `/ee-login`、`/ee-status`、`/ee-logout`，失效时清理旧凭据并同步 npm 配置。
+- **一键接入**：macOS / Linux 执行 `curl -fsSL <dsh-ee>/setup.sh | sh`，Windows 执行 `irm <dsh-ee>/setup.ps1 | iex`。脚本走设备码登录，写 `~/.npmrc` 与权限为 0600 的 `$DSH_HOME/dsh-ee/token.pending`，插件首次启动将令牌导入凭据库后删除待导入文件。`setup.sh --token <令牌>` 或 `DSH_EE_TOKEN` 保留手动 / CI 流程，并继续写 `$DSH_HOME/.env`。服务地址由 `DSH_EE_PUBLIC_URL` 或请求地址决定。
+- **升级与回滚**：升级数据库会自动新增令牌表和列，原主密钥必须保留。回滚到旧服务端后 `ee_at_` 不可用，需要改回旧 `ee_npm_` / `sk-ee-`；旧版会忽略新增表和列。
 - 已知限制：镜像的上游包不带 npm 签名，经 dsh-ee 下载并校验签名的工具（如 corepack 自动下载 pnpm）会失败；请先装好 pnpm 再运行接入脚本。
 
 ## 大模型接入
@@ -61,8 +64,8 @@ DSH 的 `dsh plugin add` 在 profile 目录里转发给 pnpm，所以「能力�
 - **回源**：「按需回源并缓存」时，作用域之外的包取上游 packument（磁盘缓存 5 分钟，带 ETag 重新验证，上游不可用时用旧缓存），tarball 第一次下载时拉取、校验 integrity 后存下；「只提供已预载的包」或离线模式下只用本地已有的版本。**声明了 `dsh.bundle` 的上游版本（即社区插件）在白名单模式下必须先在本地审核上架才可见**，普通依赖不需要审核。
 - **上游预载**：从 dshfind 插件目录（DSH 索引 format 1）挑插件，镜像插件本身与依赖闭包（dependencies、optionalDependencies、必需的 peerDependencies，按 npm 的 semver 规则解析，含预发布版本的规则），记录闭包大小与是否离线可装。插件进入待审核（或勾选直接上架），依赖直接可用。每 6 小时按「新版本」设置检查已预载插件的新版本。员工也可以「申请引入」某个包，走同样的流程进入待审核。
 - **离线包**：能上网的实例导出 tar（`dsh-ee-bundle.json` 清单 + 按 sha512 命名的 tarball），拷进隔离网实例导入；导入时逐个重算 sha512，与文件名、清单 integrity 都一致才入库，插件版本进入待审核。
-- **令牌**：员工在「接入指南」里创建个人令牌（`ee_npm_…`，只读或可发布），只存 sha256；也支持 `npm login --auth-type=legacy`。设置里「安装也需要令牌」关闭后匿名可装，发布总是要令牌。每次 tarball 下载记入 `npm_downloads`（安装审计与企业内热门）。
-- **接入脚本**：`curl -fsSL <dsh-ee>/setup.sh | sh -s -- <令牌>`（Windows：`iwr <dsh-ee>/setup.ps1 | iex; Setup-DshEE -Token <令牌>`）用 `npm config` 写好 registry、作用域与令牌。
+- **令牌**：统一 `ee_at_…` 令牌按 `registry:read` / `registry:publish` scope 控制 npm 权限；旧 `ee_npm_…` 只读 / 可发布令牌与 `npm login --auth-type=legacy` 继续支持。设置里「安装也需要令牌」关闭后匿名可装，发布总是要令牌。每次 tarball 下载记入 `npm_downloads`（安装审计与企业内热门）。
+- **接入脚本**：`curl -fsSL <dsh-ee>/setup.sh | sh`（Windows：`irm <dsh-ee>/setup.ps1 | iex`）通过设备确认后用 `npm config` 写好 registry、作用域与令牌；无浏览器环境用 `sh -s -- --token <令牌>`。
 - **DSH 插件索引**：`GET /index/dsh-index.json`，按 dshfind 的 `dsh-index.mjs` 同一口径生成并自检（读端任何一条违规就整份拒收）。只含已上架插件的元数据，**不需要令牌**（DSH 请求索引源时不一定能带认证头）；下载 tarball 仍然要令牌。
 
 不支持：`npm unpublish`（返回 405，请在网页下架）、npm 的 web 登录、组织与团队权限、漏洞审计（`/-/npm/v1/security/*` 返回空结果）、部门级可见范围（P1）。
@@ -131,10 +134,12 @@ OceanBase 单机最低也要几 GB 内存，本地机器紧张时先用 TiDB 调
 | GET | `/api/auth/me` | 当前用户、角色、有效权限点、是否超级管理员 |
 | GET | `/api/me/menus` | 当前用户能访问的菜单（已按权限过滤，含隐藏页面） |
 | POST | `/api/auth/password` | `{old_password, new_password}`，成功后所有会话失效 |
-| GET | `/api/me/keys` | 我的 key、本月用量与额度 |
-| POST | `/api/me/keys` | 自助创建 `{name, expires_at?}`，明文只返回这一次 |
-| DELETE | `/api/me/keys/{id}` | 吊销自己的 key |
-| GET / POST | `/api/admin/users` | 用户列表（含角色） / 新建 `{username, password, display_name, department, role_ids?, monthly_token_limit?}`；不传 `role_ids` 给默认的「员工」角色，不传额度默认 `0`（未分配） |
+| GET | `/api/me/keys` | 旧版 key、本月用量与额度 |
+| POST | `/api/me/keys` | 自助创建旧版 key `{name, expires_at?}`，明文只返回这一次 |
+| DELETE | `/api/me/keys/{id}` | 吊销自己的旧版 key |
+| GET / POST | `/api/me/tokens` | 统一新旧令牌列表 / 创建 `ee_at_` `{name, scopes, monthly_token_limit?, allowed_models?, expires_in_days?}` |
+| DELETE | `/api/me/tokens/{id}` | 按 `at:` / `npm:` / `key:` 前缀吊销自己的令牌 |
+| GET / POST | `/api/admin/users` | 用户列表（含角色） / 新建 `{username, password, display_name, department, role_ids?, monthly_token_limit?}`；机器人用 `account_type: bot` + `owner_id` 且不设密码；不传 `role_ids` 给默认的「员工」角色，不传额度默认 `0`（未分配） |
 | PATCH | `/api/admin/users/{id}` | `{display_name, department, disabled, password}` 任选 |
 | PUT | `/api/admin/users/{id}/roles` | `{role_ids}` 整体替换用户的角色 |
 | GET / POST | `/api/admin/permissions` | 权限点列表 / 新建自定义权限点 `{code, name, group, description}` |
@@ -151,8 +156,12 @@ OceanBase 单机最低也要几 GB 内存，本地机器紧张时先用 TiDB 调
 | POST | `/api/admin/providers/{id}/check` | 检查连接，返回上游提供的模型列表 |
 | GET / POST | `/api/admin/models` | 全部模型 / 批量添加 `{provider_id, items: [{upstream_model, name?, display_name?}]}`，重名的跳过 |
 | PATCH / DELETE | `/api/admin/models/{id}` | 修改 `{name, upstream_model, display_name, enabled}` / 删除 |
-| GET / POST | `/api/admin/keys` | 全部 key / 代发 `{user_id, name, expires_at?}`，明文只返回这一次 |
-| DELETE | `/api/admin/keys/{id}` | 吊销 |
+| GET / POST | `/api/admin/keys` | 旧版 key 列表 / 代发 `{user_id, name, expires_at?}`，明文只返回这一次 |
+| DELETE | `/api/admin/keys/{id}` | 吊销旧版 key |
+| GET / POST | `/api/admin/tokens` | 统一令牌筛选 / 给员工或机器人下发令牌 |
+| POST | `/api/admin/tokens/revoke` | 按 id、用户、设备或部门批量吊销 |
+| POST | `/api/device/code`、`/api/device/token` | 设备码发起与轮询领取（无需会话） |
+| GET / POST | `/api/device/{user_code}` | 查看设备信息 / 登录后批准或拒绝 |
 | GET | `/api/settings` | 系统设置（登录即可读） |
 | PUT | `/api/admin/settings` | 整份替换；按改动的段落校验权限（npm 源 / 上游段落也可由对应管理员修改） |
 | GET | `/api/catalog`、`/api/catalog/{包名}` | 能力市场：已上架的能力 / 详情（版本、检查结果、README） |
