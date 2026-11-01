@@ -479,11 +479,14 @@ func TestHub(t *testing.T) {
 	}
 	files := untar(t, body)
 	patch := files["package/cordis.patch.yml"]
-	for _, want := range []string{"name: '@acme/dsh-connect'", "baseUrl: '" + ts.URL + "'", "serverName: acme", "url: '" + ts.URL + "/mcp'",
-		"process.env.DSHEE_TOKEN", "indexes:", "baseURL: '" + ts.URL + "/v1'", "model: 'deepseek-chat'"} {
+	for _, want := range []string{"name: '@acme/dsh-connect'", "base: '" + ts.URL + "'", "serverName: 'acme'", "tokenRef: DSHEE_TOKEN",
+		"X-DshEE-Client: 'dsh-connect/1.0.1'", "indexes:", "baseURL: '" + ts.URL + "/v1'", "model: 'deepseek-chat'"} {
 		if !strings.Contains(patch, want) {
 			t.Fatalf("接入组合包缺少 %q：\n%s", want, patch)
 		}
+	}
+	if strings.Contains(patch, "dsh-mcp-client") {
+		t.Fatal("接入组合包不应再包含 dsh-mcp-client")
 	}
 	if !strings.Contains(files["package/package.json"], `"patch": "./cordis.patch.yml"`) || !strings.Contains(files["package/index.js"], "registerProvider") {
 		t.Fatalf("package.json / index.js 不对：%v", files["package/package.json"])

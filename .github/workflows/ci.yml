@@ -25,6 +25,13 @@ jobs:
       # tsc + vite build；缺英文翻译的键会在这里报错
       - run: pnpm build
         working-directory: web
+      - run: npm ci --no-audit --no-fund
+        working-directory: dsh-plugin
+      - run: npm test
+        working-directory: dsh-plugin
+      - run: npm run build
+        working-directory: dsh-plugin
+      - run: git diff --exit-code server/internal/api/connectpkg/index.js
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist

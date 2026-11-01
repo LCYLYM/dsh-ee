@@ -13,13 +13,16 @@ PNPM    ?= corepack pnpm
 LDFLAGS := -s -w -X main.version=$(VERSION)
 EMBED   := server/internal/webui/build
 
-.PHONY: web embed build release test e2e image bundle clean
+.PHONY: web plugin embed build release test e2e image bundle clean
 
 web:
 	cd web && $(PNPM) install --frozen-lockfile && $(PNPM) build
 
+plugin:
+	cd dsh-plugin && npm ci --no-audit --no-fund && npm test && npm run build
+
 # 把 web/dist 换进嵌入目录；保留目录里的 .gitignore
-embed: web
+embed: web plugin
 	find $(EMBED) -mindepth 1 ! -name .gitignore -exec rm -rf {} +
 	cp -R web/dist/. $(EMBED)/
 

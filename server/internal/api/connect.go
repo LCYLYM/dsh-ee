@@ -69,7 +69,7 @@ func (s *Server) connectBase(ctx context.Context, r *http.Request) (string, erro
 func yamlQuote(v string) string { return "'" + strings.ReplaceAll(v, "'", "''") + "'" }
 
 // buildConnect 生成接入插件的文件内容与内容摘要（摘要不含版本号）。
-func (s *Server) buildConnect(ctx context.Context, base string) (string, map[string][]byte, string, error) {
+func (s *Server) buildConnect(ctx context.Context, base, version string) (string, map[string][]byte, string, error) {
 	set, err := s.appSettings(ctx)
 	if err != nil {
 		return "", nil, "", err
@@ -85,11 +85,8 @@ func (s *Server) buildConnect(ctx context.Context, base string) (string, map[str
 	fmt.Fprintf(&p, "# %s 的 DSH 接入组合包，由 dsh-ee（%s）生成，请勿手改。\n", org, base)
 	p.WriteString("- insert:\n")
 	fmt.Fprintf(&p, "    - id: dsh-ee-connect\n      name: %s\n      config:\n", yamlQuote(pkg))
-	fmt.Fprintf(&p, "        baseUrl: %s\n        tokenEnv: %s\n        pollSeconds: %d\n        rank: %d\n        installRequired: %t\n",
-		yamlQuote(base), connectTokenEnv, set.Connect.PollSeconds, connectSkillRank, set.Connect.InstallRequired)
-	fmt.Fprintf(&p, "    - id: dsh-ee-mcp\n      name: '@deepseek-ai/dsh-mcp-client'\n      config:\n")
-	fmt.Fprintf(&p, "        serverName: %s\n        transport: streamable-http\n        url: %s\n", server, yamlQuote(base+"/mcp"))
-	fmt.Fprintf(&p, "        headers:\n          Authorization: !!js '`Bearer ${process.env.%s ?? \"\"}`'\n", connectTokenEnv)
+	fmt.Fprintf(&p, "        base: %s\n        org: %s\n        serverName: %s\n        tokenRef: %s\n        autoInstall: %t\n        version: %s\n",
+		yamlQuote(base), yamlQuote(org), yamlQuote(server), connectTokenEnv, set.Connect.InstallRequired, yamlQuote(version))
 	if set.Connect.Market {
 		p.WriteString("    - id: plugin-market\n      name: '@deepseek-ai/dsh-plugin-market'\n      disabled: !!js \"!ctx.get('profileContext')\"\n")
 		fmt.Fprintf(&p, "      config:\n        indexes:\n          - %s\n", yamlQuote(base+"/index/dsh-index.json"))
@@ -110,8 +107,8 @@ func (s *Server) buildConnect(ctx context.Context, base string) (string, map[str
 		if !slices.Contains(models, def) {
 			def = models[0]
 		}
-		fmt.Fprintf(&p, "- id: llm-pi-ai\n  config:\n    providers:\n      dsh-ee:\n        apiKeyEnv: %s\n        api: openai-completions\n        baseURL: %s\n        models:\n",
-			connectTokenEnv, yamlQuote(base+"/v1"))
+		fmt.Fprintf(&p, "- id: llm-pi-ai\n  config:\n    providers:\n      dsh-ee:\n        apiKeyEnv: %s\n        api: openai-completions\n        baseURL: %s\n        headers:\n          X-DshEE-Client: %s\n        models:\n",
+			connectTokenEnv, yamlQuote(base+"/v1"), yamlQuote("dsh-connect/"+version))
 		for _, m := range models {
 			fmt.Fprintf(&p, "          - id: %s\n", yamlQuote(m))
 		}
@@ -138,8 +135,12 @@ dsh-ee：%s
 	files := map[string][]byte{"index.js": connectIndexJS, "cordis.patch.yml": patch, "README.md": []byte(readme)}
 	h := sha256.New()
 	for _, name := range []string{"index.js", "cordis.patch.yml", "README.md"} {
-		fmt.Fprintf(h, "%s\x00%d\x00", name, len(files[name]))
-		h.Write(files[name])
+		content := files[name]
+		if name == "cordis.patch.yml" {
+			content = bytes.ReplaceAll(content, []byte(version), []byte(""))
+		}
+		fmt.Fprintf(h, "%s\x00%d\x00", name, len(content))
+		h.Write(content)
 	}
 	return pkg, files, hex.EncodeToString(h.Sum(nil))[:16], nil
 }
@@ -235,7 +236,12 @@ func (s *Server) ensureConnect(ctx context.Context, r *http.Request, force bool,
 		st.Error = err.Error()
 		return &st, nil
 	}
-	pkg, files, hash, err := s.buildConnect(ctx, base)
+	pkg := connectPackage(set)
+	version, err := s.nextConnectVersion(ctx, pkg)
+	if err != nil {
+		return nil, err
+	}
+	pkg, files, hash, err := s.buildConnect(ctx, base, version)
 	if err != nil {
 		return nil, err
 	}
@@ -243,10 +249,6 @@ func (s *Server) ensureConnect(ctx context.Context, r *http.Request, force bool,
 		if v, err := s.store.GetVersion(ctx, pkg, st.Version); err == nil && v.Status == store.StatusPublished {
 			return &st, nil
 		}
-	}
-	version, err := s.nextConnectVersion(ctx, pkg)
-	if err != nil {
-		return nil, err
 	}
 	org := strings.TrimSpace(set.OrgName)
 	if org == "" {
@@ -363,7 +365,7 @@ func (s *Server) handleAdminConnect(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := map[string]any{"state": st}
 	if base, err := s.connectBase(r.Context(), r); err == nil {
-		if pkg, files, hash, err := s.buildConnect(r.Context(), base); err == nil {
+		if pkg, files, hash, err := s.buildConnect(r.Context(), base, st.Version); err == nil {
 			resp["package"], resp["stale"], resp["patch"] = pkg, hash != st.Hash || pkg != st.Package, string(files["cordis.patch.yml"])
 		}
 	}
