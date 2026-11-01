@@ -38,9 +38,12 @@ export default async function (t) {
   assertEq((await api(admin, "POST", "/api/admin/users", { username: emp, password: "hub-password-123", department: "研发效能部" })).status, 201, "建员工");
   const page = await newPage(t);
   await login(page, emp, "hub-password-123");
-  const tok = await api(page, "POST", "/api/me/npm-tokens", { name: "dsh", access: "read" });
-  assertEq(tok.status, 201, "接入令牌");
+  const tok = await api(page, "POST", "/api/me/tokens", { name: "dsh", scopes: ["models", "registry:read", "hub", "connections"] });
+  assertEq(tok.status, 201, "统一接入令牌");
   const token = tok.data.token;
+  const legacy = await api(page, "POST", "/api/me/npm-tokens", { name: "legacy-dsh", access: "read" });
+  assertEq(legacy.status, 201, "旧 npm 令牌");
+  assertEq((await dsh(legacy.data.token, "GET", "/api/dsh/catalog")).status, 200, "旧 npm 令牌读取 DSH 目录");
   let cat = await dsh(token, "GET", "/api/dsh/catalog");
   assert(!cat.data.skills.some((s) => s.name === skill), "没启用的技能不应下发");
   await page.goto(`${BASE}/hub?tab=skill`);

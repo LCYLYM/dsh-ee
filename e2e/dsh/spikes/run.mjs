@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright-core'
+import { createDsh, stateEvents, waitFor } from '../lib.mjs'
 import { startFakeLlm } from './fake-llm.mjs'
 
 const spikeDir = path.dirname(fileURLToPath(import.meta.url))
@@ -13,6 +12,7 @@ const pluginSource = path.join(spikeDir, 'plugin')
 let plugin
 const workRoot = process.env.SPIKE_WORK ?? path.join(repo, '.tools/dsh-spikes')
 const chrome = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+const { command, startWeb, stopWeb, openPage, submitTask } = createDsh({ dsh, repo, chrome, workspaceLabel: process.env.SPIKE_WORKSPACE_LABEL })
 
 fs.mkdirSync(workRoot, { recursive: true })
 
@@ -28,105 +28,8 @@ function environment(home, fake, state) {
   }
 }
 
-function command(args, env, options = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(dsh, args, { env, cwd: repo })
-    let stdout = ''
-    let stderr = ''
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk
-      if (options.echo) process.stdout.write(chunk)
-    })
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk
-      if (options.echo) process.stderr.write(chunk)
-    })
-    child.on('error', reject)
-    child.on('close', (code) => {
-      if (code === 0 || options.allowExit) resolve({ stdout, stderr, code })
-      else reject(new Error(`dsh ${args.join(' ')} exited ${code}\n${stdout}\n${stderr}`))
-    })
-  })
-}
-
-async function waitFor(check, description, timeoutMs = 60_000) {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const value = await check()
-    if (value) return value
-    await new Promise((resolve) => setTimeout(resolve, 200))
-  }
-  throw new Error(`Timed out: ${description}`)
-}
-
-function stateEvents(state) {
-  if (!fs.existsSync(state)) return []
-  return fs.readFileSync(state, 'utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line))
-}
-
 async function install(profile, env) {
   await command(['plugin', '--profile', profile, 'add', plugin], env, { echo: true })
-}
-
-async function startWeb(env, logPath) {
-  const child = spawn(dsh, ['web', '--no-open', '--port', '0'], { env, cwd: repo })
-  let output = ''
-  const log = fs.createWriteStream(logPath)
-  child.stdout.on('data', (chunk) => {
-    output += chunk
-    log.write(chunk)
-  })
-  child.stderr.on('data', (chunk) => {
-    output += chunk
-    log.write(chunk)
-  })
-  const url = await waitFor(() => output.match(/https?:\/\/127\.0\.0\.1:\d+\/\?token=\S+/)?.[0], 'web URL')
-  return { child, url, output: () => output, log }
-}
-
-async function stopWeb(web) {
-  if (!web) return
-  web.child.kill('SIGTERM')
-  await waitFor(() => web.child.exitCode !== null, 'web shutdown', 10_000).catch(() => web.child.kill('SIGKILL'))
-  web.log.end()
-}
-
-async function openPage(url) {
-  const browser = await chromium.launch({ executablePath: chrome, headless: true, args: ['--no-sandbox'] })
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
-  await page.goto(url)
-  await page.waitForLoadState('networkidle')
-  const previewContinue = page.getByRole('button', { name: 'Continue', exact: true })
-  if (await previewContinue.isVisible()) {
-    await waitFor(() => previewContinue.isEnabled(), 'preview notice button')
-    await previewContinue.click({ force: true })
-    await waitFor(async () => !(await previewContinue.isVisible()), 'preview notice dismissal', 10_000)
-  }
-  await chooseWorkspace(page)
-  return { browser, page }
-}
-
-// 全新的 DSH_HOME 在部分平台（实测 Linux）首页要求先选工作区，输入框才会出现。
-// 目录浏览器从用户主目录开始，点仓库所在的那一级目录名再「Open」；
-// 仓库不在主目录下一层时，用 SPIKE_WORKSPACE_LABEL 指定要点的目录名。
-async function chooseWorkspace(page) {
-  const chooser = page.getByText('Choose workspace', { exact: true })
-  try {
-    await chooser.waitFor({ state: 'visible', timeout: 3_000 })
-  } catch {
-    return
-  }
-  await chooser.click()
-  await page.getByText(process.env.SPIKE_WORKSPACE_LABEL ?? path.basename(repo), { exact: true }).click()
-  await page.getByRole('button', { name: 'Open', exact: true }).click()
-  await waitFor(() => page.locator('textarea:visible, [contenteditable=true]:visible').first().isVisible(), 'chat input after choosing workspace')
-}
-
-async function submitTask(page, task) {
-  const input = page.locator('textarea:visible, [contenteditable=true]:visible').first()
-  await waitFor(() => input.isVisible(), 'chat input')
-  await input.fill(task)
-  await input.press('Enter')
 }
 
 async function runS1(work, fake, state) {

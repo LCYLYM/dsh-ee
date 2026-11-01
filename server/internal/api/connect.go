@@ -124,7 +124,7 @@ func (s *Server) buildConnect(ctx context.Context, base, version string) (string
 - 接入企业系统：工具名以 mcp__%s__ 开头，dsh-ee 按你的权限转发并记录；
 %s%s- 自动安装企业设为「自动安装」的插件。
 
-需要在 DSH 的 .env 里设置接入令牌：%s=<在 dsh-ee「接入指南」生成的令牌>。
+通过 setup 设备登录或在 DSH 对话里执行 /ee-login 后，令牌保存在凭据库（%s）；CI 也可在 .env 中手动设置同名变量。
 
 dsh-ee：%s
 `, org, org, server,

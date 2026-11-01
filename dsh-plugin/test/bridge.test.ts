@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { McpBridge } from "../src/bridge.js";
 import { normalizeConfig } from "../src/config.js";
 
-test("bridge registers and removes tools from list_changed", async () => {
+test("bridge registers initial tools before start resolves and removes tools from list_changed", async () => {
   const registered = new Map<string, any>();
   const ctx = {
     tools: {
@@ -16,6 +16,7 @@ test("bridge registers and removes tools from list_changed", async () => {
   let tools = [{ name: "lookup", description: "Lookup", inputSchema: { type: "object" } }];
   const http = {
     async fetch(_path: string, init: RequestInit) {
+      if (!init.body) return new Response(null);
       const body = JSON.parse(String(init.body));
       if (body.method === "initialize") return new Response(JSON.stringify({ result: {} }), { headers: { "mcp-session-id": "s1" } });
       if (body.method === "tools/list") return new Response(JSON.stringify({ result: { tools } }));
@@ -24,7 +25,7 @@ test("bridge registers and removes tools from list_changed", async () => {
     },
   };
   const bridge = new McpBridge(ctx as any, normalizeConfig({ base: "http://localhost", serverName: "acme" }), http as any);
-  await bridge.sync();
+  await bridge.start();
   assert.ok(registered.has("mcp__acme__lookup"));
   tools = [];
   await bridge.sync();

@@ -243,7 +243,7 @@ async function installRequired(ctx, config, required) {
 }
 
 // src/skills.ts
-function registerSkills(ctx, config, http) {
+async function registerSkills(ctx, config, http) {
   let catalog = { skills: [], required_plugins: [] };
   let etag = "";
   const refresh = async () => {
@@ -254,6 +254,8 @@ function registerSkills(ctx, config, http) {
     etag = response.headers.get("etag") ?? "loaded";
     return true;
   };
+  await refresh();
+  await installRequired(ctx, config, catalog.required_plugins);
   ctx.skills.registerProvider((control) => {
     let timer;
     const pollSeconds = Math.max(15, Number(config.pollSeconds) || 60) * 1e3;
@@ -346,9 +348,9 @@ var McpBridge = class {
       if (!this.disposers.has(name2)) this.register(tool);
     }
   }
-  start() {
+  async start() {
     this.controller = new AbortController();
-    void this.sync().catch(() => void 0);
+    await this.sync().catch(() => void 0);
     void (async () => {
       try {
         const response = await this.http.fetch("/mcp", { headers: { accept: "text/event-stream" }, signal: this.controller?.signal });
@@ -387,8 +389,8 @@ function apply(ctx, input) {
   ctx.effect(async () => {
     await tokens.importPending();
     registerCommands(ctx, config, tokens);
-    registerSkills(ctx, config, http);
-    bridge.start();
+    await registerSkills(ctx, config, http);
+    await bridge.start();
     return () => bridge.stop();
   });
 }

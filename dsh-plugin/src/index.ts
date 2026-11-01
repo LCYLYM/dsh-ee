@@ -24,8 +24,8 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
   ctx.effect(async () => {
     await tokens.importPending();
     registerCommands(ctx, config, tokens);
-    registerSkills(ctx, config, http);
-    bridge.start();
+    await registerSkills(ctx, config, http);
+    await bridge.start();
     return () => bridge.stop();
   });
 }

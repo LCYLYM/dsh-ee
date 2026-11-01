@@ -265,11 +265,11 @@ if [ "$DEVICE_LOGIN" -eq 0 ]; then
   echo "` + connectTokenEnv + `=$TOKEN" >> "$ENV_FILE.tmp"
   mv "$ENV_FILE.tmp" "$ENV_FILE"
   chmod 600 "$ENV_FILE"
-  echo "✔ 已把接入令牌写进 $ENV_FILE（` + connectTokenEnv + `）"
+  echo "✔ 已把接入令牌写进 ${ENV_FILE}（` + connectTokenEnv + `）"
 else
   chmod 700 "$PENDING_DIR"
   chmod 600 "$PENDING_FILE"
-  echo "✔ 令牌已保存到 $PENDING_FILE，DSH 启动后会导入凭据库并删除此文件"
+  echo "✔ 令牌已保存到 ${PENDING_FILE}，DSH 启动后会导入凭据库并删除此文件"
   if [ -f "$ENV_FILE" ] && grep -q '^` + connectTokenEnv + `=' "$ENV_FILE"; then
     REMOVE_OLD=0
     if [ "${DSH_EE_SETUP_INTERACTIVE:-}" != "1" ] && [ -r /dev/tty ] && [ -w /dev/tty ]; then

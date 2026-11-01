@@ -51,9 +51,9 @@ export class McpBridge {
     }
   }
 
-  start(): void {
+  async start(): Promise<void> {
     this.controller = new AbortController();
-    void this.sync().catch(() => undefined);
+    await this.sync().catch(() => undefined);
     void (async () => {
       try {
         const response = await this.http.fetch("/mcp", { headers: { accept: "text/event-stream" }, signal: this.controller?.signal });

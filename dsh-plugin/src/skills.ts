@@ -2,7 +2,7 @@ import type { DshContext, PluginConfig } from "./dsh.js";
 import type { HttpClient } from "./http.js";
 import { installRequired } from "./plugins.js";
 
-export function registerSkills(ctx: DshContext, config: PluginConfig, http: HttpClient): void {
+export async function registerSkills(ctx: DshContext, config: PluginConfig, http: HttpClient): Promise<void> {
   let catalog: any = { skills: [], required_plugins: [] };
   let etag = "";
   const refresh = async () => {
@@ -13,6 +13,8 @@ export function registerSkills(ctx: DshContext, config: PluginConfig, http: Http
     etag = response.headers.get("etag") ?? "loaded";
     return true;
   };
+  await refresh();
+  await installRequired(ctx, config, catalog.required_plugins);
 
   ctx.skills.registerProvider((control: any) => {
     let timer: ReturnType<typeof setTimeout> | undefined;

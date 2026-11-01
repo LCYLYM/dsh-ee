@@ -56,7 +56,7 @@ func getScript(t *testing.T, base, path string) string {
 func TestSetupScripts(t *testing.T) {
 	ts, _ := setupScriptServer(t)
 	sh := getScript(t, ts.URL, "/setup.sh")
-	for _, want := range []string{"node -e", "/api/device/code", "/api/device/token", "--token", "DSH_EE_SETUP_INTERACTIVE", "token.pending", `if [ "$DEVICE_LOGIN" -eq 0 ]`} {
+	for _, want := range []string{"node -e", "/api/device/code", "/api/device/token", "--token", "DSH_EE_SETUP_INTERACTIVE", "token.pending", `if [ "$DEVICE_LOGIN" -eq 0 ]`, "${PENDING_FILE}，", "${ENV_FILE}（"} {
 		if !strings.Contains(sh, want) {
 			t.Errorf("setup.sh 缺少 %q", want)
 		}

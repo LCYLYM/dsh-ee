@@ -1,4 +1,4 @@
-// 员工：管理员建用户并分配额度 → 员工登录自助创建 key → 用 key 调网关 → 用量计入账号额度
+// 员工：管理员建用户并分配额度 → 员工登录自助创建统一令牌 → 调网关 → 用量计入令牌与账号额度
 import http from "node:http";
 import { ADMIN_PW, BASE, api, assert, assertEq, login, logout, newPage, shot, step, tag } from "../lib.mjs";
 
@@ -44,15 +44,15 @@ export default async function (t) {
     await logout(page);
 
     await login(page, emp, "li-na-password-1");
-    await page.goto(`${BASE}/keys`);
-    await page.getByRole("button", { name: "新建 key" }).first().click();
-    await page.getByPlaceholder("我的 DSH").fill("李娜的 DSH");
-    await page.getByRole("button", { name: "创建 key" }).click();
-    const pre = page.locator("pre").filter({ hasText: /^\s*sk-ee-\S+\s*$/ }).first();
+    await page.goto(`${BASE}/tokens`);
+    await page.getByRole("button", { name: "生成令牌" }).first().click();
+    await page.getByLabel("名称", { exact: true }).fill("李娜的 DSH");
+    await page.locator("form").getByRole("button", { name: "生成令牌" }).click();
+    const pre = page.locator("pre").filter({ hasText: /^\s*ee_at_\S+\s*$/ }).first();
     await pre.waitFor();
     const key = (await pre.innerText()).trim();
-    assert(key.startsWith("sk-ee-"), "没拿到 key：" + key);
-    step("员工自助创建 key：" + key.slice(0, 12) + "…");
+    assert(key.startsWith("ee_at_"), "没拿到统一令牌：" + key);
+    step("员工自助创建统一令牌：" + key.slice(0, 12) + "…");
     await shot(page, "keys-issued");
 
     const call = (m) =>
@@ -65,12 +65,12 @@ export default async function (t) {
     assertEq(await call("deepseek-reasoner"), 403, "不在允许列表里的模型");
     step("允许的模型 → 200，其它模型 → 403");
 
-    await page.getByRole("button", { name: "我已保存，关闭" }).click();
     await page.reload();
-    await page.getByText("本月已用").first().waitFor();
-    const mine = await api(page, "GET", "/api/me/keys");
-    assertEq(mine.data.quota.month_tokens, 2000, "账号本月用量");
-    step("账号本月已用 2000 token");
+    await page.getByRole("heading", { name: "我的令牌" }).waitFor();
+    const mine = await api(page, "GET", "/api/me/tokens");
+    const current = mine.data.tokens.find((item) => item.prefix === key.slice(0, 12));
+    assertEq(current.month_used, 2000, "统一令牌本月用量");
+    step("令牌本月已用 2000 token");
     await shot(page, "keys-mine");
 
     await page.goto(`${BASE}/admin/users`);

@@ -103,7 +103,8 @@ export default async function (t) {
     const tokenBox = page.locator("pre").filter({ hasText: /^\s*ee_npm_\S+\s*$/ }).first();
     await tokenBox.waitFor();
     const token = (await tokenBox.innerText()).trim();
-    assert((await page.locator("pre").filter({ hasText: "setup.sh" }).innerText()).includes(token), "接入命令里应自动填上新令牌");
+    await page.getByRole("button", { name: "手动配置", exact: true }).click();
+    assert((await page.locator("pre").filter({ hasText: "_authToken=" }).innerText()).includes(token), "手动 npmrc 里应自动填上新令牌");
     step("接入指南创建令牌：" + token.slice(0, 14) + "…");
     await shot(page, "registry-setup");
 

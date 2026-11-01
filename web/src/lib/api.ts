@@ -323,6 +323,10 @@ export type TokenSource = "manual" | "device" | "issued" | "legacy";
 export interface TokenView {
   id: string;
   kind: "access" | "npm" | "key";
+  user_id?: number;
+  username?: string;
+  department?: string;
+  account_type?: "human" | "bot";
   name: string;
   prefix: string;
   source: TokenSource;

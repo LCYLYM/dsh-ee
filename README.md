@@ -38,6 +38,10 @@ DSH_EE_TEST_DSN='root:@tcp(127.0.0.1:4000)/' make test
 
 # 浏览器端到端测试：对一个已启动的服务（推荐用 make build 的单文件），需要初始管理员密码
 E2E_BASE=http://127.0.0.1:8080 ADMIN_PW=… make e2e      # 或 cd e2e && node run.mjs registry 只跑一个
+
+# 接入插件单元测试与真实 DSH A1～A6（需先 make build，并准备 DSH 0.2.1-rc.5、Chrome）
+cd dsh-plugin && npm test
+cd e2e/dsh/scenarios && npm test
 ```
 
 每次推送 GitHub Actions（`.github/workflows/ci.yml`）会：构建前端、对 TiDB 跑 Go 集成测试、用嵌好前端的单文件跑全部端到端测试、校验 compose 并构建镜像。`oceanbase` 工作流（手动触发 / 每周一次）在 OceanBase 上把 Go 测试与端到端测试再跑一遍，本地也可以用 `scripts/test-oceanbase.sh`（需要 8 GB 以上内存）。

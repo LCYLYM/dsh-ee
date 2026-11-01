@@ -55,27 +55,34 @@ export default async function (t) {
   await page.getByLabel("新密码").waitFor();
   step("重新启用；重置密码在行下方展开");
 
-  await page.goto(`${BASE}/admin/keys`);
-  await page.getByRole("button", { name: "代发 key" }).first().click();
-  await page.locator("form").getByRole("combobox").click();
-  await page.getByPlaceholder("搜索…").fill(`测试${tag}-12`);
-  await page.locator("[cmdk-item]").first().click();
-  assert((await page.locator("form").getByRole("combobox").first().innerText()).includes(`${prefix}12`), "可搜索选择没选中");
-  await page.locator("form").getByRole("textbox").first().fill("ui 测试 key");
+  await page.goto(`${BASE}/admin/quotas`);
+  await page.getByPlaceholder("搜索员工、显示名或部门").fill(`${prefix}07`);
+  await page.locator("tbody tr").first().getByRole("button", { name: "调整额度" }).click();
   await page.locator("form button", { hasText: "选择日期" }).click();
   const grid = page.getByRole("grid");
   await grid.waitFor();
   assert((await grid.locator("button[disabled]").count()) > 0, "今天之前的日期应不可选");
   await grid.locator("button:not([disabled])").last().click();
-  step("可搜索选择员工；日期选择禁用过去的日期");
+  step("日期选择禁用过去的日期");
+
+  await page.goto(`${BASE}/admin/tokens`);
+  await page.getByRole("button", { name: "下发令牌" }).first().click();
+  await page.locator("form").getByRole("combobox").click();
+  await page.getByPlaceholder("搜索…").fill(`测试${tag}-12`);
+  await page.locator("[cmdk-item]").first().click();
+  assert((await page.locator("form").getByRole("combobox").first().innerText()).includes(`${prefix}12`), "可搜索选择没选中");
+  await page.getByLabel("名称", { exact: true }).fill("ui 测试令牌");
+  step("可搜索选择员工");
   await shot(page, "ui-issue-key");
-  await page.locator("form").getByRole("button", { name: "代发 key" }).click();
-  await page.getByText(new RegExp(`已代发给 ${prefix.replace(".", "\\.")}12`)).waitFor();
-  await page.getByRole("button", { name: "我已保存，关闭" }).click();
-  await page.locator("tbody tr").filter({ hasText: "ui 测试 key" }).first().getByRole("button", { name: "吊销" }).click();
+  await page.locator("form").getByRole("button", { name: "下发令牌" }).click();
+  await page.locator("pre").filter({ hasText: /^\s*ee_at_\S+\s*$/ }).waitFor();
+  await page.getByPlaceholder("部门名称").fill("财务部");
+  await page.getByRole("button", { name: "吊销整个部门的令牌" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "吊销" }).click();
   await page.getByRole("alertdialog").waitFor({ state: "hidden" });
-  step("代发并吊销 key");
+  await page.getByLabel("状态", { exact: true }).selectOption("revoked");
+  await page.locator("tbody tr").filter({ hasText: "ui 测试令牌" }).first().getByText("已吊销").waitFor();
+  step("下发统一令牌并按部门批量吊销");
 
   await page.getByRole("button", { name: "退出登录" }).hover();
   await page.getByRole("tooltip").waitFor();

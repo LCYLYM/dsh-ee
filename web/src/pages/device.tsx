@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { api, formatTime } from "../lib/api";
@@ -14,6 +14,14 @@ export default function DevicePage() {
   const { busy, run } = useAction();
   const [manual, setManual] = useState("");
   const [done, setDone] = useState<"approved" | "denied" | null>(null);
+  const initial = useRef(true);
+  useEffect(() => {
+    if (initial.current) {
+      initial.current = false;
+      return;
+    }
+    reload();
+  }, [code, reload]);
 
   const decide = async (approve: boolean) => {
     const r = await run(() => api.approveDevice(code, approve));

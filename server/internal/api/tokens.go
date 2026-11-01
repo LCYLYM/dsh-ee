@@ -18,6 +18,10 @@ const accessTokenPrefix = "ee_at_"
 type tokenView struct {
 	ID                string     `json:"id"`
 	Kind              string     `json:"kind"`
+	UserID            int64      `json:"user_id,omitempty"`
+	Username          string     `json:"username,omitempty"`
+	Department        string     `json:"department,omitempty"`
+	AccountType       string     `json:"account_type,omitempty"`
 	Name              string     `json:"name"`
 	Prefix            string     `json:"prefix"`
 	Source            string     `json:"source"`
@@ -37,6 +41,7 @@ type tokenView struct {
 func accessView(t *store.AccessToken, used int64) tokenView {
 	return tokenView{
 		ID: "at:" + strconv.FormatInt(t.ID, 10), Kind: "access", Name: t.Name, Prefix: t.Prefix,
+		UserID: t.UserID, Username: t.Username, Department: t.Department, AccountType: t.AccountType,
 		Source: t.Source, Scopes: nonNil(t.Scopes), ClientName: t.ClientName, ClientOS: t.ClientOS,
 		MonthlyTokenLimit: t.MonthlyTokenLimit, MonthUsed: used, AllowedModels: nonNil(t.AllowedModels),
 		ExpiresAt: t.ExpiresAt, LastUsedAt: t.LastUsedAt, LastIP: t.LastIP, RevokedAt: t.RevokedAt, CreatedAt: t.CreatedAt,
