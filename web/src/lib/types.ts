@@ -113,6 +113,8 @@ export interface Settings {
     pollSeconds: number;
     deviceTokenDays: number;
     allowManualTokens: boolean;
+    /** Agent 总开关：关闭后 DSH 里不再有 ee_* 工具与系统技能。 */
+    agentEnabled: boolean;
   };
   registry: {
     /** 企业作用域之外的包：按需回源上游并缓存，或只提供已预载 / 已审核的包。 */

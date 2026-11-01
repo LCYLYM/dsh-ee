@@ -54,3 +54,20 @@ func ScopeFilter(access *Access, scopes []string) *Access {
 	}
 	return out
 }
+
+// HasAdminPerms 判断账号是否有任何管理类权限点（超级管理员也算）。
+// 只有这样的账号才能给令牌开启管理模式；管理模式开启时令牌才带 admin 范围。
+func HasAdminPerms(access *Access) bool {
+	if access == nil {
+		return false
+	}
+	if access.Super {
+		return true
+	}
+	for code, on := range access.Perms {
+		if on && scopeAllows(ScopeAdmin, code) {
+			return true
+		}
+	}
+	return false
+}

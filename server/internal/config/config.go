@@ -32,6 +32,8 @@ type Config struct {
 	PublicURL string
 	// 启动时等待数据库就绪的最长时间（docker compose 里数据库常比服务晚起来）。
 	DBWait time.Duration
+	// 管理模式「1 小时 / 8 小时」里「小时」的长度，默认 1h；只给自动化测试缩短用，生产不要设
+	AdminModeUnit time.Duration
 }
 
 func Load() (*Config, error) {
@@ -70,6 +72,13 @@ func Load() (*Config, error) {
 			return nil, fmt.Errorf("DSH_EE_SESSION_TTL: %w", err)
 		}
 		c.SessionTTL = d
+	}
+	if v := os.Getenv("DSH_EE_ADMIN_MODE_UNIT"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			return nil, fmt.Errorf("DSH_EE_ADMIN_MODE_UNIT 必须是正的时间长度，例如 15s")
+		}
+		c.AdminModeUnit = d
 	}
 	if v := os.Getenv("DSH_EE_DB_WAIT"); v != "" {
 		d, err := time.ParseDuration(v)

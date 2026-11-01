@@ -100,6 +100,7 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	s.settings.mu.Unlock()
 	if len(changed) > 0 {
 		s.audit(r, auditSettingsUpdate, strings.Join(changed, ", "), map[string]any{"sections": changed})
+		s.hub.notify() // Agent 总开关等设置会改变工具与系统技能
 		s.kickConnect()
 	}
 	writeJSON(w, http.StatusOK, &next)

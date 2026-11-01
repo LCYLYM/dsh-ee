@@ -462,9 +462,9 @@ var agentExcluded = map[string]string{
 | 阶段 | 服务端 | 插件 | 网页 | 测试 |
 |---|---|---|---|---|
 | **A** | 0008 迁移；`principal.go` 统一解析并替换 4 处鉴权；令牌 CRUD 与下发接口；设备码接口；机器人账号；额度按令牌；接入包 patch 改为 `apiKeyEnv` + 去掉 mcp-client 行 | `dsh-plugin/` 源码化与构建；`auth.ts`；`http.ts`；技能提供方搬迁；MCP 桥只接企业连接 | device、tokens、admin/tokens、users、setup | 4 个 spike；10.1～10.3 中 A 的部分 |
-| **B** | 路由表重构；agentSpec 框架与内部转发；员工侧工具；`/api/dsh/whoami`；`ee_doctor`；系统技能 guide / doctor / share；审计 via | 桥接入 `ee_*`；审批钩子；`ee_local_doctor`；本地 upload | audit 来源列 | 覆盖率测试；员工工具集成测试；真实 DSH 场景 B |
-| **C** | 管理模式（elevate、计时器、list_changed）；管理侧工具；两步确认；`shape` 白名单 | 审批 displayReason 带 preview | tokens 页管理模式 | 安全矩阵测试；真实 DSH 场景 C |
-| **D** | `setup-status`；系统技能 admin / setup；审核 inspect | — | — | 真实 DSH 场景 D |
+| **B**（已完成，见 [阶段 B 完成报告](agent-connect-phase-b-report.md)） | 路由表重构；agentSpec 框架与内部转发；员工侧工具；`/api/dsh/whoami`；`ee_doctor`；系统技能 guide / doctor / share；审计 via；两步确认框架（从 C 提前） | 桥接入 `ee_*`；审批钩子；`ee_local_doctor`；本地 upload | audit 来源列 | 覆盖率测试；员工工具集成测试；真实 DSH 场景 B |
+| **C**（已完成，见 [阶段 C 完成报告](agent-connect-phase-c-report.md)） | 管理模式（elevate、计时器、list_changed）；管理侧工具；两步确认；`shape` 白名单 | 审批 displayReason 带 preview | tokens 页管理模式 | 安全矩阵测试；真实 DSH 场景 C |
+| **D**（已完成，见 [阶段 D 完成报告](agent-connect-phase-d-report.md)） | `setup-status`；系统技能 admin / setup；审核 inspect | — | — | 真实 DSH 场景 D |
 
 ## 10. 验证方式
 

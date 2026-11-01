@@ -28,3 +28,21 @@ func TestScopeFilter(t *testing.T) {
 		t.Fatalf("超管管理 scope 应保留全部权限：%+v", got)
 	}
 }
+
+func TestHasAdminPerms(t *testing.T) {
+	if HasAdminPerms(nil) {
+		t.Fatal("nil 没有管理权限")
+	}
+	if !HasAdminPerms(&Access{Super: true}) {
+		t.Fatal("超级管理员有管理权限")
+	}
+	if HasAdminPerms(&Access{Perms: map[string]bool{PortalView: true, LLMUse: true, KeysSelf: true, RegistryUse: true, RegistryPublish: true}}) {
+		t.Fatal("只有员工权限点不算管理权限")
+	}
+	if !HasAdminPerms(&Access{Perms: map[string]bool{PortalView: true, TokensDeptManage: true}}) {
+		t.Fatal("有任一管理类权限点就算")
+	}
+	if HasAdminPerms(&Access{Perms: map[string]bool{UsersManage: false}}) {
+		t.Fatal("值为 false 的不算")
+	}
+}

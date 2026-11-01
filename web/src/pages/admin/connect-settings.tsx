@@ -60,6 +60,7 @@ export default function ConnectSettings() {
           <input className={cx(inputBase, "w-24")} type="number" min={1} max={3650} value={c.deviceTokenDays} onChange={(e) => set({ deviceTokenDays: Number(e.target.value) })} />
         </Field>
         <ToggleRow label={t("connectAdmin.allowManualTokens")} checked={c.allowManualTokens} onChange={(v) => set({ allowManualTokens: v })} />
+        <ToggleRow label={t("connectAdmin.agentEnabled")} desc={t("connectAdmin.agentEnabledDesc")} checked={c.agentEnabled} onChange={(v) => set({ agentEnabled: v })} />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-5 text-sm">

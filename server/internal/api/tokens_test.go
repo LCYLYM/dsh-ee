@@ -140,3 +140,47 @@ func TestTokenDepartmentPermission(t *testing.T) {
 	expect(t, "管理员空条件也被拒绝", code, 400, body)
 	alive("管理员空条件后令牌仍有效", "ee_at_other_dept")
 }
+
+// 回归：统一接口 DELETE /api/me/tokens/{id} 曾对 npm: 与 key: 两类令牌不校验归属，
+// 任何员工都能按自增 id 吊销别人的旧版 npm 令牌与 API key。
+func TestRevokeMyTokenOnlyOwn(t *testing.T) {
+	f := newPrincipalFixture(t)
+	limit := int64(100000)
+	victim := f.user(t, "revoke-victim", &limit)
+	attacker := f.user(t, "revoke-attacker", &limit)
+	login := func(name string) *client {
+		c := newClient(t, f.ts.URL)
+		code, body := c.do("POST", "/api/auth/login", map[string]string{"username": name, "password": "employee-password-1"}, nil)
+		expect(t, name+" 登录", code, 200, body)
+		return c
+	}
+	v, a := login(victim.Username), login(attacker.Username)
+	code, body := v.do("POST", "/api/me/npm-tokens", map[string]any{"name": "victim-npm", "access": "read"}, nil)
+	expect(t, "受害者的 npm 令牌", code, 201, body)
+	npm := decodeAs[struct {
+		Token string
+		Info  struct{ ID int64 }
+	}](t, body)
+	code, body = v.do("POST", "/api/me/keys", map[string]any{"name": "victim-key"}, nil)
+	expect(t, "受害者的 key", code, 201, body)
+	key := decodeAs[struct {
+		Token  string             `json:"key"`
+		APIKey struct{ ID int64 } `json:"api_key"`
+	}](t, body)
+	if npm.Token == "" || key.Token == "" || npm.Info.ID == 0 || key.APIKey.ID == 0 {
+		t.Fatalf("响应字段与预期不符：%+v %+v", npm, key)
+	}
+	for _, id := range []string{"npm:" + itoa(npm.Info.ID), "key:" + itoa(key.APIKey.ID)} {
+		code, body = a.do("DELETE", "/api/me/tokens/"+id, nil, nil)
+		expect(t, "别人的 "+id+" 不能吊销", code, 404, body)
+	}
+	code, body = v.do("GET", "/v1/models", nil, bearer(key.Token))
+	expect(t, "受害者的 key 仍有效", code, 200, body)
+	code, body = v.do("GET", "/api/dsh/whoami", nil, bearer(npm.Token))
+	expect(t, "受害者的 npm 令牌仍有效", code, 200, body)
+	// 自己的照常能吊销
+	code, body = v.do("DELETE", "/api/me/tokens/key:"+itoa(key.APIKey.ID), nil, nil)
+	expect(t, "吊销自己的 key", code, 204, body)
+	code, body = v.do("DELETE", "/api/me/tokens/npm:"+itoa(npm.Info.ID), nil, nil)
+	expect(t, "吊销自己的 npm 令牌", code, 204, body)
+}

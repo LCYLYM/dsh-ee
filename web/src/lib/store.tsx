@@ -40,6 +40,7 @@ export const defaultSettings: Settings = {
     pollSeconds: 60,
     deviceTokenDays: 90,
     allowManualTokens: true,
+    agentEnabled: true,
   },
   registry: {
     proxyMode: "cache",

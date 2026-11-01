@@ -157,6 +157,7 @@ func (s *Server) handleSetUserRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.audit(r, auditUserRoles, s.usernameOf(r, id), map[string]any{"id": id, "roles": roleNames(refs[id])})
+	s.hub.notify() // 角色变了，他的 Agent 工具可能随之增减
 	s.hub.notify()
 	writeJSON(w, http.StatusOK, map[string]any{"roles": nonNil(refs[id])})
 }
@@ -372,6 +373,7 @@ func (s *Server) handleUpdateRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.audit(r, auditRoleUpdate, updated.Name, map[string]any{"id": id, "code": updated.Code, "permissions": updated.Permissions})
+	s.hub.notify()
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -402,6 +404,7 @@ func (s *Server) handleDeleteRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.audit(r, auditRoleDelete, role.Name, map[string]any{"id": id, "code": role.Code})
+	s.hub.notify()
 	w.WriteHeader(http.StatusNoContent)
 }
 

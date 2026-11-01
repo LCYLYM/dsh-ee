@@ -341,6 +341,8 @@ export interface TokenView {
   last_ip: string;
   revoked_at: string | null;
   created_at: string;
+  /** 管理模式的到期时间；没开启或已到期时为空。 */
+  admin_until?: string | null;
 }
 
 export interface TokenInput {
@@ -737,6 +739,8 @@ export const api = {
   myTokens: () => request<{ tokens: TokenView[] }>("GET", "/api/me/tokens").then((r) => r.tokens),
   createMyToken: (input: TokenInput) => request<{ token: string; info: TokenView }>("POST", "/api/me/tokens", input),
   revokeMyToken: (id: string) => request<void>("DELETE", `/api/me/tokens/${id}`),
+  elevateToken: (id: string, password: string, hours: 1 | 8) => request<{ admin_until: string }>("POST", `/api/me/tokens/${id}/elevate`, { password, hours }),
+  endElevation: (id: string) => request<void>("DELETE", `/api/me/tokens/${id}/elevate`),
 
   users: () => request<{ users: User[] }>("GET", "/api/admin/users").then((r) => r.users),
   /** role_ids 不传时给默认的「员工」角色；auth_source 为 ldap 时不设密码。 */

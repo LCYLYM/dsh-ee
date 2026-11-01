@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"regexp"
 	"slices"
@@ -54,11 +55,17 @@ func (s *Server) dshPrincipal(w http.ResponseWriter, r *http.Request) (*Principa
 }
 
 func (s *Server) dshAuth(w http.ResponseWriter, r *http.Request) (viewer, bool) {
+	v, _, ok := s.dshViewer(w, r)
+	return v, ok
+}
+
+// dshViewer 同 dshAuth，并返回主体（Agent 工具要用）。
+func (s *Server) dshViewer(w http.ResponseWriter, r *http.Request) (viewer, *Principal, bool) {
 	p, ok := s.dshPrincipal(w, r)
 	if !ok {
-		return viewer{}, false
+		return viewer{}, nil, false
 	}
-	return viewer{p.User, p.Access}, true
+	return viewer{user: p.User, access: p.Access, agent: s.agentOn(r.Context(), p), canAdmin: p.CanAdmin, adminLive: p.AdminLive}, p, true
 }
 
 var serverNameRe = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
@@ -119,6 +126,8 @@ type dshCatalog struct {
 	assets map[string]*store.Asset
 	specs  map[string]*assetSpec
 	conns  []*dshConn
+	// 系统技能的正文，按名字
+	system map[string]string
 }
 
 // userCatalog 算出某个员工的 DSH 此刻应有的技能、连接与必装插件：
@@ -220,6 +229,19 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 			}
 		}
 	}
+	// 系统技能：名字归系统，同名的员工能力让位
+	c.system = map[string]string{}
+	if v.agent {
+		set, err := s.appSettings(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, ss := range systemSkills(set, c.ServerName, v) {
+			c.Skills = slices.DeleteFunc(c.Skills, func(k dshSkill) bool { return k.Name == ss.skill.Name })
+			c.Skills = append(c.Skills, ss.skill)
+			c.system[ss.skill.Name] = ss.body
+		}
+	}
 	sort.Slice(c.Skills, func(i, j int) bool { return c.Skills[i].Name < c.Skills[j].Name })
 	sort.Slice(c.Required, func(i, j int) bool { return c.Required[i].Name < c.Required[j].Name })
 	sort.Slice(c.conns, func(i, j int) bool { return c.conns[i].asset.Slug < c.conns[j].asset.Slug })
@@ -228,6 +250,9 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	h := sha256.New()
 	_ = json.NewEncoder(h).Encode(c.Skills)
 	_ = json.NewEncoder(h).Encode(c.Required)
+	for _, name := range slices.Sorted(maps.Keys(c.system)) {
+		fmt.Fprintf(h, "sys:%s:%s;", name, c.system[name])
+	}
 	for _, cn := range c.conns {
 		fmt.Fprintf(h, "%s@%d:", cn.asset.Slug, cn.version)
 		for _, t := range cn.tools {
@@ -252,6 +277,7 @@ func (s *Server) handleDshWhoami(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"username": p.User.Username, "department": p.User.Department, "scopes": scopes,
 		"token_prefix": p.Prefix, "expires_at": p.ExpiresAt, "client_name": p.Client, "legacy": p.Legacy,
+		"agent": s.agentOn(r.Context(), p), "admin_live": p.AdminLive,
 	})
 }
 
@@ -288,6 +314,14 @@ func (s *Server) handleDshSkill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := r.PathValue("name")
+	if body, ok := c.system[name]; ok {
+		for _, sk := range c.Skills {
+			if sk.Name == name {
+				writeJSON(w, http.StatusOK, map[string]any{"skill": sk, "content": body})
+				return
+			}
+		}
+	}
 	a, sp := c.assets[name], c.specs[name]
 	if a == nil || a.Kind == store.KindConnection {
 		writeErr(w, http.StatusNotFound, "没有这项技能，或它不在你的可用范围内")
@@ -387,7 +421,7 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusMethodNotAllowed, "不支持的方法")
 		return
 	}
-	v, ok := s.dshAuth(w, r)
+	v, pr, ok := s.dshViewer(w, r)
 	if !ok {
 		return
 	}
@@ -421,7 +455,7 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 			"protocolVersion": version,
 			"capabilities":    map[string]any{"tools": map[string]any{"listChanged": true}},
 			"serverInfo":      map[string]any{"name": "dsh-ee", "version": s.opts.Version},
-			"instructions":    mcpInstructions(c),
+			"instructions":    mcpInstructions(c, v.agent),
 		}, nil)
 	case "ping":
 		writeRPC(w, msg.ID, map[string]any{}, nil)
@@ -442,6 +476,9 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
+		for _, def := range s.agentToolList(r.Context(), pr) {
+			tools = append(tools, def)
+		}
 		writeRPC(w, msg.ID, map[string]any{"tools": tools}, nil)
 	case "tools/call":
 		var p struct {
@@ -450,6 +487,10 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := json.Unmarshal(msg.Params, &p); err != nil {
 			writeRPC(w, msg.ID, nil, &mcp.Error{Code: -32602, Message: "参数格式不对"})
+			return
+		}
+		if strings.HasPrefix(p.Name, "ee_") {
+			writeRPC(w, msg.ID, s.agentCall(r, pr, p.Name, p.Arguments), nil)
 			return
 		}
 		c, err := s.userCatalog(r.Context(), v)
@@ -482,11 +523,15 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func mcpInstructions(c *dshCatalog) string {
-	if len(c.conns) == 0 {
-		return "当前账号没有可用的企业连接。"
-	}
+func mcpInstructions(c *dshCatalog, agent bool) string {
 	var b strings.Builder
+	if agent {
+		b.WriteString("ee_* 工具用来操作企业工作台 dsh-ee 本身（额度、能力中心、插件、使用记录），用法见技能 dsh-ee-guide。\n")
+	}
+	if len(c.conns) == 0 {
+		b.WriteString("当前账号没有可用的企业连接。")
+		return b.String()
+	}
 	b.WriteString("这些工具连着企业内部系统，经 dsh-ee 按当前员工的权限转发，每次调用都会记录。工具名的第一段是系统名：\n")
 	for _, cn := range c.conns {
 		fmt.Fprintf(&b, "- %s：%s", cn.asset.Slug, cn.spec.Title)

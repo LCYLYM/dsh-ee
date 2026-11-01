@@ -189,9 +189,13 @@ var hubKinds = []string{store.KindSkill, store.KindPrompt, store.KindApp, store.
 type viewer struct {
 	user   *store.User
 	access *rbac.Access
+	// 这次请求能用 Agent（令牌带 agent 范围、总开关开着）；只有 DSH 目录与 MCP 用到
+	agent bool
+	// 账号本身有管理权限；令牌此刻开着管理模式
+	canAdmin, adminLive bool
 }
 
-func viewerOf(r *http.Request) viewer { return viewer{currentUser(r), currentAccess(r)} }
+func viewerOf(r *http.Request) viewer { return viewer{user: currentUser(r), access: currentAccess(r)} }
 
 func (v viewer) inScope(sc store.Scope) bool {
 	return sc.Allows(v.user.ID, v.user.Department, v.access.RoleIDs)
@@ -551,6 +555,10 @@ func (s *Server) handleHubCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.Slug = strings.TrimSpace(req.Slug)
+	if strings.HasPrefix(req.Slug, systemSkillPrefix) {
+		writeErr(w, http.StatusBadRequest, "标识不能以 "+systemSkillPrefix+" 开头，这是系统技能的前缀")
+		return
+	}
 	if !slugRe.MatchString(req.Slug) || len(req.Slug) > maxSlug {
 		writeErr(w, http.StatusBadRequest, "标识只能用小写字母、数字和连字符，例如 expense-policy，最多 48 个字符")
 		return

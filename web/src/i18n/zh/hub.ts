@@ -213,6 +213,8 @@ export default {
     poll: "检查间隔（秒）",
     deviceTokenDays: "设备登录令牌有效天数",
     allowManualTokens: "允许员工手动生成令牌",
+    agentEnabled: "允许在 DSH 里用 Agent 操作工作台",
+    agentEnabledDesc: "员工的 DSH 里出现 ee_* 工具（查额度、启用能力、分享、申请连接等）和使用指南类系统技能；写操作都会先请员工批准。关闭后立即消失。",
     status: "当前版本",
     notPublished: "还没有发布",
     published: "{{pkg}}@{{version}} · {{time}}",

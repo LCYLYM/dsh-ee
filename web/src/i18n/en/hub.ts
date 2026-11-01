@@ -215,6 +215,8 @@ export default {
     poll: "Check interval (seconds)",
     deviceTokenDays: "Device token lifetime (days)",
     allowManualTokens: "Allow employees to create tokens manually",
+    agentEnabled: "Let employees operate the workbench from DSH with the Agent",
+    agentEnabledDesc: "Employees' DSH gets ee_* tools (check quota, enable capabilities, share, request connections…) and guide-style system skills; every write asks for approval first. Turning this off removes them immediately.",
     status: "Current version",
     notPublished: "Not published yet",
     published: "{{pkg}}@{{version}} · {{time}}",

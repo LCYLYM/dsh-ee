@@ -72,12 +72,13 @@ func run(log *slog.Logger) error {
 		return err
 	}
 	srv := api.New(st, box, api.Options{
-		CookieSecure: cfg.CookieSecure,
-		SessionTTL:   cfg.SessionTTL,
-		Version:      version,
-		Web:          webui.Handler(),
-		DataDir:      cfg.DataDir,
-		PublicURL:    cfg.PublicURL,
+		CookieSecure:  cfg.CookieSecure,
+		SessionTTL:    cfg.SessionTTL,
+		Version:       version,
+		Web:           webui.Handler(),
+		DataDir:       cfg.DataDir,
+		PublicURL:     cfg.PublicURL,
+		AdminModeUnit: cfg.AdminModeUnit,
 	}, log)
 
 	go sweepSessions(ctx, st, log)
@@ -143,6 +144,9 @@ func sweepSessions(ctx context.Context, st *store.Store, log *slog.Logger) {
 				log.Warn("清理过期会话失败", "err", err)
 			} else if n > 0 {
 				log.Info("已清理过期会话", "count", n)
+			}
+			if _, err := st.DeleteExpiredAgentConfirms(ctx); err != nil {
+				log.Warn("清理过期确认码失败", "err", err)
 			}
 			if n, err := st.DeleteExpiredDeviceCodes(ctx); err != nil {
 				log.Warn("清理过期设备码失败", "err", err)

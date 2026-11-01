@@ -60,7 +60,7 @@ export default {
       token: { create: "Created token", issue: "Issued token", revoke: "Revoked token", revoke_bulk: "Revoked tokens in bulk" },
       device: { approve: "Authorized device", deny: "Denied device" },
       asset: { create: "Created capability", version: "Submitted version", edit: "Changed availability", delete: "Deleted capability" },
-      connection: { tool: "Configured connection tool" },
+      connection: { tool: "Configured connection tool", request: "Requested a connection" },
       connect: { publish: "Published connect plugin" },
     },
   },

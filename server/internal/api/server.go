@@ -32,6 +32,8 @@ type Options struct {
 	DataDir string
 	// 对外地址，用于生成 tarball 下载地址；为空时按请求推断。
 	PublicURL string
+	// 管理模式里「小时」的长度，默认 1 小时；只给自动化测试缩短用。
+	AdminModeUnit time.Duration
 	// 访问上游 npm registry 与 dshfind 目录的客户端；测试里可替换。
 	NpmUpstream *http.Client
 	// 上游 packument 缓存时间，默认 5 分钟。
@@ -57,6 +59,12 @@ type Server struct {
 	conns connClients
 	// 设置或模型变化后触发接入插件检查
 	connectKick chan struct{}
+	// 有令牌开启 / 结束管理模式后触发到期监控重算
+	elevationKick chan struct{}
+	// 全部路由；Agent 工具也从这里取处理函数
+	routeTable []route
+	// 由路由表生成的 Agent 工具
+	agentTools []*agentTool
 }
 
 func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Server {
@@ -72,8 +80,10 @@ func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Serv
 			MaxIdleConnsPerHost:   32,
 		}}
 	}
-	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), deviceCodeRate: newIPRate(deviceCodePerMinute), deviceTokenRate: newIPRate(deviceTokenPerMinute), upstream: up, connectKick: make(chan struct{}, 1)}
+	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), deviceCodeRate: newIPRate(deviceCodePerMinute), deviceTokenRate: newIPRate(deviceTokenPerMinute), upstream: up, connectKick: make(chan struct{}, 1), elevationKick: make(chan struct{}, 1)}
 	s.registry = s.newRegistry()
+	s.routeTable = s.routes()
+	s.agentTools = buildAgentTools(s.routeTable)
 	return s
 }
 
@@ -119,156 +129,9 @@ func (s *Server) newRegistry() *registry.Service {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]string{"status": "ok", "version": s.opts.Version})
-	})
-
-	mux.HandleFunc("GET /api/auth/methods", s.handleAuthMethods)
-	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
-	mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
-	mux.Handle("GET /api/auth/me", s.requireUser(http.HandlerFunc(s.handleMe)))
-	mux.Handle("POST /api/auth/password", s.requireUser(http.HandlerFunc(s.handleChangePassword)))
-	// 登录即可；每个接口按权限点校验，菜单只是前端的展示配置
-	user := func(h http.HandlerFunc) http.Handler { return s.requireUser(h) }
-	perm := func(h http.HandlerFunc, codes ...string) http.Handler {
-		return s.requireUser(s.requirePerm(codes...)(h))
+	for _, rt := range s.routeTable {
+		mux.Handle(rt.pattern, rt.handler(s))
 	}
-	mux.HandleFunc("POST /api/device/code", s.handleDeviceCode)
-	mux.HandleFunc("POST /api/device/token", s.handleDeviceToken)
-	mux.Handle("GET /api/device/{user_code}", user(s.handleDeviceInfo))
-	mux.Handle("POST /api/device/{user_code}", user(s.handleDeviceApprove))
-	mux.HandleFunc("POST /api/dsh/logout", s.handleDshLogout)
-	mux.Handle("GET /api/me/menus", user(s.handleMyMenus))
-
-	// 员工：额度、查看并自助创建 / 吊销自己的 key
-	mux.Handle("GET /api/me/keys", perm(s.handleMyKeys, rbac.KeysSelf))
-	mux.Handle("POST /api/me/keys", perm(s.handleCreateMyKey, rbac.KeysSelf))
-	mux.Handle("DELETE /api/me/keys/{id}", perm(s.handleRevokeMyKey, rbac.KeysSelf))
-	mux.Handle("GET /api/me/tokens", perm(s.handleMyTokens, rbac.KeysSelf, rbac.RegistryUse))
-	mux.Handle("POST /api/me/tokens", perm(s.handleCreateMyToken, rbac.KeysSelf, rbac.RegistryUse))
-	mux.Handle("DELETE /api/me/tokens/{id}", perm(s.handleRevokeMyToken, rbac.KeysSelf, rbac.RegistryUse))
-
-	// 用户（分配额度、分发 key、分配角色的页面也需要列出用户）
-	mux.Handle("GET /api/admin/users", perm(s.handleListUsers, rbac.UsersView, rbac.UsersManage, rbac.QuotasManage, rbac.KeysManage, rbac.RolesManage))
-	mux.Handle("POST /api/admin/users", perm(s.handleCreateUser, rbac.UsersManage))
-	mux.Handle("PATCH /api/admin/users/{id}", perm(s.handleUpdateUser, rbac.UsersManage))
-	mux.Handle("PUT /api/admin/users/{id}/roles", perm(s.handleSetUserRoles, rbac.RolesManage))
-	mux.Handle("PATCH /api/admin/users/{id}/quota", perm(s.handleUpdateUserQuota, rbac.QuotasManage))
-
-	// 角色与权限点
-	mux.Handle("GET /api/admin/permissions", perm(s.handleListPermissions, rbac.RolesManage, rbac.MenusManage))
-	mux.Handle("POST /api/admin/permissions", perm(s.handleCreatePermission, rbac.RolesManage))
-	mux.Handle("DELETE /api/admin/permissions/{code}", perm(s.handleDeletePermission, rbac.RolesManage))
-	mux.Handle("GET /api/admin/roles", perm(s.handleListRoles, rbac.RolesManage, rbac.UsersManage))
-	mux.Handle("POST /api/admin/roles", perm(s.handleCreateRole, rbac.RolesManage))
-	mux.Handle("PATCH /api/admin/roles/{id}", perm(s.handleUpdateRole, rbac.RolesManage))
-	mux.Handle("DELETE /api/admin/roles/{id}", perm(s.handleDeleteRole, rbac.RolesManage))
-
-	// 菜单与页面
-	mux.Handle("GET /api/admin/menus", perm(s.handleListMenus, rbac.MenusManage))
-	mux.Handle("POST /api/admin/menus", perm(s.handleCreateMenu, rbac.MenusManage))
-	mux.Handle("PUT /api/admin/menus/order", perm(s.handleReorderMenus, rbac.MenusManage))
-	mux.Handle("POST /api/admin/menus/reset", perm(s.handleResetMenus, rbac.MenusManage))
-	mux.Handle("PATCH /api/admin/menus/{id}", perm(s.handleUpdateMenu, rbac.MenusManage))
-	mux.Handle("DELETE /api/admin/menus/{id}", perm(s.handleDeleteMenu, rbac.MenusManage))
-
-	// 模型接入与 key
-	mux.Handle("GET /api/admin/providers", perm(s.handleListProviders, rbac.ProvidersManage, rbac.QuotasManage, rbac.KeysManage))
-	mux.Handle("POST /api/admin/providers", perm(s.handleCreateProvider, rbac.ProvidersManage))
-	mux.Handle("PATCH /api/admin/providers/{id}", perm(s.handleUpdateProvider, rbac.ProvidersManage))
-	mux.Handle("DELETE /api/admin/providers/{id}", perm(s.handleDeleteProvider, rbac.ProvidersManage))
-	mux.Handle("POST /api/admin/providers/{id}/check", perm(s.handleCheckProvider, rbac.ProvidersManage))
-	mux.Handle("GET /api/admin/models", perm(s.handleListModels, rbac.ProvidersManage, rbac.QuotasManage, rbac.KeysManage))
-	mux.Handle("POST /api/admin/models", perm(s.handleCreateModels, rbac.ProvidersManage))
-	mux.Handle("PATCH /api/admin/models/{id}", perm(s.handleUpdateModel, rbac.ProvidersManage))
-	mux.Handle("DELETE /api/admin/models/{id}", perm(s.handleDeleteModel, rbac.ProvidersManage))
-	mux.Handle("GET /api/admin/keys", perm(s.handleListKeys, rbac.KeysManage))
-	mux.Handle("POST /api/admin/keys", perm(s.handleIssueKey, rbac.KeysManage))
-	mux.Handle("DELETE /api/admin/keys/{id}", perm(s.handleRevokeKey, rbac.KeysManage))
-	mux.Handle("GET /api/admin/tokens", user(s.handleAdminTokens))
-	mux.Handle("POST /api/admin/tokens", user(s.handleIssueToken))
-	mux.Handle("POST /api/admin/tokens/revoke", user(s.handleRevokeTokens))
-
-	// 系统设置：登录即可读（前端要用组织名、作用域、评分开关），按段落校验写权限
-	mux.Handle("GET /api/settings", user(s.handleGetSettings))
-	mux.Handle("PUT /api/admin/settings", perm(s.handlePutSettings, rbac.SettingsManage, rbac.RegistryManage, rbac.UpstreamManage))
-
-	// LDAP / AD 登录：配置里有服务账号，单独存、单独授权
-	mux.Handle("GET /api/admin/auth/ldap", perm(s.handleGetLDAP, rbac.SettingsManage))
-	mux.Handle("PUT /api/admin/auth/ldap", perm(s.handlePutLDAP, rbac.SettingsManage))
-	mux.Handle("POST /api/admin/auth/ldap/test", perm(s.handleTestLDAP, rbac.SettingsManage))
-	mux.Handle("POST /api/admin/auth/ldap/sync", perm(s.handleSyncLDAP, rbac.SettingsManage))
-
-	// 能力中心：技能、提示词、微应用、企业连接，插件的可用范围与下发方式
-	mux.Handle("GET /api/hub", perm(s.handleHub, rbac.PortalView))
-	mux.Handle("POST /api/hub", perm(s.handleHubCreate, rbac.RegistryPublish, rbac.ConnectionsManage))
-	mux.Handle("GET /api/hub/{id}", perm(s.handleHubDetail, rbac.PortalView))
-	mux.Handle("PATCH /api/hub/{id}", perm(s.handleHubPatch, rbac.PortalView))
-	mux.Handle("DELETE /api/hub/{id}", perm(s.handleHubDelete, rbac.PluginsManage, rbac.ConnectionsManage))
-	mux.Handle("POST /api/hub/{id}/versions", perm(s.handleHubNewVersion, rbac.RegistryPublish, rbac.PluginsManage, rbac.ConnectionsManage))
-	mux.Handle("POST /api/hub/{id}/subscription", perm(s.handleHubSubscribe, rbac.PortalView))
-	mux.Handle("DELETE /api/hub/{id}/subscription", perm(s.handleHubSubscribe, rbac.PortalView))
-	mux.Handle("GET /api/admin/hub/review", perm(s.handleHubReviewQueue, rbac.PluginsManage))
-	mux.Handle("POST /api/admin/hub/review", perm(s.handleHubReview, rbac.PluginsManage))
-	mux.Handle("PUT /api/admin/plugin-policies/{name...}", perm(s.handlePutPluginPolicy, rbac.PluginsManage))
-	mux.Handle("POST /api/admin/connections/test", perm(s.handleConnTest, rbac.ConnectionsManage))
-	mux.Handle("POST /api/admin/connections/{id}/sync", perm(s.handleConnSync, rbac.ConnectionsManage))
-	mux.Handle("PATCH /api/admin/connections/{id}/tools/{name}", perm(s.handleConnTool, rbac.ConnectionsManage))
-
-	// DSH 接入：接入插件的发布，以及员工本机 DSH 调用的目录与 MCP 网关（令牌认证）
-	mux.Handle("GET /api/connect", perm(s.handleConnectInfo, rbac.PortalView))
-	mux.Handle("GET /api/admin/connect", perm(s.handleAdminConnect, rbac.SettingsManage))
-	mux.Handle("POST /api/admin/connect/publish", perm(s.handlePublishConnect, rbac.SettingsManage))
-	mux.HandleFunc("GET /api/dsh/whoami", s.handleDshWhoami)
-	mux.HandleFunc("GET /api/dsh/catalog", s.handleDshCatalog)
-	mux.HandleFunc("GET /api/dsh/skills/{name}", s.handleDshSkill)
-	mux.HandleFunc("/mcp", s.handleMCP)
-
-	// 统计与审计
-	mux.Handle("GET /api/admin/stats", perm(s.handleStats, rbac.DashboardView))
-	mux.Handle("GET /api/admin/audit", perm(s.handleListAudit, rbac.AuditView))
-	mux.Handle("GET /api/me/overview", perm(s.handleMyOverview, rbac.PortalView))
-
-	// 能力市场与发布（员工）
-	mux.Handle("GET /api/catalog", perm(s.handleCatalog, rbac.PortalView))
-	mux.Handle("GET /api/catalog/{name...}", perm(s.handleCatalogDetail, rbac.PortalView))
-	mux.Handle("GET /api/me/packages", perm(s.handleMyPackages, rbac.RegistryPublish))
-	mux.Handle("POST /api/me/packages", perm(s.handleUploadPackage, rbac.RegistryPublish))
-	mux.Handle("POST /api/me/import-requests", perm(s.handleImportRequest, rbac.RegistryPublish))
-	mux.Handle("GET /api/me/npm-tokens", perm(s.handleMyNpmTokens, rbac.RegistryUse, rbac.RegistryPublish))
-	mux.Handle("POST /api/me/npm-tokens", perm(s.handleCreateMyNpmToken, rbac.RegistryUse, rbac.RegistryPublish))
-	mux.Handle("DELETE /api/me/npm-tokens/{id}", perm(s.handleRevokeMyNpmToken, rbac.RegistryUse, rbac.RegistryPublish))
-
-	// 能力管理与审核
-	mux.Handle("GET /api/admin/packages", perm(s.handleAdminPackages, rbac.PluginsManage, rbac.RegistryManage, rbac.DashboardView))
-	mux.Handle("GET /api/admin/packages/{name...}", perm(s.handleAdminPackageDetail, rbac.PluginsManage, rbac.RegistryManage))
-	mux.Handle("PATCH /api/admin/packages/{name...}", perm(s.handlePatchPackage, rbac.PluginsManage))
-	mux.Handle("GET /api/admin/review", perm(s.handleReviewQueue, rbac.PluginsManage))
-	mux.Handle("POST /api/admin/review", perm(s.handleReview, rbac.PluginsManage))
-	mux.Handle("GET /api/admin/tarball", perm(s.handleAdminTarball, rbac.PluginsManage))
-
-	// npm 源与上游预载
-	mux.Handle("GET /api/admin/registry", perm(s.handleRegistryOverview, rbac.RegistryManage, rbac.UpstreamManage, rbac.DashboardView))
-	mux.Handle("POST /api/admin/registry/check", perm(s.handleRegistryCheck, rbac.RegistryManage))
-	mux.Handle("GET /api/admin/npm-tokens", perm(s.handleAllNpmTokens, rbac.RegistryManage))
-	mux.Handle("DELETE /api/admin/npm-tokens/{id}", perm(s.handleRevokeNpmToken, rbac.RegistryManage))
-	mux.Handle("GET /api/admin/upstream/feed", perm(s.handleUpstreamFeed, rbac.UpstreamManage))
-	mux.Handle("POST /api/admin/upstream/sync", perm(s.handleUpstreamSync, rbac.UpstreamManage))
-	mux.Handle("GET /api/admin/upstream/jobs", perm(s.handleListJobs, rbac.UpstreamManage))
-	mux.Handle("GET /api/admin/upstream/jobs/{id}", perm(s.handleGetJob, rbac.UpstreamManage))
-	mux.Handle("POST /api/admin/upstream/check-updates", perm(s.handleCheckUpdates, rbac.UpstreamManage))
-	mux.Handle("GET /api/admin/upstream/export", perm(s.handleExportBundle, rbac.UpstreamManage))
-	mux.Handle("POST /api/admin/upstream/import", perm(s.handleImportBundle, rbac.UpstreamManage))
-
-	// npm 协议与 DSH 插件索引
-	mux.HandleFunc("/npm/", s.handleNpm)
-	mux.HandleFunc("GET /index/dsh-index.json", s.handleDshIndex)
-	mux.HandleFunc("GET /setup.sh", s.handleSetupSh)
-	mux.HandleFunc("GET /setup.ps1", s.handleSetupPs1)
-
-	// OpenAI 兼容网关，用个人 key 鉴权
-	mux.HandleFunc("GET /v1/models", s.handleModels)
-	mux.HandleFunc("POST /v1/chat/completions", s.handleChatCompletions)
 
 	// 没匹配上的接口返回 JSON 404，不要落到前端的 index.html
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { writeErr(w, http.StatusNotFound, "接口不存在") })
@@ -390,6 +253,7 @@ func notFound(err error) bool { return errors.Is(err, store.ErrNotFound) }
 // RunBackground 跑定时任务：每小时核对一次 LDAP 目录；每 6 小时检查已预载插件的新版本（按系统设置自动同步或进入审核）。
 func (s *Server) RunBackground(ctx context.Context) {
 	go s.runLDAPSync(ctx)
+	go s.runElevationExpiry(ctx)
 	if s.registry == nil {
 		return
 	}

@@ -53,6 +53,8 @@ type AppSettings struct {
 		PollSeconds       int  `json:"pollSeconds"`
 		DeviceTokenDays   int  `json:"deviceTokenDays"`
 		AllowManualTokens bool `json:"allowManualTokens"`
+		// 总开关：关闭后 /mcp 不再提供 ee_* 工具，系统技能也不下发
+		AgentEnabled bool `json:"agentEnabled"`
 	} `json:"connect"`
 	Registry struct {
 		// cache：企业作用域之外的包按需回源并缓存 / preloaded：只提供已预载的包
@@ -88,6 +90,7 @@ func DefaultSettings() *AppSettings {
 	s.Connect.PollSeconds = 60
 	s.Connect.DeviceTokenDays = 90
 	s.Connect.AllowManualTokens = true
+	s.Connect.AgentEnabled = true
 	s.Registry.ProxyMode = "cache"
 	s.Registry.ExtraScopes = []string{}
 	s.Registry.RequireToken = true

@@ -54,6 +54,7 @@ const (
 	auditAssetEdit      = "asset.edit"
 	auditAssetDelete    = "asset.delete"
 	auditConnTool       = "connection.tool"
+	auditConnRequest    = "connection.request"
 	auditConnectPublish = "connect.publish"
 
 	auditNpmTokenCreate = "npm_token.create"
@@ -68,7 +69,17 @@ func (s *Server) audit(r *http.Request, action, target string, detail map[string
 // auditAs 指定操作人（npm 令牌、登录这类没有会话的请求）；u 为 nil 表示匿名。
 func (s *Server) auditAs(r *http.Request, u *store.User, action, target string, detail map[string]any) {
 	a := &store.AuditLog{Action: action, Target: target, Detail: detail, IP: clientIP(r)}
-	if token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+	if info, ok := agentFrom(r.Context()); ok {
+		// 经 Agent 的操作：来源记 agent，并带上是哪个工具调的
+		a.Via, a.Client = "agent", info.Principal.Client
+		if info.Principal.TokenID > 0 {
+			a.TokenID = &info.Principal.TokenID
+		}
+		a.Detail = map[string]any{"tool": info.Tool}
+		for k, v := range detail {
+			a.Detail[k] = v
+		}
+	} else if token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
 		if p, err := s.resolveBearer(r.Context(), token, clientIP(r)); err == nil {
 			a.Via = "token"
 			a.Client = p.Client

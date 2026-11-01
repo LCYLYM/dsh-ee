@@ -20,6 +20,7 @@ import (
 
 type principalFixture struct {
 	st    *store.Store
+	srv   *api.Server
 	ts    *httptest.Server
 	admin *client
 }
@@ -37,9 +38,10 @@ func newPrincipalFixture(t *testing.T) *principalFixture {
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)
 	box, _ := secret.NewBox(key)
-	ts := httptest.NewServer(api.New(st, box, api.Options{DataDir: t.TempDir(), Upstream: up.Client()}, slog.New(slog.NewTextHandler(io.Discard, nil))).Handler())
+	srv := api.New(st, box, api.Options{DataDir: t.TempDir(), Upstream: up.Client()}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
-	f := &principalFixture{st: st, ts: ts, admin: newClient(t, ts.URL)}
+	f := &principalFixture{st: st, srv: srv, ts: ts, admin: newClient(t, ts.URL)}
 	code, body := f.admin.do("POST", "/api/auth/login", map[string]string{"username": "admin", "password": "admin-password-123"}, nil)
 	expect(t, "管理员登录", code, 200, body)
 	code, body = f.admin.do("POST", "/api/admin/providers", map[string]any{

@@ -58,7 +58,7 @@ export default {
       token: { create: "生成令牌", issue: "下发令牌", revoke: "吊销令牌", revoke_bulk: "批量吊销令牌" },
       device: { approve: "授权设备", deny: "拒绝设备" },
       asset: { create: "新建能力", version: "提交新版本", edit: "修改范围或上下架", delete: "删除能力" },
-      connection: { tool: "设置连接工具" },
+      connection: { tool: "设置连接工具", request: "申请使用企业连接" },
       connect: { publish: "发布接入插件" },
     },
   },

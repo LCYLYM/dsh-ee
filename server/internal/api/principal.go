@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -35,9 +36,13 @@ type Principal struct {
 	Limit     *int64
 	Models    []string
 	AdminLive bool
-	Client    string
-	Prefix    string
-	ExpiresAt *time.Time
+	// 账号本身有管理权限（与令牌当前有没有开管理模式无关）
+	CanAdmin bool
+	// 管理模式到期时间；AdminLive 为 false 时无意义
+	AdminUntil *time.Time
+	Client     string
+	Prefix     string
+	ExpiresAt  *time.Time
 }
 
 func (p *Principal) quota() *store.UserQuota {
@@ -79,15 +84,23 @@ func (s *Server) resolveBearer(ctx context.Context, token, ip string) (*Principa
 		if err != nil {
 			return nil, err
 		}
+		// admin 范围只在管理模式有效期内生效：到期（或提前结束）后令牌立刻退回员工权限，
+		// 不依赖任何定时任务；账号本身没有管理权限时也不放行。
+		live := slices.Contains(t.Scopes, rbac.ScopeAdmin) && t.AdminUntil != nil && t.AdminUntil.After(time.Now()) && rbac.HasAdminPerms(account)
+		effective := make([]string, 0, len(t.Scopes))
 		scopes := ScopeSet{}
 		for _, scope := range t.Scopes {
+			if scope == rbac.ScopeAdmin && !live {
+				continue
+			}
+			effective = append(effective, scope)
 			scopes[scope] = true
 		}
 		_ = s.store.TouchAccessToken(ctx, t.ID, ip)
 		return &Principal{
-			User: u, Access: rbac.ScopeFilter(account, t.Scopes), Scopes: scopes, TokenID: t.ID,
+			User: u, Access: rbac.ScopeFilter(account, effective), Scopes: scopes, TokenID: t.ID,
 			Limit: t.MonthlyTokenLimit, Models: t.AllowedModels, Client: t.ClientName,
-			Prefix: t.Prefix, ExpiresAt: t.ExpiresAt,
+			Prefix: t.Prefix, ExpiresAt: t.ExpiresAt, AdminLive: live, AdminUntil: t.AdminUntil, CanAdmin: rbac.HasAdminPerms(account),
 		}, nil
 	case strings.HasPrefix(token, npmTokenPrefix):
 		t, u, err := s.store.ActiveNpmToken(ctx, hash)

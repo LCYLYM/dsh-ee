@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 )
@@ -279,5 +280,99 @@ func (s *Store) TokenMonthUsage(ctx context.Context, id int64) (int64, error) {
 	err := s.db.QueryRowContext(ctx,
 		"SELECT COALESCE(SUM(total_tokens), 0) FROM usage_logs WHERE token_id = ? AND created_at >= ?",
 		id, MonthStart(now())).Scan(&n)
+	return n, err
+}
+
+// ---- 管理模式 ----
+
+// ElevateToken 开启管理模式：补上 admin 范围（若还没有），admin_until 设为到期时间。
+func (s *Store) ElevateToken(ctx context.Context, id int64, until time.Time) error {
+	t, err := s.AccessTokenByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	scopes := t.Scopes
+	if !slices.Contains(scopes, "admin") {
+		scopes = append(append([]string{}, scopes...), "admin")
+	}
+	res, err := s.db.ExecContext(ctx, "UPDATE access_tokens SET scopes = ?, admin_until = ? WHERE id = ? AND revoked_at IS NULL",
+		strings.Join(scopes, ","), until.UTC(), id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// EndElevation 提前结束管理模式。
+func (s *Store) EndElevation(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE access_tokens SET admin_until = NULL WHERE id = ?", id)
+	return err
+}
+
+// NextElevationExpiry 是还在管理模式的令牌里最早的到期时间；没有则返回 nil。
+func (s *Store) NextElevationExpiry(ctx context.Context) (*time.Time, error) {
+	var t sql.NullTime
+	err := s.db.QueryRowContext(ctx, "SELECT MIN(admin_until) FROM access_tokens WHERE admin_until IS NOT NULL AND revoked_at IS NULL").Scan(&t)
+	if err != nil || !t.Valid {
+		return nil, err
+	}
+	return &t.Time, nil
+}
+
+// ExpireElevations 清掉已经到期的管理模式并返回这些令牌（调用方写审计、通知 DSH）。
+func (s *Store) ExpireElevations(ctx context.Context) ([]*AccessToken, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT "+accessTokenColumns+" FROM access_tokens t WHERE t.admin_until IS NOT NULL AND t.admin_until <= ? AND t.revoked_at IS NULL", now())
+	if err != nil {
+		return nil, err
+	}
+	var out []*AccessToken
+	for rows.Next() {
+		t, err := scanAccessToken(rows)
+		if err != nil {
+			rows.Close()
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, t := range out {
+		if _, err := s.db.ExecContext(ctx, "UPDATE access_tokens SET admin_until = NULL WHERE id = ? AND admin_until <= ?", t.ID, now()); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// CountTokensBy 是 RevokeTokensBy 会动到的令牌数，用于吊销前的预览。
+func (s *Store) CountTokensBy(ctx context.Context, f TokenRevokeFilter) (int64, error) {
+	if f.Empty() {
+		return 0, errors.New("必须带筛选条件")
+	}
+	q := "SELECT COUNT(*) FROM access_tokens t JOIN users u ON u.id = t.user_id WHERE t.revoked_at IS NULL"
+	var args []any
+	if f.UserID != nil {
+		q += " AND t.user_id = ?"
+		args = append(args, *f.UserID)
+	}
+	if f.ClientName != nil {
+		q += " AND t.client_name = ?"
+		args = append(args, *f.ClientName)
+	}
+	if f.Department != nil {
+		q += " AND u.department = ?"
+		args = append(args, *f.Department)
+	}
+	if f.BotOnly {
+		q += " AND u.account_type = ?"
+		args = append(args, AccountBot)
+	}
+	var n int64
+	err := s.db.QueryRowContext(ctx, q, args...).Scan(&n)
 	return n, err
 }

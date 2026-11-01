@@ -4,7 +4,7 @@ function frame(data) {
   return `data: ${typeof data === 'string' ? data : JSON.stringify(data)}\n\n`
 }
 
-function textResponse(text) {
+export function textResponse(text) {
   return [
     { choices: [{ delta: { role: 'assistant', content: '' }, index: 0, finish_reason: null }] },
     { choices: [{ delta: { content: text }, index: 0, finish_reason: null }] },
@@ -13,12 +13,16 @@ function textResponse(text) {
   ]
 }
 
-function toolResponse(name, args = {}) {
+let callCounter = 0
+
+export function toolResponse(name, args = {}) {
+  // 同一轮里多次调用同一个工具时 id 不能重复
+  const id = `call_${name}_${++callCounter}`
   return [
     { choices: [{ delta: { role: 'assistant', content: '' }, index: 0, finish_reason: null }] },
     {
       choices: [{
-        delta: { tool_calls: [{ index: 0, id: `call_${name}`, type: 'function', function: { name, arguments: JSON.stringify(args) } }] },
+        delta: { tool_calls: [{ index: 0, id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] },
         index: 0,
         finish_reason: null,
       }],
@@ -59,6 +63,9 @@ export async function startFakeLlm(scenario) {
   const selected = scenario === 's8-cli' ? 's8' : scenario.endsWith('-web') ? scenario.slice(0, -4) : scenario
   const script = [...(scripts[selected] ?? scripts.s4)]
   const requests = []
+  // 按任务文本编排：请求的用户消息等于某个 task 时，依次取它的剧本；没有匹配的才走默认剧本。
+  // DSH 的会话标题等附带请求不会匹配，不会吃掉工具调用。
+  const tasks = new Map()
   const sse = { active: 0, opened: 0, closed: 0, maxActive: 0 }
   const server = http.createServer((req, res) => {
     const chunks = []
@@ -88,7 +95,16 @@ export async function startFakeLlm(scenario) {
       }
       const body = JSON.parse(text)
       requests.push({ body, headers: req.headers })
-      const behavior = script.shift() ?? textResponse('script exhausted')
+      let behavior
+      for (const [task, queue] of tasks) {
+        if (queue.length && body.messages?.some((message) => message.role === 'user' && String(message.content) === task)) {
+          behavior = queue.shift()
+          break
+        }
+      }
+      behavior ??= script.shift() ?? textResponse('script exhausted')
+      // 剧本项可以是函数：按这次请求的内容（例如上一步工具返回的确认码）现算
+      if (typeof behavior === 'function') behavior = behavior(body)
       if (!Array.isArray(behavior)) {
         res.writeHead(behavior.status, { 'content-type': 'application/json' })
         res.end(JSON.stringify(behavior.body))
@@ -104,6 +120,9 @@ export async function startFakeLlm(scenario) {
   return {
     requests,
     sse,
+    script(task, behaviors) {
+      tasks.set(task, [...behaviors])
+    },
     url: `http://127.0.0.1:${address.port}/v1`,
     async close() {
       await new Promise((resolve) => server.close(resolve))

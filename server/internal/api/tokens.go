@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -36,10 +37,16 @@ type tokenView struct {
 	LastIP            string     `json:"last_ip"`
 	RevokedAt         *time.Time `json:"revoked_at"`
 	CreatedAt         time.Time  `json:"created_at"`
+	// 管理模式的到期时间；没开启或已到期时为空
+	AdminUntil *time.Time `json:"admin_until"`
 }
 
 func accessView(t *store.AccessToken, used int64) tokenView {
-	return tokenView{
+	var adminUntil *time.Time
+	if t.AdminUntil != nil && t.AdminUntil.After(time.Now()) {
+		adminUntil = t.AdminUntil
+	}
+	return tokenView{AdminUntil: adminUntil,
 		ID: "at:" + strconv.FormatInt(t.ID, 10), Kind: "access", Name: t.Name, Prefix: t.Prefix,
 		UserID: t.UserID, Username: t.Username, Department: t.Department, AccountType: t.AccountType,
 		Source: t.Source, Scopes: nonNil(t.Scopes), ClientName: t.ClientName, ClientOS: t.ClientOS,
@@ -245,6 +252,16 @@ func (s *Server) handleRevokeMyToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "npm":
+		// 只能吊销自己的：不是自己的一律按不存在处理，不暴露别人的令牌 id
+		own, err := s.store.ListNpmTokens(ctx, currentUser(r).ID)
+		if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		if !slices.ContainsFunc(own, func(token *store.NpmToken) bool { return token.ID == n }) {
+			writeErr(w, http.StatusNotFound, "令牌不存在")
+			return
+		}
 		if err := s.store.RevokeNpmToken(ctx, n); err != nil {
 			if errors.Is(err, store.ErrNotFound) {
 				writeErr(w, http.StatusNotFound, "令牌不存在")
@@ -254,6 +271,13 @@ func (s *Server) handleRevokeMyToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "key":
+		if k, err := s.store.GetAPIKey(ctx, n); notFound(err) || (err == nil && k.UserID != currentUser(r).ID) {
+			writeErr(w, http.StatusNotFound, "令牌不存在")
+			return
+		} else if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
 		if err := s.store.RevokeAPIKey(ctx, n); err != nil {
 			if errors.Is(err, store.ErrNotFound) {
 				writeErr(w, http.StatusNotFound, "令牌不存在")
