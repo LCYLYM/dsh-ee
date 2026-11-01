@@ -17,6 +17,8 @@ export const AUDIT_CATEGORIES = [
   "review",
   "upstream",
   "npm_token",
+  "token",
+  "device",
   "asset",
   "connection",
   "connect",

@@ -3,6 +3,9 @@ export default {
   dashboard: {
     title: "总览",
     desc: "企业资产 → dsh-ee ⇄ DSH 执行 · 近 14 天",
+    tokenUsage: "模型用量",
+    byUser: "按人",
+    byToken: "按令牌",
     assets: "企业资产",
     published: "项能力已上架",
     assetsNote: "同事分享 {{internal}} 项，上游社区 {{upstream}} 项",

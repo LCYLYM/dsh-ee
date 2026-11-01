@@ -38,6 +38,8 @@ export const defaultSettings: Settings = {
     market: true,
     installRequired: true,
     pollSeconds: 60,
+    deviceTokenDays: 90,
+    allowManualTokens: true,
   },
   registry: {
     proxyMode: "cache",

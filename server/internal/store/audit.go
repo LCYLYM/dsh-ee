@@ -17,6 +17,9 @@ type AuditLog struct {
 	Target    string         `json:"target"`
 	Detail    map[string]any `json:"detail"`
 	IP        string         `json:"ip"`
+	Via       string         `json:"via"`
+	TokenID   *int64         `json:"token_id"`
+	Client    string         `json:"client"`
 	CreatedAt time.Time      `json:"created_at"`
 	// 操作人当前的显示名与部门，列表查询时填充。
 	ActorDisplayName string `json:"actor_display_name"`
@@ -32,10 +35,13 @@ func (s *Store) InsertAudit(ctx context.Context, a *AuditLog) error {
 		}
 		detail = string(b)
 	}
+	if a.Via == "" {
+		a.Via = "web"
+	}
 	a.CreatedAt = now()
 	res, err := s.db.ExecContext(ctx,
-		"INSERT INTO audit_logs (actor_id, actor_name, action, target, detail, ip, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		a.ActorID, truncateRunes(a.ActorName, 64), a.Action, truncateRunes(a.Target, 255), detail, truncateRunes(a.IP, 64), a.CreatedAt)
+		"INSERT INTO audit_logs (actor_id, actor_name, action, target, detail, ip, via, token_id, client, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		a.ActorID, truncateRunes(a.ActorName, 64), a.Action, truncateRunes(a.Target, 255), detail, truncateRunes(a.IP, 64), a.Via, a.TokenID, truncateRunes(a.Client, 128), a.CreatedAt)
 	if err != nil {
 		return err
 	}
@@ -50,6 +56,7 @@ type AuditFilter struct {
 	// 动作前缀，如 "user." 或完整的 "review.approve"
 	Action  string
 	ActorID int64
+	Via     string
 	// 在操作人、对象里模糊搜索
 	Query string
 	Since time.Time
@@ -76,6 +83,10 @@ func (s *Store) ListAudit(ctx context.Context, f AuditFilter) ([]*AuditLog, erro
 		where = append(where, "a.actor_id = ?")
 		args = append(args, f.ActorID)
 	}
+	if f.Via != "" {
+		where = append(where, "a.via = ?")
+		args = append(args, f.Via)
+	}
 	if f.Query != "" {
 		q := "%" + escapeLike(f.Query) + "%"
 		where = append(where, "(a.actor_name LIKE ? OR a.target LIKE ? OR u.display_name LIKE ?)")
@@ -95,7 +106,7 @@ func (s *Store) ListAudit(ctx context.Context, f AuditFilter) ([]*AuditLog, erro
 	}
 	args = append(args, limit)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT a.id, a.actor_id, a.actor_name, a.action, a.target, a.detail, a.ip, a.created_at,
+		`SELECT a.id, a.actor_id, a.actor_name, a.action, a.target, a.detail, a.ip, a.via, a.token_id, a.client, a.created_at,
 		        COALESCE(u.display_name, ''), COALESCE(u.department, '')
 		 FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_id
 		 WHERE `+strings.Join(where, " AND ")+`
@@ -107,15 +118,18 @@ func (s *Store) ListAudit(ctx context.Context, f AuditFilter) ([]*AuditLog, erro
 	out := []*AuditLog{}
 	for rows.Next() {
 		var a AuditLog
-		var actor sql.NullInt64
+		var actor, tokenID sql.NullInt64
 		var detail sql.NullString
-		if err := rows.Scan(&a.ID, &actor, &a.ActorName, &a.Action, &a.Target, &detail, &a.IP, &a.CreatedAt,
+		if err := rows.Scan(&a.ID, &actor, &a.ActorName, &a.Action, &a.Target, &detail, &a.IP, &a.Via, &tokenID, &a.Client, &a.CreatedAt,
 			&a.ActorDisplayName, &a.ActorDepartment); err != nil {
 			return nil, err
 		}
 		if actor.Valid {
 			v := actor.Int64
 			a.ActorID = &v
+		}
+		if tokenID.Valid {
+			a.TokenID = &tokenID.Int64
 		}
 		if detail.Valid && detail.String != "" {
 			_ = json.Unmarshal([]byte(detail.String), &a.Detail)

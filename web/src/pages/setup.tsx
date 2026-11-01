@@ -45,6 +45,12 @@ export default function Setup() {
         </Card>
       )}
 
+      <Card className="mt-6 p-5 text-sm text-neutral-700">
+        <h2 className="mb-2 font-medium text-neutral-900">{t("setup.deviceLoginTitle")}</h2>
+        <p>{t("setup.deviceLoginDesc")}</p>
+        <div className="mt-2 font-mono text-xs text-neutral-600">/ee-login · /ee-status</div>
+      </Card>
+
       <div className="mt-6">
         <Segmented
           value={mode}
@@ -60,13 +66,13 @@ export default function Setup() {
       <div className="mt-4 space-y-4">
         {mode === "unix" && (
           <>
-            <CopyBox label={t("setup.runInTerminal")} text={`curl -fsSL ${baseUrl}/setup.sh | sh -s -- ${shown}`} />
+            <CopyBox label={t("setup.runInTerminal")} text={`curl -fsSL ${baseUrl}/setup.sh | sh`} />
             <ScriptExplain index={indexUrl} />
           </>
         )}
         {mode === "windows" && (
           <>
-            <CopyBox label={t("setup.runInPowerShell")} text={`iwr ${baseUrl}/setup.ps1 -UseBasicParsing | iex; Setup-DshEE -Token ${shown}`} />
+            <CopyBox label={t("setup.runInPowerShell")} text={`irm ${baseUrl}/setup.ps1 | iex`} />
             <ScriptExplain index={indexUrl} />
           </>
         )}

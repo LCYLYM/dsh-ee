@@ -25,6 +25,8 @@ export interface User {
   month_tokens: number;
   /** local：本地密码 / ldap：由企业目录认证，资料在每次登录时同步。 */
   auth_source: "local" | "ldap";
+  account_type: "human" | "bot";
+  owner_id: number | null;
   email: string;
   external_dn?: string;
   last_login_at: string | null;
@@ -312,6 +314,58 @@ export interface Stats {
   departments: { department: string; users: number; active_users: number; installs: number; calls: number; tokens: number }[];
   platforms: { os: string; arch: string; users: number; installs: number }[];
   storage: { origin: "hosted" | "upstream"; versions: number; bytes: number }[];
+  token_stats?: { id: number; name: string; username: string; account_type: "human" | "bot"; tokens: number }[];
+}
+
+export type TokenScope = "models" | "registry:read" | "registry:publish" | "hub" | "connections" | "agent" | "admin";
+export type TokenSource = "manual" | "device" | "issued" | "legacy";
+
+export interface TokenView {
+  id: string;
+  kind: "access" | "npm" | "key";
+  name: string;
+  prefix: string;
+  source: TokenSource;
+  scopes: TokenScope[];
+  client_name: string;
+  client_os: string;
+  monthly_token_limit: number | null;
+  month_used: number;
+  allowed_models: string[];
+  expires_at: string | null;
+  last_used_at: string | null;
+  last_ip: string;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export interface TokenInput {
+  name: string;
+  scopes: TokenScope[];
+  monthly_token_limit?: number | null;
+  allowed_models?: string[];
+  expires_in_days?: number;
+  user_id?: number;
+}
+
+export interface DeviceInfo {
+  user_code: string;
+  client_name: string;
+  client_os: string;
+  client_version: string;
+  client_ip: string;
+  scopes: TokenScope[];
+  expires_at: string;
+  replace_existing: boolean;
+}
+
+export interface DeviceCodeResponse {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  verification_uri_complete: string;
+  interval: number;
+  expires_in: number;
 }
 
 export interface MyOverview {
@@ -333,6 +387,9 @@ export interface AuditLog {
   target: string;
   detail: Record<string, unknown> | null;
   ip: string;
+  via: "web" | "token" | "agent" | "system";
+  token_id: number | null;
+  client: string;
   created_at: string;
   actor_display_name: string;
   actor_department: string;
@@ -345,6 +402,7 @@ export interface AuditQuery {
   q?: string;
   since?: string;
   until?: string;
+  via?: string;
 }
 
 // ---- LDAP ----
@@ -662,11 +720,19 @@ export const api = {
   myMenus: () => request<{ menus: Menu[] }>("GET", "/api/me/menus").then((r) => r.menus),
   changePassword: (old_password: string, new_password: string) =>
     request<void>("POST", "/api/auth/password", { old_password, new_password }),
+  createDeviceCode: (input: { client_name: string; client_os: string; client_version: string }) =>
+    request<DeviceCodeResponse>("POST", "/api/device/code", input),
+  pollDeviceToken: (device_code: string) => request<{ access_token: string; scopes: string[]; user: { username: string; department: string }; expires_at: string }>("POST", "/api/device/token", { device_code }),
+  deviceInfo: (code: string) => request<DeviceInfo>("GET", `/api/device/${encodeURIComponent(code)}`),
+  approveDevice: (code: string, approve: boolean) => request<{ status: string }>("POST", `/api/device/${encodeURIComponent(code)}`, { approve }),
 
   myKeys: () => request<{ keys: ApiKey[]; quota: MyQuota }>("GET", "/api/me/keys"),
   createMyKey: (k: { name: string; expires_at?: string }) =>
     request<{ key: string; api_key: ApiKey }>("POST", "/api/me/keys", k),
   revokeMyKey: (id: number) => request<void>("DELETE", `/api/me/keys/${id}`),
+  myTokens: () => request<{ tokens: TokenView[] }>("GET", "/api/me/tokens").then((r) => r.tokens),
+  createMyToken: (input: TokenInput) => request<{ token: string; info: TokenView }>("POST", "/api/me/tokens", input),
+  revokeMyToken: (id: string) => request<void>("DELETE", `/api/me/tokens/${id}`),
 
   users: () => request<{ users: User[] }>("GET", "/api/admin/users").then((r) => r.users),
   /** role_ids 不传时给默认的「员工」角色；auth_source 为 ldap 时不设密码。 */
@@ -677,6 +743,8 @@ export const api = {
     department: string;
     role_ids?: number[];
     auth_source?: "local" | "ldap";
+    account_type?: "human" | "bot";
+    owner_id?: number;
   }) => request<User>("POST", "/api/admin/users", u),
   updateUser: (id: number, patch: Partial<{ display_name: string; department: string; disabled: boolean; password: string }>) =>
     request<User>("PATCH", `/api/admin/users/${id}`, patch),
@@ -728,6 +796,10 @@ export const api = {
   issueKey: (k: { user_id: number; name: string; expires_at?: string }) =>
     request<{ key: string; api_key: ApiKey }>("POST", "/api/admin/keys", k),
   revokeKey: (id: number) => request<void>("DELETE", `/api/admin/keys/${id}`),
+  adminTokens: (query = "") => request<{ tokens: TokenView[] }>(`GET`, `/api/admin/tokens${query}`).then((r) => r.tokens),
+  issueToken: (input: TokenInput) => request<{ token: string; info: TokenView }>("POST", "/api/admin/tokens", input),
+  revokeTokens: (input: { ids?: string[]; user_id?: number; client_name?: string; department?: string }) =>
+    request<{ revoked: number }>("POST", "/api/admin/tokens/revoke", input),
 
   authMethods: () => request<{ ldap: boolean }>("GET", "/api/auth/methods", undefined, { silent401: true }),
   ldap: () => request<LdapView>("GET", "/api/admin/auth/ldap"),
@@ -737,7 +809,7 @@ export const api = {
   syncLdap: () => request<LdapSyncResult>("POST", "/api/admin/auth/ldap/sync"),
 
   /** tz 为本地时区相对 UTC 的分钟数（东八区 480），按本地日期分天。 */
-  stats: (days: number) => request<Stats>("GET", `/api/admin/stats?days=${days}&tz=${-new Date().getTimezoneOffset()}`),
+  stats: (days: number, groupBy?: "token") => request<Stats>("GET", `/api/admin/stats?days=${days}&tz=${-new Date().getTimezoneOffset()}${groupBy ? `&group_by=${groupBy}` : ""}`),
   myOverview: () => request<MyOverview>("GET", "/api/me/overview"),
   audit: (q: AuditQuery = {}) => {
     const params = new URLSearchParams();

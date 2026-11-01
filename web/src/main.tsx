@@ -18,6 +18,7 @@ import Account from "./pages/account";
 import PluginDetail from "./pages/plugin-detail";
 import AssetDetail from "./pages/asset-detail";
 import AssetEditor from "./pages/asset-editor";
+import DevicePage from "./pages/device";
 import { useTranslation } from "react-i18next";
 
 function Status({ title, children }: { title: string; children?: React.ReactNode }) {
@@ -74,6 +75,7 @@ function AppRoutes() {
       >
         <Route path="start" element={<Start />} />
         <Route path="account" element={<Account />} />
+        <Route path="device" element={<DevicePage />} />
         <Route path="plugins/:name" element={<PluginDetail />} />
         <Route path="assets/new" element={<AssetEditor />} />
         <Route path="assets/:id" element={<AssetDetail />} />

@@ -56,6 +56,10 @@ export default function ConnectSettings() {
         <Field label={t("connectAdmin.poll")}>
           <input className={cx(inputBase, "w-24")} type="number" min={15} max={3600} value={c.pollSeconds} onChange={(e) => set({ pollSeconds: Number(e.target.value) })} />
         </Field>
+        <Field label={t("connectAdmin.deviceTokenDays")}>
+          <input className={cx(inputBase, "w-24")} type="number" min={1} max={3650} value={c.deviceTokenDays} onChange={(e) => set({ deviceTokenDays: Number(e.target.value) })} />
+        </Field>
+        <ToggleRow label={t("connectAdmin.allowManualTokens")} checked={c.allowManualTokens} onChange={(v) => set({ allowManualTokens: v })} />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-5 text-sm">

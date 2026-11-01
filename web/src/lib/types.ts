@@ -111,6 +111,8 @@ export interface Settings {
     /** 自动安装设为「自动安装」的插件与微应用依赖的插件。 */
     installRequired: boolean;
     pollSeconds: number;
+    deviceTokenDays: number;
+    allowManualTokens: boolean;
   };
   registry: {
     /** 企业作用域之外的包：按需回源上游并缓存，或只提供已预载 / 已审核的包。 */

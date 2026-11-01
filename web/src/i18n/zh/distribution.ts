@@ -28,6 +28,8 @@ export default {
     desc: "接入后，DSH 的插件页会显示企业市场里的插件，安装时从内网下载，不需要访问外网。",
     tokenTitle: "你的个人安装令牌",
     tokenDesc: "命令里已带上令牌，用于安装审计与按部门可见的插件。请勿外传。",
+    deviceLoginTitle: "在浏览器里确认后自动完成",
+    deviceLoginDesc: "脚本会显示确认码并尝试打开浏览器。以后令牌失效时，在 DSH 对话里输入 /ee-login；输入 /ee-status 可查看状态。无浏览器环境请使用「手动配置」。",
     manual: "手动配置",
     runInTerminal: "终端执行",
     runInPowerShell: "PowerShell 执行",

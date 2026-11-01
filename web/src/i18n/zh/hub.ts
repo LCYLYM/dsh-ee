@@ -211,6 +211,8 @@ export default {
     installRequired: "自动安装插件",
     installRequiredDesc: "设为「自动安装」的插件与微应用依赖的插件，在员工的 DSH 里自动装上。",
     poll: "检查间隔（秒）",
+    deviceTokenDays: "设备登录令牌有效天数",
+    allowManualTokens: "允许员工手动生成令牌",
     status: "当前版本",
     notPublished: "还没有发布",
     published: "{{pkg}}@{{version}} · {{time}}",

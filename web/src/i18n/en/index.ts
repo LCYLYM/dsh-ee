@@ -16,6 +16,7 @@ import auth from "./auth";
 import registry from "./registry";
 import audit from "./audit";
 import hub from "./hub";
+import tokens from "./tokens";
 
 export default {
   ...common,
@@ -34,4 +35,5 @@ export default {
   ...registry,
   ...audit,
   ...hub,
+  ...tokens,
 } satisfies Messages<typeof zh>;

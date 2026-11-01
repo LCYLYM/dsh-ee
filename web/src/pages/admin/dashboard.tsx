@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router";
 import { ArrowRight } from "lucide-react";
 import { kindOf } from "../../lib/catalog";
@@ -11,7 +12,7 @@ import { platformLabel } from "../../lib/labels";
 import { BarList, DailyBars } from "../../components/charts";
 import { pluginPath } from "../../components/plugin-card";
 import { LoadState } from "../../components/api-ui";
-import { Badge, Card, CardHeader, PageHeader } from "../../components/ui";
+import { Badge, Card, CardHeader, PageHeader, Segmented } from "../../components/ui";
 import { PageLink } from "../../lib/menus";
 import { useTranslation } from "react-i18next";
 
@@ -64,7 +65,8 @@ export default function AdminDashboard() {
   const { settings } = useStore();
   const { can } = useAuth();
   const canAudit = can("audit.view");
-  const stats = useApi(() => api.stats(DAYS));
+  const [usageGroup, setUsageGroup] = useState<"user" | "token">("user");
+  const stats = useApi(() => api.stats(DAYS, "token"));
   const audit = useApi(() => (canAudit ? api.audit({ limit: 6 }) : Promise.resolve([])));
   // 全部状态的能力（能力市场的列表只有已上架的，算不出待审核、驳回与下架）
   const packages = useApi(api.adminPackages);
@@ -214,6 +216,28 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader
+            title={t("dashboard.tokenUsage")}
+            aside={<Segmented value={usageGroup} onChange={setUsageGroup} options={[{ value: "user", label: t("dashboard.byUser") }, { value: "token", label: t("dashboard.byToken") }]} />}
+          />
+          {usageGroup === "user" ? (
+            <ul className="px-5 pb-3 text-sm">
+              {(s?.top_models ?? []).slice(0, 6).map((m) => <li key={m.model} className="flex justify-between border-t border-neutral-100 py-2 first:border-t-0"><span className="font-mono">{m.model}</span><span className="tabular-nums">{formatTokens(m.tokens)}</span></li>)}
+            </ul>
+          ) : (
+            <ul className="px-5 pb-3 text-sm">
+              {(s?.token_stats ?? []).slice(0, 10).map((token) => (
+                <li key={token.id} className="flex items-center justify-between gap-3 border-t border-neutral-100 py-2 first:border-t-0">
+                  <span>{token.name}{token.account_type === "bot" && <Badge>{t("users.bot")}</Badge>}<span className="ml-2 text-xs text-neutral-500">{token.username}</span></span>
+                  <span className="tabular-nums">{formatTokens(token.tokens)}</span>
+                </li>
+              ))}
+              {s?.token_stats?.length === 0 && <li className="text-neutral-600">{t("dashboard.noInstalls")}</li>}
+            </ul>
           )}
         </Card>
 

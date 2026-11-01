@@ -38,17 +38,20 @@ function RolePicker({ roles, value, onChange }: { roles: Role[]; value: number[]
   );
 }
 
-function CreateUser({ roles, onCreated }: { roles: Role[] | null; onCreated: (u: User) => void }) {
+function CreateUser({ roles, users, onCreated }: { roles: Role[] | null; users: User[]; onCreated: (u: User) => void }) {
   const { t } = useTranslation();
   const [f, setF] = useState(emptyForm);
   const defaultRoles = roles?.filter((r) => r.code === "member").map((r) => r.id) ?? [];
   const [roleIds, setRoleIds] = useState<number[] | null>(null);
   const [source, setSource] = useState<"local" | "ldap">("local");
+  const [accountType, setAccountType] = useState<"human" | "bot">("human");
+  const [ownerId, setOwnerId] = useState("");
   const methods = useApi(api.authMethods);
   const [error, setError] = useState<string | null>(null);
   const { busy, run } = useAction();
   const set = (patch: Partial<typeof f>) => setF((x) => ({ ...x, ...patch }));
   const ldap = source === "ldap";
+  const bot = accountType === "bot";
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -58,6 +61,8 @@ function CreateUser({ roles, onCreated }: { roles: Role[] | null; onCreated: (u:
       api.createUser({
         ...f,
         username: f.username.trim(),
+        account_type: accountType,
+        ...(bot ? { password: undefined, ...(ownerId ? { owner_id: Number(ownerId) } : {}) } : {}),
         ...(ldap ? { password: undefined, auth_source: "ldap" as const } : {}),
         ...(roleIds ? { role_ids: roleIds } : {}),
       }),
@@ -70,6 +75,9 @@ function CreateUser({ roles, onCreated }: { roles: Role[] | null; onCreated: (u:
 
   return (
     <form onSubmit={submit} className="space-y-4 px-5 pb-5">
+      <Field label={t("users.accountType")}>
+        <Segmented value={accountType} onChange={setAccountType} options={[{ value: "human", label: t("users.human") }, { value: "bot", label: t("users.bot") }]} />
+      </Field>
       <Field
         label={t("users.source")}
         hint={ldap ? (methods.data && !methods.data.ldap ? `${t("users.ldapCreateHint")} ${t("users.ldapOff")}` : t("users.ldapCreateHint")) : undefined}
@@ -87,7 +95,7 @@ function CreateUser({ roles, onCreated }: { roles: Role[] | null; onCreated: (u:
         <Field label={t("users.username")} hint={t("users.usernameHint")}>
           <input className={inputCls} required value={f.username} onChange={(e) => set({ username: e.target.value })} placeholder="zhang.wei" />
         </Field>
-        {!ldap && (
+        {!ldap && !bot && (
           <Field label={t("users.initialPassword")} hint={t("users.initialPasswordHint")}>
             <input className={inputCls} type="text" autoComplete="off" required value={f.password} onChange={(e) => set({ password: e.target.value })} />
           </Field>
@@ -98,6 +106,14 @@ function CreateUser({ roles, onCreated }: { roles: Role[] | null; onCreated: (u:
         <Field label={t("users.department")}>
           <input className={inputCls} value={f.department} onChange={(e) => set({ department: e.target.value })} placeholder={t("users.departmentPlaceholder")} />
         </Field>
+        {bot && (
+          <Field label={t("users.owner")}>
+            <select className={inputCls} value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
+              <option value="">{t("users.noOwner")}</option>
+              {users.filter((u) => u.account_type !== "bot").map((u) => <option key={u.id} value={u.id}>{u.display_name || u.username}</option>)}
+            </select>
+          </Field>
+        )}
       </div>
       {roles ? (
         <fieldset>
@@ -108,7 +124,7 @@ function CreateUser({ roles, onCreated }: { roles: Role[] | null; onCreated: (u:
         <p className="text-sm text-neutral-600">{t("users.defaultRoleNote")}</p>
       )}
       <ErrorNote>{error}</ErrorNote>
-      <Button type="submit" disabled={busy || !f.username || (!ldap && !f.password)}>
+      <Button type="submit" disabled={busy || !f.username || (!ldap && !bot && !f.password)}>
         {busy ? t("common.creating") : t("users.create")}
       </Button>
     </form>
@@ -162,6 +178,7 @@ export default function AdminUsers() {
           </div>
           <div className="flex items-center gap-1.5 text-xs text-neutral-600">
             {u.username}
+            {u.account_type === "bot" && <Badge>{t("users.bot")}</Badge>}
             {u.auth_source === "ldap" && (
               <span title={u.external_dn ? t("users.ldapTip", { dn: u.external_dn }) : undefined}>
                 <Badge tone="brand">{t("users.ldapBadge")}</Badge>
@@ -299,6 +316,7 @@ export default function AdminUsers() {
           <CardHeader title={t("users.newUser")} />
           <CreateUser
             roles={roles.data}
+            users={users ?? []}
             onCreated={(u) => {
               notify(t("users.created", { name: u.username }));
               setCreating(false);

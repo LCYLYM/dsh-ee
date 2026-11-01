@@ -68,6 +68,15 @@ func (s *Server) audit(r *http.Request, action, target string, detail map[string
 // auditAs 指定操作人（npm 令牌、登录这类没有会话的请求）；u 为 nil 表示匿名。
 func (s *Server) auditAs(r *http.Request, u *store.User, action, target string, detail map[string]any) {
 	a := &store.AuditLog{Action: action, Target: target, Detail: detail, IP: clientIP(r)}
+	if token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+		if p, err := s.resolveBearer(r.Context(), token); err == nil {
+			a.Via = "token"
+			a.Client = p.Client
+			if p.TokenID > 0 {
+				a.TokenID = &p.TokenID
+			}
+		}
+	}
 	if u != nil {
 		id := u.ID
 		a.ActorID, a.ActorName = &id, u.Username
@@ -82,7 +91,7 @@ func (s *Server) auditAs(r *http.Request, u *store.User, action, target string, 
 
 // auditSystem 记录后台任务（如目录同步）的操作，没有请求。
 func (s *Server) auditSystem(ctx context.Context, action, target string, detail map[string]any) {
-	if err := s.store.InsertAudit(context.WithoutCancel(ctx), &store.AuditLog{Action: action, Target: target, Detail: detail}); err != nil {
+	if err := s.store.InsertAudit(context.WithoutCancel(ctx), &store.AuditLog{Action: action, Target: target, Detail: detail, Via: "system"}); err != nil {
 		s.log.Warn("写审计日志失败", "action", action, "err", err)
 	}
 }
@@ -112,6 +121,7 @@ func (s *Server) handleListAudit(w http.ResponseWriter, r *http.Request) {
 	f := store.AuditFilter{
 		Action: strings.TrimSpace(q.Get("action")),
 		Query:  strings.TrimSpace(q.Get("q")),
+		Via:    strings.TrimSpace(q.Get("via")),
 	}
 	f.Before, _ = strconv.ParseInt(q.Get("before"), 10, 64)
 	f.ActorID, _ = strconv.ParseInt(q.Get("actor"), 10, 64)

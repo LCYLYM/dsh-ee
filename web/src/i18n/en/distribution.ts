@@ -30,6 +30,8 @@ export default {
     desc: "Once connected, DSH's plugin page shows the company market and installs from the intranet, with no internet access needed.",
     tokenTitle: "Your personal install token",
     tokenDesc: "The commands below already include it; it's used for install auditing and department-only plugins. Don't share it.",
+    deviceLoginTitle: "Confirm in your browser to finish",
+    deviceLoginDesc: "The script shows a code and tries to open your browser. If your token expires later, run /ee-login in DSH; /ee-status shows the current state. Use Manual setup for servers and CI.",
     manual: "Manual setup",
     runInTerminal: "Run in a terminal",
     runInPowerShell: "Run in PowerShell",

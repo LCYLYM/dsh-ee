@@ -5,6 +5,9 @@ export default {
   dashboard: {
     title: "Overview",
     desc: "Enterprise assets → dsh-ee ⇄ DSH execution · last 14 days",
+    tokenUsage: "Model usage",
+    byUser: "By user",
+    byToken: "By token",
     assets: "Enterprise assets",
     published: "capabilities published",
     assetsNote: "{{internal}} shared by colleagues, {{upstream}} from the community",

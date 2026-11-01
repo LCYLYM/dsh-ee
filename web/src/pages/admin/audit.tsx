@@ -7,10 +7,12 @@ import { Combobox } from "../../components/pickers";
 import { LoadState } from "../../components/api-ui";
 
 const PAGE = 50;
+const viaOptions = ["web", "token", "agent", "system"] as const;
 
 export default function AdminAudit() {
   const { t } = useTranslation();
   const [category, setCategory] = useState("");
+  const [via, setVia] = useState("");
   const [query, setQuery] = useState("");
   const [q, setQ] = useState("");
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -30,7 +32,7 @@ export default function AdminAudit() {
       const id = ++seq.current;
       setLoading(true);
       api
-        .audit({ action: category ? `${category}.` : undefined, q, before, limit: PAGE })
+        .audit({ action: category ? `${category}.` : undefined, via: via || undefined, q, before, limit: PAGE })
         .then((rows) => {
           if (id !== seq.current) return;
           setLogs((cur) => (before ? [...cur, ...rows] : rows));
@@ -40,7 +42,7 @@ export default function AdminAudit() {
         .catch((e: unknown) => id === seq.current && setError(e instanceof Error ? e.message : String(e)))
         .finally(() => id === seq.current && setLoading(false));
     },
-    [category, q],
+    [category, via, q],
   );
   useEffect(() => load(), [load]);
 
@@ -65,6 +67,16 @@ export default function AdminAudit() {
           aria-label={t("auditLog.allCategories")}
           options={AUDIT_CATEGORIES.map((c) => ({ value: c, label: t(`auditLog.categories.${c}`) }))}
         />
+        <Combobox
+          className="w-40"
+          value={via}
+          onChange={setVia}
+          allowEmpty
+          emptyLabel={t("auditLog.allSources")}
+          placeholder={t("auditLog.allSources")}
+          aria-label={t("auditLog.allSources")}
+          options={viaOptions.map((value) => ({ value, label: t(`auditLog.sources.${value}`) }))}
+        />
       </div>
       <Card>
         <LoadState loading={loading && logs.length === 0} error={logs.length === 0 ? error : null} onRetry={() => load()}>
@@ -78,6 +90,7 @@ export default function AdminAudit() {
                     <th className="px-5 py-2.5 font-normal whitespace-nowrap">{t("auditLog.colTime")}</th>
                     <th className="px-5 py-2.5 font-normal">{t("auditLog.colActor")}</th>
                     <th className="px-5 py-2.5 font-normal">{t("auditLog.colAction")}</th>
+                    <th className="px-5 py-2.5 font-normal">{t("auditLog.colSource")}</th>
                     <th className="px-5 py-2.5 font-normal">{t("auditLog.colTarget")}</th>
                     <th className="px-5 py-2.5 font-normal">{t("auditLog.colDetail")}</th>
                     <th className="px-5 py-2.5 font-normal">{t("auditLog.colIp")}</th>
@@ -94,6 +107,7 @@ export default function AdminAudit() {
                       <td className="px-5 py-2.5 whitespace-nowrap">
                         <Badge tone={auditTone(l.action)}>{auditAction(t, l.action)}</Badge>
                       </td>
+                      <td className="px-5 py-2.5 text-neutral-600">{t(`auditLog.sources.${l.via}`)}{l.client && <div className="text-xs">{l.client}</div>}</td>
                       <td data-raw className="max-w-64 px-5 py-2.5 break-all text-neutral-900">{l.target || "—"}</td>
                       <td data-raw className="max-w-96 px-5 py-2.5 font-mono text-xs break-all text-neutral-600">{auditDetail(l) || "—"}</td>
                       <td className="px-5 py-2.5 font-mono text-xs whitespace-nowrap text-neutral-600">{l.ip || "—"}</td>

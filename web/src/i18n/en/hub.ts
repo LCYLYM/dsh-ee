@@ -213,6 +213,8 @@ export default {
     installRequired: "Install plugins automatically",
     installRequiredDesc: "Plugins set to install automatically, and those micro-apps depend on, are installed in employees' DSH.",
     poll: "Check interval (seconds)",
+    deviceTokenDays: "Device token lifetime (days)",
+    allowManualTokens: "Allow employees to create tokens manually",
     status: "Current version",
     notPublished: "Not published yet",
     published: "{{pkg}}@{{version}} · {{time}}",
