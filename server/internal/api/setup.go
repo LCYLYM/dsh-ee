@@ -90,7 +90,8 @@ const post = async (url, body) => {
       console.log("✔ 已登录 " + (user.username || "") + (user.department ? "（" + user.department + "）" : ""));
       return;
     }
-    if (polled.data.error === "slow_down") interval += 5000;
+    // slow_down / rate_limited 都是「慢一点再来」，不算失败
+    if (polled.data.error === "slow_down" || polled.data.error === "rate_limited") interval += 5000;
     else if (polled.data.error !== "authorization_pending") throw new Error(polled.data.error || "设备登录失败：HTTP " + polled.status);
   }
   throw new Error("设备登录超时，请重新运行 setup");
@@ -221,7 +222,7 @@ function Setup-DshEE {
       } catch {
         $pollError = $null
         if ($_.ErrorDetails.Message) { try { $pollError = $_.ErrorDetails.Message | ConvertFrom-Json } catch {} }
-        if ($pollError.error -eq 'slow_down') { $interval += 5; continue }
+        if ($pollError.error -eq 'slow_down' -or $pollError.error -eq 'rate_limited') { $interval += 5; continue }
         if ($pollError.error -eq 'authorization_pending') { continue }
         Write-Error "设备登录失败：$($pollError.error)"
         return

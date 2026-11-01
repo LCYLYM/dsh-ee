@@ -50,7 +50,7 @@ func (p *Principal) quota() *store.UserQuota {
 
 func tokenError(code string) error { return bearerError(code) }
 
-func (s *Server) resolveBearer(ctx context.Context, token string) (*Principal, error) {
+func (s *Server) resolveBearer(ctx context.Context, token, ip string) (*Principal, error) {
 	token = strings.TrimSpace(token)
 	hash := secret.Hash(token)
 	switch {
@@ -83,7 +83,7 @@ func (s *Server) resolveBearer(ctx context.Context, token string) (*Principal, e
 		for _, scope := range t.Scopes {
 			scopes[scope] = true
 		}
-		_ = s.store.TouchAccessToken(ctx, t.ID, "")
+		_ = s.store.TouchAccessToken(ctx, t.ID, ip)
 		return &Principal{
 			User: u, Access: rbac.ScopeFilter(account, t.Scopes), Scopes: scopes, TokenID: t.ID,
 			Limit: t.MonthlyTokenLimit, Models: t.AllowedModels, Client: t.ClientName,

@@ -55,11 +55,19 @@ export function registerCommands(ctx: DshContext, config: PluginConfig, tokens: 
     description: "退出企业账号",
     handler: async () => {
       const current = await tokens.resolve();
-      if (current) {
-        await fetch(`${config.base}/api/dsh/logout`, { method: "POST", headers: { Authorization: `Bearer ${current.value}` } });
-        await tokens.unset();
+      if (!current) return { kind: "success", text: "当前没有登录企业账号" };
+      const revoked = await fetch(`${config.base}/api/dsh/logout`, { method: "POST", headers: { Authorization: `Bearer ${current.value}` } })
+        .then((response) => response.ok, () => false);
+      await tokens.unset();
+      // unset 只能清掉 DSH 凭据库里的值；令牌若来自环境变量或 $DSH_HOME/.env，DSH 仍会读到它
+      const left = await tokens.resolve();
+      if (left?.value === current.value) {
+        return {
+          kind: "error",
+          text: `${revoked ? "已在服务端吊销该令牌，" : ""}但它来自环境变量或 $DSH_HOME/.env（${config.tokenRef}），请手动删除后重启 DSH`,
+        };
       }
-      return { kind: "success", text: "已退出企业账号" };
+      return { kind: "success", text: revoked ? "已退出企业账号" : "本机已退出；连不上 dsh-ee，令牌未能在服务端吊销，可在网页「我的令牌」里吊销" };
     },
   });
 }

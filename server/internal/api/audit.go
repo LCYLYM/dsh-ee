@@ -69,7 +69,7 @@ func (s *Server) audit(r *http.Request, action, target string, detail map[string
 func (s *Server) auditAs(r *http.Request, u *store.User, action, target string, detail map[string]any) {
 	a := &store.AuditLog{Action: action, Target: target, Detail: detail, IP: clientIP(r)}
 	if token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
-		if p, err := s.resolveBearer(r.Context(), token); err == nil {
+		if p, err := s.resolveBearer(r.Context(), token, clientIP(r)); err == nil {
 			a.Via = "token"
 			a.Client = p.Client
 			if p.TokenID > 0 {

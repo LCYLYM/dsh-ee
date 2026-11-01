@@ -16,12 +16,21 @@ type rateWindow struct {
 	count int
 }
 
+// ipRate 是按 IP 的固定窗口限流（每分钟 limit 次）。
 type ipRate struct {
 	mu    sync.Mutex
+	limit int
 	items map[string]*rateWindow
 }
 
-func newIPRate() *ipRate { return &ipRate{items: map[string]*rateWindow{}} }
+func newIPRate(limit int) *ipRate { return &ipRate{limit: limit, items: map[string]*rateWindow{}} }
+
+// 发起登录与轮询分开限流。轮询的单设备速度由 slow_down 约束，这里只防滥用：
+// 公司内网常常多人共用一个出口 IP，额度要够几十台设备同时按 5 秒间隔轮询。
+const (
+	deviceCodePerMinute  = 30
+	deviceTokenPerMinute = 600
+)
 
 func (l *ipRate) allow(ip string) bool {
 	l.mu.Lock()
@@ -29,10 +38,18 @@ func (l *ipRate) allow(ip string) bool {
 	now := time.Now()
 	w := l.items[ip]
 	if w == nil || now.Sub(w.start) >= time.Minute {
+		if len(l.items) > 10000 {
+			// 顺手清掉过期窗口，防止 map 无限增长
+			for k, v := range l.items {
+				if now.Sub(v.start) >= time.Minute {
+					delete(l.items, k)
+				}
+			}
+		}
 		l.items[ip] = &rateWindow{start: now, count: 1}
 		return true
 	}
-	if w.count >= 10 {
+	if w.count >= l.limit {
 		return false
 	}
 	w.count++
@@ -82,7 +99,7 @@ func validDeviceScopes(scopes []string) bool {
 }
 
 func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
-	if !s.deviceRate.allow(clientIP(r)) {
+	if !s.deviceCodeRate.allow(clientIP(r)) {
 		writeDeviceErr(w, http.StatusTooManyRequests, "rate_limited")
 		return
 	}
@@ -116,7 +133,7 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDeviceToken(w http.ResponseWriter, r *http.Request) {
-	if !s.deviceRate.allow(clientIP(r)) {
+	if !s.deviceTokenRate.allow(clientIP(r)) {
 		writeDeviceErr(w, http.StatusTooManyRequests, "rate_limited")
 		return
 	}
@@ -249,7 +266,7 @@ func (s *Server) handleDshLogout(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "缺少接入令牌", "code": tokenInvalid})
 		return
 	}
-	p, err := s.resolveBearer(r.Context(), token)
+	p, err := s.resolveBearer(r.Context(), token, clientIP(r))
 	if err != nil {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "接入令牌无效", "code": tokenInvalid})
 		return

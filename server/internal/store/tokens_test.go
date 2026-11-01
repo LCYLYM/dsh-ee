@@ -77,6 +77,11 @@ func TestAccessTokenStore(t *testing.T) {
 		t.Fatalf("令牌关联信息不对：%+v", got)
 	}
 
+	// 刚续过期（剩余接近完整窗口）：再用不续期
+	fresh := now().Add(90*24*time.Hour - time.Hour)
+	if _, err := st.DB().ExecContext(ctx, "UPDATE access_tokens SET expires_at = ? WHERE id = ?", fresh, token.ID); err != nil {
+		t.Fatal(err)
+	}
 	if err := st.TouchAccessToken(ctx, token.ID, "127.0.0.1"); err != nil {
 		t.Fatal(err)
 	}
@@ -84,15 +89,16 @@ func TestAccessTokenStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !got.ExpiresAt.Equal(expires) {
-		t.Fatalf("距上次使用不到一天不应续期：old=%s new=%s", expires, got.ExpiresAt)
+	if !got.ExpiresAt.Equal(fresh) {
+		t.Fatalf("剩余有效期接近完整窗口时不应续期：old=%s new=%s", fresh, got.ExpiresAt)
 	}
 	if got.LastIP != "127.0.0.1" {
 		t.Fatalf("最近使用 IP 未保存：%s", got.LastIP)
 	}
 
-	oldUse := now().Add(-48 * time.Hour)
-	if _, err := st.DB().ExecContext(ctx, "UPDATE access_tokens SET last_used_at = ?, expires_at = ? WHERE id = ?", oldUse, expires, token.ID); err != nil {
+	// 天天在用（last_used_at 很新）但剩余有效期只剩一天：必须续期。
+	// 回归：曾按「上次使用超过一天」判断，经常使用的员工反而永远不续期。
+	if _, err := st.DB().ExecContext(ctx, "UPDATE access_tokens SET last_used_at = ?, expires_at = ? WHERE id = ?", now().Add(-2*time.Minute), expires, token.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.TouchAccessToken(ctx, token.ID, "127.0.0.2"); err != nil {
@@ -103,7 +109,21 @@ func TestAccessTokenStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.ExpiresAt == nil || !got.ExpiresAt.After(now().Add(89*24*time.Hour)) {
-		t.Fatalf("超过一天应滑动续期 90 天：%v", got.ExpiresAt)
+		t.Fatalf("经常使用的令牌应滑动续期 90 天：%v", got.ExpiresAt)
+	}
+	if got.LastIP != "127.0.0.2" {
+		t.Fatalf("最近使用 IP 未更新：%s", got.LastIP)
+	}
+
+	// 不知道 IP 时不覆盖已有记录
+	if _, err := st.DB().ExecContext(ctx, "UPDATE access_tokens SET last_used_at = ? WHERE id = ?", now().Add(-time.Hour), token.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.TouchAccessToken(ctx, token.ID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ = st.ActiveAccessToken(ctx, secret.Hash(plain)); got.LastIP != "127.0.0.2" {
+		t.Fatalf("空 IP 不应覆盖：%s", got.LastIP)
 	}
 
 	if _, err := st.DB().ExecContext(ctx, `INSERT INTO usage_logs

@@ -99,3 +99,51 @@ func TestDeviceFlow(t *testing.T) {
 		t.Fatalf("拒绝状态不对：%s", body)
 	}
 }
+
+// 回归：发起与轮询曾共用每 IP 每分钟 10 次的限流，员工 45 秒内没点授权，第 11 次轮询拿到
+// rate_limited，DSH 与 setup 都判定登录失败；公司内网多人共用出口 IP 时更早触发。
+func TestDevicePollingNotRateLimited(t *testing.T) {
+	f := newPrincipalFixture(t)
+	u := f.user(t, "slow-approver", nil)
+	c := newClient(t, f.ts.URL)
+	code, body := c.do("POST", "/api/auth/login", map[string]string{"username": u.Username, "password": "employee-password-1"}, nil)
+	expect(t, "员工登录", code, 200, body)
+
+	anonymous := newClient(t, f.ts.URL)
+	var codes []struct {
+		DeviceCode string `json:"device_code"`
+		UserCode   string `json:"user_code"`
+	}
+	// 同一出口 IP 上 12 台设备同时发起登录
+	for i := 0; i < 12; i++ {
+		code, body := anonymous.do("POST", "/api/device/code", map[string]any{"client_name": "laptop-" + itoa(int64(i))}, nil)
+		expect(t, "发起设备码", code, 200, body)
+		codes = append(codes, decode[struct {
+			DeviceCode string `json:"device_code"`
+			UserCode   string `json:"user_code"`
+		}](t, body))
+	}
+	// 每台轮询 5 次（共 60 次），只允许 authorization_pending / slow_down
+	for round := 0; round < 5; round++ {
+		for _, d := range codes {
+			code, body := anonymous.do("POST", "/api/device/token", map[string]string{"device_code": d.DeviceCode}, nil)
+			if code == 429 || strings.Contains(string(body), "rate_limited") {
+				t.Fatalf("正常轮询不应被限流（第 %d 轮）：%d %s", round, code, body)
+			}
+		}
+	}
+	code, body = c.do("POST", "/api/device/"+codes[0].UserCode, map[string]any{"approve": true}, nil)
+	expect(t, "慢慢批准", code, 200, body)
+	code, body = anonymous.do("POST", "/api/device/token", map[string]string{"device_code": codes[0].DeviceCode}, nil)
+	expect(t, "批准后仍能领取", code, 200, body)
+
+	// 发起登录本身仍有上限
+	limited := false
+	for i := 0; i < 40 && !limited; i++ {
+		code, _ := anonymous.do("POST", "/api/device/code", map[string]any{"client_name": "flood"}, nil)
+		limited = code == 429
+	}
+	if !limited {
+		t.Fatal("同一 IP 大量发起设备码应被限流")
+	}
+}

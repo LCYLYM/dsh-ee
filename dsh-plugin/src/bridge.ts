@@ -53,19 +53,34 @@ export class McpBridge {
 
   async start(): Promise<void> {
     this.controller = new AbortController();
+    const signal = this.controller.signal;
     await this.sync().catch(() => undefined);
+    // 长连接收 tools/list_changed；断开（dsh-ee 重启、网络抖动）后退避重连，
+    // 重连成功先补一次同步，避免错过断开期间的变化。插件停用时 abort 退出。
     void (async () => {
-      try {
-        const response = await this.http.fetch("/mcp", { headers: { accept: "text/event-stream" }, signal: this.controller?.signal });
-        const reader = response.body?.getReader();
-        if (!reader) return;
-        while (true) {
-          const { done } = await reader.read();
-          if (done) break;
-          await this.sync().catch(() => undefined);
+      let delay = 1000;
+      while (!signal.aborted) {
+        try {
+          const response = await this.http.fetch("/mcp", { headers: { accept: "text/event-stream" }, signal });
+          const reader = response.ok ? response.body?.getReader() : undefined;
+          if (reader) {
+            delay = 1000;
+            await this.sync().catch(() => undefined);
+            while (true) {
+              const { done } = await reader.read();
+              if (done) break;
+              await this.sync().catch(() => undefined);
+            }
+          }
+        } catch {
+          // 下面统一退避
         }
-      } catch {
-        // 插件卸载时中断连接即可。
+        if (signal.aborted) break;
+        await new Promise((resolve) => {
+          const timer = setTimeout(resolve, delay);
+          signal.addEventListener("abort", () => { clearTimeout(timer); resolve(undefined); }, { once: true });
+        });
+        delay = Math.min(delay * 2, 60_000);
       }
     })();
   }

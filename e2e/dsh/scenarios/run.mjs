@@ -20,7 +20,8 @@ const employeePassword = 'scenario-employee-password-1'
 const employeeName = 'scenario.employee'
 const department = '研发效能部'
 const model = 'scenario-chat'
-const { command, startWeb, stopWeb, openPage, submitTask } = createDsh({ dsh, repo, chrome, workspaceLabel: process.env.SPIKE_WORKSPACE_LABEL })
+const workspaceDir = 'dsh-workspace'
+const { command, startWeb, stopWeb, openPage, submitTask } = createDsh({ dsh, repo, chrome, workspaceLabel: process.env.SPIKE_WORKSPACE_LABEL ?? workspaceDir })
 fs.mkdirSync(work, { recursive: true })
 fs.mkdirSync(shots, { recursive: true })
 
@@ -123,6 +124,9 @@ function scenarioEnv(name, token) {
   const dshHome = path.join(work, name, 'dsh-home')
   const fakeBin = path.join(work, 'fake-bin')
   fs.mkdirSync(home, { recursive: true })
+  // Linux 上全新的 DSH Web 首页要求先选工作区，目录浏览器从（隔离后的）HOME 开始；
+  // 在隔离 HOME 里放一个固定名字的工作区目录，供 chooseWorkspace 点选。
+  fs.mkdirSync(path.join(home, workspaceDir), { recursive: true })
   fs.mkdirSync(dshHome, { recursive: true })
   fs.mkdirSync(fakeBin, { recursive: true })
   for (const command of ['open', 'xdg-open']) {

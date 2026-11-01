@@ -62,7 +62,7 @@ func (s *Server) npmAuth(r *http.Request) (*npmCaller, error) {
 		}
 	}
 	if token != "" {
-		p, err := s.resolveBearer(r.Context(), token)
+		p, err := s.resolveBearer(r.Context(), token, clientIP(r))
 		var be bearerError
 		if errors.As(err, &be) {
 			return nil, errBadToken

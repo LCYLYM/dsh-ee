@@ -351,6 +351,7 @@ func (s *Server) handleIssueToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRevokeTokens(w http.ResponseWriter, r *http.Request) {
+	// department 非空表示调用者只有「本部门令牌管理」：只能动本部门机器人账号的令牌
 	department, ok := s.adminTokenScope(r)
 	if !ok {
 		writeErr(w, http.StatusForbidden, "没有令牌管理权限")
@@ -365,43 +366,77 @@ func (s *Server) handleRevokeTokens(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &req) {
 		return
 	}
-	if department != "" {
-		if req.Department != nil && *req.Department != department {
-			writeErr(w, http.StatusForbidden, "只能吊销本部门机器人账号的令牌")
-			return
-		}
-		if req.UserID != nil {
-			u, err := s.store.GetUser(r.Context(), *req.UserID)
-			if err != nil || u.Department != department || u.AccountType != store.AccountBot {
-				writeErr(w, http.StatusForbidden, "只能吊销本部门机器人账号的令牌")
-				return
-			}
-		}
-	}
+	const deptOnly = "只能吊销本部门机器人账号的令牌"
 	if len(req.IDs) > 0 {
-		count := 0
+		ids := make([]int64, 0, len(req.IDs))
 		for _, raw := range req.IDs {
-			kind, id, ok := strings.Cut(raw, ":")
-			if !ok || kind != "at" {
+			kind, v, ok := strings.Cut(raw, ":")
+			id, err := strconv.ParseInt(v, 10, 64)
+			if !ok || kind != "at" || err != nil || id <= 0 {
 				writeErr(w, http.StatusBadRequest, "批量吊销目前只支持 at:<id> 形式")
 				return
 			}
-			n, _ := strconv.ParseInt(id, 10, 64)
-			if err := s.store.RevokeToken(r.Context(), n); err != nil {
+			t, err := s.store.AccessTokenByID(r.Context(), id)
+			if notFound(err) {
+				writeErr(w, http.StatusBadRequest, "令牌不存在："+raw)
+				return
+			}
+			if err != nil {
+				s.internalErr(w, r, err)
+				return
+			}
+			// 先全部校验再动手，避免越权请求吊销了一部分
+			if department != "" && (t.Department != department || t.AccountType != store.AccountBot) {
+				writeErr(w, http.StatusForbidden, deptOnly)
+				return
+			}
+			ids = append(ids, id)
+		}
+		count := 0
+		for _, id := range ids {
+			err := s.store.RevokeToken(r.Context(), id)
+			if notFound(err) {
+				continue // 已经吊销过
+			}
+			if err != nil {
 				s.internalErr(w, r, err)
 				return
 			}
 			count++
 		}
-		s.audit(r, "token.revoke_bulk", "ids", map[string]any{"count": count})
+		s.audit(r, "token.revoke_bulk", "ids", map[string]any{"count": count, "ids": req.IDs})
 		writeJSON(w, http.StatusOK, map[string]any{"revoked": count})
 		return
 	}
-	n, err := s.store.RevokeTokensBy(r.Context(), store.TokenRevokeFilter{UserID: req.UserID, ClientName: req.ClientName, Department: req.Department})
+	f := store.TokenRevokeFilter{UserID: req.UserID, ClientName: req.ClientName, Department: req.Department}
+	if f.ClientName != nil && *f.ClientName == "" && f.UserID == nil && f.Department == nil {
+		f.ClientName = nil // 只给空设备名等于没有条件
+	}
+	if f.Empty() {
+		writeErr(w, http.StatusBadRequest, "请指定要吊销的令牌、账号、设备或部门")
+		return
+	}
+	if department != "" {
+		if req.Department != nil && *req.Department != department {
+			writeErr(w, http.StatusForbidden, deptOnly)
+			return
+		}
+		if req.UserID != nil {
+			u, err := s.store.GetUser(r.Context(), *req.UserID)
+			if err != nil || u.Department != department || u.AccountType != store.AccountBot {
+				writeErr(w, http.StatusForbidden, deptOnly)
+				return
+			}
+		}
+		// 无论请求怎么写，都限定在本部门的机器人账号
+		f.Department = &department
+		f.BotOnly = true
+	}
+	n, err := s.store.RevokeTokensBy(r.Context(), f)
 	if err != nil {
 		s.internalErr(w, r, err)
 		return
 	}
-	s.audit(r, "token.revoke_bulk", "filter", map[string]any{"count": n})
+	s.audit(r, "token.revoke_bulk", "filter", map[string]any{"count": n, "user_id": req.UserID, "client_name": req.ClientName, "department": f.Department})
 	writeJSON(w, http.StatusOK, map[string]any{"revoked": n})
 }

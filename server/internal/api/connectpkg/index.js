@@ -142,7 +142,7 @@ var DeviceFlow = class {
       });
       const body = await response.json();
       if (body.access_token) return body;
-      if (body.error === "slow_down") {
+      if (body.error === "slow_down" || body.error === "rate_limited") {
         interval += 5e3;
       } else if (body.error !== "authorization_pending") {
         throw new Error(body.error || `\u8BBE\u5907\u767B\u5F55\u5931\u8D25\uFF1AHTTP ${response.status}`);
@@ -159,8 +159,9 @@ var DeviceFlow = class {
   }
 };
 function openBrowser(url) {
-  const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-  execFile(command, [url], () => {
+  if (process.platform === "win32") execFile("cmd", ["/c", "start", "", url], () => {
+  });
+  else execFile(process.platform === "darwin" ? "open" : "xdg-open", [url], () => {
   });
 }
 
@@ -215,11 +216,17 @@ function registerCommands(ctx, config, tokens) {
     description: "\u9000\u51FA\u4F01\u4E1A\u8D26\u53F7",
     handler: async () => {
       const current = await tokens.resolve();
-      if (current) {
-        await fetch(`${config.base}/api/dsh/logout`, { method: "POST", headers: { Authorization: `Bearer ${current.value}` } });
-        await tokens.unset();
+      if (!current) return { kind: "success", text: "\u5F53\u524D\u6CA1\u6709\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7" };
+      const revoked = await fetch(`${config.base}/api/dsh/logout`, { method: "POST", headers: { Authorization: `Bearer ${current.value}` } }).then((response) => response.ok, () => false);
+      await tokens.unset();
+      const left = await tokens.resolve();
+      if (left?.value === current.value) {
+        return {
+          kind: "error",
+          text: `${revoked ? "\u5DF2\u5728\u670D\u52A1\u7AEF\u540A\u9500\u8BE5\u4EE4\u724C\uFF0C" : ""}\u4F46\u5B83\u6765\u81EA\u73AF\u5883\u53D8\u91CF\u6216 $DSH_HOME/.env\uFF08${config.tokenRef}\uFF09\uFF0C\u8BF7\u624B\u52A8\u5220\u9664\u540E\u91CD\u542F DSH`
+        };
       }
-      return { kind: "success", text: "\u5DF2\u9000\u51FA\u4F01\u4E1A\u8D26\u53F7" };
+      return { kind: "success", text: revoked ? "\u5DF2\u9000\u51FA\u4F01\u4E1A\u8D26\u53F7" : "\u672C\u673A\u5DF2\u9000\u51FA\uFF1B\u8FDE\u4E0D\u4E0A dsh-ee\uFF0C\u4EE4\u724C\u672A\u80FD\u5728\u670D\u52A1\u7AEF\u540A\u9500\uFF0C\u53EF\u5728\u7F51\u9875\u300C\u6211\u7684\u4EE4\u724C\u300D\u91CC\u540A\u9500" };
     }
   });
 }
@@ -247,15 +254,20 @@ async function registerSkills(ctx, config, http) {
   let catalog = { skills: [], required_plugins: [] };
   let etag = "";
   const refresh = async () => {
-    const response = await http.fetch("/api/dsh/catalog", { headers: etag ? { "If-None-Match": etag } : {} });
-    if (response.status === 304) return false;
-    if (!response.ok) return false;
-    catalog = await response.json();
-    etag = response.headers.get("etag") ?? "loaded";
-    return true;
+    try {
+      const response = await http.fetch("/api/dsh/catalog", { headers: etag ? { "If-None-Match": etag } : {} });
+      if (response.status === 304) return false;
+      if (!response.ok) return false;
+      catalog = await response.json();
+      etag = response.headers.get("etag") ?? "loaded";
+      return true;
+    } catch {
+      return false;
+    }
   };
+  const install = () => installRequired(ctx, config, catalog.required_plugins).catch(() => void 0);
   await refresh();
-  await installRequired(ctx, config, catalog.required_plugins);
+  await install();
   ctx.skills.registerProvider((control) => {
     let timer;
     const pollSeconds = Math.max(15, Number(config.pollSeconds) || 60) * 1e3;
@@ -263,7 +275,7 @@ async function registerSkills(ctx, config, http) {
       try {
         if (await refresh()) {
           control.invalidate();
-          await installRequired(ctx, config, catalog.required_plugins);
+          await install();
         }
       } finally {
         if (!control.signal.aborted) timer = setTimeout(tick, pollSeconds);
@@ -288,7 +300,8 @@ async function registerSkills(ctx, config, http) {
         }));
       },
       async get(candidate, options) {
-        const response = await http.fetch(`/api/dsh/skills/${encodeURIComponent(String(candidate.locator))}`, { signal: options.signal });
+        const response = await http.fetch(`/api/dsh/skills/${encodeURIComponent(String(candidate.locator))}`, { signal: options.signal }).catch(() => void 0);
+        if (!response) return void 0;
         if (!response.ok) return void 0;
         const body = await response.json();
         const { rank: _rank, locator: _locator, ...summary } = candidate;
@@ -350,18 +363,34 @@ var McpBridge = class {
   }
   async start() {
     this.controller = new AbortController();
+    const signal = this.controller.signal;
     await this.sync().catch(() => void 0);
     void (async () => {
-      try {
-        const response = await this.http.fetch("/mcp", { headers: { accept: "text/event-stream" }, signal: this.controller?.signal });
-        const reader = response.body?.getReader();
-        if (!reader) return;
-        while (true) {
-          const { done } = await reader.read();
-          if (done) break;
-          await this.sync().catch(() => void 0);
+      let delay = 1e3;
+      while (!signal.aborted) {
+        try {
+          const response = await this.http.fetch("/mcp", { headers: { accept: "text/event-stream" }, signal });
+          const reader = response.ok ? response.body?.getReader() : void 0;
+          if (reader) {
+            delay = 1e3;
+            await this.sync().catch(() => void 0);
+            while (true) {
+              const { done } = await reader.read();
+              if (done) break;
+              await this.sync().catch(() => void 0);
+            }
+          }
+        } catch {
         }
-      } catch {
+        if (signal.aborted) break;
+        await new Promise((resolve) => {
+          const timer = setTimeout(resolve, delay);
+          signal.addEventListener("abort", () => {
+            clearTimeout(timer);
+            resolve(void 0);
+          }, { once: true });
+        });
+        delay = Math.min(delay * 2, 6e4);
       }
     })();
   }

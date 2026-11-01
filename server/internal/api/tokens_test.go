@@ -104,4 +104,39 @@ func TestTokenDepartmentPermission(t *testing.T) {
 	}
 	code, body = c.do("POST", "/api/admin/tokens/revoke", map[string]any{"department": "其它部门"}, nil)
 	expect(t, "跨部门吊销被拒绝", code, 403, body)
+
+	// 回归：部门令牌管理员曾能用「只带设备名 / 按 id / 空条件」吊销全公司的令牌
+	code, body = f.admin.do("POST", "/api/admin/users", map[string]any{
+		"username": "finance-user", "password": "employee-password-1", "department": "财务部",
+	}, nil)
+	expect(t, "创建其它部门员工", code, 201, body)
+	other := decode[store.User](t, body)
+	otherTok := f.token(t, other.ID, "ee_at_other_dept", []string{rbac.ScopeHub}, nil, nil)
+	peerTok := f.token(t, u.ID, "ee_at_peer_human", []string{rbac.ScopeHub}, nil, nil)
+	alive := func(name, plain string) {
+		t.Helper()
+		code, body := c.do("GET", "/api/dsh/catalog", nil, bearer(plain))
+		expect(t, name, code, 200, body)
+	}
+	for _, req := range []map[string]any{{}, {"client_name": ""}} {
+		code, body = c.do("POST", "/api/admin/tokens/revoke", req, nil)
+		expect(t, "空条件被拒绝", code, 400, body)
+	}
+	code, body = c.do("POST", "/api/admin/tokens/revoke", map[string]any{"ids": []string{"at:" + itoa(otherTok.ID)}}, nil)
+	expect(t, "按 id 吊销其它部门被拒绝", code, 403, body)
+	code, body = c.do("POST", "/api/admin/tokens/revoke", map[string]any{"ids": []string{"at:" + itoa(peerTok.ID)}}, nil)
+	expect(t, "按 id 吊销本部门真人被拒绝", code, 403, body)
+	code, body = c.do("POST", "/api/admin/tokens/revoke", map[string]any{"client_name": "test-client"}, nil)
+	expect(t, "只带设备名", code, 200, body)
+	code, body = c.do("POST", "/api/admin/tokens/revoke", map[string]any{"department": "研发效能部"}, nil)
+	expect(t, "按本部门吊销", code, 200, body)
+	if !strings.Contains(string(body), `"revoked":1`) {
+		t.Fatalf("按本部门吊销应只动机器人的 1 个令牌：%s", body)
+	}
+	alive("其它部门员工的令牌仍有效", "ee_at_other_dept")
+	alive("本部门真人员工的令牌仍有效", "ee_at_peer_human")
+
+	code, body = f.admin.do("POST", "/api/admin/tokens/revoke", map[string]any{}, nil)
+	expect(t, "管理员空条件也被拒绝", code, 400, body)
+	alive("管理员空条件后令牌仍有效", "ee_at_other_dept")
 }

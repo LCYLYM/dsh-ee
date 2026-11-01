@@ -13,12 +13,12 @@ import (
 
 var upstreamErrorPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\b(?:401|403)\b`),
-	regexp.MustCompile(`\b429\b|rate.?limit`),
-	regexp.MustCompile(`\binsufficient[\s_-]+(?:quota|balance|credits?)\b`),
-	regexp.MustCompile(`\b(?:quota|usage[\s_-]+limit)[\s_-]+(?:exceeded|exhausted|reached)\b`),
-	regexp.MustCompile(`\bexceed(?:ed|s)?[\s_-]+(?:(?:your|the)[\s_-]+)?(?:current[\s_-]+)?quota\b`),
-	regexp.MustCompile(`\b(?:balance|credits?)[\s_-]+(?:exhausted|depleted)\b`),
-	regexp.MustCompile(`\bout[\s_-]+of[\s_-]+(?:credits?|budget)\b`),
+	regexp.MustCompile(`(?i)\b429\b|rate.?limit`), // 上游这条带 /i
+	regexp.MustCompile(`(?i)\binsufficient[\s_-]+(?:quota|balance|credits?)\b`),
+	regexp.MustCompile(`(?i)\b(?:quota|usage[\s_-]+limit)[\s_-]+(?:exceeded|exhausted|reached)\b`),
+	regexp.MustCompile(`(?i)\bexceed(?:ed|s)?[\s_-]+(?:(?:your|the)[\s_-]+)?(?:current[\s_-]+)?quota\b`),
+	regexp.MustCompile(`(?i)\b(?:balance|credits?)[\s_-]+(?:exhausted|depleted)\b`),
+	regexp.MustCompile(`(?i)\bout[\s_-]+of[\s_-]+(?:credits?|budget)\b`),
 }
 
 func assertDshErrorSafe(t *testing.T, body []byte) {

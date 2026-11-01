@@ -33,7 +33,8 @@ export class DeviceFlow {
       });
       const body = await response.json() as { error?: string; access_token?: string; scopes?: string[]; user?: { username: string; department: string }; expires_at?: string };
       if (body.access_token) return body as any;
-      if (body.error === "slow_down") {
+      // slow_down / rate_limited 都是「慢一点再来」，不算失败
+      if (body.error === "slow_down" || body.error === "rate_limited") {
         interval += 5000;
       } else if (body.error !== "authorization_pending") {
         throw new Error(body.error || `设备登录失败：HTTP ${response.status}`);
@@ -48,6 +49,7 @@ export class DeviceFlow {
 }
 
 export function openBrowser(url: string): void {
-  const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-  execFile(command, [url], () => {});
+  // start 是 cmd 的内置命令，不能直接 execFile；空字符串占位窗口标题
+  if (process.platform === "win32") execFile("cmd", ["/c", "start", "", url], () => {});
+  else execFile(process.platform === "darwin" ? "open" : "xdg-open", [url], () => {});
 }

@@ -41,15 +41,16 @@ type Options struct {
 }
 
 type Server struct {
-	store      *store.Store
-	box        *secret.Box
-	opts       Options
-	log        *slog.Logger
-	limiter    *loginLimiter
-	deviceRate *ipRate
-	upstream   *http.Client
-	registry   *registry.Service
-	settings   settingsCache
+	store           *store.Store
+	box             *secret.Box
+	opts            Options
+	log             *slog.Logger
+	limiter         *loginLimiter
+	deviceCodeRate  *ipRate
+	deviceTokenRate *ipRate
+	upstream        *http.Client
+	registry        *registry.Service
+	settings        settingsCache
 	// 能力目录变化的通知（DSH 的 MCP 长连接据此刷新工具）
 	hub hubBroker
 	// 上游 MCP 连接的缓存，按资产 id
@@ -71,7 +72,7 @@ func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Serv
 			MaxIdleConnsPerHost:   32,
 		}}
 	}
-	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), deviceRate: newIPRate(), upstream: up, connectKick: make(chan struct{}, 1)}
+	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), deviceCodeRate: newIPRate(deviceCodePerMinute), deviceTokenRate: newIPRate(deviceTokenPerMinute), upstream: up, connectKick: make(chan struct{}, 1)}
 	s.registry = s.newRegistry()
 	return s
 }
