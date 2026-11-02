@@ -169,6 +169,13 @@ func (s *Server) routes() []route {
 		pub("GET /api/dsh/whoami", s.handleDshWhoami),
 		pub("GET /api/dsh/catalog", s.handleDshCatalog),
 		pub("GET /api/dsh/skills/{name}", s.handleDshSkill),
+		prm("GET /api/dsh/releases", s.handleDshReleases, rbac.PortalView),
+		prm("GET /dl/{target}/{file}", s.handleDownloadDshRelease, rbac.PortalView),
+		prm("GET /api/admin/dsh-releases", s.handleAdminDshReleases, rbac.SettingsManage),
+		prm("POST /api/admin/dsh-releases/check", s.handleCheckDshReleases, rbac.SettingsManage),
+		prm("POST /api/admin/dsh-releases/{id}/mirror", s.handleMirrorDshRelease, rbac.SettingsManage),
+		prm("POST /api/admin/dsh-releases/{id}/recommend", s.handleRecommendDshRelease, rbac.SettingsManage),
+		prm("DELETE /api/admin/dsh-releases/{id}", s.handleDeleteDshRelease, rbac.SettingsManage),
 		pub("/mcp", s.handleMCP),
 
 		// 管理员向导：首次部署清单、日常巡检、审核时读内容、连接申请

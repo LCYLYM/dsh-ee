@@ -57,6 +57,10 @@ const (
 	auditConnRequest            = "connection.request"
 	auditConnectPublish         = "connect.publish"
 	auditDshReleaseMirrorFailed = "dsh_release.mirror_failed"
+	auditDshReleaseCheck        = "dsh_release.check"
+	auditDshReleaseMirror       = "dsh_release.mirror"
+	auditDshReleaseRecommend    = "dsh_release.recommend"
+	auditDshReleaseDelete       = "dsh_release.delete"
 
 	auditNpmTokenCreate = "npm_token.create"
 	auditNpmTokenRevoke = "npm_token.revoke"
