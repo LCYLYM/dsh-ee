@@ -121,7 +121,8 @@ type dshCatalog struct {
 	Required []dshPlugin `json:"required_plugins"`
 	Revision string      `json:"revision"`
 	// 企业连接在 DSH 里的工具前缀（mcp__<server_name>__）
-	ServerName string `json:"server_name"`
+	ServerName string   `json:"server_name"`
+	Brand      dshBrand `json:"brand"`
 
 	assets map[string]*store.Asset
 	specs  map[string]*assetSpec
@@ -246,10 +247,16 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	sort.Slice(c.Required, func(i, j int) bool { return c.Required[i].Name < c.Required[j].Name })
 	sort.Slice(c.conns, func(i, j int) bool { return c.conns[i].asset.Slug < c.conns[j].asset.Slug })
 
+	brand, err := s.brandInfo(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+	c.Brand = brand
 	// 修订号：目录里任何会影响 DSH 的东西变了，它就变
 	h := sha256.New()
 	_ = json.NewEncoder(h).Encode(c.Skills)
 	_ = json.NewEncoder(h).Encode(c.Required)
+	_ = json.NewEncoder(h).Encode(c.Brand)
 	for _, name := range slices.Sorted(maps.Keys(c.system)) {
 		fmt.Fprintf(h, "sys:%s:%s;", name, c.system[name])
 	}
@@ -288,6 +295,11 @@ func (s *Server) handleDshCatalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c, err := s.userCatalog(r.Context(), v)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	c.Brand, err = s.brandInfo(r.Context(), s.publicBase(r))
 	if err != nil {
 		s.internalErr(w, r, err)
 		return

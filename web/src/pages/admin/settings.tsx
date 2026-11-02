@@ -5,6 +5,7 @@ import type { Settings } from "../../lib/types";
 import { Button, Card, cx, Field, inputBase, inputCls, PageHeader, Segmented, ToggleRow } from "../../components/ui";
 import LdapSettings from "./ldap-settings";
 import ConnectSettings from "./connect-settings";
+import BrandSettings from "./brand-settings";
 import { PageLink } from "../../lib/menus";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -161,6 +162,10 @@ export default function AdminSettings() {
             checked={s.distribution.enabled}
             onChange={(v) => set("distribution", { enabled: v })}
           />
+        </Section>
+
+        <Section title={t("brandAdmin.title")} desc={t("brandAdmin.desc")}>
+          <BrandSettings />
         </Section>
 
         <Section title={t("connectAdmin.title")}>

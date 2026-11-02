@@ -1,5 +1,19 @@
 /** 上游预载与系统设置（管理端）。 */
 export default {
+  brandAdmin: {
+    title: "品牌",
+    desc: "在 DSH Desktop 的侧栏与首屏显示企业名称和 logo。",
+    enabled: "启用企业品牌",
+    enabledDesc: "关闭后保留官方品牌；启用后由企业接入插件接管三个品牌位置。",
+    name: "品牌名称",
+    nameHint: "1～24 个字符，不能使用 DeepSeek Harness 全名；例如「某某 AI · 基于 DSH」。",
+    logo: "上传 logo",
+    logoHint: "PNG 或 SVG，不超过 256 KB；PNG 需为边长至少 64 像素的正方形。",
+    preview: "品牌预览",
+    uploaded: "logo 已更新",
+    uploading: "正在上传…",
+    runtimeNote: "品牌数据在插件运行时拉取。更换后不需要重装插件，重启 DSH 即可生效。",
+  },
   upstreamAdmin: {
     title: "上游预载",
     desc: "把社区热门插件连同完整依赖闭包同步进内网。员工安装时只访问内网 registry。",

@@ -28,6 +28,7 @@ export default {
       connection: "Connections",
       connect: "DSH connect plugin",
       dsh_release: "DSH Desktop distribution",
+      brand: "Company branding",
     },
     colTime: "Time",
     colActor: "Actor",
@@ -64,6 +65,7 @@ export default {
       connection: { tool: "Configured connection tool", request: "Requested a connection" },
       connect: { publish: "Published connect plugin" },
       dsh_release: { check: "Checked official releases", mirror: "Downloaded installer", mirror_failed: "Installer verification failed", recommend: "Set recommended release", delete: "Deleted local installer" },
+      brand: { update: "Updated company branding" },
     },
   },
 } satisfies Messages<typeof zh>;

@@ -41,6 +41,11 @@ type AppSettings struct {
 		AllowAlpha            bool   `json:"allowAlpha"`
 		AllowCommunityDesktop bool   `json:"allowCommunityDesktop"`
 	} `json:"distribution"`
+	Brand struct {
+		Enabled bool   `json:"enabled"`
+		Name    string `json:"name"`
+		LogoRev string `json:"logoRev"`
+	} `json:"brand"`
 	Auth string `json:"auth"`
 	// DSH 接入插件（<主作用域>/dsh-connect）：由 dsh-ee 生成并发布到自己的 npm 源
 	Connect struct {

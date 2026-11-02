@@ -37,6 +37,7 @@ const (
 	auditKeyRevoke      = "key.revoke"
 
 	auditSettingsUpdate = "settings.update"
+	auditBrandUpdate    = "brand.update"
 	auditLDAPUpdate     = "ldap.update"
 	auditLDAPSync       = "ldap.sync"
 

@@ -687,14 +687,14 @@ async function request<T>(
   method: string,
   path: string,
   body?: unknown,
-  opts: { silent401?: boolean; raw?: { body: Blob | ArrayBuffer; type: string } } = {},
+  opts: { silent401?: boolean; raw?: { body: Blob | ArrayBuffer | FormData; type?: string } } = {},
 ): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
       method,
       credentials: "same-origin",
-      headers: opts.raw ? { "Content-Type": opts.raw.type } : body === undefined ? undefined : { "Content-Type": "application/json" },
+      headers: opts.raw ? (opts.raw.type ? { "Content-Type": opts.raw.type } : undefined) : body === undefined ? undefined : { "Content-Type": "application/json" },
       body: opts.raw ? opts.raw.body : body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -859,6 +859,11 @@ export const api = {
   recommendDshRelease: (id: number) => request<{ ok: boolean }>("POST", `/api/admin/dsh-releases/${id}/recommend`),
   deleteDshRelease: (id: number) => request<void>("DELETE", `/api/admin/dsh-releases/${id}`),
   dshClients: () => request<{ clients: DshClient[] }>("GET", "/api/me/dsh-clients").then((r) => r.clients),
+  uploadBrandLogo: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<{ logo_rev: string }>("PUT", "/api/admin/brand/logo", undefined, { raw: { body: form } });
+  },
 
   /** 系统设置：未登录时返回 401（静默），调用方保留默认值。 */
   settings: () => request<Settings>("GET", "/api/settings", undefined, { silent401: true }),

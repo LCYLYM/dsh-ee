@@ -102,6 +102,11 @@ export interface Settings {
     keepVersions: number;
     offerDmg: boolean;
   };
+  brand: {
+    enabled: boolean;
+    name: string;
+    logoRev: string;
+  };
   auth: "local" | "ldap" | "oidc";
   /** DSH 接入插件（<主作用域>/dsh-connect）：由 dsh-ee 生成并发布到自己的 npm 源。 */
   connect: {

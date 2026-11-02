@@ -74,8 +74,9 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
-	// 认证方式由 LDAP 配置的开关决定（PUT /api/admin/auth/ldap），这里沿用当前值
+	// 认证方式由 LDAP 配置的开关决定；LogoRev 只能由 logo 上传接口更新。
 	next.Auth = cur.Auth
+	next.Brand.LogoRev = cur.Brand.LogoRev
 	// 只检查实际改动的段落
 	a := currentAccess(r)
 	cv, nv := reflect.ValueOf(*cur), reflect.ValueOf(next)
@@ -166,6 +167,17 @@ func validateSettings(v *store.AppSettings) string {
 	}
 	if v.Distribution.KeepVersions < 1 || v.Distribution.KeepVersions > 10 {
 		return "Desktop 保留版本数应在 1–10 之间"
+	}
+	v.Brand.Name = strings.TrimSpace(v.Brand.Name)
+	nameLen := len([]rune(v.Brand.Name))
+	if v.Brand.Enabled && nameLen == 0 {
+		return "启用企业品牌时必须填写名称"
+	}
+	if nameLen > 24 {
+		return "品牌名称不能超过 24 个字符"
+	}
+	if strings.Contains(strings.ToLower(strings.Join(strings.Fields(v.Brand.Name), "")), "deepseekharness") {
+		return "按 DSH 品牌规范，不能使用 DeepSeek Harness 全名，可以写『某某 AI · 基于 DSH』"
 	}
 	if v.Connect.PollSeconds < 15 || v.Connect.PollSeconds > 3600 {
 		return "DSH 接入插件的检查间隔应在 15–3600 秒之间"

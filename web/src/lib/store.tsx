@@ -30,6 +30,11 @@ export const defaultSettings: Settings = {
     keepVersions: 3,
     offerDmg: false,
   },
+  brand: {
+    enabled: false,
+    name: "",
+    logoRev: "",
+  },
   auth: "local",
   connect: {
     enabled: true,

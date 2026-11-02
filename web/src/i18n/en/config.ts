@@ -2,6 +2,20 @@ import type zh from "../zh/config";
 import type { Messages } from "../types";
 
 export default {
+  brandAdmin: {
+    title: "Brand",
+    desc: "Show the company name and logo in the DSH Desktop sidebar and home screen.",
+    enabled: "Enable company branding",
+    enabledDesc: "Keep the official brand when off. When enabled, the company connect plugin takes over all three brand slots.",
+    name: "Brand name",
+    nameHint: "1–24 characters. Do not use the full DeepSeek Harness name; for example, “Acme AI · Built on DSH”.",
+    logo: "Upload logo",
+    logoHint: "PNG or SVG up to 256 KB. PNG must be square and at least 64 × 64 pixels.",
+    preview: "Brand preview",
+    uploaded: "Logo updated",
+    uploading: "Uploading…",
+    runtimeNote: "Branding is fetched at runtime. Employees only need to restart DSH after a change; no plugin reinstall is needed.",
+  },
   upstreamAdmin: {
     title: "Upstream preload",
     desc: "Sync popular community plugins, with their full dependency closures, into the intranet. Employees install only from the internal registry.",
