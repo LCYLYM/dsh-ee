@@ -21,9 +21,13 @@
   --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
 }
 
-body {
-  @apply bg-neutral-50 text-neutral-900 antialiased;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+/* 基础样式必须写在 @layer base 里：未分层的规则优先级高于 @layer 内的工具类，
+   写在外面会把 .dark 的主题变量整个压掉（之前的深色主题不生效就是这个原因）。 */
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  }
 }
 
 /* 落地页流程图的流动虚线 */
@@ -168,6 +172,39 @@ body {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* 深色桥接：界面里有大量固定的 neutral-* 色阶（约 800 处），
+   在 .dark 下把整条色阶翻转，等价于把浅色界面整体映射成深色界面，
+   不用逐个页面改 class。数值与上面的 --background / --card / --foreground 对齐。 */
+.dark {
+  --color-neutral-50: oklch(0.145 0 0);
+  --color-neutral-100: oklch(0.205 0 0);
+  --color-neutral-200: oklch(0.269 0 0);
+  --color-neutral-300: oklch(0.371 0 0);
+  --color-neutral-400: oklch(0.5 0 0);
+  --color-neutral-500: oklch(0.62 0 0);
+  --color-neutral-600: oklch(0.708 0 0);
+  --color-neutral-700: oklch(0.8 0 0);
+  --color-neutral-800: oklch(0.87 0 0);
+  --color-neutral-900: oklch(0.955 0 0);
+  --color-neutral-950: oklch(0.985 0 0);
+}
+
+/* 刻意反色（深底浅字）的区块——终端预览、代码块、落地页的深色章节——
+   在 .dark 下把色阶还原回原本的浅色系，否则会变成「浅底白字」看不出来。 */
+.dark .on-dark {
+  --color-neutral-50: oklch(0.985 0 0);
+  --color-neutral-100: oklch(0.97 0 0);
+  --color-neutral-200: oklch(0.922 0 0);
+  --color-neutral-300: oklch(0.87 0 0);
+  --color-neutral-400: oklch(0.708 0 0);
+  --color-neutral-500: oklch(0.556 0 0);
+  --color-neutral-600: oklch(0.439 0 0);
+  --color-neutral-700: oklch(0.371 0 0);
+  --color-neutral-800: oklch(0.269 0 0);
+  --color-neutral-900: oklch(0.205 0 0);
+  --color-neutral-950: oklch(0.145 0 0);
 }
 
 @layer base {

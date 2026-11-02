@@ -141,7 +141,7 @@ export default function AdminPlugins() {
                     </td>
                   </tr>
                   {yanking?.name === p.name && (
-                    <tr className="bg-red-50/40">
+                    <tr className="bg-red-50/40 dark:bg-red-500/10">
                       <td />
                       <td colSpan={9} className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-2">

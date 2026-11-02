@@ -206,7 +206,7 @@ export default function LdapSettings() {
         <ToggleRow label={t("ldapAdmin.insecure")} desc={t("ldapAdmin.insecureDesc")} checked={form.insecureSkipVerify} onChange={(v) => set({ insecureSkipVerify: v })} />
         <Field label={t("ldapAdmin.caCert")} hint={t("ldapAdmin.caCertHint")}>
           <textarea
-            className="min-h-20 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            className="min-h-20 w-full rounded-md border border-neutral-300 bg-card px-3 py-2 font-mono text-xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             value={form.caCert}
             onChange={(e) => set({ caCert: e.target.value })}
             placeholder="-----BEGIN CERTIFICATE-----"

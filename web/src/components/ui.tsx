@@ -20,10 +20,10 @@ export function Button({
       className={cx(
         "inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50",
         size === "sm" ? "h-8 px-3 text-sm" : "h-9 px-4 text-sm",
-        variant === "primary" && "bg-neutral-900 text-white hover:bg-neutral-700",
-        variant === "secondary" && "border border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-50",
+        variant === "primary" && "bg-foreground text-background hover:opacity-90",
+        variant === "secondary" && "border border-neutral-300 bg-card text-neutral-800 hover:bg-neutral-50",
         variant === "ghost" && "text-neutral-600 hover:bg-neutral-100",
-        variant === "danger" && "border border-red-200 bg-white text-red-600 hover:bg-red-50",
+        variant === "danger" && "border border-red-200 bg-card text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10",
         className,
       )}
       {...rest}
@@ -33,10 +33,10 @@ export function Button({
 
 const tones = {
   slate: "bg-neutral-100 text-neutral-600",
-  brand: "bg-brand-50 text-brand-700",
-  green: "bg-emerald-50 text-emerald-700",
-  amber: "bg-amber-50 text-amber-700",
-  red: "bg-red-50 text-red-700",
+  brand: "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300",
+  green: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+  amber: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  red: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300",
 };
 
 export function Badge({ tone = "slate", children }: { tone?: keyof typeof tones; children: ReactNode }) {
@@ -48,7 +48,7 @@ export function Badge({ tone = "slate", children }: { tone?: keyof typeof tones;
 }
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cx("rounded-lg border border-neutral-200/80 bg-white", className)}>{children}</div>;
+  return <div className={cx("rounded-lg border border-neutral-200/80 bg-card", className)}>{children}</div>;
 }
 
 export function Toggle({
@@ -120,7 +120,7 @@ export function Segmented<T extends string>({
           onClick={() => onChange(o.value)}
           className={cx(
             "rounded px-3 py-1 text-sm transition",
-            value === o.value ? "bg-white font-medium text-neutral-900 ring-1 ring-neutral-200" : "text-neutral-600 hover:text-neutral-900",
+            value === o.value ? "bg-card font-medium text-neutral-900 ring-1 ring-neutral-200" : "text-neutral-600 hover:text-neutral-900",
           )}
         >
           {o.label}
@@ -134,7 +134,7 @@ export function CopyBox({ text, label }: { text: string; label?: string }) {
   const [done, setDone] = useState(false);
   const { t } = useTranslation();
   return (
-    <div className="group relative rounded-md bg-neutral-900 text-neutral-100">
+    <div className="group on-dark relative rounded-md bg-neutral-900 text-neutral-100">
       {label && <div className="border-b border-white/10 px-4 py-1.5 text-xs text-neutral-500">{label}</div>}
       <pre className="overflow-x-auto px-4 py-3 pr-12 font-mono text-[13px] leading-relaxed">{text}</pre>
       <Tip label={done ? t("common.copied") : t("common.copy")}>
@@ -260,7 +260,7 @@ export function Field({ label, hint, children }: { label: string; hint?: ReactNo
 
 /** 不带宽度的输入框样式；需要定宽时用它，避免 w-full 与 w-40 这类类名互相覆盖。 */
 export const inputBase =
-  "h-9 rounded-md border border-neutral-300 bg-white px-3 text-sm outline-none placeholder:text-neutral-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
+  "h-9 rounded-md border border-neutral-300 bg-card px-3 text-sm outline-none placeholder:text-neutral-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
 
 export const inputCls = `${inputBase} w-full`;
 

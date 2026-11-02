@@ -158,7 +158,7 @@ export default function DshDownload() {
             <h2 className="mb-3 font-semibold text-neutral-900">{t("download.otherVersions")}</h2>
             <div className="space-y-4">
               {others.map((r) => (
-                <details key={r.distro + r.version} className="group rounded-xl border border-neutral-200 bg-white">
+                <details key={r.distro + r.version} className="group rounded-xl border border-neutral-200 bg-card">
                   <summary className="flex cursor-pointer items-center gap-2 px-5 py-3.5">
                     <span className="font-medium text-neutral-800">
                       {r.distro} {r.version}

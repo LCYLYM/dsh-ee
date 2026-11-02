@@ -58,7 +58,7 @@ export default function DevicePage() {
                     <div><dt className="text-neutral-500">{t("device.ip")}</dt><dd className="mt-1 font-mono">{data.client_ip || "—"}</dd></div>
                   </dl>
                   <div><h3 className="mb-2 text-sm font-medium">{t("device.scopes")}</h3><div className="flex flex-wrap gap-2">{data.scopes.map((scope) => <Badge key={scope}>{t(`tokens.scopes.${scope}`)}</Badge>)}</div></div>
-                  {data.replace_existing && <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">{t("device.replaceNote")}</p>}
+                  {data.replace_existing && <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">{t("device.replaceNote")}</p>}
                   <div className="flex justify-end gap-3"><Button variant="secondary" disabled={busy} onClick={() => decide(false)}>{t("device.deny")}</Button><Button disabled={busy} onClick={() => decide(true)}>{t("device.approve")}</Button></div>
                 </div>
               )}

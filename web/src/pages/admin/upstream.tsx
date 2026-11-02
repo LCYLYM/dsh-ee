@@ -406,7 +406,7 @@ function Offline() {
           </Field>
           <a
             href={api.exportUrl(exportSince || undefined)}
-            className="mt-4 inline-flex h-9 items-center rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-800 hover:bg-neutral-50"
+            className="mt-4 inline-flex h-9 items-center rounded-md border border-neutral-300 bg-card px-3 text-sm text-neutral-800 hover:bg-neutral-50"
           >
             {t("upstreamAdmin.generate")}
           </a>

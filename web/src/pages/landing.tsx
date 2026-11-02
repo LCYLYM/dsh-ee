@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Puzzle } from "lucide-react";
 import { auditLog, clientPlatforms, microApps } from "../mock/data";
 import { PageLink } from "../lib/menus";
 import { LangSwitch } from "../components/lang-switch";
+import { ThemeToggle } from "../components/theme-toggle";
 import { cx } from "../components/ui";
 import { isZh } from "../i18n";
 import { useTranslation } from "react-i18next";
@@ -84,7 +85,7 @@ function Diagram() {
               onClick={() => setI(j)}
               className={cx(
                 "px-4 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
-                i === j ? "bg-neutral-900 text-white" : "bg-white text-neutral-900 hover:bg-neutral-50",
+                i === j ? "bg-foreground text-background" : "bg-card text-foreground hover:bg-neutral-50",
               )}
             >
               <div className="font-medium">{t(`landing.sources.${x.key}.title`)}</div>
@@ -112,7 +113,7 @@ function Diagram() {
         <Arrow label={t("landing.diagram.up")} reverse />
       </div>
 
-      <div className="flex flex-col bg-neutral-950 p-5 text-white">
+      <div className="on-dark flex flex-col bg-neutral-950 p-5 text-white">
         <h3 className="text-lg font-semibold">{t("landing.diagram.run")}</h3>
         <p className="mt-1 text-sm text-white/75">{t("landing.diagram.runHint")}</p>
         <pre className="mt-4 flex-1 overflow-x-auto bg-black px-4 py-3 text-[13px] leading-relaxed whitespace-pre-wrap text-neutral-300">
@@ -145,7 +146,7 @@ function WorkbenchFragment() {
           </div>
         ))}
       </div>
-      <div className="bg-white p-4">
+      <div className="bg-card p-4">
         <div className="text-base font-semibold text-neutral-900">{t("landing.fragment.apps")}</div>
         <ul className="mt-2">
           {apps.map((m) => (
@@ -170,7 +171,7 @@ function AuditFragment() {
   const { t } = useTranslation();
   const total = clientPlatforms.reduce((a, c) => a + c.count, 0);
   return (
-    <div data-ui className="border border-neutral-800 bg-neutral-900 text-sm">
+    <div data-ui className="on-dark border border-neutral-800 bg-neutral-900 text-sm">
       <div className="flex items-baseline justify-between px-5 pt-4 pb-2">
         <span className="font-medium text-white">{t("landing.fragment.auditLog")}</span>
         <span className="text-xs text-neutral-400">{t("landing.fragment.today")}</span>
@@ -220,7 +221,7 @@ export default function Landing() {
   const { t } = useTranslation();
   useReveal();
   return (
-    <div className="min-h-screen bg-white text-neutral-900">
+    <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-neutral-200">
         <div className="mx-auto flex h-16 max-w-[1360px] items-center gap-8 px-5 sm:px-8">
           <Link to="/" className="flex items-center gap-2 font-semibold">
@@ -237,10 +238,11 @@ export default function Landing() {
           </nav>
           <nav className="ml-auto flex items-center gap-4">
             <LangSwitch className="hidden sm:inline-flex" />
+            <ThemeToggle />
           </nav>
           <Link
             to="/start"
-            className="bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700 active:translate-y-px"
+            className="bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 active:translate-y-px"
           >
             {t("landing.enter")}
           </Link>
@@ -318,7 +320,7 @@ export default function Landing() {
           </div>
         </section>
 
-        <section id="control" className="scroll-mt-6 bg-neutral-950 py-28 text-white">
+        <section id="control" className="on-dark scroll-mt-6 bg-neutral-950 py-28 text-white">
           <div className="mx-auto grid max-w-[1360px] gap-12 px-5 sm:px-8 lg:grid-cols-2">
             <div>
               <h2 data-reveal className={h2}>
@@ -358,7 +360,7 @@ export default function Landing() {
             </ol>
           </div>
           <div data-reveal className="self-center" style={delay(120)}>
-            <pre className="overflow-x-auto bg-neutral-950 p-6 text-sm leading-7 text-neutral-200">
+            <pre className="on-dark overflow-x-auto bg-neutral-950 p-6 text-sm leading-7 text-neutral-200">
               <code>
                 <span className="text-neutral-500">{t("landing.codeServer")}</span>
                 {"\n"}docker compose up -d{"\n\n"}

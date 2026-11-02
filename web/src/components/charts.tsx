@@ -65,7 +65,7 @@ export function DailyBars({
                 )}
                 {hover === i && (
                   <div
-                    className="absolute left-1/2 z-10 -translate-x-1/2 -translate-y-full rounded bg-neutral-900 px-2 py-1 text-xs whitespace-nowrap text-white shadow-md"
+                    className="on-dark absolute left-1/2 z-10 -translate-x-1/2 -translate-y-full rounded bg-neutral-900 px-2 py-1 text-xs whitespace-nowrap text-white shadow-md"
                     style={{ bottom: `calc(${pct(v)} + 6px)` }}
                   >
                     {dates[i] && dayLabel(dates[i])} · {format(v)} {unit}

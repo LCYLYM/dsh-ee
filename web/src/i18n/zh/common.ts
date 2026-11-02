@@ -27,6 +27,12 @@ export default {
   },
   shell: {
     language: "语言",
+    theme: {
+      label: "主题：{{mode}}",
+      light: "浅色",
+      dark: "深色",
+      system: "跟随系统",
+    },
     loadingAuth: "正在确认登录状态…",
     loadingMenus: "加载菜单…",
     menusFailed: "菜单加载失败，点此重试",

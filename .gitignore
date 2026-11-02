@@ -11,3 +11,6 @@ deploy/out/
 
 # pnpm 的本地存储（视配置可能落在仓库根目录）
 .pnpm-store/
+
+# 安装进来的 Agent skill（可用 lh acceptance install 重新拉取，不入库）
+.agents/skills/

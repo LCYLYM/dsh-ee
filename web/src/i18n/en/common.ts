@@ -29,6 +29,12 @@ export default {
   },
   shell: {
     language: "Language",
+    theme: {
+      label: "Theme: {{mode}}",
+      light: "Light",
+      dark: "Dark",
+      system: "Follow system",
+    },
     loadingAuth: "Checking your session…",
     loadingMenus: "Loading menu…",
     menusFailed: "Menu failed to load. Click to retry",

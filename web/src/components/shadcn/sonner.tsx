@@ -1,11 +1,14 @@
+import { useSyncExternalStore } from "react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
+import { getTheme, resolvedTheme, subscribeTheme } from "@/lib/theme"
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  // 提示条跟着界面主题走：深色下用 sonner 自带的 dark 配色
+  const mode = useSyncExternalStore(subscribeTheme, getTheme, getTheme)
   return (
     <Sonner
-      // 应用目前只有浅色主题
-      theme="light"
+      theme={resolvedTheme(mode)}
       className="toaster group"
       icons={{
         success: (

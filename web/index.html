@@ -4,6 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>dsh-ee · 企业 DSH 插件市场</title>
+    <script>
+      // 首屏先落主题再渲染，避免刷新时闪一下浅色。逻辑与 src/lib/theme.ts 保持一致。
+      (function () {
+        try {
+          var mode = localStorage.getItem("dsh-ee:theme") || "system";
+          var dark =
+            mode === "dark" ||
+            (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+          document.documentElement.style.colorScheme = dark ? "dark" : "light";
+        } catch (e) {
+          /* localStorage 被禁用时按浅色起步 */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

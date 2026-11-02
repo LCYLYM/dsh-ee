@@ -108,7 +108,7 @@ export default function Setup() {
         )}
       </div>
 
-      <Card className="mt-8 flex gap-3 border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+      <Card className="mt-8 flex gap-3 border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
         <Info size={18} className="mt-0.5 shrink-0" />
         <div>{t("setup.coexist")}</div>
       </Card>

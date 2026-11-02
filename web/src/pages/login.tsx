@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { useApi } from "../lib/use-api";
 import { Button, inputCls } from "../components/ui";
 import { LangSwitch } from "../components/lang-switch";
+import { ThemeToggle } from "../components/theme-toggle";
 import { useTranslation } from "react-i18next";
 
 /** 只允许站内相对路径，防止 next 参数被拿来做开放重定向。 */
@@ -50,7 +51,7 @@ export default function Login() {
         </span>
         <span className="text-lg font-semibold text-neutral-900">dsh-ee</span>
       </Link>
-      <form onSubmit={submit} className="w-full max-w-sm rounded-lg border border-neutral-200/80 bg-white p-6">
+      <form onSubmit={submit} className="w-full max-w-sm rounded-lg border border-neutral-200/80 bg-card p-6">
         <h1 className="text-xl font-semibold text-neutral-900">{t("login.title")}</h1>
         <p className="mt-1 text-sm text-neutral-600">{ldap ? t("login.ldapHint") : t("login.subtitle")}</p>
         <div className="mt-6 space-y-4">
@@ -78,7 +79,7 @@ export default function Login() {
           </label>
         </div>
         {(error ?? bootError) && (
-          <p role="alert" className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+          <p role="alert" className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-500/15 dark:text-red-300">
             {error ?? bootError}
           </p>
         )}
@@ -87,7 +88,10 @@ export default function Login() {
         </Button>
       </form>
       <p className="mt-6 text-xs text-neutral-500">{ldap ? t("login.ldapForgot") : t("login.forgot")}</p>
-      <LangSwitch className="mt-3" />
+      <div className="mt-3 flex items-center justify-center gap-2">
+        <LangSwitch />
+        <ThemeToggle />
+      </div>
     </div>
   );
 }

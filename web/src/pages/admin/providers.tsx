@@ -156,7 +156,7 @@ function ImportPicker({ result, existing, onImport, onClose, busy }: { result: C
       </div>
       <div className="grid max-h-64 gap-1 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
         {candidates.map((m) => (
-          <label key={m} className="flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-white">
+          <label key={m} className="flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-neutral-100">
             <input
               type="checkbox"
               className="h-4 w-4 accent-neutral-900"

@@ -230,11 +230,11 @@ export default function Hub() {
         desc={t("hub.desc")}
         actions={
           <>
-            <PageLink page="setup" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-800 hover:bg-neutral-50">
+            <PageLink page="setup" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-300 bg-card px-3 text-sm text-neutral-800 hover:bg-neutral-50">
               <Terminal size={15} /> {t("market.setupGuide")}
             </PageLink>
             {settings.distribution.enabled && recommendedCore && (
-              <PageLink page="dsh-download" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-800 hover:bg-neutral-50">
+              <PageLink page="dsh-download" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-300 bg-card px-3 text-sm text-neutral-800 hover:bg-neutral-50">
                 <Download size={15} /> {t("market.downloadDsh", { version: recommendedCore.version })}
               </PageLink>
             )}

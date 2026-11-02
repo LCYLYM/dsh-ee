@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import "./index.css";
 import "./i18n";
+import { initTheme } from "./lib/theme";
 import { StoreProvider } from "./lib/store";
 import { AuthProvider, RequireAuth } from "./lib/auth";
 import { MenuProvider, useMenus } from "./lib/menus";
@@ -92,6 +93,9 @@ function AppRoutes() {
     </Routes>
   );
 }
+
+// 首屏的 .dark 类已由 index.html 的内联脚本加好，这里接着做运行时切换与「跟随系统」
+initTheme();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

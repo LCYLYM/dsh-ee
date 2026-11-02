@@ -5,6 +5,7 @@ import { useStore } from "../lib/store";
 import { useAuth } from "../lib/auth";
 import { useMenuTitle, useMenus } from "../lib/menus";
 import { LangSwitch } from "./lang-switch";
+import { ThemeToggle } from "./theme-toggle";
 import { useLabels } from "../lib/labels";
 import { MenuIcon } from "../lib/icons";
 import type { Menu } from "../lib/api";
@@ -58,7 +59,7 @@ function NavEntry({ m, onNavigate }: { m: Menu; onNavigate: () => void }) {
       <span className="truncate">{title}</span>
       {extras.off && <span className="text-xs text-neutral-500">{t("shell.off")}</span>}
       {!!extras.count && (
-        <span className="ml-auto rounded bg-red-50 px-1.5 text-xs leading-5 text-red-800 tabular-nums">{extras.count}</span>
+        <span className="ml-auto rounded bg-red-50 px-1.5 text-xs leading-5 text-red-800 tabular-nums dark:bg-red-500/15 dark:text-red-300">{extras.count}</span>
       )}
     </NavLink>
   );
@@ -110,8 +111,9 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
           ) : null,
         )}
       </div>
-      <div className="mt-auto px-3 pt-6">
+      <div className="mt-auto flex items-center justify-between px-3 pt-6">
         <LangSwitch />
+        <ThemeToggle />
       </div>
       {user && (
         <div className="flex items-center gap-1 pt-2">

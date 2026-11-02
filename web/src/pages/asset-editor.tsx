@@ -15,7 +15,7 @@ import { Badge, Button, Card, cx, Field, inputBase, inputCls, PageHeader, Segmen
 import { PageLink } from "../lib/menus";
 
 const KINDS: AssetKind[] = ["skill", "prompt", "app", "connection"];
-const textareaCls = "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none placeholder:text-neutral-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
+const textareaCls = "w-full rounded-md border border-neutral-300 bg-card px-3 py-2 text-sm outline-none placeholder:text-neutral-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
 
 function emptySpec(kind: AssetKind): AssetSpec {
   switch (kind) {
