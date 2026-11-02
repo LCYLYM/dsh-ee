@@ -34,9 +34,12 @@ type AppSettings struct {
 		AutoSync string `json:"autoSync"`
 	} `json:"upstream"`
 	Distribution struct {
-		Enabled               bool `json:"enabled"`
-		AllowAlpha            bool `json:"allowAlpha"`
-		AllowCommunityDesktop bool `json:"allowCommunityDesktop"`
+		Enabled               bool   `json:"enabled"`
+		AutoSync              string `json:"autoSync"`
+		KeepVersions          int    `json:"keepVersions"`
+		OfferDmg              bool   `json:"offerDmg"`
+		AllowAlpha            bool   `json:"allowAlpha"`
+		AllowCommunityDesktop bool   `json:"allowCommunityDesktop"`
 	} `json:"distribution"`
 	Auth string `json:"auth"`
 	// DSH 接入插件（<主作用域>/dsh-connect）：由 dsh-ee 生成并发布到自己的 npm 源
@@ -82,6 +85,8 @@ func DefaultSettings() *AppSettings {
 	s.Upstream.Registry = "npmmirror"
 	s.Upstream.AutoSync = "review"
 	s.Distribution.Enabled = true
+	s.Distribution.AutoSync = "notify"
+	s.Distribution.KeepVersions = 3
 	s.Distribution.AllowCommunityDesktop = true
 	s.Connect.Enabled = true
 	s.Connect.Model = true
