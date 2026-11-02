@@ -3,7 +3,7 @@ import { ArrowLeft, Building2, CheckCircle2, ExternalLink } from "lucide-react";
 import { categoryLabel } from "../lib/catalog";
 import { api, formatBytes, formatTime, toPlugin } from "../lib/api";
 import { useApi } from "../lib/use-api";
-import { useScoring, useStore } from "../lib/store";
+import { useScoring } from "../lib/store";
 import { LoadState } from "../components/api-ui";
 import { ScanList } from "../components/scan-list";
 import { Badge, Card, CopyBox, PluginIcon, ScoreBadge } from "../components/ui";
@@ -18,9 +18,9 @@ export default function PluginDetail() {
 
 function Loader({ name }: { name: string }) {
   const { t } = useTranslation();
-  const { releases } = useStore();
   const scoring = useScoring();
   const { data: d, loading, error, reload } = useApi(() => api.catalogDetail(name));
+  const releaseData = useApi(api.dshReleases);
 
   if (error && !d) {
     return (
@@ -35,7 +35,7 @@ function Loader({ name }: { name: string }) {
 
   return (
     <LoadState loading={loading && !d} error={null} onRetry={reload}>
-      {d && <Detail d={d} core={releases.find((r) => r.product === "core" && r.recommended)?.version} scoringUpstream={scoring.upstream} />}
+      {d && <Detail d={d} core={releaseData.data?.releases.find((r) => r.recommended)?.version} scoringUpstream={scoring.upstream} />}
     </LoadState>
   );
 }

@@ -102,6 +102,9 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		s.audit(r, auditSettingsUpdate, strings.Join(changed, ", "), map[string]any{"sections": changed})
 		s.hub.notify() // Agent 总开关等设置会改变工具与系统技能
 		s.kickConnect()
+		if slices.Contains(changed, "distribution") {
+			s.kickDshReleases()
+		}
 	}
 	writeJSON(w, http.StatusOK, &next)
 }
@@ -157,6 +160,12 @@ func validateSettings(v *store.AppSettings) string {
 			return "自定义上游 registry 必须是 http(s) 地址，且不能在地址里带账号密码"
 		}
 		v.Upstream.CustomRegistry = strings.TrimRight(v.Upstream.CustomRegistry, "/")
+	}
+	if !slices.Contains([]string{"off", "notify", "mirror"}, v.Distribution.AutoSync) {
+		return "Desktop 自动同步取值不对：" + v.Distribution.AutoSync
+	}
+	if v.Distribution.KeepVersions < 1 || v.Distribution.KeepVersions > 10 {
+		return "Desktop 保留版本数应在 1–10 之间"
 	}
 	if v.Connect.PollSeconds < 15 || v.Connect.PollSeconds > 3600 {
 		return "DSH 接入插件的检查间隔应在 15–3600 秒之间"

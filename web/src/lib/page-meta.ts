@@ -16,7 +16,7 @@ const META = {
   workbench: { title: "我的工作台", defaultPath: "/workbench", description: "个人指标、装过的能力、部门在用、我分享的" },
   apps: { title: "微应用", defaultPath: "/apps", description: "基于 DSH 运行的企业微应用" },
   market: { title: "能力中心", defaultPath: "/hub", description: "插件、技能、提示词、企业连接与微应用" },
-  "dsh-download": { title: "下载 DSH", defaultPath: "/dsh", description: "DSH 核心与桌面版下载（模拟数据）" },
+  "dsh-download": { title: "下载 DSH", defaultPath: "/dsh", description: "DSH 核心与桌面版下载" },
   setup: { title: "接入指南", defaultPath: "/setup", description: "一条命令接入企业源" },
   publish: { title: "分享能力", defaultPath: "/publish", description: "上传或申请引入能力" },
   "my-keys": { title: "我的令牌", defaultPath: "/tokens", description: "我的额度，自助创建与吊销令牌" },
@@ -34,7 +34,7 @@ const META = {
   "admin-review": { title: "待审核", defaultPath: "/admin/review", description: "审核队列" },
   "admin-registry": { title: "npm 源", defaultPath: "/admin/registry", description: "路由规则、上游、访问令牌" },
   "admin-upstream": { title: "上游预载", defaultPath: "/admin/upstream", description: "在线同步与离线导入" },
-  "admin-distribution": { title: "DSH 分发", defaultPath: "/admin/distribution", description: "DSH 本体分发（模拟数据）" },
+  "admin-distribution": { title: "DSH 分发", defaultPath: "/admin/distribution", description: "DSH 本体分发" },
   "admin-settings": { title: "系统设置", defaultPath: "/admin/settings", description: "全局设置" },
 } satisfies Record<string, PageMeta>;
 

@@ -1,113 +1,154 @@
-import { Link } from "react-router";
-import { RefreshCw, Upload } from "lucide-react";
-import { useStore } from "../../lib/store";
-import type { DshRelease } from "../../lib/types";
-import { Badge, Button, Card, PageHeader, Toggle } from "../../components/ui";
-import { PageLink } from "../../lib/menus";
+import { useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { Trans, useTranslation } from "react-i18next";
+import { api, formatBytes, formatTime } from "../../lib/api";
+import { useApi } from "../../lib/use-api";
+import { useStore } from "../../lib/store";
+import type { DshRelease, DshTarget } from "../../lib/types";
+import { Badge, Button, Card, PageHeader, ToggleRow } from "../../components/ui";
+import { LoadState } from "../../components/api-ui";
+import { PageLink } from "../../lib/menus";
 
-function ChannelBadge({ c }: { c: DshRelease["channel"] }) {
+function ReleaseTable({ target, title, rows, busy, act }: { target: DshTarget; title: string; rows: DshRelease[]; busy: number; act: (id: number, action: "mirror" | "recommend" | "delete") => void }) {
   const { t } = useTranslation();
-  return c === "stable" ? <Badge tone="green">{t("download.stable")}</Badge> : c === "alpha" ? <Badge tone="amber">{t("download.alpha")}</Badge> : <Badge>{t("download.legacy")}</Badge>;
-}
-const channelBadge = (c: DshRelease["channel"]) => <ChannelBadge c={c} />;
-
-function ReleaseTable({ product, title }: { product: DshRelease["product"]; title: string }) {
-  const { t } = useTranslation();
-  const { releases, setRecommended, toggleMirrored, settings, notify } = useStore();
-  const rows = releases.filter((r) => r.product === product);
   return (
-    <Card>
-      <div className="flex items-center border-b border-neutral-100 px-5 py-3">
-        <span className="font-medium text-neutral-800">{title}</span>
-        <div className="ml-auto flex gap-2">
-          <Button variant="secondary" size="sm" onClick={() => notify(t("distributionAdmin.officialChecked"))}>
-            <RefreshCw size={14} /> {t("distributionAdmin.checkOfficial")}
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => notify(t("distributionAdmin.uploadPrototype"))}>
-            <Upload size={14} /> {t("distributionAdmin.upload")}
-          </Button>
-        </div>
+    <Card className="overflow-hidden">
+      <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">{title}</div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-left text-xs text-neutral-500">
+            <tr>
+              <th className="px-5 py-2 font-normal">{t("distributionAdmin.colRelease")}</th>
+              <th className="px-5 py-2 font-normal">{t("distributionAdmin.colDate")}</th>
+              <th className="px-5 py-2 font-normal">{t("distributionAdmin.colSize")}</th>
+              <th className="px-5 py-2 font-normal">{t("distributionAdmin.colState")}</th>
+              <th className="px-5 py-2 font-normal">{t("distributionAdmin.colActions")}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-100">
+            {rows.filter((r) => r.target === target).map((r) => {
+              const progress = r.size > 0 ? Math.min(100, ((r.downloaded ?? 0) / r.size) * 100) : 0;
+              return (
+                <tr key={r.id}>
+                  <td className="px-5 py-3">
+                    <div className="font-mono font-medium text-neutral-800">{r.version} · {r.kind}</div>
+                    {r.recommended && <Badge tone="brand">{t("download.recommended")}</Badge>}
+                    {r.error && <div className="mt-1 max-w-md text-xs text-red-600">{r.error}</div>}
+                  </td>
+                  <td className="px-5 py-3 text-neutral-500">{formatTime(r.released_at)}</td>
+                  <td className="px-5 py-3 text-neutral-500">{r.size > 0 ? formatBytes(r.size) : "—"}</td>
+                  <td className="px-5 py-3">
+                    <Badge tone={(r.state ?? "available") === "mirrored" ? "green" : (r.state ?? "available") === "failed" ? "red" : (r.state ?? "available") === "downloading" ? "amber" : "slate"}>
+                      {t(`distributionAdmin.state.${(r.state ?? "available")}`)}
+                    </Badge>
+                    {(r.state ?? "available") === "downloading" && <div className="mt-1 text-xs text-neutral-500">{t("distributionAdmin.progress", { downloaded: formatBytes(r.downloaded ?? 0), pct: progress.toFixed(0) })}</div>}
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      {((r.state ?? "available") === "available" || (r.state ?? "available") === "failed") && (
+                        <Button size="sm" variant="secondary" disabled={busy === r.id} onClick={() => act(r.id, "mirror")}>{t("distributionAdmin.mirror")}</Button>
+                      )}
+                      {(r.state ?? "available") === "mirrored" && !r.recommended && (
+                        <>
+                          <Button size="sm" variant="secondary" disabled={busy === r.id} onClick={() => act(r.id, "recommend")}>{t("distributionAdmin.recommend")}</Button>
+                          <Button size="sm" variant="danger" disabled={busy === r.id} onClick={() => act(r.id, "delete")}>{t("common.delete")}</Button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {!rows.some((r) => r.target === target) && (
+              <tr><td colSpan={5} className="px-5 py-8 text-center text-neutral-500">{t("distributionAdmin.empty")}</td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
-      <table className="w-full text-sm">
-        <thead className="text-left text-xs text-neutral-500">
-          <tr>
-            <th className="px-5 py-2 font-normal">{t("distributionAdmin.colRelease")}</th>
-            <th className="px-5 py-2 font-normal">{t("distributionAdmin.colChannel")}</th>
-            <th className="px-5 py-2 font-normal">{t("distributionAdmin.colDate")}</th>
-            <th className="px-5 py-2 font-normal">{t("distributionAdmin.colPlatforms")}</th>
-            <th className="px-5 py-2 font-normal">{t("distributionAdmin.colMirrored")}</th>
-            <th className="px-5 py-2 font-normal">{t("distributionAdmin.colRecommended")}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-neutral-100">
-          {rows.map((r) => {
-            const hidden =
-              (r.channel === "alpha" && !settings.distribution.allowAlpha) ||
-              (r.distro.includes("社区") && !settings.distribution.allowCommunityDesktop);
-            return (
-              <tr key={r.distro + r.version}>
-                <td className="px-5 py-3">
-                  <div className="font-medium text-neutral-800">
-                    {r.distro} <span className="font-mono">{r.version}</span>
-                  </div>
-                  <div className="text-xs text-neutral-500">
-                    {r.notes}
-                    {hidden && <span className="ml-1 text-amber-600">{t("distributionAdmin.hiddenNote")}</span>}
-                  </div>
-                </td>
-                <td className="px-5 py-3">{channelBadge(r.channel)}</td>
-                <td className="px-5 py-3 text-neutral-500">{r.releasedAt}</td>
-                <td className="px-5 py-3 text-xs text-neutral-500">
-                  {t("distributionAdmin.artifacts", { count: r.artifacts.length, gb: (r.artifacts.reduce((a, x) => a + x.sizeMb, 0) / 1024).toFixed(2) })}
-                </td>
-                <td className="px-5 py-3">
-                  <Toggle checked={r.mirrored} onChange={() => toggleMirrored(r.distro, r.version)} />
-                </td>
-                <td className="px-5 py-3">
-                  <input
-                    type="radio"
-                    name={`rec-${product}-${product === "desktop" ? r.distro : "core"}`}
-                    checked={r.recommended}
-                    disabled={!r.mirrored}
-                    onChange={() => {
-                      setRecommended(product, r.distro, r.version);
-                      notify(t("distributionAdmin.setRecommended", { distro: r.distro, version: r.version }));
-                    }}
-                    className="accent-brand-500"
-                  />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
     </Card>
   );
 }
 
 export default function AdminDistribution() {
   const { t } = useTranslation();
-  const { settings } = useStore();
+  const { settings, updateSettings, notify } = useStore();
+  const { data, loading, error, reload } = useApi(api.adminDshReleases);
+  const [busy, setBusy] = useState(0);
+  const rows = data ?? [];
+  const downloading = rows.some((r) => (r.state ?? "available") === "downloading");
+
+  useEffect(() => {
+    if (!downloading) return;
+    const timer = setInterval(reload, 2000);
+    return () => clearInterval(timer);
+  }, [downloading, reload]);
+
+  const run = async (id: number, action: "mirror" | "recommend" | "delete") => {
+    setBusy(id);
+    try {
+      if (action === "mirror") await api.mirrorDshRelease(id);
+      if (action === "recommend") await api.recommendDshRelease(id);
+      if (action === "delete") await api.deleteDshRelease(id);
+      notify(t(`distributionAdmin.done.${action}`));
+      await reload();
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(0);
+    }
+  };
+
   return (
     <div>
       <PageHeader
         title={t("distributionAdmin.title")}
         desc={t("distributionAdmin.desc")}
+        actions={<Button variant="secondary" onClick={async () => { await api.checkDshReleases(); notify(t("distributionAdmin.checkStarted")); }}><RefreshCw size={14} /> {t("distributionAdmin.checkOfficial")}</Button>}
       />
       {!settings.distribution.enabled && (
         <Card className="mb-6 border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
           <Trans i18nKey="distributionAdmin.disabledNote" components={{ link: <PageLink page="admin-settings" className="mx-1 underline" /> }} />
         </Card>
       )}
-      <div className="space-y-6">
-        <ReleaseTable product="core" title={t("distributionAdmin.core")} />
-        <ReleaseTable product="desktop" title={t("distributionAdmin.desktop")} />
-        <Card className="p-5 text-sm text-neutral-600">
-          <div className="mb-1 font-medium text-neutral-800">{t("distributionAdmin.preconfigured")}</div>
-          {t("distributionAdmin.preconfiguredDesc")}
-        </Card>
-      </div>
+      <Card className="mb-6 grid gap-5 p-5 md:grid-cols-3">
+        <label className="text-sm">
+          <span className="mb-1 block font-medium text-neutral-800">{t("distributionAdmin.autoSync")}</span>
+          <select
+            aria-label={t("distributionAdmin.autoSync")}
+            className="h-9 w-full rounded-md border border-neutral-300 bg-card px-3"
+            value={settings.distribution.autoSync}
+            onChange={(e) => updateSettings((s) => ({ ...s, distribution: { ...s.distribution, autoSync: e.target.value as typeof s.distribution.autoSync } }))}
+          >
+            <option value="off">{t("distributionAdmin.sync.off")}</option>
+            <option value="notify">{t("distributionAdmin.sync.notify")}</option>
+            <option value="mirror">{t("distributionAdmin.sync.mirror")}</option>
+          </select>
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block font-medium text-neutral-800">{t("distributionAdmin.keepVersions")}</span>
+          <input
+            aria-label={t("distributionAdmin.keepVersions")}
+            type="number"
+            min={1}
+            max={10}
+            className="h-9 w-full rounded-md border border-neutral-300 bg-card px-3"
+            value={settings.distribution.keepVersions}
+            onChange={(e) => updateSettings((s) => ({ ...s, distribution: { ...s.distribution, keepVersions: Number(e.target.value) } }))}
+          />
+        </label>
+        <ToggleRow
+          label={t("distributionAdmin.offerDmg")}
+          desc={t("distributionAdmin.offerDmgDesc")}
+          checked={settings.distribution.offerDmg}
+          onChange={(v) => updateSettings((s) => ({ ...s, distribution: { ...s.distribution, offerDmg: v } }))}
+        />
+      </Card>
+      <LoadState loading={loading && !data} error={error} onRetry={reload}>
+        <div className="space-y-6">
+          <ReleaseTable target="mac-arm64" title={t("distributionAdmin.arm64")} rows={rows} busy={busy} act={run} />
+          <ReleaseTable target="mac-x64" title={t("distributionAdmin.x64")} rows={rows} busy={busy} act={run} />
+        </div>
+      </LoadState>
     </div>
   );
 }

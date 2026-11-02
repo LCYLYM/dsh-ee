@@ -211,15 +211,16 @@ export function AssetsGrid({
 export default function Hub() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { plugins, settings, releases } = useStore();
+  const { plugins, settings } = useStore();
   const { can } = useAuth();
   const { pathOf } = useMenus();
   const [params, setParams] = useSearchParams();
   const tab = (TABS.includes(params.get("tab") as Tab) ? params.get("tab") : "all") as Tab;
   const hub = useApi(api.hub);
+  const releaseData = useApi(api.dshReleases);
   const assets = hub.data?.assets ?? [];
   const [banner, setBanner] = useState(() => localStorage.getItem(BANNER_KEY) !== "off");
-  const recommendedCore = releases.find((r) => r.product === "core" && r.recommended);
+  const recommendedCore = releaseData.data?.releases.find((r) => r.recommended);
   const count = (k: Tab) => (k === "all" ? assets.length + plugins.length : k === "plugin" ? plugins.length : assets.filter((a) => a.kind === k).length);
   const setTab = (k: Tab) => setParams(k === "all" ? {} : { tab: k }, { replace: true });
 

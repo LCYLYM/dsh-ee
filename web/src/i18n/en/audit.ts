@@ -27,6 +27,7 @@ export default {
       asset: "Capability hub",
       connection: "Connections",
       connect: "DSH connect plugin",
+      dsh_release: "DSH Desktop distribution",
     },
     colTime: "Time",
     colActor: "Actor",
@@ -62,6 +63,7 @@ export default {
       asset: { create: "Created capability", version: "Submitted version", edit: "Changed availability", delete: "Deleted capability" },
       connection: { tool: "Configured connection tool", request: "Requested a connection" },
       connect: { publish: "Published connect plugin" },
+      dsh_release: { check: "Checked official releases", mirror: "Downloaded installer", mirror_failed: "Installer verification failed", recommend: "Set recommended release", delete: "Deleted local installer" },
     },
   },
 } satisfies Messages<typeof zh>;

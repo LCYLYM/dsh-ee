@@ -25,6 +25,7 @@ export default {
       asset: "能力中心",
       connection: "企业连接",
       connect: "DSH 接入插件",
+      dsh_release: "DSH 桌面版分发",
     },
     colTime: "时间",
     colActor: "操作人",
@@ -60,6 +61,7 @@ export default {
       asset: { create: "新建能力", version: "提交新版本", edit: "修改范围或上下架", delete: "删除能力" },
       connection: { tool: "设置连接工具", request: "申请使用企业连接" },
       connect: { publish: "发布接入插件" },
+      dsh_release: { check: "检查官方版本", mirror: "下载安装包", mirror_failed: "安装包校验失败", recommend: "设置推荐版本", delete: "删除本地安装包" },
     },
   },
 };

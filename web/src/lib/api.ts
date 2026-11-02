@@ -1,6 +1,6 @@
 /** 与 server/ 对接的接口层。类型与 server/internal/store 的 JSON 字段一一对应。 */
 import i18n from "../i18n";
-import type { Plugin, PluginKind, PluginStatus, Settings } from "./types";
+import type { DshRelease, Plugin, PluginKind, PluginStatus, Settings } from "./types";
 
 export interface RoleRef {
   id: number;
@@ -852,6 +852,12 @@ export const api = {
   connectInfo: () => request<ConnectInfo>("GET", "/api/connect"),
   adminConnect: () => request<{ state: ConnectState; package?: string; stale?: boolean; patch?: string }>("GET", "/api/admin/connect"),
   publishConnect: (force = false) => request<ConnectState>("POST", "/api/admin/connect/publish", { force }),
+  dshReleases: () => request<{ enabled: boolean; releases: DshRelease[] }>("GET", "/api/dsh/releases"),
+  adminDshReleases: () => request<{ releases: DshRelease[] }>("GET", "/api/admin/dsh-releases").then((r) => r.releases),
+  checkDshReleases: () => request<{ ok: boolean }>("POST", "/api/admin/dsh-releases/check"),
+  mirrorDshRelease: (id: number) => request<{ ok: boolean }>("POST", `/api/admin/dsh-releases/${id}/mirror`),
+  recommendDshRelease: (id: number) => request<{ ok: boolean }>("POST", `/api/admin/dsh-releases/${id}/recommend`),
+  deleteDshRelease: (id: number) => request<void>("DELETE", `/api/admin/dsh-releases/${id}`),
 
   /** 系统设置：未登录时返回 401（静默），调用方保留默认值。 */
   settings: () => request<Settings>("GET", "/api/settings", undefined, { silent401: true }),

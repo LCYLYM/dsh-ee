@@ -51,29 +51,24 @@ export interface Plugin {
   submittedAt?: number;
 }
 
-export type ReleaseChannel = "stable" | "alpha" | "legacy";
-
-export interface Artifact {
-  os: "windows" | "macos" | "linux";
-  arch: "x64" | "arm64";
-  file: string;
-  sizeMb: number;
-  sha256: string;
-}
+export type DshTarget = "mac-arm64" | "mac-x64";
+export type DshReleaseState = "available" | "downloading" | "mirrored" | "failed";
 
 export interface DshRelease {
-  product: "core" | "desktop";
-  /** 桌面端可能有官方与社区多个发行版。 */
-  distro: string;
+  id: number;
+  target: DshTarget;
+  kind: "zip" | "dmg";
   version: string;
-  channel: ReleaseChannel;
-  releasedAt: string;
-  notes: string;
-  /** 企业推荐版本：员工下载页默认展示它，插件兼容性以它为准。 */
+  released_at: string;
+  size: number;
+  sha512: string;
   recommended: boolean;
-  /** 是否已同步到企业内网存储。 */
-  mirrored: boolean;
-  artifacts: Artifact[];
+  verified: boolean;
+  download_url: string;
+  file?: string;
+  state?: DshReleaseState;
+  downloaded?: number;
+  error?: string;
 }
 
 export interface Settings {
@@ -96,8 +91,9 @@ export interface Settings {
   };
   distribution: {
     enabled: boolean;
-    allowAlpha: boolean;
-    allowCommunityDesktop: boolean;
+    autoSync: "off" | "notify" | "mirror";
+    keepVersions: number;
+    offerDmg: boolean;
   };
   auth: "local" | "ldap" | "oidc";
   /** DSH 接入插件（<主作用域>/dsh-connect）：由 dsh-ee 生成并发布到自己的 npm 源。 */

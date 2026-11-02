@@ -1,9 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { initialReleases } from "../mock/data";
 import { api, toPlugin } from "./api";
 import { useAuth } from "./auth";
-import type { DshRelease, Plugin, Settings } from "./types";
+import type { Plugin, Settings } from "./types";
 import i18n from "../i18n";
 
 /** 与服务端 store.DefaultSettings 一致；登录前、或接口还没返回时用它。 */
@@ -27,8 +26,9 @@ export const defaultSettings: Settings = {
   },
   distribution: {
     enabled: true,
-    allowAlpha: false,
-    allowCommunityDesktop: true,
+    autoSync: "notify",
+    keepVersions: 3,
+    offerDmg: false,
   },
   auth: "local",
   connect: {
@@ -63,9 +63,6 @@ interface Store {
   reloadPending: () => void;
   /** 员工访问 dsh-ee 的地址：设置里填了就用它，否则用当前页面地址。 */
   baseUrl: string;
-  releases: DshRelease[];
-  setRecommended: (product: DshRelease["product"], distro: string, version: string) => void;
-  toggleMirrored: (distro: string, version: string) => void;
   notify: (msg: string) => void;
 }
 
@@ -77,7 +74,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [pluginsLoading, setPluginsLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
-  const [releases, setReleases] = useState<DshRelease[]>(initialReleases);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef(settings);
   latest.current = settings;
@@ -147,19 +143,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     pendingCount,
     reloadPending,
     baseUrl: (settings.baseUrl || window.location.origin).replace(/\/$/, ""),
-    releases,
-    setRecommended: (product, distro, version) =>
-      setReleases((rs) =>
-        rs.map((r) =>
-          r.product !== product || (product === "desktop" && r.distro !== distro)
-            ? r
-            : { ...r, recommended: r.version === version },
-        ),
-      ),
-    toggleMirrored: (distro, version) =>
-      setReleases((rs) =>
-        rs.map((r) => (r.distro === distro && r.version === version ? { ...r, mirrored: !r.mirrored } : r)),
-      ),
     notify: (msg) => void toast(msg),
   };
 

@@ -161,20 +161,6 @@ export default function AdminSettings() {
             checked={s.distribution.enabled}
             onChange={(v) => set("distribution", { enabled: v })}
           />
-          <ToggleRow
-            label={t("settingsAdmin.showPreview")}
-            desc={t("settingsAdmin.showPreviewDesc")}
-            checked={s.distribution.allowAlpha}
-            disabled={!s.distribution.enabled}
-            onChange={(v) => set("distribution", { allowAlpha: v })}
-          />
-          <ToggleRow
-            label={t("settingsAdmin.communityDesktop")}
-            desc={t("settingsAdmin.communityDesktopDesc")}
-            checked={s.distribution.allowCommunityDesktop}
-            disabled={!s.distribution.enabled}
-            onChange={(v) => set("distribution", { allowCommunityDesktop: v })}
-          />
         </Section>
 
         <Section title={t("connectAdmin.title")}>
