@@ -113,7 +113,7 @@ func (s *Server) buildConnect(ctx context.Context, base, version string) (string
 		if !slices.Contains(models, def) {
 			def = models[0]
 		}
-		fmt.Fprintf(&p, "- id: llm-pi-ai\n  config:\n    providers:\n      dsh-ee:\n        apiKeyEnv: %s\n        api: openai-completions\n        baseURL: %s\n        headers:\n          X-DshEE-Client: %s\n        models:\n",
+		fmt.Fprintf(&p, "- id: llm-pi-ai\n  config:\n    providers:\n      dsh-ee:\n        apiKeyEnv: %s\n        api: openai-completions\n        baseURL: %s\n        headers:\n          X-DshEE-Client: %s\n          X-DshEE-Host: !!js \"process.versions.electron ? 'desktop/' + (process.env.DSH_DESKTOP_VERSION || process.env.DSH_VERSION || process.versions.electron) : 'cli'\"\n        models:\n",
 			connectTokenEnv, yamlQuote(base+"/v1"), yamlQuote("dsh-connect/"+version))
 		for _, m := range models {
 			fmt.Fprintf(&p, "          - id: %s\n", yamlQuote(m))

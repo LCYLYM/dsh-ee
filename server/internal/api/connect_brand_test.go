@@ -4,16 +4,28 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/hikariming/dsh-ee/server/internal/store"
 )
 
 func TestConnectBrandBundle(t *testing.T) {
 	f := newReleaseFixture(t, "notify")
 	ctx := context.Background()
+	provider := &store.Provider{Name: "test", BaseURL: "http://127.0.0.1:8093", APIKeyEnc: []byte{1}, APIKeyHint: "…1", Enabled: true}
+	if err := f.st.CreateProvider(ctx, provider); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.st.CreateModel(ctx, &store.Model{ProviderID: provider.ID, Name: "dist-chat", UpstreamModel: "dist-chat", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
 	_, files, disabledHash, err := f.s.buildConnect(ctx, "http://127.0.0.1:8092", "1.0.1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	patch := string(files["cordis.patch.yml"])
+	if !strings.Contains(patch, "X-DshEE-Host: !!js") {
+		t.Fatalf("模型网关也应上报 Desktop 宿主：%s", patch)
+	}
 	if strings.Contains(patch, "ui-brand-official") {
 		t.Fatalf("品牌关闭时不应禁用官方品牌：%s", patch)
 	}
