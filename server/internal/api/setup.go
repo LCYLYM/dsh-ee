@@ -138,6 +138,7 @@ if [ -z "$TOKEN" ]; then
   fi
   DEVICE_LOGIN=1
 fi
+` + s.desktopShell(r) + `
 if ! command -v npm >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1; then
   echo "没有找到 Node.js / npm：请先安装 Node.js（DSH 自带的 Node 也可以，把它加到 PATH）。" >&2
   exit 1
