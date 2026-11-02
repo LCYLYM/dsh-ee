@@ -63,6 +63,18 @@ export default async function (t) {
   }, href);
   assert(downloaded.status === 200 || downloaded.status === 206, `下载状态 ${downloaded.status}`);
   assertEq(downloaded.bytes, 4, "Range 下载字节数");
-  await shot(employee, "distribution-download");
   step("员工页列出版本，登录下载支持 Range");
+
+  const issued = await api(employee, "POST", "/api/me/tokens", { name: "Desktop E2E", scopes: ["models", "registry:read", "hub", "connections"] });
+  assertEq(issued.status, 201, "创建插件令牌");
+  const catalogStatus = await employee.evaluate(async ({ base, token }) => {
+    const response = await fetch(`${base}/api/dsh/catalog`, {
+      headers: { Authorization: `Bearer ${token}`, "X-DshEE-Client": "dsh-connect/1.0.7", "X-DshEE-Host": "desktop/0.2.1-rc.5" },
+    });
+    return response.status;
+  }, { base: BASE, token: issued.data.token });
+  assertEq(catalogStatus, 200, "模拟 Desktop 插件上线");
+  await employee.getByText("✔ 已接入：DSH Desktop · 插件 1.0.7", { exact: true }).waitFor({ timeout: 10000 });
+  await shot(employee, "distribution-download");
+  step("四步引导检测 Desktop 插件上线并显示已接入");
 }

@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
-import { Apple, Download, Monitor, ShieldCheck } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Apple, CheckCircle2, Download, Monitor, RefreshCw, ShieldCheck, Terminal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, formatBytes, formatTime } from "../lib/api";
 import { useApi } from "../lib/use-api";
-import type { DshRelease, DshTarget } from "../lib/types";
-import { Badge, Card, PageHeader } from "../components/ui";
+import { useStore } from "../lib/store";
+import type { DshClient, DshRelease, DshTarget } from "../lib/types";
+import { Badge, Card, CopyBox, PageHeader } from "../components/ui";
 import { LoadState } from "../components/api-ui";
+import { PageLink } from "../lib/menus";
 
 type Architecture = "arm" | "x64" | "unknown";
 
@@ -43,9 +45,40 @@ function DownloadRow({ release, title }: { release: DshRelease; title: string })
   );
 }
 
+function useConnection() {
+  const startedAt = useRef(Date.now());
+  const [clients, setClients] = useState<DshClient[]>([]);
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      const items = await api.dshClients().catch(() => []);
+      if (stopped) return;
+      setClients(items);
+      const online = items.some((c) => c.last_host.startsWith("desktop/") && Date.parse(c.last_used_at) > startedAt.current);
+      if (online) return;
+      if (Date.now() - startedAt.current >= 5 * 60 * 1000) {
+        setTimedOut(true);
+        return;
+      }
+      timer = setTimeout(poll, 3000);
+    };
+    void poll();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+  const connected = clients.find((c) => c.last_host.startsWith("desktop/") && Date.parse(c.last_used_at) > startedAt.current);
+  return { connected, timedOut };
+}
+
 export default function DshDownload() {
   const { t } = useTranslation();
+  const { baseUrl } = useStore();
   const { data, loading, error, reload } = useApi(api.dshReleases);
+  const { connected, timedOut } = useConnection();
   const arch = useArchitecture();
   const isMac = /Mac/i.test(navigator.userAgent);
   const targets: DshTarget[] = arch === "arm" ? ["mac-arm64"] : arch === "x64" ? ["mac-x64"] : ["mac-arm64", "mac-x64"];
@@ -57,31 +90,71 @@ export default function DshDownload() {
     <div>
       <PageHeader title={t("download.title")} desc={t("download.desc")} />
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
-        {!isMac ? (
-          <Card className="p-12 text-center">
-            <Monitor className="mx-auto mb-3 text-neutral-400" size={28} />
-            <p className="text-sm text-neutral-500">{t("download.windowsSoon")}</p>
-          </Card>
-        ) : (
-          <Card className="overflow-hidden">
-            <div className="flex items-start gap-3 px-5 py-5">
-              <Apple className="mt-0.5 text-neutral-700" size={22} />
-              <div>
-                <h2 className="font-semibold text-neutral-900">{t("download.stepDownload")}</h2>
-                <p className="mt-1 text-sm text-neutral-500">{t("download.unzip")}</p>
-                {arch === "unknown" && <p className="mt-1 text-sm text-neutral-500">{t("download.chooseChip")}</p>}
-              </div>
-            </div>
-            {targets.map((target) => {
-              const rows = releases.filter((r) => r.target === target);
-              return rows.map((r) => <DownloadRow key={r.id} release={r} title={t(`download.target.${target}`)} />);
-            })}
-            {!releases.length && <div className="border-t border-neutral-100 px-5 py-8 text-center text-sm text-neutral-500">{t("download.empty")}</div>}
-            <div className="flex items-center gap-2 border-t border-neutral-100 bg-neutral-50 px-5 py-3 text-xs text-neutral-500">
-              <ShieldCheck size={14} /> {t("download.hashNote")}
-            </div>
-          </Card>
-        )}
+        <div className="space-y-6">
+          {!isMac ? (
+            <Card className="p-12 text-center">
+              <Monitor className="mx-auto mb-3 text-neutral-400" size={28} />
+              <p className="text-sm text-neutral-500">{t("download.windowsSoon")}</p>
+            </Card>
+          ) : (
+            <>
+              <Card className="overflow-hidden">
+                <div className="flex items-start gap-3 px-5 py-5">
+                  <Apple className="mt-0.5 text-neutral-700" size={22} />
+                  <div>
+                    <h2 className="font-semibold text-neutral-900">{t("download.stepDownload")}</h2>
+                    <p className="mt-1 text-sm text-neutral-500">{t("download.unzip")}</p>
+                    {arch === "unknown" && <p className="mt-1 text-sm text-neutral-500">{t("download.chooseChip")}</p>}
+                  </div>
+                </div>
+                {targets.map((target) => releases.filter((r) => r.target === target).map((r) => <DownloadRow key={r.id} release={r} title={t(`download.target.${target}`)} />))}
+                {!releases.length && <div className="border-t border-neutral-100 px-5 py-8 text-center text-sm text-neutral-500">{t("download.empty")}</div>}
+                <div className="flex items-center gap-2 border-t border-neutral-100 bg-neutral-50 px-5 py-3 text-xs text-neutral-500">
+                  <ShieldCheck size={14} /> {t("download.hashNote")}
+                </div>
+              </Card>
+
+              <Card className="flex items-start gap-3 p-5">
+                <CheckCircle2 className="mt-0.5 text-neutral-700" size={22} />
+                <div>
+                  <h2 className="font-semibold text-neutral-900">{t("download.stepOpen")}</h2>
+                  <p className="mt-1 text-sm text-neutral-500">{t("download.openDesc")}</p>
+                </div>
+              </Card>
+
+              <Card className="p-5">
+                <div className="mb-3 flex items-start gap-3">
+                  <Terminal className="mt-0.5 text-neutral-700" size={22} />
+                  <div>
+                    <h2 className="font-semibold text-neutral-900">{t("download.stepCommand")}</h2>
+                    <p className="mt-1 text-sm text-neutral-500">{t("download.commandDesc")}</p>
+                  </div>
+                </div>
+                <CopyBox text={`curl -fsSL ${baseUrl}/setup.sh | sh`} />
+              </Card>
+
+              <Card className="p-5">
+                <div className="flex items-start gap-3">
+                  <RefreshCw className={`mt-0.5 ${connected ? "text-emerald-600" : "text-neutral-700"}`} size={22} />
+                  <div>
+                    <h2 className="font-semibold text-neutral-900">{t("download.stepReconnect")}</h2>
+                    {connected ? (
+                      <p className="mt-1 text-sm font-medium text-emerald-700">
+                        {t("download.connected", { device: connected.client_name || t("download.defaultDevice"), version: connected.last_client.replace("dsh-connect/", "") })}
+                      </p>
+                    ) : timedOut ? (
+                      <p className="mt-1 text-sm text-neutral-500">
+                        {t("download.notDetected")} <PageLink page="setup" className="text-brand-600 hover:underline">{t("download.connectGuide")}</PageLink>
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-sm text-neutral-500">{t("download.waiting")}</p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            </>
+          )}
+        </div>
       </LoadState>
     </div>
   );

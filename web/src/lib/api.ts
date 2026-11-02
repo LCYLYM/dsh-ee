@@ -1,6 +1,6 @@
 /** 与 server/ 对接的接口层。类型与 server/internal/store 的 JSON 字段一一对应。 */
 import i18n from "../i18n";
-import type { DshRelease, Plugin, PluginKind, PluginStatus, Settings } from "./types";
+import type { DshClient, DshRelease, Plugin, PluginKind, PluginStatus, Settings } from "./types";
 
 export interface RoleRef {
   id: number;
@@ -858,6 +858,7 @@ export const api = {
   mirrorDshRelease: (id: number) => request<{ ok: boolean }>("POST", `/api/admin/dsh-releases/${id}/mirror`),
   recommendDshRelease: (id: number) => request<{ ok: boolean }>("POST", `/api/admin/dsh-releases/${id}/recommend`),
   deleteDshRelease: (id: number) => request<void>("DELETE", `/api/admin/dsh-releases/${id}`),
+  dshClients: () => request<{ clients: DshClient[] }>("GET", "/api/me/dsh-clients").then((r) => r.clients),
 
   /** 系统设置：未登录时返回 401（静默），调用方保留默认值。 */
   settings: () => request<Settings>("GET", "/api/settings", undefined, { silent401: true }),

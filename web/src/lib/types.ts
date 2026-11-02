@@ -71,6 +71,13 @@ export interface DshRelease {
   error?: string;
 }
 
+export interface DshClient {
+  client_name: string;
+  last_client: string;
+  last_host: string;
+  last_used_at: string;
+}
+
 export interface Settings {
   orgName: string;
   baseUrl: string;
