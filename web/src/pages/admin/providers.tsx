@@ -5,7 +5,7 @@ import { useStore } from "../../lib/store";
 import { useAction, useApi } from "../../lib/use-api";
 import { ErrorNote, LoadState } from "../../components/api-ui";
 import zhLlm from "../../i18n/zh/llm-admin";
-import { Badge, Button, Card, CardHeader, cx, Field, inputBase, inputCls, PageHeader, Toggle } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, cx, Field, inputBase, inputCls, PageHeader, PasswordInput, Toggle } from "../../components/ui";
 import { useTranslation } from "react-i18next";
 import { useConfirm } from "@/lib/confirm";
 import { Tip } from "@/components/tip";
@@ -86,7 +86,7 @@ function ProviderForm({ initial, onDone, onCancel }: { initial?: Provider; onDon
           <input className={cx(inputCls, "font-mono")} required value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
         </Field>
         <Field label={t("providers.apiKey")} hint={initial ? t("providers.apiKeyKeep", { hint: initial.api_key_hint }) : t("providers.apiKeyNew")}>
-          <input className={inputCls} type="password" autoComplete="off" required={!initial} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-…" />
+          <PasswordInput label={t("providers.apiKey")} className={inputCls} autoComplete="off" required={!initial} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-…" />
         </Field>
         <Field label={t("providers.priority")} hint={t("providers.priorityHint")}>
           <input className={inputCls} inputMode="numeric" value={priority} onChange={(e) => setPriority(e.target.value)} />

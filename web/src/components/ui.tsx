@@ -1,5 +1,5 @@
-import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { Check, Copy, Star } from "lucide-react";
+import { useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
+import { Check, Copy, Eye, EyeOff, Star } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Tip } from "@/components/tip";
 
@@ -270,4 +270,38 @@ export function formatKb(kb: number) {
 
 export function formatDate(ts: number) {
   return new Date(ts * 1000).toLocaleDateString("zh-CN");
+}
+
+/**
+ * 密码 / 密钥输入框：右侧一个眼睛图标，点击在明文与掩码之间切换。
+ * 样式与普通 input 一致（传入 inputCls 或 inputBase），宽度由 containerClassName 控制
+ * ——固定宽度的地方（例如 LDAP 试连的窄输入框）要一起传，否则图标会飘到右侧。
+ */
+export function PasswordInput({
+  label,
+  className,
+  containerClassName,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { label?: string; containerClassName?: string }) {
+  const { t } = useTranslation();
+  const [visible, setVisible] = useState(false);
+  // 按钮的文案刻意不含「密码 / password」：否则它会被 getByLabel('密码') 之类的
+  // 标签匹配当成第二个「密码」控件，读屏时也会和输入框撞名。
+  const toggleLabel = visible ? t("common.hideSecret") : t("common.revealSecret");
+  return (
+    <div className={cx("relative", containerClassName ?? "w-full")}>
+      <input {...props} aria-label={label} type={visible ? "text" : "password"} className={cx(className, "pr-10")} />
+      <Tip label={toggleLabel} side="top">
+        <button
+          type="button"
+          aria-label={toggleLabel}
+          aria-pressed={visible}
+          onClick={() => setVisible((v) => !v)}
+          className="absolute top-1/2 right-1 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
+        >
+          {visible ? <EyeOff size={15} aria-hidden /> : <Eye size={15} aria-hidden />}
+        </button>
+      </Tip>
+    </div>
+  );
 }

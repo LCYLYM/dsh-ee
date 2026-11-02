@@ -4,7 +4,7 @@ import { Puzzle } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { api } from "../lib/api";
 import { useApi } from "../lib/use-api";
-import { Button, inputCls } from "../components/ui";
+import { Button, inputCls, PasswordInput } from "../components/ui";
 import { LangSwitch } from "../components/lang-switch";
 import { ThemeToggle } from "../components/theme-toggle";
 import { useTranslation } from "react-i18next";
@@ -68,9 +68,9 @@ export default function Login() {
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-neutral-800">{t("login.password")}</span>
-            <input
+            <PasswordInput
+              label={t("login.password")}
               className={inputCls}
-              type="password"
               autoComplete="current-password"
               required
               value={password}

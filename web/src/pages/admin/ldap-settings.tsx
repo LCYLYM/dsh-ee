@@ -8,7 +8,7 @@ import { useAction, useApi } from "../../lib/use-api";
 import { useLabels } from "../../lib/labels";
 import { ErrorNote, LoadState } from "../../components/api-ui";
 import { Combobox } from "../../components/pickers";
-import { Badge, Button, cx, Field, inputBase, inputCls, Segmented, ToggleRow } from "../../components/ui";
+import { Badge, Button, cx, Field, inputBase, inputCls, PasswordInput, Segmented, ToggleRow } from "../../components/ui";
 
 const PRESETS = {
   openldap: {
@@ -191,9 +191,9 @@ export default function LdapSettings() {
             <input className={cx(inputCls, "font-mono")} value={form.bindDn} onChange={(e) => set({ bindDn: e.target.value })} autoComplete="off" />
           </Field>
           <Field label={t("ldapAdmin.bindPassword")}>
-            <input
+            <PasswordInput
+              label={t("ldapAdmin.bindPassword")}
               className={inputCls}
-              type="password"
               autoComplete="new-password"
               value={bindPassword}
               onChange={(e) => setBindPassword(e.target.value)}
@@ -331,9 +331,10 @@ export default function LdapSettings() {
           <input className={cx(inputBase, "w-48")} value={testUser} onChange={(e) => setTestUser(e.target.value)} autoComplete="off" />
         </Field>
         <Field label={t("ldapAdmin.testPassword")}>
-          <input
-            className={cx(inputBase, "w-48")}
-            type="password"
+          <PasswordInput
+            label={t("ldapAdmin.testPassword")}
+            className={inputBase}
+            containerClassName="w-48"
             value={testPassword}
             onChange={(e) => setTestPassword(e.target.value)}
             autoComplete="new-password"

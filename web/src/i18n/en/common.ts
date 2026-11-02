@@ -3,6 +3,8 @@ import type { Messages } from "../types";
 
 export default {
   common: {
+    revealSecret: "Show plain text",
+    hideSecret: "Hide plain text",
     loading: "Loading…",
     loadFailed: "Failed to load: {{error}}",
     retry: "Retry",

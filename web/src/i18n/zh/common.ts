@@ -1,6 +1,8 @@
 /** 通用词、应用外壳、页面默认名称。 */
 export default {
   common: {
+    revealSecret: "显示明文",
+    hideSecret: "隐藏明文",
     loading: "加载中…",
     loadFailed: "加载失败：{{error}}",
     retry: "重试",

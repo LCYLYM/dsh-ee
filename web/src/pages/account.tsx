@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAction } from "../lib/use-api";
 import { ErrorNote } from "../components/api-ui";
-import { Button, Card, Field, inputCls, PageHeader } from "../components/ui";
+import { Button, Card, Field, inputCls, PageHeader, PasswordInput } from "../components/ui";
 import { useTranslation } from "react-i18next";
 import { useLabels } from "../lib/labels";
 
@@ -77,13 +77,13 @@ export default function Account() {
           <form onSubmit={submit} className="space-y-4">
             <h2 className="text-base font-medium text-neutral-900">{t("account.changePassword")}</h2>
             <Field label={t("account.currentPassword")}>
-              <input className={inputCls} type="password" autoComplete="current-password" required value={oldPw} onChange={(e) => setOldPw(e.target.value)} />
+              <PasswordInput label={t("account.currentPassword")} className={inputCls} autoComplete="current-password" required value={oldPw} onChange={(e) => setOldPw(e.target.value)} />
             </Field>
             <Field label={t("account.newPassword")} hint={t("account.newPasswordHint")}>
-              <input className={inputCls} type="password" autoComplete="new-password" required value={newPw} onChange={(e) => setNewPw(e.target.value)} />
+              <PasswordInput label={t("account.newPassword")} className={inputCls} autoComplete="new-password" required value={newPw} onChange={(e) => setNewPw(e.target.value)} />
             </Field>
             <Field label={t("account.confirmPassword")}>
-              <input className={inputCls} type="password" autoComplete="new-password" required value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} />
+              <PasswordInput label={t("account.confirmPassword")} className={inputCls} autoComplete="new-password" required value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} />
             </Field>
             <ErrorNote>{error}</ErrorNote>
             <Button type="submit" disabled={busy || !oldPw || !newPw}>

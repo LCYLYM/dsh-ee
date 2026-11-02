@@ -7,7 +7,7 @@ import { useStore } from "../lib/store";
 import { useAuth } from "../lib/auth";
 import { useConfirm } from "@/lib/confirm";
 import { ErrorNote, LoadState } from "../components/api-ui";
-import { Badge, Button, Card, CardHeader, CopyBox, Field, inputCls, PageHeader } from "../components/ui";
+import { Badge, Button, Card, CardHeader, CopyBox, Field, inputCls, PageHeader, PasswordInput } from "../components/ui";
 
 const scopeOptions: TokenScope[] = ["models", "registry:read", "registry:publish", "hub", "connections", "agent"];
 
@@ -122,7 +122,7 @@ export default function MyTokens() {
           <form onSubmit={elevate} className="space-y-4 px-5 pb-5">
             <p className="text-sm text-neutral-600">{t("tokens.adminModeDesc", { name: data?.find((token) => token.id === elevating)?.name ?? elevating })}</p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label={t("tokens.adminPassword")}><input className={inputCls} type="password" autoComplete="current-password" required autoFocus value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+              <Field label={t("tokens.adminPassword")}><PasswordInput label={t("tokens.adminPassword")} className={inputCls} autoComplete="current-password" required autoFocus value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
               <Field label={t("tokens.adminDuration")}>
                 <div className="flex gap-4 pt-2 text-sm">
                   {([1, 8] as const).map((h) => <label key={h} className="flex items-center gap-1.5"><input type="radio" name="hours" checked={hours === h} onChange={() => setHours(h)} />{t("tokens.adminHours", { count: h })}</label>)}

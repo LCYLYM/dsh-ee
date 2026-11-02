@@ -11,7 +11,7 @@ import { ErrorNote, LoadState } from "../components/api-ui";
 import { ScopeEditor } from "../components/scope-editor";
 import { useScopeOptions } from "../components/scope-dialog";
 import { Combobox } from "../components/pickers";
-import { Badge, Button, Card, cx, Field, inputBase, inputCls, PageHeader, Segmented, ToggleRow } from "../components/ui";
+import { Badge, Button, Card, cx, Field, inputBase, inputCls, PageHeader, PasswordInput, Segmented, ToggleRow } from "../components/ui";
 import { PageLink } from "../lib/menus";
 
 const KINDS: AssetKind[] = ["skill", "prompt", "app", "connection"];
@@ -133,9 +133,9 @@ function ConnectionFields({ spec, set, secret, setSecret, secretHint }: { spec: 
             </Field>
           )}
           <Field label={t("connections.secret")} hint={t("connections.secretHint")}>
-            <input
+            <PasswordInput
+              label={t("connections.secret")}
               className={inputCls}
-              type="password"
               autoComplete="new-password"
               value={secret}
               onChange={(e) => setSecret(e.target.value)}
