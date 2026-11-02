@@ -2,7 +2,7 @@ import type { DshContext, PluginConfig } from "./dsh.js";
 import type { HttpClient } from "./http.js";
 import { installRequired } from "./plugins.js";
 
-export async function registerSkills(ctx: DshContext, config: PluginConfig, http: HttpClient): Promise<void> {
+export async function registerSkills(ctx: DshContext, config: PluginConfig, http: HttpClient): Promise<() => Promise<any>> {
   let catalog: any = { skills: [], required_plugins: [] };
   let etag = "";
   // 连不上 dsh-ee（没开 VPN、服务重启）时不抛错：技能来源照常注册，之后轮询自动恢复。
@@ -64,4 +64,8 @@ export async function registerSkills(ctx: DshContext, config: PluginConfig, http
       },
     };
   });
+  return async () => {
+    await refresh();
+    return catalog.brand ?? { enabled: true, name: config.org, logo_url: "", revision: "" };
+  };
 }

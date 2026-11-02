@@ -29,6 +29,9 @@ import (
 //go:embed connectpkg/index.js
 var connectIndexJS []byte
 
+//go:embed connectpkg/client.js
+var connectClientJS []byte
+
 const (
 	connectStateKey  = "connect_bundle"
 	connectTokenEnv  = "DSHEE_TOKEN"
@@ -92,6 +95,9 @@ func (s *Server) buildConnect(ctx context.Context, base, version string) (string
 		fmt.Fprintf(&p, "      config:\n        indexes:\n          - %s\n", yamlQuote(base+"/index/dsh-index.json"))
 		p.WriteString("    - id: ui-plugin-market\n      name: '@deepseek-ai/dsh-client-ui-plugin-market'\n")
 	}
+	if set.Brand.Enabled {
+		p.WriteString("- id: ui-brand-official\n  disabled: true\n")
+	}
 	var models []string
 	if set.Connect.Model {
 		ms, err := s.store.PublicModels(ctx)
@@ -132,9 +138,10 @@ dsh-ee：%s
 		map[bool]string{true: "- 通过 dsh-ee 的模型网关调用模型（额度按账号计算）；\n"}[len(models) > 0],
 		connectTokenEnv, base)
 
-	files := map[string][]byte{"index.js": connectIndexJS, "cordis.patch.yml": patch, "README.md": []byte(readme)}
+	clientJS := bytes.ReplaceAll(connectClientJS, []byte("__DSH_EE_PACKAGE__"), []byte(pkg))
+	files := map[string][]byte{"index.js": connectIndexJS, "client.js": clientJS, "cordis.patch.yml": patch, "README.md": []byte(readme)}
 	h := sha256.New()
-	for _, name := range []string{"index.js", "cordis.patch.yml", "README.md"} {
+	for _, name := range []string{"index.js", "client.js", "cordis.patch.yml", "README.md"} {
 		content := files[name]
 		if name == "cordis.patch.yml" {
 			content = bytes.ReplaceAll(content, []byte(version), []byte(""))
@@ -153,10 +160,20 @@ func connectManifest(pkg, version, org string) []byte {
 		"type":        "module",
 		"main":        "index.js",
 		"license":     "UNLICENSED",
-		"files":       []string{"index.js", "cordis.patch.yml", "README.md"},
+		"files":       []string{"index.js", "client.js", "cordis.patch.yml", "README.md"},
 		"keywords":    []string{"dsh-plugin", "dsh-ee"},
-		"dsh":         map[string]any{"bundle": map[string]any{"patch": "./cordis.patch.yml"}},
-		"dsh-ee":      map[string]any{"title": "DSH 接入插件", "category": "tools", "kind": "connector"},
+		"exports": map[string]any{
+			".":        map[string]any{"default": "./index.js"},
+			"./client": map[string]any{"default": "./client.js"},
+		},
+		"dsh": map[string]any{
+			"bundle": map[string]any{"patch": "./cordis.patch.yml"},
+			"client": map[string]any{
+				"inject":   []string{"@deepseek-ai/dsh-client-ui-renderer", "@deepseek-ai/dsh-client-ui-sidebar", "@deepseek-ai/dsh-api-remotes"},
+				"platform": "web",
+			},
+		},
+		"dsh-ee": map[string]any{"title": "DSH 接入插件", "category": "tools", "kind": "connector"},
 	}
 	b, _ := json.MarshalIndent(m, "", "  ")
 	return append(b, '\n')

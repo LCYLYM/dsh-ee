@@ -6,6 +6,7 @@ import { registerSkills } from "./skills.js";
 import { McpBridge } from "./bridge.js";
 import { registerApproval } from "./approval.js";
 import { registerDoctor } from "./doctor.js";
+import { registerBrand } from "./brand.js";
 import { uploadPackage } from "./upload.js";
 import type { DshContext, PluginConfig } from "./dsh.js";
 
@@ -30,7 +31,8 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
     await tokens.importPending();
     registerCommands(ctx, config, tokens);
     registerDoctor(ctx, config, tokens, http, bridge);
-    await registerSkills(ctx, config, http);
+    const readBrand = await registerSkills(ctx, config, http);
+    registerBrand(ctx, readBrand);
     await bridge.start();
     return () => bridge.stop();
   });
