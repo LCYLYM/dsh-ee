@@ -30,9 +30,9 @@
 | 清单字段：`version`、`files[].url / sha512 / size`、`releaseDate`。Mac 清单里只有 zip；当前版本 0.2.1-rc.5（2026-10-29） | 实测 |
 | 首次安装用的固定 DMG：`https://download.deepseek.com/desktop/dsh-latest-macos-{arm64,x64}.dmg`，只有 ETag，没有官方哈希 | 实测；发布文档「固定安装包下载」 |
 | 只有 Nightly 一个通道，没有 Linux Desktop | 发布文档 |
-| Desktop 自带的 `dsh` 在 `resources/runtime/cli/bin/dsh`：需要「先启动一次 Desktop 初始化 profile，完全退出，再运行 `dsh plugin --profile desktop add`」；profile 没初始化过时会拒绝 | Desktop README「内置命令运行时」 |
-| 自带的 Node 在 `resources/runtime/primary-runtime/dependencies/node/bin/node` | `apps/desktop/src/command-management.ts` |
-| 欢迎页只在「没登录官方账号，并且没有任何已配置的 `apiKeyEnv` 凭据」时出现 | `apps/desktop/src/welcome-api.ts`、`welcome-backend.ts` |
+| 真机应用为 `DeepSeek Harness.app`（`com.deepseek.dsh`），自带的 `dsh` 在 `Contents/Resources/runtime/cli/bin/dsh`：首次在设置页直接完全退出也会初始化 profile；未初始化时插件命令会拒绝并给出提示 | Desktop README；S-M2、S-M6 真机验证（2026-11-02） |
+| 自带的 Node 在 `Contents/Resources/runtime/primary-runtime/dependencies/node/bin/node` | `apps/desktop/src/command-management.ts`；S-M2 真机验证 |
+| 欢迎页只在「没登录官方账号，并且没有任何已配置的 `apiKeyEnv` 凭据」时出现；导入 `DSHEE_TOKEN` 后重开可直接进入工作区并完成企业模型对话 | `apps/desktop/src/welcome-api.ts`、`welcome-backend.ts`；S-M3 真机验证 |
 | 官方品牌插件只是占用这些位置。上游说明文档写明：使用其他品牌的部署，换一个占用同样位置的包。这些位置每个只能放一个，重复注册会报错 | `packages/client/ui-brand-official/README.zh.md`；`ui-slots/src/index.ts:1222` |
 | 插件换不了的：窗口标题（构建时的 `DSH_CLIENT_TITLE`）、应用名称和图标、「关于 DeepSeek Harness」菜单、欢迎页、更新弹窗 | 同上；Desktop README |
 | 品牌规范：不能用「DeepSeek Harness」全名，可以写「DSH」或「基于 DeepSeek Harness 构建」，不能暗示官方背书 | `BRAND_GUIDELINES.zh.md` |
@@ -143,11 +143,11 @@ DMG 另设一个 `kind = dmg` 的行：版本取下载时清单的 `version`，�
 | 编号 | 要验证的事 | 通过标准 | 不通过时的备选 |
 |---|---|---|---|
 | S-M1 ✅ 用户 2026-11-02 确认通过 | 树外组合包能关掉 `ui-brand-official`，并用自己的浏览器入口占用三个品牌位置；浏览器部分能拿到服务端部分的数据 | 侧栏和首屏显示测试 logo 和名称，控制台没有「already has a registration」报错 | 关不掉：问上游有没有官方做法 / 提 issue；拿不到数据：品牌写进包配置，换品牌时发新版插件 |
-| S-M2 | `.app` 的实际名称；`Contents/Resources/runtime/cli/bin/dsh` 和自带 node 的路径；Desktop 运行时执行 `plugin add` 会怎样 | 记下路径；运行中执行会被拒绝或给出明确提示 | 路径不固定时，用 `mdfind kMDItemCFBundleIdentifier=<appId>` 查找 |
-| S-M3 | 先把令牌写进凭据库并装好插件，重新打开 Desktop 能直接进工作区 | 不出现欢迎页 | 在下载页说明欢迎页怎么跳过 |
-| S-M4 | 自带 pnpm 能读到 `~/.npmrc` 里作用域对应的 registry 和 `_authToken`，从 dsh-ee 私有源装上接入插件 | `dsh plugin --profile desktop list` 里能看到插件 | 改为先下载 tarball 再本地安装（§5 备选） |
-| S-M5 | 浏览器从 dsh-ee 下载 zip、解压后，Gatekeeper 能正常打开（文件带 quarantine 标记，但应用已公证） | 双击就能打开，不提示「已损坏」 | 改为默认提供 DMG |
-| S-M6 | 第 ② 步首次打开时欢迎页的行为（直接 ⌘Q 会不会留下没初始化完的 profile） | 退出后 `profiles/desktop` 存在，S-M2 的安装能成功 | 引导改成「打开后在欢迎页随便填个 key 再退出」，或者等上游提供初始化命令 |
+| S-M2 ✅ 2026-11-02 真机通过 | 应用为 `DeepSeek Harness.app`，bundle id `com.deepseek.dsh`；内置 dsh 与 node 路径和设计一致 | 初始化后及 Desktop 运行中 `plugin --profile desktop list` 均成功 | 无需备选；未初始化时命令会明确提示先打开 Desktop |
+| S-M3 ✅ 2026-11-02 真机通过 | 令牌写入 `token.pending` 并重开 Desktop | 不出现官方登录欢迎页；令牌被导入；企业模型完成一轮对话 | 无需备选 |
+| S-M4 ✅ 2026-11-02 真机通过 | 自带 pnpm 读取隔离 `.npmrc` 中的作用域 registry 和 `_authToken`，从 dsh-ee 私有源安装 | `plugin list` 能看到 `@company/dsh-connect` | 直连成功，不采用 tarball 备选 |
+| S-M5 ✅ 2026-11-02 真机通过 | 同版本 Safari 下载应用带 quarantine；`spctl` 显示 `accepted / Notarized Developer ID` | 通过 `open --env` 用隔离配置启动，无 Gatekeeper 报错 | 无需备选；M1 后仍需从 dsh-ee 页面复验 |
+| S-M6 ✅ 2026-11-02 真机通过 | 首次打开停在设置页，直接 ⌘Q | 退出后 `profiles/desktop` 存在，`plugin list` 成功 | 无需备选；第 ② 步可直接退出 |
 
 S-M1 已通过；S-M2、S-M4 决定方案能不能成立，必须先做；S-M3、S-M5、S-M6 只影响引导文案。
 
