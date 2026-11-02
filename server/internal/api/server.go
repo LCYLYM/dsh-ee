@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/hikariming/dsh-ee/server/internal/rbac"
@@ -61,6 +62,12 @@ type Server struct {
 	connectKick chan struct{}
 	// 有令牌开启 / 结束管理模式后触发到期监控重算
 	elevationKick chan struct{}
+	releaseFeeds  map[string]string
+	releaseDMGs   map[string]string
+	releaseHTTP   *http.Client
+	releaseKick   chan struct{}
+	releaseMu     sync.Mutex
+	releaseJobs   map[string]bool
 	// 全部路由；Agent 工具也从这里取处理函数
 	routeTable []route
 	// 由路由表生成的 Agent 工具
@@ -81,6 +88,7 @@ func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Serv
 		}}
 	}
 	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), deviceCodeRate: newIPRate(deviceCodePerMinute), deviceTokenRate: newIPRate(deviceTokenPerMinute), upstream: up, connectKick: make(chan struct{}, 1), elevationKick: make(chan struct{}, 1)}
+	s.initDshReleases()
 	s.registry = s.newRegistry()
 	s.routeTable = s.routes()
 	s.agentTools = buildAgentTools(s.routeTable)
@@ -97,6 +105,7 @@ func (s *Server) newRegistry() *registry.Service {
 			return nil
 		}
 	}
+	s.opts.DataDir = dir
 	hc := s.opts.NpmUpstream
 	if hc == nil {
 		hc = &http.Client{Transport: &http.Transport{
@@ -250,10 +259,11 @@ func currentAccess(r *http.Request) *rbac.Access {
 
 func notFound(err error) bool { return errors.Is(err, store.ErrNotFound) }
 
-// RunBackground 跑定时任务：每小时核对一次 LDAP 目录；每 6 小时检查已预载插件的新版本（按系统设置自动同步或进入审核）。
+// RunBackground 跑定时任务：LDAP、插件更新、接入插件与 Desktop 版本同步。
 func (s *Server) RunBackground(ctx context.Context) {
 	go s.runLDAPSync(ctx)
 	go s.runElevationExpiry(ctx)
+	go s.runDshReleases(ctx)
 	if s.registry == nil {
 		return
 	}

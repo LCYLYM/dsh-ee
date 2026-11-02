@@ -117,6 +117,18 @@ func (s *Store) UpdateDshReleaseState(ctx context.Context, id int64, state, loca
 	return err
 }
 
+func (s *Store) UpdateDshReleaseMetadata(ctx context.Context, r *DshRelease) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE dsh_releases SET released_at = ?, file = ?, size = ?, sha512 = ?, upstream_url = ?
+		WHERE id = ? AND state IN ('available', 'failed')`, r.ReleasedAt, r.File, r.Size, r.SHA512, r.UpstreamURL, r.ID)
+	return err
+}
+
+func (s *Store) FinishDshRelease(ctx context.Context, id, size int64, sha512, localPath string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE dsh_releases SET state = 'mirrored', size = ?, sha512 = ?, local_path = ?, error = NULL, mirrored_at = ? WHERE id = ?`,
+		size, sha512, localPath, now(), id)
+	return err
+}
+
 func (s *Store) SetDshReleaseRecommended(ctx context.Context, id int64) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
