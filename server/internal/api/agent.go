@@ -88,6 +88,7 @@ var agentExcluded = map[string]string{
 	"POST /api/device/{user_code}":   "授权必须由人在浏览器完成，Agent 不能替自己授权",
 	"POST /api/dsh/logout":           "接入插件的退出登录",
 	"GET /api/me/menus":              "网页菜单",
+	"GET /api/me/dsh-clients":        "下载页轮询 Desktop 接入状态",
 	"GET /api/me/keys":               "旧版 key 由网页管理",
 	"POST /api/me/keys":              "旧版 key 由网页管理，明文不进模型上下文",
 	"DELETE /api/me/keys/{id}":       "旧版 key 由网页管理",
@@ -182,7 +183,7 @@ func (s *Server) requireAgent(next http.Handler) http.Handler {
 			writeErr(w, http.StatusUnauthorized, "请先登录")
 			return
 		}
-		p, err := s.resolveBearer(r.Context(), token, clientIP(r))
+		p, err := s.resolveBearer(r.Context(), token, clientIP(r), r.Header.Get("X-DshEE-Client"), r.Header.Get("X-DshEE-Host"))
 		if err != nil {
 			if be, ok := err.(bearerError); ok {
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "登录已失效，请重新登录", "code": string(be)})

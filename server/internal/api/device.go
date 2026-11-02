@@ -266,7 +266,7 @@ func (s *Server) handleDshLogout(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "缺少接入令牌", "code": tokenInvalid})
 		return
 	}
-	p, err := s.resolveBearer(r.Context(), token, clientIP(r))
+	p, err := s.resolveBearer(r.Context(), token, clientIP(r), r.Header.Get("X-DshEE-Client"), r.Header.Get("X-DshEE-Host"))
 	if err != nil {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "接入令牌无效", "code": tokenInvalid})
 		return

@@ -1,5 +1,11 @@
 import type { TokenManager } from "./token.js";
 
+export function dshHost(versions: Record<string, string | undefined> = process.versions as unknown as Record<string, string | undefined>): string {
+  const electron = versions.electron;
+  if (!electron) return "cli";
+  return `desktop/${process.env.DSH_DESKTOP_VERSION || process.env.DSH_VERSION || electron}`;
+}
+
 export class HttpClient {
   constructor(private tokens: TokenManager) {}
 
@@ -7,8 +13,10 @@ export class HttpClient {
     const current = await this.tokens.resolve();
     const headers = new Headers(init.headers);
     if (current?.value) headers.set("Authorization", `Bearer ${current.value}`);
-    const base = (this.tokens as any).config.base;
-    const response = await fetch(`${base}${path}`, { ...init, headers });
+    const config = (this.tokens as any).config;
+    if (!headers.has("X-DshEE-Client")) headers.set("X-DshEE-Client", `dsh-connect/${config.version || "dev"}`);
+    if (!headers.has("X-DshEE-Host")) headers.set("X-DshEE-Host", dshHost());
+    const response = await fetch(`${config.base}${path}`, { ...init, headers });
     if (response.status === 401 && current?.value) {
       const body = await response.clone().json().catch(() => null) as { code?: string } | null;
       if (body?.code?.startsWith("token_")) await this.tokens.invalidate(current.value);

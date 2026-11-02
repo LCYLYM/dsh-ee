@@ -85,7 +85,7 @@ func (s *Server) auditAs(r *http.Request, u *store.User, action, target string, 
 			a.Detail[k] = v
 		}
 	} else if token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
-		if p, err := s.resolveBearer(r.Context(), token, clientIP(r)); err == nil {
+		if p, err := s.resolveBearer(r.Context(), token, clientIP(r), r.Header.Get("X-DshEE-Client"), r.Header.Get("X-DshEE-Host")); err == nil {
 			a.Via = "token"
 			a.Client = p.Client
 			if p.TokenID > 0 {

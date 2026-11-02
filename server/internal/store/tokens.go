@@ -30,6 +30,8 @@ type AccessToken struct {
 	ClientOS          string     `json:"client_os"`
 	ClientVersion     string     `json:"client_version"`
 	LastUsedAt        *time.Time `json:"last_used_at"`
+	LastClient        string     `json:"last_client"`
+	LastHost          string     `json:"last_host"`
 	LastIP            string     `json:"last_ip"`
 	RevokedAt         *time.Time `json:"revoked_at"`
 	CreatedBy         int64      `json:"created_by"`
@@ -38,7 +40,7 @@ type AccessToken struct {
 
 const accessTokenColumns = `t.id, t.user_id, t.name, t.prefix, t.token_hash, t.source, t.scopes, t.monthly_token_limit,
 	t.allowed_models, t.expires_at, t.sliding_days, t.admin_until, t.client_name, t.client_os, t.client_version,
-	t.last_used_at, t.last_ip, t.revoked_at, t.created_by, t.created_at`
+	t.last_used_at, t.last_client, t.last_host, t.last_ip, t.revoked_at, t.created_by, t.created_at`
 
 func scanAccessToken(row interface{ Scan(...any) error }, joined ...any) (*AccessToken, error) {
 	var t AccessToken
@@ -49,7 +51,7 @@ func scanAccessToken(row interface{ Scan(...any) error }, joined ...any) (*Acces
 	err := row.Scan(append([]any{
 		&t.ID, &t.UserID, &t.Name, &t.Prefix, &t.TokenHash, &t.Source, &scopes, &limit,
 		&models, &expires, &sliding, &adminUntil, &t.ClientName, &t.ClientOS, &t.ClientVersion,
-		&used, &t.LastIP, &revoked, &t.CreatedBy, &t.CreatedAt,
+		&used, &t.LastClient, &t.LastHost, &t.LastIP, &revoked, &t.CreatedBy, &t.CreatedAt,
 	}, joined...)...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -143,17 +145,45 @@ func (s *Store) AccessTokenByID(ctx context.Context, id int64) (*AccessToken, er
 		 FROM access_tokens t JOIN users u ON u.id = t.user_id WHERE t.id = ?`, id), new(string), new(string), new(string))
 }
 
-func (s *Store) TouchAccessToken(ctx context.Context, id int64, ip string) error {
+func (s *Store) TouchAccessToken(ctx context.Context, id int64, ip string, clientHost ...string) error {
 	t := now()
-	// 滑动续期：剩余有效期比完整窗口少一天以上才续，经常使用的令牌每天最多续一次，
-	// 不必每个请求都改 expires_at。（不能按 last_used_at 判断：它每分钟都会刷新。）
+	client, host := "", ""
+	if len(clientHost) > 0 {
+		client = clientHost[0]
+	}
+	if len(clientHost) > 1 {
+		host = clientHost[1]
+	}
+	cutoff := t.Add(-time.Minute)
+	// 滑动续期每天最多写一次；活跃时间、IP 与插件宿主共用每分钟一次的写入窗口。
 	_, err := s.db.ExecContext(ctx, `UPDATE access_tokens SET
 		expires_at = IF(sliding_days IS NOT NULL AND (expires_at IS NULL OR expires_at < DATE_SUB(DATE_ADD(?, INTERVAL sliding_days DAY), INTERVAL 1 DAY)),
 			DATE_ADD(?, INTERVAL sliding_days DAY), expires_at),
 		last_ip = IF(? <> '' AND (last_ip = '' OR last_used_at IS NULL OR last_used_at < ?), ?, last_ip),
+		last_client = IF(? <> '' AND (last_used_at IS NULL OR last_used_at < ?), ?, last_client),
+		last_host = IF(? <> '' AND (last_used_at IS NULL OR last_used_at < ?), ?, last_host),
 		last_used_at = IF(last_used_at IS NULL OR last_used_at < ?, ?, last_used_at)
-		WHERE id = ? AND revoked_at IS NULL`, t, t, ip, t.Add(-time.Minute), ip, t.Add(-time.Minute), t, id)
+		WHERE id = ? AND revoked_at IS NULL`, t, t, ip, cutoff, ip, client, cutoff, client, host, cutoff, host, cutoff, t, id)
 	return err
+}
+
+func (s *Store) ListActiveDshClients(ctx context.Context, userID int64, since time.Time) ([]*AccessToken, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+accessTokenColumns+` FROM access_tokens t
+		WHERE t.user_id = ? AND t.revoked_at IS NULL AND t.last_used_at >= ? AND t.last_client LIKE 'dsh-connect/%'
+		ORDER BY t.last_used_at DESC LIMIT 50`, userID, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*AccessToken
+	for rows.Next() {
+		item, err := scanAccessToken(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) ListUserTokens(ctx context.Context, userID int64) ([]*AccessToken, error) {

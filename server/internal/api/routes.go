@@ -94,6 +94,7 @@ func (s *Server) routes() []route {
 		prm("GET /api/me/connections", s.handleMyConnections, rbac.PortalView),
 		prm("POST /api/me/connection-requests", s.handleCreateConnectionRequest, rbac.PortalView),
 		prm("GET /api/me/doctor", s.handleMyDoctor, rbac.PortalView),
+		prm("GET /api/me/dsh-clients", s.handleMyDshClients, rbac.PortalView),
 
 		// 用户（分配额度、分发 key、分配角色的页面也需要列出用户）
 		prm("GET /api/admin/users", s.handleListUsers, rbac.UsersView, rbac.UsersManage, rbac.QuotasManage, rbac.KeysManage, rbac.RolesManage),
