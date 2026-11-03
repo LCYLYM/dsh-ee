@@ -42,7 +42,7 @@ Go 写的 dsh-ee 服务端。目前实现：
 - **技能、提示词、微应用**：存在 `assets` / `asset_versions`；员工提交的版本在白名单模式下要审核。DSH 通过 `GET /api/dsh/catalog`（带 ETag，没变化回 304）拿到自己此刻应有的目录，`GET /api/dsh/skills/{name}` 取正文。提示词与微应用以「只给人调用」的 skill 下发（DSH 里输入 `/名字`）。
 - **企业连接（MCP 网关）**：`/mcp` 是一个 Streamable HTTP MCP 服务，聚合员工有权使用的全部连接，工具名 `<连接>__<工具>`。上游可以是 MCP 服务，也可以是导入的 OpenAPI 文档（每个操作一个工具，写操作默认关闭）。凭据用主密钥加密存在 dsh-ee，按员工逐次校验后带上凭据转发，调用记入 `connection_calls`。GET `/mcp` 打开事件流，能力目录变化时推 `notifications/tools/list_changed`。
 - **DSH 接入插件**：dsh-ee 按系统设置生成 `<主作用域>/dsh-connect`（远程技能来源、插件内 MCP 桥、可选模型提供方与插件索引、自动安装必装插件），内容变化时自动发布新版本。插件每次请求现取 DSH 凭据库中的 `DSHEE_TOKEN`，支持 `/ee-login`、`/ee-status`、`/ee-logout`，失效时清理旧凭据并同步 npm 配置。
-- **一键接入**：macOS / Linux 执行 `curl -fsSL <dsh-ee>/setup.sh | sh`，Windows 执行 `irm <dsh-ee>/setup.ps1 | iex`。脚本走设备码登录，写 `~/.npmrc` 与权限为 0600 的 `$DSH_HOME/dsh-ee/token.pending`，插件首次启动将令牌导入凭据库后删除待导入文件。`setup.sh --token <令牌>` 或 `DSH_EE_TOKEN` 保留手动 / CI 流程，并继续写 `$DSH_HOME/.env`。服务地址由 `DSH_EE_PUBLIC_URL` 或请求地址决定。
+- **一键接入**：macOS / Linux 执行 `curl -fsSL <dsh-ee>/setup.sh | sh`，Windows 执行 `irm <dsh-ee>/setup.ps1 | iex`。脚本走设备码登录，把 npm 源与令牌写进 DSH profile 目录的 `.npmrc`（`$DSH_HOME/profiles/<profile>/.npmrc`，DSH 跑 pnpm 时的工作目录；不改 `~/.npmrc`，`DSH_EE_GLOBAL_NPMRC=1` 时才额外写全局），以及权限为 0600 的 `$DSH_HOME/dsh-ee/token.pending`，插件首次启动将令牌导入凭据库后删除待导入文件。`setup.sh --token <令牌>` 或 `DSH_EE_TOKEN` 保留手动 / CI 流程，并继续写 `$DSH_HOME/.env`。服务地址由 `DSH_EE_PUBLIC_URL` 或请求地址决定。不想用终端的员工可以在 DSH 插件页「添加插件」里粘贴免登录地址 `<dsh-ee>/dl/connect/dsh-connect-<版本>.tgz`（接入指南页显示），接入插件登录后自己维护 profile 的 `.npmrc`。
 - **升级与回滚**：升级数据库会自动新增令牌表和列，原主密钥必须保留。回滚到旧服务端后 `ee_at_` 不可用，需要改回旧 `ee_npm_` / `sk-ee-`；旧版会忽略新增表和列。
 - 已知限制：镜像的上游包不带 npm 签名，经 dsh-ee 下载并校验签名的工具（如 corepack 自动下载 pnpm）会失败；请先装好 pnpm 再运行接入脚本。
 

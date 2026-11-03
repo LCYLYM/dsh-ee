@@ -60,19 +60,41 @@ function normalizeConfig(input) {
     serverName: input.serverName || "ee",
     tokenRef: input.tokenRef || "DSHEE_TOKEN",
     autoInstall: input.autoInstall !== false,
-    version: input.version || "dev"
+    version: input.version || "dev",
+    scopes: Array.isArray(input.scopes) ? input.scopes.filter((s) => typeof s === "string" && s.startsWith("@")) : []
   };
 }
 function dshHome() {
   return process.env.DSH_HOME || path.join(os.homedir(), ".dsh");
 }
-function npmrcPath() {
+function npmrcPath(ctx) {
+  const dir = ctx.get("profileContext")?.dir;
+  if (typeof dir === "string" && dir) return path.join(dir, ".npmrc");
   return process.env.NPM_CONFIG_USERCONFIG || path.join(os.homedir(), ".npmrc");
+}
+function npmrcEntries(config, token) {
+  const registry = `${config.base}/npm/`;
+  const entries = /* @__PURE__ */ new Map();
+  for (const scope of config.scopes) entries.set(`${scope}:registry`, registry);
+  entries.set(`${registry.replace(/^https?:/, "")}:_authToken`, token);
+  return entries;
 }
 
 // src/token.ts
 import fs from "node:fs";
 import path2 from "node:path";
+function npmrcState(ctx, config, token) {
+  const file = npmrcPath(ctx);
+  if (!fs.existsSync(file)) return "missing";
+  const lines = new Map(fs.readFileSync(file, "utf8").split(/\r?\n/).filter((l) => l.includes("=")).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
+  let state = "ok";
+  for (const [key, value] of npmrcEntries(config, token)) {
+    const have = lines.get(key);
+    if (have === void 0) return "missing";
+    if (have !== value) state = "mismatch";
+  }
+  return state;
+}
 var TokenManager = class {
   constructor(ctx, config) {
     this.ctx = ctx;
@@ -108,30 +130,21 @@ var TokenManager = class {
     await this.unset();
     return true;
   }
+  /** 把企业作用域与令牌写进 profile 的 .npmrc，其它行原样保留；内容没变就不写。返回是否改动了文件。 */
   async syncNpmrc(token) {
-    const file = npmrcPath();
-    const registry = `${this.config.base}/npm/`;
-    const key = `${registry.replace(/^https?:/, "")}:_authToken`;
-    const lines = fs.existsSync(file) ? fs.readFileSync(file, "utf8").split(/\r?\n/) : [];
-    let found = false;
-    const next = lines.map((line) => {
-      if (line.startsWith(`${key}=`)) {
-        found = true;
-        return `${key}=${token}`;
-      }
-      return line;
-    });
-    if (!found) next.push(`${key}=${token}`);
+    const file = npmrcPath(this.ctx);
+    const entries = npmrcEntries(this.config, token);
+    const before = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+    const kept = before.split(/\r?\n/).filter((line) => line && !entries.has(line.split("=", 1)[0]));
+    const after = [...kept, ...[...entries].map(([key, value]) => `${key}=${value}`)].join("\n") + "\n";
+    if (after === before) return false;
     fs.mkdirSync(path2.dirname(file), { recursive: true });
-    fs.writeFileSync(file, `${next.filter((line, index) => line || index < next.length - 1).join("\n")}
-`, { mode: 384 });
+    fs.writeFileSync(file, after, { mode: 384 });
+    fs.chmodSync(file, 384);
     return true;
   }
   async npmrcMatches(token) {
-    const file = npmrcPath();
-    if (!fs.existsSync(file)) return false;
-    const key = `${this.config.base}/npm/`.replace(/^https?:/, "") + ":_authToken";
-    return fs.readFileSync(file, "utf8").split(/\r?\n/).some((line) => line === `${key}=${token}`);
+    return npmrcState(this.ctx, this.config, token) === "ok";
   }
 };
 
@@ -571,7 +584,6 @@ ${need.preview}` : "";
 }
 
 // src/doctor.ts
-import fs2 from "node:fs";
 function compareVersions(a, b) {
   const parse = (v) => {
     const [core, pre] = v.replace(/^v/, "").split("-", 2);
@@ -587,14 +599,6 @@ function compareVersions(a, b) {
   if (!x.pre) return 1;
   if (!y.pre) return -1;
   return x.pre < y.pre ? -1 : 1;
-}
-function npmrcState(config, token) {
-  const file = npmrcPath();
-  if (!fs2.existsSync(file)) return "missing";
-  const key = `${config.base}/npm/`.replace(/^https?:/, "") + ":_authToken";
-  const line = fs2.readFileSync(file, "utf8").split(/\r?\n/).find((l) => l.startsWith(`${key}=`));
-  if (line === void 0) return "missing";
-  return line === `${key}=${token}` ? "ok" : "mismatch";
 }
 async function runLocalDoctor(ctx, config, tokens, http, bridge) {
   const checks = [];
@@ -620,13 +624,13 @@ async function runLocalDoctor(ctx, config, tokens, http, bridge) {
     reachable = false;
     add({ id: "token", status: "fail", title: `\u8FDE\u4E0D\u4E0A dsh-ee\uFF08${config.base}\uFF09`, fix: "\u68C0\u67E5\u7F51\u7EDC\u6216 VPN\uFF1Bdsh-ee \u91CD\u542F\u65F6\u7A0D\u7B49\u518D\u8BD5" });
   }
-  const npmrc = npmrcState(config, current.value);
-  add(npmrc === "ok" ? { id: "npmrc", status: "ok", title: ".npmrc \u91CC\u7684\u4F01\u4E1A\u6E90\u4EE4\u724C\u4E0E\u5F53\u524D\u767B\u5F55\u4E00\u81F4" } : {
+  const npmrc = npmrcState(ctx, config, current.value);
+  add(npmrc === "ok" ? { id: "npmrc", status: "ok", title: "DSH \u7684 .npmrc \u91CC\u4F01\u4E1A\u6E90\u914D\u7F6E\u4E0E\u5F53\u524D\u767B\u5F55\u4E00\u81F4", detail: npmrcPath(ctx) } : {
     id: "npmrc",
     status: "warn",
-    title: npmrc === "missing" ? ".npmrc \u91CC\u6CA1\u6709\u4F01\u4E1A npm \u6E90\u7684\u4EE4\u724C" : ".npmrc \u91CC\u7684\u4F01\u4E1A\u6E90\u4EE4\u724C\u4E0E\u5F53\u524D\u767B\u5F55\u4E0D\u4E00\u81F4",
-    detail: "\u88C5\u4F01\u4E1A\u63D2\u4EF6\u4F1A\u56E0 401 \u5931\u8D25",
-    fix: "\u91CD\u65B0\u767B\u5F55\u4F1A\u81EA\u52A8\u540C\u6B65\uFF1B\u4E5F\u53EF\u4EE5\u53EA\u6539 .npmrc \u91CC `_authToken` \u90A3\u4E00\u884C"
+    title: npmrc === "missing" ? "DSH \u7684 .npmrc \u91CC\u7F3A\u5C11\u4F01\u4E1A npm \u6E90\u914D\u7F6E" : "DSH \u7684 .npmrc \u91CC\u4F01\u4E1A\u6E90\u4EE4\u724C\u4E0E\u5F53\u524D\u767B\u5F55\u4E0D\u4E00\u81F4",
+    detail: `${npmrcPath(ctx)}\uFF1B\u88C5\u4F01\u4E1A\u63D2\u4EF6\u4F1A\u56E0 401 \u5931\u8D25`,
+    fix: "\u91CD\u542F DSH \u6216\u91CD\u65B0\u767B\u5F55\u4F1A\u81EA\u52A8\u540C\u6B65"
   });
   if (!reachable) return { summary: summarize(checks), checks };
   let models = [];
@@ -649,7 +653,7 @@ async function runLocalDoctor(ctx, config, tokens, http, bridge) {
       add({ id: "default_model", status: "warn", title: `\u4F01\u4E1A\u9ED8\u8BA4\u6A21\u578B ${server.default_model} \u4E0D\u5728\u4F60\u7684\u53EF\u7528\u5217\u8868\u91CC`, fix: "\u5728 DSH \u91CC\u6539\u9009\u53EF\u7528\u7684\u6A21\u578B" });
     }
     if (server.connect_version && config.version !== "dev") {
-      add(compareVersions(server.connect_version, config.version) > 0 ? { id: "plugin_version", status: "warn", title: `\u63A5\u5165\u63D2\u4EF6\u6709\u65B0\u7248\u672C ${server.connect_version}\uFF08\u5F53\u524D ${config.version}\uFF09`, fix: "\u5728 DSH \u63D2\u4EF6\u9875\u66F4\u65B0\u63A5\u5165\u63D2\u4EF6\uFF0C\u7136\u540E\u91CD\u542F DSH" } : { id: "plugin_version", status: "ok", title: `\u63A5\u5165\u63D2\u4EF6 ${config.version} \u5DF2\u662F\u6700\u65B0` });
+      add(compareVersions(server.connect_version, config.version) > 0 ? { id: "plugin_version", status: "warn", title: `\u63A5\u5165\u63D2\u4EF6\u6709\u65B0\u7248\u672C ${server.connect_version}\uFF08\u5F53\u524D ${config.version}\uFF09`, fix: `\u5728 DSH \u63D2\u4EF6\u9875\u66F4\u65B0\u63A5\u5165\u63D2\u4EF6\uFF08\u5F53\u521D\u662F\u7C98\u8D34\u5730\u5740\u5B89\u88C5\u7684\uFF0C\u5C31\u5728\u300C\u6DFB\u52A0\u63D2\u4EF6\u300D\u91CC\u8F93\u5165 ${config.scopes[0] ?? "@\u4F01\u4E1A\u4F5C\u7528\u57DF"}/dsh-connect \u91CD\u65B0\u6DFB\u52A0\uFF09\uFF0C\u7136\u540E\u91CD\u542F DSH` } : { id: "plugin_version", status: "ok", title: `\u63A5\u5165\u63D2\u4EF6 ${config.version} \u5DF2\u662F\u6700\u65B0` });
     }
     const manager = ctx.get("pluginManager");
     if (manager && (server.required_plugins ?? []).length) {
@@ -2740,7 +2744,7 @@ function registerBrand(ctx, readBrand) {
 }
 
 // src/upload.ts
-import fs3 from "node:fs";
+import fs2 from "node:fs";
 import os3 from "node:os";
 import path3 from "node:path";
 var MAX_BYTES = 128 * 1024 * 1024;
@@ -2754,7 +2758,7 @@ async function uploadPackage(http, args) {
   if (!/\.(tgz|tar\.gz)$/i.test(file)) return fail("\u53EA\u80FD\u4E0A\u4F20 npm pack \u751F\u6210\u7684 .tgz \u6587\u4EF6");
   let stat;
   try {
-    stat = fs3.statSync(file);
+    stat = fs2.statSync(file);
   } catch {
     return fail(`\u627E\u4E0D\u5230\u6587\u4EF6\uFF1A${file}`);
   }
@@ -2765,7 +2769,7 @@ async function uploadPackage(http, args) {
     response = await http.fetch("/api/agent/packages", {
       method: "POST",
       headers: { "content-type": "application/octet-stream" },
-      body: fs3.readFileSync(file)
+      body: fs2.readFileSync(file)
     });
   } catch {
     return fail("\u8FDE\u4E0D\u4E0A dsh-ee\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u6216 VPN");
@@ -2793,6 +2797,8 @@ function apply(ctx, input) {
   registerApproval(ctx, bridge);
   ctx.effect(async () => {
     await tokens.importPending();
+    const current = await tokens.resolve();
+    if (current?.value) await tokens.syncNpmrc(current.value).catch(() => false);
     registerCommands(ctx, config, tokens);
     registerDoctor(ctx, config, tokens, http, bridge);
     const readBrand = await registerSkills(ctx, config, http);

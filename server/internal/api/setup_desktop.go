@@ -1,22 +1,11 @@
 package api
 
-import (
-	"net/http"
-	"strings"
-)
+import "net/http"
 
 const desktopAppName = "DeepSeek Harness"
 
 func (s *Server) desktopShell(r *http.Request) string {
 	pkg, _ := s.connectSetup(r)
-	set, err := s.appSettings(r.Context())
-	if err != nil {
-		return ""
-	}
-	var scopes []string
-	for _, scope := range set.CompanyScopes() {
-		scopes = append(scopes, shellQuote(scope))
-	}
 	return `
 # macOS 已安装 Desktop 时，使用它自带的 Node 与 dsh，不要求系统安装 npm / pnpm。
 if [ "$(uname -s)" = "Darwin" ]; then
@@ -57,31 +46,12 @@ if [ "$(uname -s)" = "Darwin" ]; then
       "$DSH_NODE" -e ` + shellQuote(setupDeviceJS) + `
       TOKEN=$(cat "$PENDING_FILE")
     fi
-    NPMRC="$HOME/.npmrc"
-    touch "$NPMRC"
-    chmod 600 "$NPMRC"
-    grep -vF 'registry=' "$NPMRC" > "$NPMRC.tmp" || true
-    grep -F ':registry=' "$NPMRC" >> "$NPMRC.tmp" || true
-    for scope in ` + strings.Join(scopes, " ") + `; do
-      grep -vF "$scope:registry=" "$NPMRC.tmp" > "$NPMRC.tmp2" || true
-      mv "$NPMRC.tmp2" "$NPMRC.tmp"
-    done
-    grep -vF "$AUTH_KEY=" "$NPMRC.tmp" > "$NPMRC.tmp2" || true
-    mv "$NPMRC.tmp2" "$NPMRC.tmp"
-    {
-      printf '%s=%s\n' 'registry' "$REGISTRY"
-      for scope in ` + strings.Join(scopes, " ") + `; do
-        printf '%s:registry=%s\n' "$scope" "$REGISTRY"
-      done
-      printf '%s=%s\n' "$AUTH_KEY" "$TOKEN"
-    } >> "$NPMRC.tmp"
-    mv "$NPMRC.tmp" "$NPMRC"
-    chmod 600 "$NPMRC"
-    echo "✔ 已写入 ~/.npmrc：Desktop 自带 pnpm 从 $REGISTRY 安装"
-    if ! curl -fsS -H "Authorization: Bearer $TOKEN" "$BASE/api/dsh/whoami" >/dev/null; then
+    if ! check_token; then
       echo "✘ 令牌无效或连不上 dsh-ee，请检查后重试" >&2
       exit 1
     fi
+    write_profile_npmrc "$DSH_DIR/profiles/desktop"
+    hint_global_npmrc
     if [ "$DEVICE_LOGIN" -eq 0 ]; then
       ENV_FILE="$DSH_DIR/.env"
       mkdir -p "$DSH_DIR"

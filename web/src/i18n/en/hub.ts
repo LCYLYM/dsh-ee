@@ -229,7 +229,7 @@ export default {
   },
   setupConnect: {
     title: "Connect DSH",
-    desc: "One command sets up the npm registry and token, writes the token to DSH's .env, and installs the connect plugin {{pkg}}. After that, whatever you enable in the hub syncs automatically.",
+    desc: "One command writes the npm registry and token into DSH's own .npmrc (your ~/.npmrc and local npm are left alone), signs you in and installs the connect plugin {{pkg}}. After that, whatever you enable in the hub syncs automatically.",
     notReady: "An admin hasn't published the DSH connect plugin yet; run the script now to set up the registry, and run it again once it's published.",
     ready: "Connect plugin {{pkg}}@{{version}} is published",
     needs: "Requires Node.js, pnpm and DSH (or npx) on this machine.",
@@ -238,6 +238,8 @@ export default {
     manualAdd: "2. Install the connect plugin:",
     manualRestart: "3. Restart DSH (dsh web).",
     tokenNote: "The access token is the npm token you generate below; it's used for the npm registry, models, skills and internal systems.",
+    tarballTitle: "Prefer not to use a terminal?",
+    tarballDesc: "On the DSH plugins page, click Add plugin and paste the address below. After restarting DSH, type /ee-login to sign in; the connect plugin then sets up the company npm registry by itself.",
   },
   reviewAssets: {
     plugins: "Plugins",

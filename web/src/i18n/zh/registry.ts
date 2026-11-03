@@ -88,7 +88,7 @@ export default {
       tokenNamePlaceholder: "例如「我的笔记本」",
       tokenOnce: "完整令牌只显示这一次，下面的命令已经自动填好：",
       revokeConfirm: "吊销「{{name}}」后，用它的电脑会立即无法从企业源安装，确定吗？",
-      scriptNpmrc: "用 npm config 把 registry 与企业作用域指向 dsh-ee，并写入你的令牌（~/.npmrc，npm 与 pnpm 都读它）",
+      scriptNpmrc: "把 registry、企业作用域与你的令牌写进 DSH profile 目录的 .npmrc（只对 DSH 生效，不改 ~/.npmrc；确实要全局生效时运行前设置 DSH_EE_GLOBAL_NPMRC=1）",
       scriptIndex: "提示你在 DSH 插件页 → Discover 里添加索引源：",
       caDesc: "dsh-ee 用的是企业自签证书时，向管理员要 CA 证书（保存为 ~/.dsh-ee-ca.pem），再执行：",
     },

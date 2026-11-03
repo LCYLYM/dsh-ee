@@ -43,15 +43,21 @@ test("invalidate only clears the failed token", async () => {
   assert.equal(ctx.values.has("DSHEE_TOKEN"), false);
 });
 
-test("npmrc update preserves other lines", async () => {
+test("npmrc 写进 profile 目录：保留其它行，替换令牌，补上作用域，不碰 ~/.npmrc", async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "ee-npmrc-"));
   process.env.HOME = home;
-  const file = path.join(home, ".npmrc");
+  const profile = path.join(home, ".dsh", "profiles", "desktop");
+  fs.mkdirSync(profile, { recursive: true });
+  const file = path.join(profile, ".npmrc");
   fs.writeFileSync(file, "registry=https://npm.example\n//localhost/npm/:_authToken=old\n");
-  const tokens = new TokenManager(context() as any, normalizeConfig({ base: "http://localhost" }));
-  await tokens.syncNpmrc("new");
-  const body = fs.readFileSync(file, "utf8");
-  assert.ok(body.includes("registry=https://npm.example"));
-  assert.ok(body.includes("//localhost/npm/:_authToken=new"));
+  const ctx = { ...context(), get(name: string) { return name === "profileContext" ? { dir: profile } : undefined; } };
+  const tokens = new TokenManager(ctx as any, normalizeConfig({ base: "http://localhost", scopes: ["@acme", "@lab"] }));
+  assert.equal(await tokens.npmrcMatches("new"), false);
+  assert.equal(await tokens.syncNpmrc("new"), true);
+  assert.equal(fs.readFileSync(file, "utf8"),
+    "registry=https://npm.example\n@acme:registry=http://localhost/npm/\n@lab:registry=http://localhost/npm/\n//localhost/npm/:_authToken=new\n");
+  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
   assert.equal(await tokens.npmrcMatches("new"), true);
+  assert.equal(await tokens.syncNpmrc("new"), false, "内容没变不应重写");
+  assert.equal(fs.existsSync(path.join(home, ".npmrc")), false);
 });

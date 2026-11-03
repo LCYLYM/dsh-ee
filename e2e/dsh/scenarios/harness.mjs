@@ -175,8 +175,9 @@ export async function setupDevice(script, env, employee) {
   return output
 }
 
-export function npmrcToken(env) {
-  const file = env.NPM_CONFIG_USERCONFIG
+// 接入脚本与接入插件只写 DSH profile 目录的 .npmrc，不写用户级 ~/.npmrc
+export function npmrcToken(env, profile = 'web') {
+  const file = path.join(env.DSH_HOME, 'profiles', profile, '.npmrc')
   if (!fs.existsSync(file)) return ''
   return fs.readFileSync(file, 'utf8').match(/_authToken=(ee_at_\S+)/)?.[1] ?? ''
 }

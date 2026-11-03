@@ -47,8 +47,14 @@ exit 1`+"\n")
 		t.Fatal(err)
 	}
 	npmrc := filepath.Join(home, ".npmrc")
-	original := "foo=bar\n@other:registry=https://other.example/npm/\nregistry=https://old.example/npm/\n@company:registry=https://old.example/npm/\n"
+	original := "foo=bar\n@other:registry=https://other.example/npm/\nregistry=" + ts.URL + "/npm/\n@company:registry=https://old.example/npm/\n"
 	if err := os.WriteFile(npmrc, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// profile 里已有的其它行保留，dsh-ee 管的几行被替换而不是追加
+	key := strings.TrimPrefix(ts.URL, "http:") + "/npm/:_authToken"
+	profileNpmrc := filepath.Join(dshHome, "profiles", "desktop", ".npmrc")
+	if err := os.WriteFile(profileNpmrc, []byte("store-dir=/tmp/store\nregistry=https://old.example/npm/\n"+key+"=OLD\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	scriptPath := filepath.Join(root, "setup.sh")
@@ -73,22 +79,32 @@ exit 1`+"\n")
 	if !strings.Contains(string(calls), "dsh plugin --profile desktop add @company/dsh-connect@latest") || !strings.Contains(string(calls), "sleep 2") {
 		t.Fatalf("内置 dsh 参数或等待行为不对：%s", calls)
 	}
-	npmrcData, err := os.ReadFile(npmrc)
+	global, err := os.ReadFile(npmrc)
+	if err != nil || string(global) != original {
+		t.Fatalf("~/.npmrc 不应被改动：%q %v", global, err)
+	}
+	if !strings.Contains(string(output), "~/.npmrc 里还有旧版接入脚本写的 dsh-ee 配置") {
+		t.Fatalf("应提示清理旧配置：%s", output)
+	}
+	if strings.Contains(string(output), "ee_at_test") {
+		t.Fatalf("输出里不应出现令牌：%s", output)
+	}
+	data, err := os.ReadFile(profileNpmrc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := string(npmrcData)
-	for _, want := range []string{"foo=bar", "@other:registry=https://other.example/npm/", "registry=" + ts.URL + "/npm/", "@company:registry=" + ts.URL + "/npm/"} {
+	text := string(data)
+	if strings.Count(text, "registry=") != 2 || strings.Contains(text, "OLD") || strings.Contains(text, "old.example") || !strings.HasPrefix(text, "store-dir=/tmp/store\n") {
+		t.Fatalf("profile .npmrc 应保留其它行、替换旧值：%s", text)
+	}
+	for _, want := range []string{"\nregistry=" + ts.URL + "/npm/\n", "@company:registry=" + ts.URL + "/npm/\n", key + "=ee_at_test\n"} {
 		if !strings.Contains(text, want) {
-			t.Errorf(".npmrc 缺少 %q：%s", want, text)
+			t.Errorf("profile .npmrc 缺少 %q：%s", want, text)
 		}
 	}
-	if strings.Contains(text, "https://old.example/npm/") {
-		t.Fatalf("旧 registry 应被替换：%s", text)
-	}
-	info, err := os.Stat(npmrc)
+	info, err := os.Stat(profileNpmrc)
 	if err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf(".npmrc 权限应为 600：%v %v", info.Mode(), err)
+		t.Fatalf("profile .npmrc 权限应为 600：%v %v", info, err)
 	}
 
 	noProfileHome := filepath.Join(root, "no-profile-home")

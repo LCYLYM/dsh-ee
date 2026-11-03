@@ -1,5 +1,5 @@
-import fs from "node:fs";
 import { npmrcPath } from "./config.js";
+import { npmrcState } from "./token.js";
 import type { McpBridge } from "./bridge.js";
 import type { DshContext, PluginConfig } from "./dsh.js";
 import type { HttpClient } from "./http.js";
@@ -29,16 +29,6 @@ export function compareVersions(a: string, b: string): number {
   if (!x.pre) return 1;
   if (!y.pre) return -1;
   return x.pre < y.pre ? -1 : 1;
-}
-
-/** .npmrc 里 dsh-ee 源的令牌行：missing 没有这一行，mismatch 与当前登录不一致。 */
-export function npmrcState(config: PluginConfig, token: string): "ok" | "missing" | "mismatch" {
-  const file = npmrcPath();
-  if (!fs.existsSync(file)) return "missing";
-  const key = `${config.base}/npm/`.replace(/^https?:/, "") + ":_authToken";
-  const line = fs.readFileSync(file, "utf8").split(/\r?\n/).find((l) => l.startsWith(`${key}=`));
-  if (line === undefined) return "missing";
-  return line === `${key}=${token}` ? "ok" : "mismatch";
 }
 
 export async function runLocalDoctor(ctx: DshContext, config: PluginConfig, tokens: TokenManager, http: HttpClient, bridge: McpBridge): Promise<{ summary: string; checks: Check[] }> {
@@ -72,15 +62,15 @@ export async function runLocalDoctor(ctx: DshContext, config: PluginConfig, toke
   }
 
   // npm 源令牌
-  const npmrc = npmrcState(config, current.value);
+  const npmrc = npmrcState(ctx, config, current.value);
   add(npmrc === "ok"
-    ? { id: "npmrc", status: "ok", title: ".npmrc 里的企业源令牌与当前登录一致" }
+    ? { id: "npmrc", status: "ok", title: "DSH 的 .npmrc 里企业源配置与当前登录一致", detail: npmrcPath(ctx) }
     : {
       id: "npmrc",
       status: "warn",
-      title: npmrc === "missing" ? ".npmrc 里没有企业 npm 源的令牌" : ".npmrc 里的企业源令牌与当前登录不一致",
-      detail: "装企业插件会因 401 失败",
-      fix: "重新登录会自动同步；也可以只改 .npmrc 里 `_authToken` 那一行",
+      title: npmrc === "missing" ? "DSH 的 .npmrc 里缺少企业 npm 源配置" : "DSH 的 .npmrc 里企业源令牌与当前登录不一致",
+      detail: `${npmrcPath(ctx)}；装企业插件会因 401 失败`,
+      fix: "重启 DSH 或重新登录会自动同步",
     });
 
   if (!reachable) return { summary: summarize(checks), checks };
@@ -112,7 +102,7 @@ export async function runLocalDoctor(ctx: DshContext, config: PluginConfig, toke
     }
     if (server.connect_version && config.version !== "dev") {
       add(compareVersions(server.connect_version, config.version) > 0
-        ? { id: "plugin_version", status: "warn", title: `接入插件有新版本 ${server.connect_version}（当前 ${config.version}）`, fix: "在 DSH 插件页更新接入插件，然后重启 DSH" }
+        ? { id: "plugin_version", status: "warn", title: `接入插件有新版本 ${server.connect_version}（当前 ${config.version}）`, fix: `在 DSH 插件页更新接入插件（当初是粘贴地址安装的，就在「添加插件」里输入 ${config.scopes[0] ?? "@企业作用域"}/dsh-connect 重新添加），然后重启 DSH` }
         : { id: "plugin_version", status: "ok", title: `接入插件 ${config.version} 已是最新` });
     }
     const manager = ctx.get("pluginManager");

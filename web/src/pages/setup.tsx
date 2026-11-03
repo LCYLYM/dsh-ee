@@ -42,6 +42,14 @@ export default function Setup() {
           <p className="mt-2 text-xs text-neutral-500">
             {t("setupConnect.needs")} {t("setupConnect.tokenNote")}
           </p>
+          {ci.ready && ci.tarball_url && (
+            <div className="mt-4">
+              <p className="mb-2 text-sm text-neutral-600">
+                <span className="font-medium text-neutral-800">{t("setupConnect.tarballTitle")}</span> {t("setupConnect.tarballDesc")}
+              </p>
+              <CopyBox text={ci.tarball_url} />
+            </div>
+          )}
         </Card>
       )}
 

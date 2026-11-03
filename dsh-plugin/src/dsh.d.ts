@@ -12,4 +12,5 @@ export interface PluginConfig {
   tokenRef: string;
   autoInstall: boolean;
   version: string;
+  scopes: string[];
 }

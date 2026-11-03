@@ -227,7 +227,7 @@ export default {
   },
   setupConnect: {
     title: "接入 DSH",
-    desc: "一条命令：写好 npm 源与令牌，把令牌写进 DSH 的 .env，再装上接入插件 {{pkg}}。之后在能力中心启用的东西会自动同步。",
+    desc: "一条命令：把 npm 源与令牌写进 DSH 自己的 .npmrc（不改 ~/.npmrc，不影响你本地的 npm），登录后装上接入插件 {{pkg}}。之后在能力中心启用的东西会自动同步。",
     notReady: "管理员还没有发布 DSH 接入插件；先运行脚本写好 npm 源，发布后再运行一次即可。",
     ready: "接入插件 {{pkg}}@{{version}} 已发布",
     needs: "需要本机装有 Node.js、pnpm 与 DSH（或 npx 可用）。",
@@ -236,6 +236,8 @@ export default {
     manualAdd: "2. 安装接入插件：",
     manualRestart: "3. 重启 DSH（dsh web）。",
     tokenNote: "接入令牌就是下面生成的 npm 令牌，同时用于 npm 源、模型、技能与企业系统。",
+    tarballTitle: "不想用终端？",
+    tarballDesc: "在 DSH 插件页点「添加插件」，粘贴下面的地址安装；重启 DSH 后在对话框输入 /ee-login 登录，接入插件会自己配好企业 npm 源。",
   },
   reviewAssets: {
     plugins: "插件",

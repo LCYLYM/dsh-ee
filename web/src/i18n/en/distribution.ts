@@ -41,7 +41,7 @@ export default {
     step1: "Add the plugin index in DSH",
     step1Desc: "DSH Plugins → Discover → Add index, then enter:",
     step2: "Make pnpm install from the internal registry",
-    step2Desc: "Write this to ~/.npmrc in your home directory (%USERPROFILE%\\.npmrc on Windows):",
+    step2Desc: "For DSH only: write this to the .npmrc in DSH's profile directory (e.g. ~/.dsh/profiles/web/.npmrc, profiles/desktop for Desktop) so local development is unaffected; put it in ~/.npmrc only if your own npm projects need it too:",
     step3: "Trust the company CA certificate (if the intranet uses a self-signed certificate)",
     shellComment: "# add this to your shell profile",
     step4: "Verify",

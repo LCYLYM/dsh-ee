@@ -613,6 +613,7 @@ export interface ConnectInfo {
   token_env: string;
   profile: string;
   server_name: string;
+  tarball_url?: string;
   error?: string;
 }
 

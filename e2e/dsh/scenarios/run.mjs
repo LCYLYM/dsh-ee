@@ -27,6 +27,8 @@ async function main() {
     assert.equal(fs.statSync(pending).mode & 0o777, 0o600)
     assert.equal(fs.statSync(path.dirname(pending)).mode & 0o777, 0o700)
     assert.equal(npmrcToken(env), firstToken)
+    assert.equal(npmrcToken(env, 'headless'), firstToken)
+    assert.ok(!fs.existsSync(env.NPM_CONFIG_USERCONFIG), 'setup 不应写用户级 ~/.npmrc')
     const envFile = path.join(env.DSH_HOME, '.env')
     assert.ok(!fs.existsSync(envFile) || !fs.readFileSync(envFile, 'utf8').includes('DSHEE_TOKEN='))
     const catalogResponse = await fetch(`${server.base}/api/dsh/catalog`, { headers: { authorization: `Bearer ${firstToken}` } })

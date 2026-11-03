@@ -39,7 +39,7 @@ export default {
     step1: "在 DSH 中添加插件索引源",
     step1Desc: "DSH 插件页 → Discover → 添加索引源，填入：",
     step2: "让 pnpm 从内网 registry 安装",
-    step2Desc: "写入用户目录的 ~/.npmrc（Windows 为 %USERPROFILE%\\.npmrc）：",
+    step2Desc: "只给 DSH 用：写进 DSH profile 目录的 .npmrc（如 ~/.dsh/profiles/web/.npmrc，Desktop 为 profiles/desktop），不影响本地开发；自己的 npm 项目也要用时才写进 ~/.npmrc：",
     step3: "信任企业 CA 证书（内网使用自签证书时）",
     shellComment: "# 写进 shell 配置文件",
     step4: "验证",

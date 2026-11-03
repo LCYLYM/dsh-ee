@@ -90,6 +90,11 @@ func (s *Server) buildConnect(ctx context.Context, base, version string) (string
 	fmt.Fprintf(&p, "    - id: dsh-ee-connect\n      name: %s\n      config:\n", yamlQuote(pkg))
 	fmt.Fprintf(&p, "        base: %s\n        org: %s\n        serverName: %s\n        tokenRef: %s\n        autoInstall: %t\n        version: %s\n",
 		yamlQuote(base), yamlQuote(org), yamlQuote(server), connectTokenEnv, set.Connect.InstallRequired, yamlQuote(version))
+	// 插件把这些作用域与令牌写进所在 profile 的 .npmrc，必装插件与升级才能从 dsh-ee 安装
+	p.WriteString("        scopes:\n")
+	for _, scope := range set.CompanyScopes() {
+		fmt.Fprintf(&p, "          - %s\n", yamlQuote(scope))
+	}
 	if set.Connect.Market {
 		p.WriteString("    - id: plugin-market\n      name: '@deepseek-ai/dsh-plugin-market'\n      disabled: !!js \"!ctx.get('profileContext')\"\n")
 		fmt.Fprintf(&p, "      config:\n        indexes:\n          - %s\n", yamlQuote(base+"/index/dsh-index.json"))
@@ -349,6 +354,8 @@ type connectInfo struct {
 	TokenEnv   string `json:"token_env"`
 	Profile    string `json:"profile"`
 	ServerName string `json:"server_name"`
+	// TarballURL 是免登录的安装地址：在 DSH 插件页直接粘贴，不需要先配置 npm 源
+	TarballURL string `json:"tarball_url,omitempty"`
 	Error      string `json:"error,omitempty"`
 }
 
@@ -368,6 +375,9 @@ func (s *Server) handleConnectInfo(w http.ResponseWriter, r *http.Request) {
 	if st.Package == info.Package && st.Version != "" {
 		if v, err := s.store.GetVersion(r.Context(), st.Package, st.Version); err == nil && v.Status == store.StatusPublished {
 			info.Version, info.Ready = st.Version, true
+			if base, err := s.connectBase(r.Context(), r); err == nil {
+				info.TarballURL = base + "/dl/connect/" + connectTarballFile(st.Version)
+			}
 		}
 	}
 	info.Error = st.Error
@@ -404,4 +414,44 @@ func (s *Server) handlePublishConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, st)
+}
+
+func connectTarballFile(version string) string { return "dsh-connect-" + version + ".tgz" }
+
+// GET /dl/connect/dsh-connect-<版本>.tgz：免登录下载接入插件，员工在 DSH 插件页粘贴这个地址即可安装，
+// 不用先配置 npm 源。包里只有 dsh-ee 地址、组织名、作用域与模型名，没有凭据；插件登录后自己写好
+// profile 的 .npmrc，之后的升级与必装插件都走 npm 源。地址带版本号：pnpm 按地址记录完整性校验值，
+// 同一地址换内容会让重装失败。只提供当前接入插件已发布的版本。
+func (s *Server) handleConnectTarball(w http.ResponseWriter, r *http.Request) {
+	if s.registry == nil {
+		writeErr(w, http.StatusServiceUnavailable, "npm 源不可用")
+		return
+	}
+	set, err := s.appSettings(r.Context())
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	file := r.PathValue("file")
+	version, ok := strings.CutPrefix(file, "dsh-connect-")
+	version, ok2 := strings.CutSuffix(version, ".tgz")
+	if !set.Connect.Enabled || !ok || !ok2 || version == "" {
+		writeErr(w, http.StatusNotFound, "没有这个接入插件")
+		return
+	}
+	pkg := connectPackage(set)
+	if meta, err := s.store.GetVersion(r.Context(), pkg, version); err != nil || meta.Status != store.StatusPublished {
+		writeErr(w, http.StatusNotFound, "没有这个接入插件版本")
+		return
+	}
+	f, v, err := s.registry.Tarball(r.Context(), pkg, version)
+	if err != nil {
+		s.registryErr(w, r, err)
+		return
+	}
+	defer f.Close()
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	w.Header().Set("ETag", `"`+v.Shasum+`"`)
+	http.ServeContent(w, r, file, v.CreatedAt, f)
 }

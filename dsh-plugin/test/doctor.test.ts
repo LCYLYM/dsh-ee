@@ -3,7 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { compareVersions, npmrcState, runLocalDoctor } from "../src/doctor.js";
+import { compareVersions, runLocalDoctor } from "../src/doctor.js";
+import { npmrcState } from "../src/token.js";
 import { normalizeConfig } from "../src/config.js";
 
 const config = normalizeConfig({ base: "http://ee.test", serverName: "ee", version: "1.0.0" });
@@ -24,12 +25,14 @@ test("版本比较", () => {
   assert.ok(compareVersions("1.0.0", "1.0.1") < 0);
 });
 
+const noProfile = { get: () => undefined } as any;
+
 test("npmrc 状态：缺失、不一致、一致", async () => {
   const line = (t: string) => `//ee.test/npm/:_authToken=${t}\n`;
-  await withNpmrc(null, () => assert.equal(npmrcState(config, "T"), "missing"));
-  await withNpmrc("registry=https://x\n", () => assert.equal(npmrcState(config, "T"), "missing"));
-  await withNpmrc(line("OLD"), () => assert.equal(npmrcState(config, "T"), "mismatch"));
-  await withNpmrc(line("T"), () => assert.equal(npmrcState(config, "T"), "ok"));
+  await withNpmrc(null, () => assert.equal(npmrcState(noProfile, config, "T"), "missing"));
+  await withNpmrc("registry=https://x\n", () => assert.equal(npmrcState(noProfile, config, "T"), "missing"));
+  await withNpmrc(line("OLD"), () => assert.equal(npmrcState(noProfile, config, "T"), "mismatch"));
+  await withNpmrc(line("T"), () => assert.equal(npmrcState(noProfile, config, "T"), "ok"));
 });
 
 function fixture(opts: { token?: string; whoami?: number; models?: string[]; server?: any; installed?: string[] }) {
@@ -73,7 +76,7 @@ test("令牌被吊销：给出 /ee-login；npmrc 被删：给出修复建议", a
     assert.equal(c.token.status, "fail");
     assert.match(c.token.fix, /\/ee-login/);
     assert.equal(c.npmrc.status, "warn");
-    assert.match(c.npmrc.title, /没有企业 npm 源的令牌/);
+    assert.match(c.npmrc.title, /缺少企业 npm 源配置/);
     assert.ok(c.npmrc.fix);
     assert.match(summary, /1 项失败/);
     assert.ok(!JSON.stringify(checks).includes('"T"'), "不能把令牌写进结果");

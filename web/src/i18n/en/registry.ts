@@ -90,7 +90,7 @@ export default {
       tokenNamePlaceholder: "e.g. \"My laptop\"",
       tokenOnce: "The full token is shown only this once; the commands below already include it:",
       revokeConfirm: "After revoking \"{{name}}\", computers using it can no longer install from the company registry. Continue?",
-      scriptNpmrc: "Points the registry and company scopes at dsh-ee with npm config and stores your token (~/.npmrc, read by both npm and pnpm)",
+      scriptNpmrc: "Writes the registry, company scopes and your token into the .npmrc in DSH's profile directory (only DSH uses it; ~/.npmrc is left alone — set DSH_EE_GLOBAL_NPMRC=1 before running if you really want it global)",
       scriptIndex: "Reminds you to add the index source in DSH → Plugins → Discover:",
       caDesc: "If dsh-ee uses a company-issued certificate, get the CA certificate from your administrator (save it as ~/.dsh-ee-ca.pem), then run:",
     },

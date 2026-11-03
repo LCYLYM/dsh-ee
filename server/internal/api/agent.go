@@ -104,6 +104,7 @@ var agentExcluded = map[string]string{
 	"GET /api/dsh/skills/{name}":     "接入插件自己的协议入口",
 	"GET /api/dsh/releases":          "员工下载页读取版本",
 	"GET /dl/{target}/{file}":        "安装包二进制下载，不适合给模型",
+	"GET /dl/connect/{file}":         "接入插件 tarball 下载，不适合给模型",
 	"/mcp":                           "MCP 协议入口",
 	"/npm/":                          "npm 协议入口",
 	"GET /index/dsh-index.json":      "DSH 插件索引协议入口",

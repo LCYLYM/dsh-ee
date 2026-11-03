@@ -174,6 +174,7 @@ func (s *Server) routes() []route {
 		pub("GET /api/dsh/skills/{name}", s.handleDshSkill),
 		prm("GET /api/dsh/releases", s.handleDshReleases, rbac.PortalView),
 		prm("GET /dl/{target}/{file}", s.handleDownloadDshRelease, rbac.PortalView),
+		pub("GET /dl/connect/{file}", s.handleConnectTarball),
 		prm("GET /api/admin/dsh-releases", s.handleAdminDshReleases, rbac.SettingsManage),
 		prm("POST /api/admin/dsh-releases/check", s.handleCheckDshReleases, rbac.SettingsManage),
 		prm("POST /api/admin/dsh-releases/{id}/mirror", s.handleMirrorDshRelease, rbac.SettingsManage),

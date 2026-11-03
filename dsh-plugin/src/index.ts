@@ -29,6 +29,9 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
 
   ctx.effect(async () => {
     await tokens.importPending();
+    // 每次启动都把令牌同步进 profile 的 .npmrc：覆盖从 tarball 地址安装、令牌轮换等情况
+    const current = await tokens.resolve();
+    if (current?.value) await tokens.syncNpmrc(current.value).catch(() => false);
     registerCommands(ctx, config, tokens);
     registerDoctor(ctx, config, tokens, http, bridge);
     const readBrand = await registerSkills(ctx, config, http);

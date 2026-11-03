@@ -91,7 +91,7 @@ async function main() {
     save('b2', { status: 'pass', approvalBeforeWrite: true, queued: true, auditVia: 'agent', denialCreatedNothing: true, denyButtons: names2 })
 
     // ---- B3 诊断 ----
-    const npmrc = env.NPM_CONFIG_USERCONFIG
+    const npmrc = path.join(env.DSH_HOME, 'profiles', 'web', '.npmrc')
     fs.writeFileSync(npmrc, fs.readFileSync(npmrc, 'utf8').split('\n').filter((line) => !line.includes('_authToken')).join('\n'))
     const b3 = 'B3 why can I not install plugins'
     const r3 = await turn(fake, page, b3, [toolResponse('ee_local_doctor', {}), textResponse('B3 done')], { requests: 2 })

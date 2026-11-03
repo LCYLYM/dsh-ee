@@ -6,7 +6,9 @@ import (
 	"strings"
 )
 
-// 员工电脑的一键接入脚本：把 npm / pnpm 指向 dsh-ee，并通过设备码或手动令牌登录。
+// 员工电脑的一键接入脚本：让 DSH 从 dsh-ee 安装插件，并通过设备码或手动令牌登录。
+// npm 源配置只写进 DSH profile 目录的 .npmrc（DSH 跑 pnpm 时的工作目录），不动 ~/.npmrc，
+// 员工自己的 npm / pnpm 不受影响；DSH_EE_GLOBAL_NPMRC=1 时才额外写全局配置。
 // 设备登录只写 npm 配置与 DSH 待导入文件；手动令牌继续写 .env 以兼容 CI 和旧流程。
 //
 //	curl -fsSL <dsh-ee>/setup.sh | sh
@@ -41,6 +43,37 @@ func (s *Server) setupVars(r *http.Request) (base, registry, authKey string, sco
 	scopes = set.CompanyScopes()
 	return
 }
+
+// profileNpmrcShell 定义 write_profile_npmrc <profile 目录>：替换 dsh-ee 管的几行（registry、作用域、令牌），
+// 其它行原样保留；以及 check_token：用 /api/dsh/whoami 校验令牌，令牌经 stdin 传给 curl，不出现在进程参数里。
+const profileNpmrcShell = `
+write_profile_npmrc() {
+  dir="$1"
+  file="$dir/.npmrc"
+  mkdir -p "$dir"
+  touch "$file"
+  chmod 600 "$file"
+  keys="registry $AUTH_KEY"
+  for scope in $SCOPES; do keys="$keys $scope:registry"; done
+  awk -v keys="$keys" 'BEGIN { n = split(keys, k, " "); for (i = 1; i <= n; i++) drop[k[i]] = 1 } { key = $0; sub(/=.*/, "", key) } !(key in drop)' "$file" > "$file.tmp"
+  {
+    printf '%s=%s\n' 'registry' "$REGISTRY"
+    for scope in $SCOPES; do printf '%s:registry=%s\n' "$scope" "$REGISTRY"; done
+    printf '%s=%s\n' "$AUTH_KEY" "$TOKEN"
+  } >> "$file.tmp"
+  mv "$file.tmp" "$file"
+  chmod 600 "$file"
+  echo "✔ 已写入 $file（只对 DSH 生效，不改 ~/.npmrc）"
+}
+check_token() {
+  printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | curl -fsS -K - "$BASE/api/dsh/whoami" >/dev/null
+}
+hint_global_npmrc() {
+  if [ "${DSH_EE_GLOBAL_NPMRC:-}" != "1" ] && [ -f "$HOME/.npmrc" ] && grep -qF "$REGISTRY" "$HOME/.npmrc"; then
+    echo "提示：~/.npmrc 里还有旧版接入脚本写的 dsh-ee 配置，DSH 已不再需要；如果它影响你本地开发，可以删掉含 $REGISTRY 的行和 _authToken 那行。"
+  fi
+}
+`
 
 func shellQuote(v string) string { return "'" + strings.ReplaceAll(v, "'", `'\''`) + "'" }
 
@@ -104,10 +137,6 @@ func (s *Server) handleSetupSh(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
-	var sc []string
-	for _, x := range scopes {
-		sc = append(sc, shellQuote(x))
-	}
 	script := `#!/bin/sh
 # dsh-ee 接入脚本：默认通过浏览器设备登录；--token 保留 CI 与旧流程。
 set -eu
@@ -116,6 +145,7 @@ BASE=` + shellQuote(base) + `
 REGISTRY=` + shellQuote(registry) + `
 AUTH_KEY=` + shellQuote(authKey) + `
 INDEX=` + shellQuote(base+"/index/dsh-index.json") + `
+SCOPES=` + shellQuote(strings.Join(scopes, " ")) + `
 TOKEN=""
 if [ "${1:-}" = "--token" ]; then
   if [ "$#" -lt 2 ] || [ -z "$2" ]; then
@@ -138,7 +168,7 @@ if [ -z "$TOKEN" ]; then
   fi
   DEVICE_LOGIN=1
 fi
-` + s.desktopShell(r) + `
+` + profileNpmrcShell + s.desktopShell(r) + `
 if ! command -v npm >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1; then
   echo "没有找到 Node.js / npm：请先安装 Node.js（DSH 自带的 Node 也可以，把它加到 PATH）。" >&2
   exit 1
@@ -152,17 +182,23 @@ if [ "$DEVICE_LOGIN" -eq 1 ]; then
   node -e ` + shellQuote(setupDeviceJS) + `
   TOKEN=$(cat "$PENDING_FILE")
 fi
-npm config set registry "$REGISTRY"
-npm config set "$AUTH_KEY" "$TOKEN"
-for scope in ` + strings.Join(sc, " ") + `; do
-  npm config set "$scope:registry" "$REGISTRY"
-done
-echo "✔ 已写入 ~/.npmrc：npm / pnpm 从 $REGISTRY 安装"
-if user="$(npm whoami --registry "$REGISTRY" 2>/dev/null)"; then
-  echo "✔ 令牌有效，当前账号：$user"
-else
+if ! check_token; then
   echo "✘ 令牌无效或连不上 dsh-ee，请检查后重试" >&2
   exit 1
+fi
+echo "✔ 令牌有效"
+for profile in ${DSH_PROFILES:-` + connectProfile + `}; do
+  write_profile_npmrc "$DSH_DIR/profiles/$profile"
+done
+if [ "${DSH_EE_GLOBAL_NPMRC:-}" = "1" ]; then
+  npm config set registry "$REGISTRY"
+  npm config set "$AUTH_KEY" "$TOKEN"
+  for scope in $SCOPES; do
+    npm config set "$scope:registry" "$REGISTRY"
+  done
+  echo "✔ 已按 DSH_EE_GLOBAL_NPMRC=1 同时写入 ~/.npmrc"
+else
+  hint_global_npmrc
 fi
 ` + s.connectShell(r)
 
@@ -238,12 +274,33 @@ function Setup-DshEE {
     $Token = $login.access_token
     Write-Host "✔ 已登录 $($login.user.username)（$($login.user.department)）"
   }
-  npm config set registry $Registry
-  npm config set $AuthKey $Token
-  foreach ($scope in @(` + strings.Join(sc, ", ") + `)) { npm config set "${scope}:registry" $Registry }
-  Write-Host "已写入 ~/.npmrc：npm / pnpm 从 $Registry 安装"
-  $user = npm whoami --registry $Registry 2>$null
-  if ($LASTEXITCODE -eq 0) { Write-Host "令牌有效，当前账号：$user" } else { Write-Error '令牌无效或连不上 dsh-ee'; return }
+  try { $me = Invoke-RestMethod -Uri "$Base/api/dsh/whoami" -Headers @{ Authorization = "Bearer $Token" } }
+  catch { Write-Error '令牌无效或连不上 dsh-ee'; return }
+  Write-Host "令牌有效，当前账号：$($me.username)"
+  $Scopes = @(` + strings.Join(sc, ", ") + `)
+  $Profiles = if ($env:DSH_PROFILES) { $env:DSH_PROFILES -split '\s+' | Where-Object { $_ } } else { @('` + connectProfile + `') }
+  foreach ($ProfileName in $Profiles) {
+    # 只写 DSH profile 目录的 .npmrc（DSH 跑 pnpm 时的工作目录），不动 ~/.npmrc
+    $ProfileDir = Join-Path (Join-Path $DshDir 'profiles') $ProfileName
+    $NpmrcFile = Join-Path $ProfileDir '.npmrc'
+    New-Item -ItemType Directory -Force -Path $ProfileDir | Out-Null
+    $drop = @('registry', $AuthKey) + ($Scopes | ForEach-Object { "${_}:registry" })
+    $lines = @()
+    if (Test-Path $NpmrcFile) { $lines = @(Get-Content $NpmrcFile | Where-Object { $drop -notcontains ($_ -split '=', 2)[0] }) }
+    $lines += "registry=$Registry"
+    foreach ($scope in $Scopes) { $lines += "${scope}:registry=$Registry" }
+    $lines += "$AuthKey=$Token"
+    # .NET 默认写无 BOM 的 UTF-8；Set-Content -Encoding utf8 在 PowerShell 5 会加 BOM
+    [System.IO.File]::WriteAllLines($NpmrcFile, [string[]]$lines)
+    icacls $NpmrcFile /inheritance:r /grant:r "${env:USERNAME}:(F)" | Out-Null
+    Write-Host "已写入 $NpmrcFile（只对 DSH 生效，不改 ~/.npmrc）"
+  }
+  if ($env:DSH_EE_GLOBAL_NPMRC -eq '1') {
+    npm config set registry $Registry
+    npm config set $AuthKey $Token
+    foreach ($scope in $Scopes) { npm config set "${scope}:registry" $Registry }
+    Write-Host '已按 DSH_EE_GLOBAL_NPMRC=1 同时写入 ~/.npmrc'
+  }
 ` + s.connectPowerShell(r) + `}
 Setup-DshEE
 `
@@ -360,9 +417,11 @@ func (s *Server) connectPowerShell(r *http.Request) string {
 	}
 	return tail + `  $ConnectPkg = ` + psQuote(pkg) + `
   if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) { Write-Error '安装 DSH 插件需要 pnpm：先运行 npm install -g pnpm，再重新运行本脚本'; return }
-  if (Get-Command dsh -ErrorAction SilentlyContinue) { dsh plugin --profile ` + connectProfile + ` add "$ConnectPkg@latest" }
-  else { npx --yes '@deepseek-ai/dsh' plugin --profile ` + connectProfile + ` add "$ConnectPkg@latest" }
-  Write-Host "已在 DSH 的 ` + connectProfile + ` profile 里装好 $ConnectPkg"
+  foreach ($ProfileName in $Profiles) {
+    if (Get-Command dsh -ErrorAction SilentlyContinue) { dsh plugin --profile $ProfileName add "$ConnectPkg@latest" }
+    else { npx --yes '@deepseek-ai/dsh' plugin --profile $ProfileName add "$ConnectPkg@latest" }
+    Write-Host "已在 DSH 的 $ProfileName profile 里装好 $ConnectPkg"
+  }
   Write-Host '完成。重启 DSH（dsh web）后，企业技能、提示词、微应用与企业系统就会出现。'
   Write-Host '以后在 $Base/hub 启用新的能力，DSH 会自动同步。'
 `
