@@ -18,6 +18,7 @@ import audit from "./audit";
 import hub from "./hub";
 import tokens from "./tokens";
 import onboarding from "./onboarding";
+import getStarted from "./get-started";
 
 export default {
   ...common,
@@ -38,4 +39,5 @@ export default {
   ...hub,
   ...tokens,
   ...onboarding,
+  ...getStarted,
 } satisfies Messages<typeof zh>;

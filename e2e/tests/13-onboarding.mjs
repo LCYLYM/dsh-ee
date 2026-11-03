@@ -1,5 +1,5 @@
 import http from "node:http";
-import { ADMIN_PW, BASE, assertEq, login, newPage, shot, step, tag } from "../lib.mjs";
+import { ADMIN_PW, BASE, assert, assertEq, login, newPage, shot, step, tag } from "../lib.mjs";
 
 
 export default async function (t) {
@@ -15,9 +15,12 @@ export default async function (t) {
     const page = await newPage(t);
     await login(page, "admin", ADMIN_PW);
     await page.goto(`${BASE}/start`);
+    await page.waitForURL(`${BASE}/go`);
     await page.getByRole("progressbar").waitFor();
     await shot(page, "onboarding-guide");
-    step("空库 /start 显示部署清单，而不是直接跳过");
+    step("空库 /go 显示部署清单（旧地址 /start 跳过来），而不是直接跳过");
+    const agentStart = page.getByRole("button", { name: "生成提示词" });
+    assert(await agentStart.isDisabled(), "需要密钥的步骤没做完时不能交给 Agent");
 
     const baseButton = page.locator("li").filter({ hasText: "访问地址" }).getByRole("button", { name: "去处理" });
     if (await baseButton.count()) {
@@ -49,6 +52,13 @@ export default async function (t) {
     await page.getByRole("dialog").waitFor({ state: "hidden" });
     step("在弹窗中选择默认模型");
 
+    // 需要密钥的几步做完：可以交给 Agent，生成提示词并等待 DSH 登录
+    await agentStart.click();
+    await page.locator("pre").filter({ hasText: "plugin_manager" }).waitFor();
+    await page.getByText("等待 DSH 发起登录").waitFor();
+    await shot(page, "onboarding-agent");
+    step("交给 Agent：发布接入插件并给出提示词");
+
     await page.locator("li").filter({ hasText: "员工额度" }).getByRole("button", { name: "去处理" }).click();
     assertEq(await page.getByRole("dialog").getByLabel("员工账号").inputValue(), "new", "默认新建普通员工，不选超级管理员");
     await page.getByRole("dialog").getByLabel("员工账号").selectOption("new");
@@ -59,8 +69,11 @@ export default async function (t) {
     await page.getByRole("dialog").waitFor({ state: "hidden" });
     const publish = page.getByRole("button", { name: "发布接入插件" });
     if (await publish.count()) await publish.click();
+    // 必做项齐了自动离开清单；管理员自己的 DSH 还没接入，先到「开始使用」，点「以后再说」进工作台
+    await page.waitForURL((u) => u.pathname !== "/go");
+    if (new URL(page.url()).pathname === "/get-started") await page.getByRole("button", { name: "以后再说" }).click();
     await page.waitForURL(`${BASE}/workbench`);
-    step("全程不离开 /start，弹窗配置完成后自动进入工作台");
+    step("全程不离开 /go，弹窗配置完成后自动离开清单进入工作台");
   } finally {
     upstream.close();
   }

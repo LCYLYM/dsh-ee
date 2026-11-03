@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from "react";
-import { Check, CheckCircle2, ArrowRight } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Bot, Check, CheckCircle2, ArrowRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, type Model, type Provider, type SetupStatus, type User } from "../lib/api";
 import type { Settings } from "../lib/types";
@@ -9,12 +9,16 @@ import { PageLink } from "../lib/menus";
 import { Badge, Button, Card, CopyBox, Field, inputCls } from "../components/ui";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { ErrorNote } from "../components/api-ui";
+import { AgentConnect } from "../components/agent-connect";
 
 const pageForStep: Record<string, string> = {
   ldap: "admin-settings",
   roles: "admin-roles",
   connections: "admin-connections",
 };
+
+// 交给 Agent 之前必须在网页上做完的步骤：要填上游密钥（机密不经过 Agent），或者 Agent 自己的 DSH 要靠它们才能对话
+const agentPrereq = ["base_url", "provider", "models", "default_model"];
 
 const displayFont = { fontFamily: "Outfit, Satoshi, Avenir Next, Segoe UI, sans-serif" };
 
@@ -228,6 +232,8 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
         </div>
       </section>
 
+      <AgentSetup status={status} reload={reload} />
+
       <ol className="mt-4">
         {status.steps.map((step, index) => {
           const current = !step.done && !step.optional && status.next === step.id;
@@ -281,5 +287,55 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
       )}
       {editing && <ConfigDialog key={editing.id} step={editing} onClose={() => setEditing(null)} onSaved={saved} settings={settings} providers={providers.data ?? []} models={models.data ?? []} users={users.data ?? []} />}
     </div>
+  );
+}
+
+/**
+ * Agent 配置：网页上做完需要密钥的几步后，发布接入插件并给出提示词；DSH 里的 Agent 用 dsh-ee-setup 配完剩下的。
+ * 期间每 5 秒刷新清单，必做项齐了页面自动进入工作台。
+ */
+function AgentSetup({ status, reload }: { status: SetupStatus; reload: () => void }) {
+  const { t } = useTranslation();
+  const { notify } = useStore();
+  const { busy, run } = useAction();
+  const [open, setOpen] = useState(false);
+  const missing = status.steps.filter((step) => agentPrereq.includes(step.id) && !step.done);
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = setInterval(reload, 5000);
+    return () => clearInterval(timer);
+  }, [open, reload]);
+
+  const start = async () => {
+    const result = await run(() => api.publishConnect());
+    if (!result.ok) return notify(result.error);
+    reload();
+    setOpen(true);
+  };
+
+  return (
+    <section className="onboarding-reveal mt-8 rounded-2xl border border-teal-200 bg-teal-50/40 p-6 sm:p-7">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-2xl">
+          <div className="flex items-center gap-2 text-lg font-medium tracking-tight text-stone-900">
+            <Bot size={18} className="text-teal-700" />
+            {t("onboarding.agentTitle")}
+          </div>
+          <p className="mt-2 text-sm leading-6 text-stone-500">{t("onboarding.agentDesc")}</p>
+          {!open && missing.length > 0 && <p className="mt-2 text-sm text-stone-600">{t("onboarding.agentNeed", { steps: missing.map((step) => step.title).join("、") })}</p>}
+        </div>
+        {!open && (
+          <Button disabled={busy || missing.length > 0} onClick={() => void start()}>
+            {busy ? t("onboarding.publishing") : t("onboarding.agentStart")}
+          </Button>
+        )}
+      </div>
+      {open && (
+        <div className="mt-6 rounded-xl bg-white p-5">
+          <AgentConnect admin />
+        </div>
+      )}
+    </section>
   );
 }

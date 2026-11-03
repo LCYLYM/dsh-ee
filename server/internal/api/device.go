@@ -65,6 +65,8 @@ type deviceCodeReq struct {
 	ClientOS      string   `json:"client_os"`
 	ClientVersion string   `json:"client_version"`
 	Scopes        []string `json:"scopes"`
+	// 「开始使用」页的接入码：带上后这次登录会出现在那个页面上
+	SetupCode string `json:"setup_code"`
 }
 
 func cleanClientField(v string, max int) string {
@@ -114,6 +116,10 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "scope 不受支持")
 		return
 	}
+	if !s.validSetupCode(req.SetupCode) {
+		writeErr(w, http.StatusBadRequest, setupCodeExpired)
+		return
+	}
 	plain := secret.Token()
 	d := &store.DeviceCode{
 		UserCode: store.NewUserCode(), ClientName: cleanClientField(req.ClientName, 128),
@@ -123,6 +129,9 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.CreateDeviceCode(r.Context(), d, secret.Hash(plain)); err != nil {
 		s.internalErr(w, r, err)
 		return
+	}
+	if req.SetupCode != "" {
+		s.setupCodes.attach(req.SetupCode, d.UserCode)
 	}
 	uri := s.publicBase(r) + "/device"
 	writeJSON(w, http.StatusOK, map[string]any{

@@ -187,13 +187,17 @@ var DeviceFlow = class {
     this.config = config;
     this.fetchImpl = fetchImpl;
   }
-  async start() {
+  /** setupCode：网页「开始使用」页给的接入码，带上后这次登录会出现在那个页面上，可以就地确认。 */
+  async start(setupCode = "") {
     const response = await this.fetchImpl(`${this.config.base}/api/device/code`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ client_name: os2.hostname(), client_os: `${process.platform} ${os2.release()}`, client_version: this.config.version })
+      body: JSON.stringify({ client_name: os2.hostname(), client_os: `${process.platform} ${os2.release()}`, client_version: this.config.version, ...setupCode ? { setup_code: setupCode } : {} })
     });
-    if (!response.ok) throw new Error(`\u8BBE\u5907\u767B\u5F55\u53D1\u8D77\u5931\u8D25\uFF1AHTTP ${response.status}`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error ? `\u8BBE\u5907\u767B\u5F55\u53D1\u8D77\u5931\u8D25\uFF1A${body.error}` : `\u8BBE\u5907\u767B\u5F55\u53D1\u8D77\u5931\u8D25\uFF1AHTTP ${response.status}`);
+    }
     return response.json();
   }
   async wait(deviceCode, intervalSeconds = 5, timeoutMs = 6e5, signal) {
@@ -233,7 +237,12 @@ function openBrowser(url) {
 }
 
 // src/commands.ts
-function registerCommands(ctx, config, tokens) {
+function parseSetupCode(rawInput) {
+  const code = String(rawInput ?? "").trim().toUpperCase();
+  return /^[A-Z0-9]{4}-?[A-Z0-9]{4}$/.test(code) ? code : "";
+}
+function registerCommands(ctx, config, tokens, onLogin = async () => {
+}) {
   const commands = ctx.get("commands");
   if (!commands) return;
   const flow = new DeviceFlow(config);
@@ -244,23 +253,28 @@ function registerCommands(ctx, config, tokens) {
   };
   register({
     name: "ee-login",
-    description: "\u91CD\u65B0\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7",
-    handler: async () => {
+    description: "\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7\uFF08\u53EF\u4EE5\u5E26\u4E0A\u7F51\u9875\u300C\u5F00\u59CB\u4F7F\u7528\u300D\u9875\u7ED9\u7684\u63A5\u5165\u7801\uFF09",
+    input: { hint: "[\u63A5\u5165\u7801]" },
+    handler: async (invocation) => {
       if (pending) return { kind: "success", text: `\u8BF7\u5728\u6D4F\u89C8\u5668\u786E\u8BA4\uFF0C\u786E\u8BA4\u7801 ${pending.code}\uFF0C\u94FE\u63A5 ${pending.url}` };
-      const started = await flow.start();
+      const setupCode = parseSetupCode(invocation?.rawInput);
+      if (String(invocation?.rawInput ?? "").trim() && !setupCode) return { kind: "error", text: "\u63A5\u5165\u7801\u683C\u5F0F\u4E0D\u5BF9\uFF0C\u5E94\u5F62\u5982 ABCD-EFGH\uFF1B\u4E0D\u5E26\u63A5\u5165\u7801\u76F4\u63A5\u8F93\u5165 /ee-login \u4E5F\u53EF\u4EE5" };
+      const started = await flow.start(setupCode);
       const url = started.verification_uri_complete;
-      openBrowser(url);
+      if (!setupCode) openBrowser(url);
       const task = (async () => {
         try {
           const result = await flow.wait(started.device_code, started.interval);
           await tokens.set(result.access_token);
           await tokens.syncNpmrc(result.access_token);
+          await onLogin().catch(() => void 0);
         } finally {
           pending = null;
         }
       })();
       pending = { code: started.user_code, url, task };
       void task.catch(() => void 0);
+      if (setupCode) return { kind: "success", text: `\u56DE\u5230 dsh-ee \u7F51\u9875\u7684\u300C\u5F00\u59CB\u4F7F\u7528\u300D\u9875\uFF0C\u6838\u5BF9\u786E\u8BA4\u7801 ${started.user_code} \u540E\u70B9\u300C\u786E\u8BA4\u6388\u6743\u300D\uFF08\u7F51\u9875\u5173\u4E86\u7684\u8BDD\u6253\u5F00 ${url}\uFF09\u3002\u786E\u8BA4\u540E\u56DE\u5230\u8FD9\u91CC\u7EE7\u7EED\u5BF9\u8BDD\u3002` };
       return { kind: "success", text: `\u8BF7\u5728\u6D4F\u89C8\u5668\u786E\u8BA4\uFF0C\u786E\u8BA4\u7801 ${started.user_code}\uFF0C\u94FE\u63A5 ${url}` };
     }
   });
@@ -335,7 +349,10 @@ async function registerSkills(ctx, config, http) {
   const install = () => installRequired(ctx, config, catalog.required_plugins).catch(() => void 0);
   await refresh();
   await install();
+  let invalidate = () => {
+  };
   ctx.skills.registerProvider((control) => {
+    invalidate = () => control.invalidate();
     let timer;
     const pollSeconds = Math.max(15, Number(config.pollSeconds) || 60) * 1e3;
     const tick = async () => {
@@ -376,9 +393,17 @@ async function registerSkills(ctx, config, http) {
       }
     };
   });
-  return async () => {
-    await refresh();
-    return catalog.brand ?? { enabled: true, name: config.org, logo_url: "", revision: "" };
+  return {
+    readBrand: async () => {
+      await refresh();
+      return catalog.brand ?? { enabled: true, name: config.org, logo_url: "", revision: "" };
+    },
+    refreshNow: async () => {
+      if (await refresh()) {
+        invalidate();
+        await install();
+      }
+    }
   };
 }
 
@@ -409,6 +434,8 @@ var McpBridge = class {
   disposers = /* @__PURE__ */ new Map();
   session = "";
   controller;
+  /** 结束长连接的退避等待，马上重连（刚登录时用）。 */
+  wakeUp;
   /** DSH 里的工具全名 -> 服务端工具名 */
   serverNames = /* @__PURE__ */ new Map();
   metas = /* @__PURE__ */ new Map();
@@ -534,14 +561,23 @@ ${canonArgs(args)}`, body.preview);
         if (signal.aborted) break;
         await new Promise((resolve) => {
           const timer = setTimeout(resolve, delay);
+          this.wakeUp = () => {
+            clearTimeout(timer);
+            delay = 1e3;
+            resolve(void 0);
+          };
           signal.addEventListener("abort", () => {
             clearTimeout(timer);
             resolve(void 0);
           }, { once: true });
         });
+        this.wakeUp = void 0;
         delay = Math.min(delay * 2, 6e4);
       }
     })();
+  }
+  wake() {
+    this.wakeUp?.();
   }
   stop() {
     this.controller?.abort();
@@ -2799,10 +2835,14 @@ function apply(ctx, input) {
     await tokens.importPending();
     const current = await tokens.resolve();
     if (current?.value) await tokens.syncNpmrc(current.value).catch(() => false);
-    registerCommands(ctx, config, tokens);
+    let skills;
+    registerCommands(ctx, config, tokens, async () => {
+      bridge.wake();
+      await Promise.all([bridge.sync().catch(() => void 0), skills?.refreshNow()]);
+    });
     registerDoctor(ctx, config, tokens, http, bridge);
-    const readBrand = await registerSkills(ctx, config, http);
-    registerBrand(ctx, readBrand);
+    skills = await registerSkills(ctx, config, http);
+    registerBrand(ctx, skills.readBrand);
     await bridge.start();
     return () => bridge.stop();
   });

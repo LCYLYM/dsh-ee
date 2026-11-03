@@ -241,7 +241,7 @@ export default function Landing() {
             <ThemeToggle />
           </nav>
           <Link
-            to="/start"
+            to="/go"
             className="bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 active:translate-y-px"
           >
             {t("landing.enter")}
@@ -270,7 +270,7 @@ export default function Landing() {
               </p>
               <div className="mt-6 flex items-center gap-6">
                 <Link
-                  to="/start"
+                  to="/go"
                   className="inline-flex items-center gap-2 bg-brand-600 px-5 py-3 font-medium text-white transition hover:bg-brand-700 active:translate-y-px"
                 >
                   {t("landing.enter")} <ArrowRight size={16} />
@@ -380,7 +380,7 @@ export default function Landing() {
           <div className="flex flex-wrap items-end justify-between gap-8">
             <p className="max-w-xl text-2xl leading-snug font-semibold">{t("landing.closing")}</p>
             <Link
-              to="/start"
+              to="/go"
               className="inline-flex items-center gap-2 bg-white px-5 py-3 font-medium text-brand-700 transition hover:bg-brand-50 active:translate-y-px"
             >
               {t("landing.enter")} <ArrowRight size={16} />

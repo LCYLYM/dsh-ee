@@ -130,13 +130,13 @@ export function Segmented<T extends string>({
   );
 }
 
-export function CopyBox({ text, label }: { text: string; label?: string }) {
+export function CopyBox({ text, label, wrap }: { text: string; label?: string; wrap?: boolean }) {
   const [done, setDone] = useState(false);
   const { t } = useTranslation();
   return (
     <div className="group on-dark relative rounded-md bg-neutral-900 text-neutral-100">
       {label && <div className="border-b border-white/10 px-4 py-1.5 text-xs text-neutral-500">{label}</div>}
-      <pre className="overflow-x-auto px-4 py-3 pr-12 font-mono text-[13px] leading-relaxed">{text}</pre>
+      <pre className={cx("px-4 py-3 pr-12 font-mono text-[13px] leading-relaxed", wrap ? "whitespace-pre-wrap break-words" : "overflow-x-auto")}>{text}</pre>
       <Tip label={done ? t("common.copied") : t("common.copy")}>
       <button
         type="button"

@@ -32,10 +32,14 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
     // 每次启动都把令牌同步进 profile 的 .npmrc：覆盖从 tarball 地址安装、令牌轮换等情况
     const current = await tokens.resolve();
     if (current?.value) await tokens.syncNpmrc(current.value).catch(() => false);
-    registerCommands(ctx, config, tokens);
+    let skills: Awaited<ReturnType<typeof registerSkills>> | undefined;
+    registerCommands(ctx, config, tokens, async () => {
+      bridge.wake();
+      await Promise.all([bridge.sync().catch(() => undefined), skills?.refreshNow()]);
+    });
     registerDoctor(ctx, config, tokens, http, bridge);
-    const readBrand = await registerSkills(ctx, config, http);
-    registerBrand(ctx, readBrand);
+    skills = await registerSkills(ctx, config, http);
+    registerBrand(ctx, skills.readBrand);
     await bridge.start();
     return () => bridge.stop();
   });

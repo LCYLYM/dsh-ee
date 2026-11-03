@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 
 /** 只允许站内相对路径，防止 next 参数被拿来做开放重定向。 */
 function safeNext(raw: string | null) {
-  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/start";
+  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/go";
 }
 
 export default function Login() {

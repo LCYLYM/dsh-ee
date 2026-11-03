@@ -234,8 +234,8 @@ func setupBody(t func(string) string) string {
 	b.WriteString("- **LDAP（可选）**：服务地址、BaseDN、用户过滤等用 `ldap_put`；**绑定密码只能在网页填**；配完用 `ldap_test` 试连。\n")
 	b.WriteString("- **部门与角色（可选）**：问管理员有哪些部门 / 岗位需要不同权限，再 `ee_roles` 建角色、`ee_users` 分配。\n")
 	b.WriteString("- **企业连接（可选）**：新建连接要上游凭据，让管理员在网页接入；接入后帮他试连、开关工具、按角色授权。\n")
-	b.WriteString("- **DSH 接入插件**：以上改完（访问地址、默认模型改过都要）再 `connect_publish`；发布后 `setup_status` 里这一项变完成。\n\n")
+	b.WriteString("- **DSH 接入插件**：以上改完（访问地址、默认模型改过都要）再 `connect_publish`；发布后 `setup_status` 里这一项变完成。这台 DSH 上已装的接入插件不会自动升级：发布了新版本后，用 `plugin_manager` 的 `install_bundle` 安装 `<访问地址>/dl/connect/dsh-connect-<新版本>.tgz`（会弹审批），按结果提示决定要不要重启。\n\n")
 	b.WriteString("## 员工接入通知\n\n")
-	b.WriteString("`setup_status` 在地址配好后会给出 `install_command` 和 `onboarding`（一段可以直接发给员工的文案）。把它原样给管理员，提醒：员工运行命令后在浏览器点一次「授权」即可；Windows 用户看 /setup 页的 PowerShell 命令；新账号别忘了先分配额度。\n")
+	b.WriteString("`setup_status` 在地址配好后会给出 `install_command` 和 `onboarding`（一段可以直接发给员工的文案）。把它原样给管理员，提醒：员工运行命令后在浏览器点一次「授权」即可；Windows 用户看 /setup 页的 PowerShell 命令；新账号别忘了先分配额度。也可以告诉员工：登录 dsh-ee 网页后会进入「开始使用」页，复制页面上的一段话贴给 DSH，按提示点一次「确认授权」就能接入。\n")
 	return b.String()
 }

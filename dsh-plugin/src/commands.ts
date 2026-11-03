@@ -2,7 +2,13 @@ import type { DshContext, PluginConfig } from "./dsh.js";
 import { DeviceFlow, openBrowser } from "./device.js";
 import type { TokenManager } from "./token.js";
 
-export function registerCommands(ctx: DshContext, config: PluginConfig, tokens: TokenManager): void {
+/** /ee-login 后面跟的接入码（网页「开始使用」页给的），形如 ABCD-EFGH；没有就是空串。 */
+export function parseSetupCode(rawInput: string | undefined): string {
+  const code = String(rawInput ?? "").trim().toUpperCase();
+  return /^[A-Z0-9]{4}-?[A-Z0-9]{4}$/.test(code) ? code : "";
+}
+
+export function registerCommands(ctx: DshContext, config: PluginConfig, tokens: TokenManager, onLogin: () => Promise<void> = async () => {}): void {
   const commands = ctx.get("commands");
   if (!commands) return;
   const flow = new DeviceFlow(config);
@@ -14,23 +20,30 @@ export function registerCommands(ctx: DshContext, config: PluginConfig, tokens: 
 
   register({
     name: "ee-login",
-    description: "重新登录企业账号",
-    handler: async () => {
+    description: "登录企业账号（可以带上网页「开始使用」页给的接入码）",
+    input: { hint: "[接入码]" },
+    handler: async (invocation: any) => {
       if (pending) return { kind: "success", text: `请在浏览器确认，确认码 ${pending.code}，链接 ${pending.url}` };
-      const started = await flow.start();
+      const setupCode = parseSetupCode(invocation?.rawInput);
+      if (String(invocation?.rawInput ?? "").trim() && !setupCode) return { kind: "error", text: "接入码格式不对，应形如 ABCD-EFGH；不带接入码直接输入 /ee-login 也可以" };
+      const started = await flow.start(setupCode);
       const url = started.verification_uri_complete;
-      openBrowser(url);
+      // 带接入码时网页「开始使用」页正开着，会自己显示确认按钮，不再另开浏览器
+      if (!setupCode) openBrowser(url);
       const task = (async () => {
         try {
           const result = await flow.wait(started.device_code, started.interval);
           await tokens.set(result.access_token);
           await tokens.syncNpmrc(result.access_token);
+          // 立刻拉工具与技能，不等长连接退避重连和目录轮询
+          await onLogin().catch(() => undefined);
         } finally {
           pending = null;
         }
       })();
       pending = { code: started.user_code, url, task };
       void task.catch(() => undefined);
+      if (setupCode) return { kind: "success", text: `回到 dsh-ee 网页的「开始使用」页，核对确认码 ${started.user_code} 后点「确认授权」（网页关了的话打开 ${url}）。确认后回到这里继续对话。` };
       return { kind: "success", text: `请在浏览器确认，确认码 ${started.user_code}，链接 ${url}` };
     },
   });

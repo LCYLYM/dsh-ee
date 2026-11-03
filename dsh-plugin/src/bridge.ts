@@ -35,6 +35,8 @@ export class McpBridge {
   private disposers = new Map<string, () => void>();
   private session = "";
   private controller?: AbortController;
+  /** 结束长连接的退避等待，马上重连（刚登录时用）。 */
+  private wakeUp?: () => void;
   /** DSH 里的工具全名 -> 服务端工具名 */
   private serverNames = new Map<string, string>();
   private metas = new Map<string, Record<string, ActionMeta>>();
@@ -173,11 +175,17 @@ export class McpBridge {
         if (signal.aborted) break;
         await new Promise((resolve) => {
           const timer = setTimeout(resolve, delay);
+          this.wakeUp = () => { clearTimeout(timer); delay = 1000; resolve(undefined); };
           signal.addEventListener("abort", () => { clearTimeout(timer); resolve(undefined); }, { once: true });
         });
+        this.wakeUp = undefined;
         delay = Math.min(delay * 2, 60_000);
       }
     })();
+  }
+
+  wake(): void {
+    this.wakeUp?.();
   }
 
   stop(): void {

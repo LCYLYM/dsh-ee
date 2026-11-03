@@ -2,7 +2,13 @@ import type { DshContext, PluginConfig } from "./dsh.js";
 import type { HttpClient } from "./http.js";
 import { installRequired } from "./plugins.js";
 
-export async function registerSkills(ctx: DshContext, config: PluginConfig, http: HttpClient): Promise<() => Promise<any>> {
+export interface SkillsHandle {
+  readBrand: () => Promise<any>;
+  /** 立刻重新拉目录（登录之后用），有变化就通知 DSH 刷新技能列表。 */
+  refreshNow: () => Promise<void>;
+}
+
+export async function registerSkills(ctx: DshContext, config: PluginConfig, http: HttpClient): Promise<SkillsHandle> {
   let catalog: any = { skills: [], required_plugins: [] };
   let etag = "";
   // 连不上 dsh-ee（没开 VPN、服务重启）时不抛错：技能来源照常注册，之后轮询自动恢复。
@@ -22,7 +28,9 @@ export async function registerSkills(ctx: DshContext, config: PluginConfig, http
   await refresh();
   await install();
 
+  let invalidate: () => void = () => {};
   ctx.skills.registerProvider((control: any) => {
+    invalidate = () => control.invalidate();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const pollSeconds = Math.max(15, Number((config as any).pollSeconds) || 60) * 1000;
     const tick = async () => {
@@ -64,8 +72,16 @@ export async function registerSkills(ctx: DshContext, config: PluginConfig, http
       },
     };
   });
-  return async () => {
-    await refresh();
-    return catalog.brand ?? { enabled: true, name: config.org, logo_url: "", revision: "" };
+  return {
+    readBrand: async () => {
+      await refresh();
+      return catalog.brand ?? { enabled: true, name: config.org, logo_url: "", revision: "" };
+    },
+    refreshNow: async () => {
+      if (await refresh()) {
+        invalidate();
+        await install();
+      }
+    },
   };
 }

@@ -13,13 +13,17 @@ export interface DeviceStart {
 export class DeviceFlow {
   constructor(private config: PluginConfig, private fetchImpl: typeof fetch = fetch) {}
 
-  async start(): Promise<DeviceStart> {
+  /** setupCode：网页「开始使用」页给的接入码，带上后这次登录会出现在那个页面上，可以就地确认。 */
+  async start(setupCode = ""): Promise<DeviceStart> {
     const response = await this.fetchImpl(`${this.config.base}/api/device/code`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ client_name: os.hostname(), client_os: `${process.platform} ${os.release()}`, client_version: this.config.version }),
+      body: JSON.stringify({ client_name: os.hostname(), client_os: `${process.platform} ${os.release()}`, client_version: this.config.version, ...(setupCode ? { setup_code: setupCode } : {}) }),
     });
-    if (!response.ok) throw new Error(`设备登录发起失败：HTTP ${response.status}`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => null) as { error?: string } | null;
+      throw new Error(body?.error ? `设备登录发起失败：${body.error}` : `设备登录发起失败：HTTP ${response.status}`);
+    }
     return response.json() as Promise<DeviceStart>;
   }
 

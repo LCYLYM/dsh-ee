@@ -114,6 +114,30 @@ export interface Model {
   enabled: boolean;
 }
 
+export interface GetStarted {
+  code: string;
+  expires_at: string;
+  /** 贴进 DSH 的第一段话：装插件、引导登录。 */
+  prompt: string;
+  /** 登录（与管理模式）之后接着说的话。 */
+  next_prompt: string;
+  tarball_url: string;
+  package: string;
+  version: string;
+  login_command: string;
+}
+
+export interface GetStartedStatus {
+  stage: "waiting" | "pending" | "approved" | "connected" | "denied";
+  expires_at: string;
+  user_code?: string;
+  client_name?: string;
+  client_os?: string;
+  client_ip?: string;
+  token_id?: number;
+  admin_live?: boolean;
+}
+
 export interface CheckResult {
   ok: boolean;
   status: number;
@@ -871,6 +895,10 @@ export const api = {
   adminConnect: () => request<{ state: ConnectState; package?: string; stale?: boolean; patch?: string }>("GET", "/api/admin/connect"),
   publishConnect: (force = false) => request<ConnectState>("POST", "/api/admin/connect/publish", { force }),
   setupStatus: () => request<SetupStatus>("GET", "/api/admin/setup-status"),
+  welcome: () => request<{ show: boolean; dismissed: boolean; connected: boolean }>("GET", "/api/me/welcome"),
+  putWelcome: (dismissed: boolean) => request<{ dismissed: boolean }>("PUT", "/api/me/welcome", { dismissed }),
+  getStarted: (admin: boolean) => request<GetStarted>("POST", "/api/me/get-started", { admin }),
+  getStartedStatus: (code: string) => request<GetStartedStatus>("GET", `/api/me/get-started/${encodeURIComponent(code)}`),
   dshReleases: () => request<{ enabled: boolean; releases: DshRelease[] }>("GET", "/api/dsh/releases"),
   adminDshReleases: () => request<{ releases: DshRelease[] }>("GET", "/api/admin/dsh-releases").then((r) => r.releases),
   checkDshReleases: () => request<{ ok: boolean }>("POST", "/api/admin/dsh-releases/check"),

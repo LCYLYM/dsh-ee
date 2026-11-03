@@ -74,16 +74,25 @@ export async function newPage(t, { lang = "zh-CN", locale, viewport = { width: 1
   return page;
 }
 
-export async function login(page, username, password) {
+/**
+ * 登录。落点要么是部署清单（/go 上的进度条），要么是分流后的页面。
+ * 还没接入过 DSH 的账号会先被带去「开始使用」；其它测试不关心它，默认点掉（keepStart 时停在那里）。
+ */
+export async function login(page, username, password, { keepStart = false } = {}) {
   await page.goto(`${BASE}/login`);
   await page.locator("input[autocomplete=username]").fill(username);
   await page.locator("input[type=password]").fill(password);
   await page.locator("button[type=submit]").click();
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
   await Promise.race([
-    page.waitForURL((u) => !u.pathname.startsWith("/start")),
+    page.waitForURL((u) => u.pathname !== "/go"),
     page.getByRole("progressbar").waitFor(),
   ]);
+  if (!keepStart && new URL(page.url()).pathname.startsWith("/get-started")) {
+    await api(page, "PUT", "/api/me/welcome", { dismissed: true });
+    await page.goto(`${BASE}/go`);
+    await page.waitForURL((u) => u.pathname !== "/go" && !u.pathname.startsWith("/get-started"));
+  }
 }
 
 export async function logout(page) {

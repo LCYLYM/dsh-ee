@@ -60,6 +60,7 @@ type Server struct {
 	conns connClients
 	// 设置或模型变化后触发接入插件检查
 	connectKick chan struct{}
+	connectMu   sync.Mutex
 	// 有令牌开启 / 结束管理模式后触发到期监控重算
 	elevationKick chan struct{}
 	releaseFeeds  map[string]string
@@ -68,6 +69,8 @@ type Server struct {
 	releaseKick   chan struct{}
 	releaseMu     sync.Mutex
 	releaseJobs   map[string]bool
+	// 「开始使用」页的接入码
+	setupCodes setupCodes
 	// 全部路由；Agent 工具也从这里取处理函数
 	routeTable []route
 	// 由路由表生成的 Agent 工具

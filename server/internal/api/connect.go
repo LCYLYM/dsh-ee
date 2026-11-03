@@ -240,6 +240,10 @@ func (s *Server) nextConnectVersion(ctx context.Context, pkg string) (string, er
 
 // ensureConnect 内容变了（或 force）就发布新版本。返回最新状态。
 func (s *Server) ensureConnect(ctx context.Context, r *http.Request, force bool, by int64) (*connectState, error) {
+	// 网页上点发布与后台检查可能同时进来：两边会算出同一个新版本号，输的一方发布失败后
+	// 把读到的旧状态连同错误写回，接入插件就短暂显示成「未发布」。串行执行，后到的直接看到已发布的状态。
+	s.connectMu.Lock()
+	defer s.connectMu.Unlock()
 	if s.registry == nil {
 		return nil, errors.New("npm 源不可用")
 	}
@@ -366,21 +370,11 @@ func (s *Server) handleConnectInfo(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
-	var st connectState
-	if _, err := s.store.GetSettingJSON(r.Context(), connectStateKey, &st); err != nil {
+	info, err := s.connectInfoFor(r.Context(), r, set)
+	if err != nil {
 		s.internalErr(w, r, err)
 		return
 	}
-	info := connectInfo{Package: connectPackage(set), Enabled: set.Connect.Enabled, TokenEnv: connectTokenEnv, Profile: connectProfile, ServerName: s.mcpServerName(r)}
-	if st.Package == info.Package && st.Version != "" {
-		if v, err := s.store.GetVersion(r.Context(), st.Package, st.Version); err == nil && v.Status == store.StatusPublished {
-			info.Version, info.Ready = st.Version, true
-			if base, err := s.connectBase(r.Context(), r); err == nil {
-				info.TarballURL = base + "/dl/connect/" + connectTarballFile(st.Version)
-			}
-		}
-	}
-	info.Error = st.Error
 	writeJSON(w, http.StatusOK, info)
 }
 

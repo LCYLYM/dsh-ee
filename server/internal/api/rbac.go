@@ -22,7 +22,7 @@ var (
 )
 
 // 前端固定占用、不能配置成菜单的路由。
-var reservedPaths = []string{"/", "/login", "/start", "/account", "/plugins"}
+var reservedPaths = []string{"/", "/login", "/go", "/start", "/get-started", "/account", "/plugins"}
 
 func dedupe[T comparable](xs []T) []T {
 	seen := map[T]bool{}

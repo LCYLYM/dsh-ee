@@ -114,6 +114,11 @@ var agentExcluded = map[string]string{
 	"POST /v1/chat/completions":      "模型网关协议入口",
 	"POST /api/me/packages":          "网页上传；Agent 用 ee_plugins.upload（经 /api/agent/packages）",
 
+	"GET /api/me/welcome":            "网页登录后的落点判断",
+	"PUT /api/me/welcome":            "网页「开始使用」页的「以后再说」",
+	"POST /api/me/get-started":       "接入码用来把 DSH 的设备登录与网页对上，Agent 不能替自己发起授权",
+	"GET /api/me/get-started/{code}": "网页「开始使用」页轮询接入进度",
+
 	"POST /api/admin/menus/reset":     "全局破坏性操作",
 	"GET /api/admin/upstream/export":  "离线包导出必须在网页上做",
 	"POST /api/admin/upstream/import": "离线包导入必须在网页上做",

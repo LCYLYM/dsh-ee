@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import "./index.css";
@@ -22,6 +22,7 @@ import AssetDetail from "./pages/asset-detail";
 import AssetEditor from "./pages/asset-editor";
 import DevicePage from "./pages/device";
 import Onboarding from "./pages/onboarding";
+import GetStarted from "./pages/get-started";
 import { useApi } from "./lib/use-api";
 import { useTranslation } from "react-i18next";
 
@@ -34,15 +35,26 @@ function Status({ title, children }: { title: string; children?: React.ReactNode
   );
 }
 
-/** 登录后的落点：进入当前用户菜单里的第一个页面。 */
+/**
+ * /go：登录后统一的分流点。管理员的必做项没配完时就地显示部署清单；
+ * 还没有 DSH 接入过、也没点过「以后再说」的人去「开始使用」；其余进入菜单里的第一个页面。
+ */
 function Start() {
   const { homePath, loading } = useMenus();
   const { can } = useAuth();
-  const { data, loading: setupLoading, reload } = useApi<SetupStatus | null>(() => can("settings.manage") ? api.setupStatus() : Promise.resolve(null));
+  const setup = useApi<SetupStatus | null>(() => can("settings.manage") ? api.setupStatus() : Promise.resolve(null));
+  const welcome = useApi(api.welcome);
   const { t } = useTranslation();
-  if (loading || (can("settings.manage") && setupLoading)) return <Status title={t("common.loading")} />;
+  // 清单刷新时一并刷新接入状态：Agent 配置期间管理员的 DSH 会接入
+  const reload = useCallback(() => {
+    setup.reload();
+    welcome.reload();
+  }, [setup.reload, welcome.reload]);
+  // 只有第一次加载显示加载中；之后的刷新不能卸掉清单页（上面有进行中的 Agent 接入）
+  if (loading || (!setup.data && setup.loading) || (!welcome.data && welcome.loading)) return <Status title={t("common.loading")} />;
   if (!homePath) return <Status title={t("shell.noPages")}>{t("shell.noPagesHint")}</Status>;
-  if (data && !data.required_done) return <Onboarding status={data} reload={reload} />;
+  if (setup.data && !setup.data.required_done) return <Onboarding status={setup.data} reload={reload} />;
+  if (welcome.data?.show) return <Navigate to="/get-started" replace />;
   return <Navigate to={homePath} replace />;
 }
 
@@ -74,13 +86,23 @@ function AppRoutes() {
       <Route index element={<Landing />} />
       <Route path="login" element={<Login />} />
       <Route
+        path="get-started"
+        element={
+          <RequireAuth>
+            <GetStarted />
+          </RequireAuth>
+        }
+      />
+      <Route
         element={
           <RequireAuth>
             <AppLayout />
           </RequireAuth>
         }
       >
-        <Route path="start" element={<Start />} />
+        <Route path="go" element={<Start />} />
+        {/* 旧地址：书签与旧版本链接 */}
+        <Route path="start" element={<Navigate to="/go" replace />} />
         <Route path="account" element={<Account />} />
         <Route path="device" element={<DevicePage />} />
         <Route path="plugins/:name" element={<PluginDetail />} />

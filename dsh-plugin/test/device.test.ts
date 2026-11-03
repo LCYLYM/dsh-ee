@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DeviceFlow } from "../src/device.js";
 import { normalizeConfig } from "../src/config.js";
+import { parseSetupCode } from "../src/commands.js";
 
 const config = normalizeConfig({ base: "http://localhost" });
 
@@ -37,4 +38,26 @@ test("device login keeps waiting through rate_limited instead of failing", async
   const result = await flow.wait("d", 0.01, 60_000);
   assert.equal(result.access_token, "ee_at_ok");
   assert.equal(statuses.length, 0);
+});
+
+test("setup code from the start page rides along with the device request", async () => {
+  let sent: any;
+  const fake: typeof fetch = async (_url, init) => {
+    sent = JSON.parse(String(init?.body));
+    return new Response(JSON.stringify({ error: "接入码不存在或已过期" }), { status: 400 });
+  };
+  await assert.rejects(new DeviceFlow(config, fake).start("ABCD-EFGH"), /接入码不存在或已过期/);
+  assert.equal(sent.setup_code, "ABCD-EFGH");
+  await new DeviceFlow(config, async (_url, init) => {
+    sent = JSON.parse(String(init?.body));
+    return new Response(JSON.stringify({ device_code: "d", user_code: "X", verification_uri_complete: "u", interval: 1 }));
+  }).start();
+  assert.equal("setup_code" in sent, false);
+});
+
+test("/ee-login accepts a setup code with or without the dash", () => {
+  assert.equal(parseSetupCode(" abcd-efgh "), "ABCD-EFGH");
+  assert.equal(parseSetupCode("ABCDEFGH"), "ABCDEFGH");
+  assert.equal(parseSetupCode(""), "");
+  assert.equal(parseSetupCode("hello world"), "");
 });
