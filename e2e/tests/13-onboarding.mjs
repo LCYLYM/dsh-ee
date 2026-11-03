@@ -1,5 +1,5 @@
 import http from "node:http";
-import { ADMIN_PW, BASE, api, assert, assertEq, login, newPage, shot, step, tag } from "../lib.mjs";
+import { ADMIN_PW, BASE, assertEq, login, newPage, shot, step, tag } from "../lib.mjs";
 
 export default async function (t) {
   const upstream = http.createServer((req, res) => {
@@ -15,22 +15,47 @@ export default async function (t) {
     await login(page, "admin", ADMIN_PW);
     await page.goto(`${BASE}/start`);
     await page.getByRole("progressbar").waitFor();
-    await page.getByText("模型供应商", { exact: false }).first().waitFor();
-    await page.getByText("员工额度", { exact: false }).first().waitFor();
     await shot(page, "onboarding-guide");
     step("空库 /start 显示部署清单，而不是直接跳过");
 
+    await page.locator("li").filter({ hasText: "访问地址" }).getByRole("button", { name: "去处理" }).click();
+    await page.getByRole("dialog").getByLabel("员工访问地址").fill(BASE);
+    await page.getByRole("button", { name: "保存并继续" }).click();
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    step("在弹窗中保存访问地址");
+
     const port = upstream.address().port;
-    assertEq((await api(page, "POST", "/api/admin/providers", { name: `guide-${tag}`, base_url: `http://127.0.0.1:${port}`, api_key: "guide-upstream-key", models: [`guide-chat-${tag}`] })).status, 201, "接入模型供应商");
-    const settings = (await api(page, "GET", "/api/settings")).data;
-    settings.connect.defaultModel = `guide-chat-${tag}`;
-    assertEq((await api(page, "PUT", "/api/admin/settings", settings)).status, 200, "设置默认模型");
-    const user = await api(page, "POST", "/api/admin/users", { username: `guide-${tag}`, password: "guide-password-1", department: "测试部" });
-    assertEq(user.status, 201, "创建员工");
-    assertEq((await api(page, "PATCH", `/api/admin/users/${user.data.id}/quota`, { monthly_token_limit: 100000, allowed_models: [`guide-chat-${tag}`], quota_expires_at: null })).status, 200, "分配员工额度");
-    await page.goto(`${BASE}/start`);
+    await page.locator("li").filter({ hasText: "模型供应商" }).getByRole("button", { name: "去处理" }).click();
+    await page.getByRole("dialog").getByLabel("Base URL").fill(`http://127.0.0.1:${port}`);
+    await page.getByRole("dialog").getByLabel("企业 API key").fill("guide-upstream-key");
+    await page.getByRole("dialog").getByLabel("对外模型").fill("");
+    await page.getByRole("button", { name: "保存并继续" }).click();
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    step("在弹窗中接入供应商");
+
+    await page.locator("li").filter({ hasText: "上架对外模型" }).getByRole("button", { name: "去处理" }).click();
+    await page.getByRole("dialog").getByLabel("对外模型").fill(`guide-chat-${tag}`);
+    await page.getByRole("button", { name: "保存并继续" }).click();
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    step("在弹窗中上架模型");
+
+    await page.locator("li").filter({ hasText: "默认模型" }).getByRole("button", { name: "去处理" }).click();
+    await page.getByRole("dialog").getByLabel("默认模型").selectOption(`guide-chat-${tag}`);
+    await page.getByRole("button", { name: "保存并继续" }).click();
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    step("在弹窗中选择默认模型");
+
+    await page.locator("li").filter({ hasText: "员工额度" }).getByRole("button", { name: "去处理" }).click();
+    await page.getByRole("dialog").getByLabel("员工账号").selectOption("new");
+    await page.getByRole("dialog").getByLabel("用户名").fill(`guide-${tag}`);
+    await page.getByRole("dialog").getByLabel("初始密码").fill("guide-password-1");
+    await page.getByRole("dialog").getByLabel("部门").fill("测试部");
+    await page.getByRole("button", { name: "保存并继续" }).click();
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    const publish = page.getByRole("button", { name: "发布接入插件" });
+    if (await publish.count()) await publish.click();
     await page.waitForURL(`${BASE}/workbench`);
-    step("供应商、默认模型和员工额度完成后自动进入工作台");
+    step("全程不离开 /start，弹窗配置完成后自动进入工作台");
   } finally {
     upstream.close();
   }

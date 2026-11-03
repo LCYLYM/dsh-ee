@@ -196,7 +196,7 @@ curl -c ck -H 'Content-Type: application/json' \
 
 # 录入企业的 DeepSeek key
 curl -b ck -H 'Content-Type: application/json' localhost:8080/api/admin/providers \
-  -d '{"name":"deepseek","base_url":"https://api.deepseek.com","api_key":"sk-…","models":["deepseek-chat","deepseek-reasoner"]}'
+  -d '{"name":"deepseek","base_url":"https://api.deepseek.com","api_key":"sk-…","models":["deepseek-flash","deepseek-v4-pro"]}'
 
 # 建员工，并给账号分配额度（每月 200 万 token，只允许两个模型）
 curl -b ck -H 'Content-Type: application/json' localhost:8080/api/admin/users \
@@ -210,7 +210,7 @@ curl -b ck -H 'Content-Type: application/json' localhost:8080/api/admin/keys \
 
 # 员工用自己的 key 调用，任何 OpenAI 兼容客户端把 base_url 指向 http://<dsh-ee>/v1 即可
 curl localhost:8080/v1/chat/completions -H 'Authorization: Bearer sk-ee-…' -H 'Content-Type: application/json' \
-  -d '{"model":"deepseek-chat","messages":[{"role":"user","content":"你好"}]}'
+  -d '{"model":"deepseek-flash","messages":[{"role":"user","content":"你好"}]}'
 ```
 
 ## 已知限制

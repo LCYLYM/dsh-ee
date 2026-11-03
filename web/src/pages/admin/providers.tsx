@@ -15,7 +15,7 @@ import { Tip } from "@/components/tip";
  * 所以不预置模型清单，建好后用「从上游导入」读取上游实际提供的模型。
  */
 const VENDORS: { id: string; baseUrl: string; note?: boolean; models?: string[] }[] = [
-  { id: "deepseek", baseUrl: "https://api.deepseek.com", models: ["deepseek-chat", "deepseek-reasoner"] },
+  { id: "deepseek", baseUrl: "https://api.deepseek.com", models: ["deepseek-flash", "deepseek-v4-pro"] },
   { id: "qwen", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
   { id: "zhipu", baseUrl: "https://open.bigmodel.cn/api/paas/v4" },
   { id: "doubao", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", note: true },

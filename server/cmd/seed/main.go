@@ -56,9 +56,9 @@ func (u demoUser) quotaText() string {
 
 // 演示员工：覆盖普通员工、审核员、运维，以及一个没分配额度的账号。
 var demoUsers = []demoUser{
-	{"zhang.wei", "张伟", "研发效能部", []string{"member"}, 5_000_000, []string{"deepseek-chat", "deepseek-reasoner"}, true},
+	{"zhang.wei", "张伟", "研发效能部", []string{"member"}, 5_000_000, []string{"deepseek-flash", "deepseek-v4-pro"}, true},
 	{"li.na", "李娜", "财务部", []string{"member"}, 2_000_000, nil, false},
-	{"sun.hao", "孙浩", "研发效能部", []string{"member", "reviewer"}, 3_000_000, []string{"deepseek-chat"}, false},
+	{"sun.hao", "孙浩", "研发效能部", []string{"member", "reviewer"}, 3_000_000, []string{"deepseek-flash"}, false},
 	{"chen.yu", "陈宇", "数据中台", []string{"member", "ops"}, 8_000_000, nil, false},
 	{"zhou.lei", "周磊", "平台架构部", []string{"member", "ops"}, 3_000_000, nil, false},
 	{"wang.fang", "王芳", "市场部", []string{"member"}, 0, nil, false},
@@ -82,9 +82,9 @@ var demoProviders = []struct {
 	Key      string
 	Models   []string
 }{
-	{"DeepSeek（官方）", "deepseek", "https://api.deepseek.com", 10, "", []string{"deepseek-chat", "deepseek-reasoner"}},
+	{"DeepSeek（官方）", "deepseek", "https://api.deepseek.com", 10, "", []string{"deepseek-flash", "deepseek-v4-pro"}},
 	// 内部网关：同名模型排在 DeepSeek 之后，官方连不上时自动切换
-	{"内部模型网关", "custom", "http://llm-gateway.acme.internal/v1", 20, "", []string{"deepseek-chat", "qwen-plus", "glm-4"}},
+	{"内部模型网关", "custom", "http://llm-gateway.acme.internal/v1", 20, "", []string{"deepseek-flash", "qwen-plus", "glm-4"}},
 }
 
 func main() {

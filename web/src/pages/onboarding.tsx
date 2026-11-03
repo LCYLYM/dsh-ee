@@ -1,17 +1,16 @@
+import { useState, type FormEvent } from "react";
 import { Check, CheckCircle2, ArrowRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { api, type SetupStatus } from "../lib/api";
-import { useAction } from "../lib/use-api";
+import { api, type Model, type Provider, type SetupStatus, type User } from "../lib/api";
+import type { Settings } from "../lib/types";
+import { useAction, useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
 import { PageLink } from "../lib/menus";
-import { Badge, Button, Card, CopyBox } from "../components/ui";
+import { Badge, Button, Card, CopyBox, Field, inputCls } from "../components/ui";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
+import { ErrorNote } from "../components/api-ui";
 
 const pageForStep: Record<string, string> = {
-  base_url: "admin-settings",
-  provider: "admin-providers",
-  models: "admin-providers",
-  default_model: "admin-settings",
-  quota: "admin-quotas",
   ldap: "admin-settings",
   roles: "admin-roles",
   connections: "admin-connections",
@@ -19,10 +18,173 @@ const pageForStep: Record<string, string> = {
 
 const displayFont = { fontFamily: "Outfit, Satoshi, Avenir Next, Segoe UI, sans-serif" };
 
+function ConfigDialog({ step, onClose, onSaved, settings, providers, models, users }: {
+  step: SetupStatus["steps"][number];
+  onClose: () => void;
+  onSaved: () => void;
+  settings: Settings;
+  providers: Provider[];
+  models: Model[];
+  users: User[];
+}) {
+  const { t } = useTranslation();
+  const { busy, run } = useAction();
+  const [error, setError] = useState<string | null>(null);
+  const [baseUrl, setBaseUrl] = useState(settings.baseUrl);
+  const [name, setName] = useState("DeepSeek");
+  const [vendorUrl, setVendorUrl] = useState("https://api.deepseek.com");
+  const [apiKey, setApiKey] = useState("");
+  const [modelNames, setModelNames] = useState("deepseek-flash,deepseek-v4-pro");
+  const [providerId, setProviderId] = useState(String(providers[0]?.id ?? ""));
+  const [defaultModel, setDefaultModel] = useState(settings.connect.defaultModel);
+  const [userId, setUserId] = useState(String(users[0]?.id ?? "new"));
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [department, setDepartment] = useState("");
+  const [limitWan, setLimitWan] = useState("10");
+  const [allowed, setAllowed] = useState<string[]>([]);
+
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    let action: Promise<unknown>;
+    switch (step.id) {
+      case "base_url":
+        action = (async () => api.saveSettings({ ...(await api.settings()), baseUrl: baseUrl.trim() }))();
+        break;
+      case "provider":
+        action = api.createProvider({
+          name: name.trim(), vendor: "deepseek", base_url: vendorUrl.trim(), api_key: apiKey, priority: 100,
+          models: modelNames.split(",").map((v) => v.trim()).filter(Boolean),
+        });
+        break;
+      case "models":
+        action = api.createModels(Number(providerId), modelNames.split(",").map((v) => v.trim()).filter(Boolean).map((upstream_model) => ({ upstream_model })));
+        break;
+      case "default_model":
+        action = (async () => {
+          const current = await api.settings();
+          return api.saveSettings({ ...current, connect: { ...current.connect, defaultModel } });
+        })();
+        break;
+      case "quota": {
+        const limit = Math.round(Number(limitWan) * 10_000);
+        if (!Number.isFinite(limit) || limit <= 0) {
+          setError(t("onboarding.quotaInvalid"));
+          return;
+        }
+        action = (async () => {
+          let id = Number(userId);
+          if (userId === "new") {
+            const created = await api.createUser({ username: username.trim(), password, display_name: username.trim(), department: department.trim() });
+            id = created.id;
+          }
+          await api.updateUserQuota(id, { monthly_token_limit: limit, allowed_models: allowed.length ? allowed : null, quota_expires_at: null });
+        })();
+        break;
+      }
+      default:
+        return;
+    }
+    const result = await run(() => action);
+    if (!result.ok) return setError(result.error);
+    onSaved();
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{step.title}</DialogTitle>
+          <DialogDescription>{t("onboarding.dialogDesc")}</DialogDescription>
+        </DialogHeader>
+        <form id="onboarding-config" onSubmit={save} className="space-y-4">
+          {step.id === "base_url" && (
+            <Field label={t("onboarding.baseUrl")} hint={t("onboarding.baseUrlHint")}>
+              <input className={inputCls} required type="url" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
+            </Field>
+          )}
+          {step.id === "provider" && (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label={t("onboarding.providerName")}><input className={inputCls} required value={name} onChange={(e) => setName(e.target.value)} /></Field>
+                <Field label="Base URL"><input className={inputCls} required value={vendorUrl} onChange={(e) => setVendorUrl(e.target.value)} /></Field>
+              </div>
+              <Field label={t("onboarding.apiKey")}><input className={inputCls} required type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-…" /></Field>
+              <Field label={t("onboarding.modelNames")} hint={t("onboarding.modelNamesHint")}><input className={inputCls} value={modelNames} onChange={(e) => setModelNames(e.target.value)} /></Field>
+            </>
+          )}
+          {step.id === "models" && (
+            <>
+              <Field label={t("onboarding.provider")}>
+                <select className={inputCls} value={providerId} onChange={(e) => setProviderId(e.target.value)}>
+                  {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </Field>
+              <Field label={t("onboarding.modelNames")} hint={t("onboarding.modelNamesHint")}><input className={inputCls} value={modelNames} onChange={(e) => setModelNames(e.target.value)} /></Field>
+            </>
+          )}
+          {step.id === "default_model" && (
+            <Field label={t("onboarding.defaultModel")}>
+              <select className={inputCls} value={defaultModel} onChange={(e) => setDefaultModel(e.target.value)}>
+                <option value="">{t("onboarding.defaultModelAuto")}</option>
+                {models.filter((m) => m.enabled).map((m) => <option key={m.id} value={m.name}>{m.display_name || m.name}（{m.name}）</option>)}
+              </select>
+            </Field>
+          )}
+          {step.id === "quota" && (
+            <>
+              <Field label={t("onboarding.employee")}>
+                <select className={inputCls} value={userId} onChange={(e) => setUserId(e.target.value)}>
+                  {users.map((u) => <option key={u.id} value={u.id}>{u.display_name || u.username}（{u.username}）</option>)}
+                  <option value="new">{t("onboarding.newEmployee")}</option>
+                </select>
+              </Field>
+              {userId === "new" && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label={t("onboarding.username")}><input className={inputCls} required value={username} onChange={(e) => setUsername(e.target.value)} placeholder="zhang.wei" /></Field>
+                  <Field label={t("onboarding.password")}><input className={inputCls} required type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+                  <Field label={t("onboarding.department")}><input className={inputCls} value={department} onChange={(e) => setDepartment(e.target.value)} /></Field>
+                </div>
+              )}
+              <Field label={t("onboarding.monthlyQuota")} hint={t("onboarding.monthlyQuotaHint")}>
+                <input className={inputCls} inputMode="decimal" value={limitWan} onChange={(e) => setLimitWan(e.target.value)} />
+              </Field>
+              {models.length > 0 && (
+                <fieldset>
+                  <legend className="mb-2 text-sm font-medium text-neutral-700">{t("onboarding.allowedModels")}</legend>
+                  <div className="flex flex-wrap gap-3">
+                    {models.filter((m) => m.enabled).map((m) => (
+                      <label key={m.id} className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={allowed.includes(m.name)} onChange={(e) => setAllowed((xs) => e.target.checked ? [...xs, m.name] : xs.filter((x) => x !== m.name))} />
+                        {m.name}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-500">{t("onboarding.allowedModelsHint")}</p>
+                </fieldset>
+              )}
+            </>
+          )}
+          <ErrorNote>{error}</ErrorNote>
+        </form>
+        <DialogFooter>
+          <Button variant="secondary" onClick={onClose}>{t("common.cancel")}</Button>
+          <Button type="submit" form="onboarding-config" disabled={busy}>{busy ? t("common.saving") : t("onboarding.saveContinue")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Onboarding({ status, reload }: { status: SetupStatus; reload: () => void }) {
   const { t } = useTranslation();
-  const { notify } = useStore();
+  const { notify, settings } = useStore();
   const { busy, run } = useAction();
+  const [editing, setEditing] = useState<SetupStatus["steps"][number] | null>(null);
+  const providers = useApi(api.providers);
+  const models = useApi(api.models);
+  const users = useApi(api.users);
   const required = status.steps.filter((step) => !step.optional);
   const completed = required.filter((step) => step.done).length;
   const pct = required.length ? Math.round((completed / required.length) * 100) : 100;
@@ -31,6 +193,13 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
     if (!result.ok) return notify(result.error);
     notify(t("onboarding.published", { version: result.value.version }));
     reload();
+  };
+  const saved = () => {
+    setEditing(null);
+    reload();
+    providers.reload();
+    models.reload();
+    users.reload();
   };
   return (
     <div className="mx-auto max-w-6xl pb-10" style={displayFont}>
@@ -63,11 +232,7 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
         {status.steps.map((step, index) => {
           const current = !step.done && !step.optional && status.next === step.id;
           return (
-            <li
-              key={step.id}
-              className={`onboarding-step group relative grid gap-4 border-b border-stone-200/90 py-6 sm:grid-cols-[2.5rem_1fr] ${current ? "bg-teal-50/55" : ""}`}
-              style={{ animationDelay: `${120 + index * 45}ms` }}
-            >
+            <li key={step.id} className={`onboarding-step group relative grid gap-4 border-b border-stone-200/90 py-6 sm:grid-cols-[2.5rem_1fr] ${current ? "bg-teal-50/55" : ""}`} style={{ animationDelay: `${120 + index * 45}ms` }}>
               <div className="relative flex justify-center pt-1">
                 <span className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold ${step.done ? "border-teal-600 bg-teal-600 text-white" : current ? "border-teal-600 bg-white text-teal-700" : "border-stone-300 bg-white text-stone-400"}`}>
                   {step.done ? <Check size={14} strokeWidth={2} /> : index + 1}
@@ -88,11 +253,11 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
                   {!step.done && (
                     step.id === "connect" ? (
                       <Button size="sm" disabled={busy} onClick={publish}>{busy ? t("onboarding.publishing") : t("onboarding.publish")}</Button>
-                    ) : pageForStep[step.id] ? (
-                      <PageLink page={pageForStep[step.id]} className="inline-flex h-8 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-sm text-stone-600 transition hover:border-teal-600 hover:text-teal-700 active:scale-[.98]">
-                        {t("onboarding.handle")} <ArrowRight size={13} />
-                      </PageLink>
-                    ) : null
+                    ) : step.optional ? (
+                      pageForStep[step.id] ? <PageLink page={pageForStep[step.id]} className="inline-flex h-8 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-sm text-stone-600 transition hover:border-teal-600 hover:text-teal-700 active:scale-[.98]">{t("onboarding.handle")} <ArrowRight size={13} /></PageLink> : null
+                    ) : (
+                      <Button size="sm" variant="secondary" onClick={() => setEditing(step)}>{t("onboarding.handle")} <ArrowRight size={13} /></Button>
+                    )
                   )}
                 </div>
               </div>
@@ -114,6 +279,7 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
           </div>
         </section>
       )}
+      {editing && <ConfigDialog key={editing.id} step={editing} onClose={() => setEditing(null)} onSaved={saved} settings={settings} providers={providers.data ?? []} models={models.data ?? []} users={users.data ?? []} />}
     </div>
   );
 }
