@@ -37,7 +37,7 @@ function ConfigDialog({ step, onClose, onSaved, settings, providers, models, use
   const [modelNames, setModelNames] = useState("deepseek-flash,deepseek-v4-pro");
   const [providerId, setProviderId] = useState(String(providers[0]?.id ?? ""));
   const [defaultModel, setDefaultModel] = useState(settings.connect.defaultModel);
-  const [userId, setUserId] = useState(String(users[0]?.id ?? "new"));
+  const [userId, setUserId] = useState(String(users.find((u) => !u.roles?.some((r) => r.is_super))?.id ?? "new"));
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [department, setDepartment] = useState("");
@@ -134,9 +134,9 @@ function ConfigDialog({ step, onClose, onSaved, settings, providers, models, use
           )}
           {step.id === "quota" && (
             <>
-              <Field label={t("onboarding.employee")}>
+              <Field label={t("onboarding.employee")} hint={t("onboarding.employeeHint")}>
                 <select className={inputCls} value={userId} onChange={(e) => setUserId(e.target.value)}>
-                  {users.map((u) => <option key={u.id} value={u.id}>{u.display_name || u.username}（{u.username}）</option>)}
+                  {users.filter((u) => !u.roles?.some((r) => r.is_super)).map((u) => <option key={u.id} value={u.id}>{u.display_name || u.username}（{u.username}）</option>)}
                   <option value="new">{t("onboarding.newEmployee")}</option>
                 </select>
               </Field>

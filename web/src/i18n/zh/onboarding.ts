@@ -18,6 +18,7 @@ export default {
     defaultModel: "默认模型",
     defaultModelAuto: "自动选择第一个模型",
     employee: "员工账号",
+    employeeHint: "超级管理员不计入员工额度，请新建普通员工",
     newEmployee: "新建员工账号",
     username: "用户名",
     password: "初始密码",

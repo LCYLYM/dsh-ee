@@ -1,6 +1,7 @@
 import http from "node:http";
 import { ADMIN_PW, BASE, assertEq, login, newPage, shot, step, tag } from "../lib.mjs";
 
+
 export default async function (t) {
   const upstream = http.createServer((req, res) => {
     req.resume();
@@ -18,11 +19,14 @@ export default async function (t) {
     await shot(page, "onboarding-guide");
     step("空库 /start 显示部署清单，而不是直接跳过");
 
-    await page.locator("li").filter({ hasText: "访问地址" }).getByRole("button", { name: "去处理" }).click();
-    await page.getByRole("dialog").getByLabel("员工访问地址").fill(BASE);
-    await page.getByRole("button", { name: "保存并继续" }).click();
-    await page.getByRole("dialog").waitFor({ state: "hidden" });
-    step("在弹窗中保存访问地址");
+    const baseButton = page.locator("li").filter({ hasText: "访问地址" }).getByRole("button", { name: "去处理" });
+    if (await baseButton.count()) {
+      await baseButton.click();
+      await page.getByRole("dialog").getByLabel("员工访问地址").fill(BASE);
+      await page.getByRole("button", { name: "保存并继续" }).click();
+      await page.getByRole("dialog").waitFor({ state: "hidden" });
+      step("在弹窗中保存访问地址");
+    }
 
     const port = upstream.address().port;
     await page.locator("li").filter({ hasText: "模型供应商" }).getByRole("button", { name: "去处理" }).click();
@@ -46,6 +50,7 @@ export default async function (t) {
     step("在弹窗中选择默认模型");
 
     await page.locator("li").filter({ hasText: "员工额度" }).getByRole("button", { name: "去处理" }).click();
+    assertEq(await page.getByRole("dialog").getByLabel("员工账号").inputValue(), "new", "默认新建普通员工，不选超级管理员");
     await page.getByRole("dialog").getByLabel("员工账号").selectOption("new");
     await page.getByRole("dialog").getByLabel("用户名").fill(`guide-${tag}`);
     await page.getByRole("dialog").getByLabel("初始密码").fill("guide-password-1");

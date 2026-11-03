@@ -21,6 +21,7 @@ export default {
     defaultModel: "Default model",
     defaultModelAuto: "Use the first model automatically",
     employee: "Employee account",
+    employeeHint: "Super admins do not count toward employee quota. Create a regular employee",
     newEmployee: "Create employee account",
     username: "Username",
     password: "Initial password",
