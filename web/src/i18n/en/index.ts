@@ -17,6 +17,7 @@ import registry from "./registry";
 import audit from "./audit";
 import hub from "./hub";
 import tokens from "./tokens";
+import onboarding from "./onboarding";
 
 export default {
   ...common,
@@ -36,4 +37,5 @@ export default {
   ...audit,
   ...hub,
   ...tokens,
+  ...onboarding,
 } satisfies Messages<typeof zh>;

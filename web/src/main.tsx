@@ -5,7 +5,8 @@ import "./index.css";
 import "./i18n";
 import { initTheme } from "./lib/theme";
 import { StoreProvider } from "./lib/store";
-import { AuthProvider, RequireAuth } from "./lib/auth";
+import { AuthProvider, RequireAuth, useAuth } from "./lib/auth";
+import { api, type SetupStatus } from "./lib/api";
 import { MenuProvider, useMenus } from "./lib/menus";
 import { AppLayout } from "./components/layout";
 import { Toaster } from "@/components/shadcn/sonner";
@@ -20,6 +21,8 @@ import PluginDetail from "./pages/plugin-detail";
 import AssetDetail from "./pages/asset-detail";
 import AssetEditor from "./pages/asset-editor";
 import DevicePage from "./pages/device";
+import Onboarding from "./pages/onboarding";
+import { useApi } from "./lib/use-api";
 import { useTranslation } from "react-i18next";
 
 function Status({ title, children }: { title: string; children?: React.ReactNode }) {
@@ -34,9 +37,12 @@ function Status({ title, children }: { title: string; children?: React.ReactNode
 /** 登录后的落点：进入当前用户菜单里的第一个页面。 */
 function Start() {
   const { homePath, loading } = useMenus();
+  const { can } = useAuth();
+  const { data, loading: setupLoading, reload } = useApi<SetupStatus | null>(() => can("settings.manage") ? api.setupStatus() : Promise.resolve(null));
   const { t } = useTranslation();
-  if (loading) return <Status title={t("common.loading")} />;
+  if (loading || (can("settings.manage") && setupLoading)) return <Status title={t("common.loading")} />;
   if (!homePath) return <Status title={t("shell.noPages")}>{t("shell.noPagesHint")}</Status>;
+  if (data && !data.required_done) return <Onboarding status={data} reload={reload} />;
   return <Navigate to={homePath} replace />;
 }
 

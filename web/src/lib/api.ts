@@ -626,6 +626,23 @@ export interface ConnectState {
   error?: string;
 }
 
+export interface SetupStep {
+  id: string;
+  title: string;
+  done: boolean;
+  optional?: boolean;
+  detail?: string;
+  how?: string;
+}
+
+export interface SetupStatus {
+  steps: SetupStep[];
+  required_done: boolean;
+  next: string;
+  install_command?: string;
+  onboarding?: string;
+}
+
 export interface ImportResult {
   packages: number;
   added: number;
@@ -853,6 +870,7 @@ export const api = {
   connectInfo: () => request<ConnectInfo>("GET", "/api/connect"),
   adminConnect: () => request<{ state: ConnectState; package?: string; stale?: boolean; patch?: string }>("GET", "/api/admin/connect"),
   publishConnect: (force = false) => request<ConnectState>("POST", "/api/admin/connect/publish", { force }),
+  setupStatus: () => request<SetupStatus>("GET", "/api/admin/setup-status"),
   dshReleases: () => request<{ enabled: boolean; releases: DshRelease[] }>("GET", "/api/dsh/releases"),
   adminDshReleases: () => request<{ releases: DshRelease[] }>("GET", "/api/admin/dsh-releases").then((r) => r.releases),
   checkDshReleases: () => request<{ ok: boolean }>("POST", "/api/admin/dsh-releases/check"),

@@ -15,6 +15,7 @@ import registry from "./registry";
 import audit from "./audit";
 import hub from "./hub";
 import tokens from "./tokens";
+import onboarding from "./onboarding";
 
 /** 中文文案（源语言）。按页面分模块，这里合并成一棵树。 */
 export default {
@@ -35,4 +36,5 @@ export default {
   ...audit,
   ...hub,
   ...tokens,
+  ...onboarding,
 };

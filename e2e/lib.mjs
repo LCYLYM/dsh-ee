@@ -79,7 +79,11 @@ export async function login(page, username, password) {
   await page.locator("input[autocomplete=username]").fill(username);
   await page.locator("input[type=password]").fill(password);
   await page.locator("button[type=submit]").click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/login") && !u.pathname.startsWith("/start"));
+  await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+  await Promise.race([
+    page.waitForURL((u) => !u.pathname.startsWith("/start")),
+    page.getByRole("heading", { name: /首次部署向导|First-time setup guide/ }).waitFor(),
+  ]);
 }
 
 export async function logout(page) {
