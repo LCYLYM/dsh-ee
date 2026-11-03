@@ -19935,7 +19935,9 @@ var brandRemote = createTypertRemoteInfo({
     "dshEE/brand": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }
   }
 }, external_exports);
+var TAKEOVER = String("__DSH_EE_BRAND_TAKEOVER__") === "true";
 async function apply(ctx) {
+  if (!TAKEOVER) return;
   await ctx.remote.$mount(brandRemote);
   ctx.inject(["remote.dshEE"], async (brandCtx) => {
     let brand;
@@ -19945,7 +19947,7 @@ async function apply(ctx) {
     } catch {
       brand = { enabled: true, name: "\u4F01\u4E1A", logo_url: "", revision: "" };
     }
-    if (!brand || brand.enabled === false) return;
+    if (!brand || brand.enabled === false) brand = { enabled: false, name: brand?.name || "\u4F01\u4E1A", logo_url: "", revision: "" };
     brand = { ...brand, name: brand.name || "\u4F01\u4E1A" };
     const EnterpriseBrandMark = (props) => brandMark(import_react.createElement, brand, props);
     const EnterpriseBrandName = () => brandName(import_react.createElement, brand);

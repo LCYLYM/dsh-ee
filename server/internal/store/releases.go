@@ -12,6 +12,8 @@ const (
 	ReleaseDownloading = "downloading"
 	ReleaseMirrored    = "mirrored"
 	ReleaseFailed      = "failed"
+	// 被清理或手动删除的版本：保留记录，但自动镜像不再下载它，管理员仍可手动重新下载。
+	ReleaseRemoved = "removed"
 )
 
 var (
@@ -119,7 +121,7 @@ func (s *Store) UpdateDshReleaseState(ctx context.Context, id int64, state, loca
 
 func (s *Store) UpdateDshReleaseMetadata(ctx context.Context, r *DshRelease) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE dsh_releases SET released_at = ?, file = ?, size = ?, sha512 = ?, upstream_url = ?
-		WHERE id = ? AND state IN ('available', 'failed')`, r.ReleasedAt, r.File, r.Size, r.SHA512, r.UpstreamURL, r.ID)
+		WHERE id = ? AND state IN ('available', 'failed', 'removed')`, r.ReleasedAt, r.File, r.Size, r.SHA512, r.UpstreamURL, r.ID)
 	return err
 }
 
@@ -156,7 +158,7 @@ func (s *Store) SetDshReleaseRecommended(ctx context.Context, id int64) error {
 }
 
 func (s *Store) ResetDshRelease(ctx context.Context, id int64) error {
-	res, err := s.db.ExecContext(ctx, `UPDATE dsh_releases SET state = 'available', local_path = NULL, error = NULL, mirrored_at = NULL
+	res, err := s.db.ExecContext(ctx, `UPDATE dsh_releases SET state = 'removed', local_path = NULL, error = NULL, mirrored_at = NULL
 		WHERE id = ? AND recommended = 0`, id)
 	if err != nil {
 		return err

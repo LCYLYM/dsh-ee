@@ -154,8 +154,11 @@ func (s *Server) dmgFromManifest(target string, m *dshManifest) (*store.DshRelea
 		return nil, err
 	}
 	r.ReleasedAt = zip.ReleasedAt
-	u, _ := url.Parse(r.UpstreamURL)
-	r.File = path.Base(u.Path)
+	// 官方 DMG 地址固定不变，本地文件名带上版本号，免得新版本覆盖旧版本。
+	r.File = fmt.Sprintf("deepseek-harness-%s-%s.dmg", m.Version, target)
+	if _, err := s.releasePartPath(r); err != nil {
+		return nil, err
+	}
 	return r, nil
 }
 
@@ -217,8 +220,15 @@ func (s *Server) syncDshReleases(ctx context.Context) error {
 			errs = append(errs, err)
 			continue
 		}
+		// 自动镜像只下载每种安装包的最新版本；被清理或删除（removed）的旧版本不会被拉回来。
+		newest := map[string]time.Time{}
 		for _, item := range items {
-			if item.State == store.ReleaseAvailable || item.State == store.ReleaseFailed {
+			if item.ReleasedAt.After(newest[item.Kind]) {
+				newest[item.Kind] = item.ReleasedAt
+			}
+		}
+		for _, item := range items {
+			if (item.State == store.ReleaseAvailable || item.State == store.ReleaseFailed) && item.ReleasedAt.Equal(newest[item.Kind]) {
 				if err := s.downloadDshRelease(ctx, item.ID); err != nil {
 					errs = append(errs, err)
 				}
@@ -368,12 +378,22 @@ func (s *Server) cleanupDshReleases(ctx context.Context, target string, keep int
 	if err != nil {
 		return err
 	}
-	var mirrored []*store.DshRelease
+	// zip 与 dmg 各自保留 keep 个。
+	byKind := map[string][]*store.DshRelease{}
 	for _, r := range items {
 		if r.State == store.ReleaseMirrored {
-			mirrored = append(mirrored, r)
+			byKind[r.Kind] = append(byKind[r.Kind], r)
 		}
 	}
+	for _, mirrored := range byKind {
+		if err := s.pruneDshReleases(ctx, mirrored, keep); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Server) pruneDshReleases(ctx context.Context, mirrored []*store.DshRelease, keep int) error {
 	sort.Slice(mirrored, func(i, j int) bool {
 		if mirrored[i].ReleasedAt.Equal(mirrored[j].ReleasedAt) {
 			return mirrored[i].ID > mirrored[j].ID

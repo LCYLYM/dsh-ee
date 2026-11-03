@@ -139,6 +139,7 @@ dsh-ee：%s
 		connectTokenEnv, base)
 
 	clientJS := bytes.ReplaceAll(connectClientJS, []byte("__DSH_EE_PACKAGE__"), []byte(pkg))
+	clientJS = bytes.ReplaceAll(clientJS, []byte("__DSH_EE_BRAND_TAKEOVER__"), []byte(strconv.FormatBool(set.Brand.Enabled)))
 	files := map[string][]byte{"index.js": connectIndexJS, "client.js": clientJS, "cordis.patch.yml": patch, "README.md": []byte(readme)}
 	h := sha256.New()
 	for _, name := range []string{"index.js", "client.js", "cordis.patch.yml", "README.md"} {

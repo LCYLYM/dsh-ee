@@ -45,7 +45,7 @@ function ReleaseTable({ target, title, rows, busy, act }: { target: DshTarget; t
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-2">
-                      {((r.state ?? "available") === "available" || (r.state ?? "available") === "failed") && (
+                      {((r.state ?? "available") === "available" || (r.state ?? "available") === "failed" || r.state === "removed") && (
                         <Button size="sm" variant="secondary" disabled={busy === r.id} onClick={() => act(r.id, "mirror")}>{t("distributionAdmin.mirror")}</Button>
                       )}
                       {(r.state ?? "available") === "mirrored" && !r.recommended && (

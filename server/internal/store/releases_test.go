@@ -52,7 +52,7 @@ func TestDshReleaseStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	old, err = st.DshReleaseByID(ctx, first.ID)
-	if err != nil || old.State != ReleaseAvailable || old.LocalPath != "" || old.MirroredAt != nil {
-		t.Fatalf("删除本地文件后应回到 available：%+v %v", old, err)
+	if err != nil || old.State != ReleaseRemoved || old.LocalPath != "" || old.MirroredAt != nil {
+		t.Fatalf("删除本地文件后应变为 removed：%+v %v", old, err)
 	}
 }

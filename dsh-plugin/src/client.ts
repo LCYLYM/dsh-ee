@@ -12,7 +12,12 @@ const brandRemote = createTypertRemoteInfo({
   },
 }, z);
 
+// 安装插件时，dsh-ee 是否已在补丁里关掉官方品牌插件（由服务端在生成包时替换）。
+// 只有关掉了才能接管品牌位置，否则会与官方品牌插件冲突；之后品牌开关怎么变，都不影响这个判断。
+const TAKEOVER = String("__DSH_EE_BRAND_TAKEOVER__") === "true";
+
 export async function apply(ctx: any): Promise<void> {
+  if (!TAKEOVER) return;
   await ctx.remote.$mount(brandRemote);
   ctx.inject(["remote.dshEE"], async (brandCtx: any) => {
     let brand: BrandViewData;
@@ -22,7 +27,8 @@ export async function apply(ctx: any): Promise<void> {
     } catch {
       brand = { enabled: true, name: "企业", logo_url: "", revision: "" };
     }
-    if (!brand || brand.enabled === false) return;
+    // 品牌在运行时被关闭或取不到时，显示中性的首字母图标与名称，而不是官方 logo。
+    if (!brand || brand.enabled === false) brand = { enabled: false, name: brand?.name || "企业", logo_url: "", revision: "" };
     brand = { ...brand, name: brand.name || "企业" };
     const EnterpriseBrandMark = (props: { size?: number }) => brandMark(createElement, brand, props);
     const EnterpriseBrandName = () => brandName(createElement, brand);

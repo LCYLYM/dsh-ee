@@ -32,6 +32,9 @@ func TestConnectBrandBundle(t *testing.T) {
 	if !strings.Contains(string(files["client.js"]), `id: "@company/dsh-connect"`) {
 		t.Fatalf("浏览器产物应替换真实包名：%s", files["client.js"][:200])
 	}
+	if !strings.Contains(string(files["client.js"]), `String("false") === "true"`) {
+		t.Fatal("品牌关闭时浏览器产物不应接管品牌位置")
+	}
 	manifest := string(connectManifest("@company/dsh-connect", "1.0.1", "企业"))
 	for _, want := range []string{`".": {`, `"./client"`, `"client.js"`, `"platform": "web"`, `"@deepseek-ai/dsh-api-remotes"`} {
 		if !strings.Contains(manifest, want) {
@@ -54,6 +57,9 @@ func TestConnectBrandBundle(t *testing.T) {
 	}
 	if !strings.Contains(string(enabledFiles["cordis.patch.yml"]), "- id: ui-brand-official\n  disabled: true") {
 		t.Fatalf("品牌启用时应关闭官方品牌：%s", enabledFiles["cordis.patch.yml"])
+	}
+	if !strings.Contains(string(enabledFiles["client.js"]), `String("true") === "true"`) {
+		t.Fatal("品牌启用时浏览器产物应接管品牌位置")
 	}
 	if enabledHash == disabledHash {
 		t.Fatal("品牌变化必须改变插件内容哈希")

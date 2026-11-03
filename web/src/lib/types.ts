@@ -52,7 +52,7 @@ export interface Plugin {
 }
 
 export type DshTarget = "mac-arm64" | "mac-x64";
-export type DshReleaseState = "available" | "downloading" | "mirrored" | "failed";
+export type DshReleaseState = "available" | "downloading" | "mirrored" | "failed" | "removed";
 
 export interface DshRelease {
   id: number;

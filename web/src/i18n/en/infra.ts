@@ -64,7 +64,7 @@ export default {
     colSize: "Size",
     colState: "State",
     colActions: "Actions",
-    state: { available: "Available", downloading: "Downloading", mirrored: "Mirrored", failed: "Failed" },
+    state: { available: "Available", downloading: "Downloading", mirrored: "Mirrored", failed: "Failed", removed: "Removed" },
     progress: "Downloaded {{downloaded}} · {{pct}}%",
     mirror: "Download to dsh-ee",
     recommend: "Set as recommended",

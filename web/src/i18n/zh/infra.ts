@@ -62,7 +62,7 @@ export default {
     colSize: "大小",
     colState: "状态",
     colActions: "操作",
-    state: { available: "待下载", downloading: "下载中", mirrored: "已镜像", failed: "失败" },
+    state: { available: "待下载", downloading: "下载中", mirrored: "已镜像", failed: "失败", removed: "已移除" },
     progress: "已下载 {{downloaded}} · {{pct}}%",
     mirror: "下载到 dsh-ee",
     recommend: "设为推荐",

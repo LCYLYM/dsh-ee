@@ -242,7 +242,7 @@ func TestDshReleaseCleanupKeepsRecommended(t *testing.T) {
 	for _, r := range items {
 		states[r.Version] = r.State
 	}
-	if states["1.0.1"] != store.ReleaseMirrored || states["1.0.3"] != store.ReleaseMirrored || states["1.0.4"] != store.ReleaseMirrored || states["1.0.2"] != store.ReleaseAvailable {
+	if states["1.0.1"] != store.ReleaseMirrored || states["1.0.3"] != store.ReleaseMirrored || states["1.0.4"] != store.ReleaseMirrored || states["1.0.2"] != store.ReleaseRemoved {
 		t.Fatalf("清理结果：%v", states)
 	}
 	if _, err := os.Stat(oldest.LocalPath); err != nil {
@@ -262,5 +262,83 @@ func TestDshReleaseDMGHash(t *testing.T) {
 	}
 	if r.State != store.ReleaseMirrored || r.Size != int64(len(f.content)) || r.SHA512 != f.manifestSHA {
 		t.Fatalf("DMG 应自行计算大小和 sha512：%+v", r)
+	}
+}
+
+func TestDshReleaseMirrorDoesNotRedownloadRemoved(t *testing.T) {
+	f := newReleaseFixture(t, "mirror")
+	ctx := context.Background()
+	if err := f.s.syncDshReleases(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r, err := f.st.DshReleaseByVersion(ctx, "mac-arm64", "zip", "1.2.3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.st.ResetDshRelease(ctx, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	before := f.downloads.Load()
+	if err := f.s.syncDshReleases(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if f.downloads.Load() != before {
+		t.Fatalf("被移除的版本不应被自动镜像重新下载：%d -> %d", before, f.downloads.Load())
+	}
+	got, _ := f.st.DshReleaseByID(ctx, r.ID)
+	if got.State != store.ReleaseRemoved {
+		t.Fatalf("状态应保持 removed：%s", got.State)
+	}
+	// 管理员仍可手动重新下载。
+	if err := f.s.downloadDshRelease(ctx, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = f.st.DshReleaseByID(ctx, r.ID)
+	if got.State != store.ReleaseMirrored {
+		t.Fatalf("手动下载后应为 mirrored：%s", got.State)
+	}
+}
+
+func TestDshReleaseDMGVersionedFileAndSeparateCleanup(t *testing.T) {
+	f := newReleaseFixture(t, "notify")
+	m := &dshManifest{Version: "1.2.3", ReleaseDate: "2026-11-02T12:00:00Z"}
+	m.Files = append(m.Files, struct {
+		URL    string `yaml:"url"`
+		SHA512 string `yaml:"sha512"`
+		Size   int64  `yaml:"size"`
+	}{f.upstream.URL + "/bin/dsh.zip", f.manifestSHA, f.manifestSize})
+	a, err := f.s.dmgFromManifest("mac-arm64", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Version = "1.2.4"
+	b, err := f.s.dmgFromManifest("mac-arm64", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.File == b.File || !strings.Contains(a.File, "1.2.3") {
+		t.Fatalf("DMG 本地文件名应带版本：%s %s", a.File, b.File)
+	}
+	// 1 个 zip + 2 个 dmg，各自保留 1 个：zip 不应被 dmg 挤掉。
+	ctx := context.Background()
+	mk := func(kind, version, file string, day int) {
+		r := &store.DshRelease{Target: "mac-arm64", Kind: kind, Version: version, ReleasedAt: time.Date(2026, 1, day, 0, 0, 0, 0, time.UTC), File: file, Size: 1, SHA512: "aGFzaA==", UpstreamURL: f.upstream.URL, State: store.ReleaseMirrored}
+		r.LocalPath = filepath.Join(f.s.opts.DataDir, file)
+		_ = os.WriteFile(r.LocalPath, []byte{1}, 0o600)
+		if err := f.st.CreateDshRelease(ctx, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mk("zip", "1.0.0", "a.zip", 1)
+	mk("dmg", "1.0.1", "b.dmg", 2)
+	mk("dmg", "1.0.2", "c.dmg", 3)
+	if err := f.s.cleanupDshReleases(ctx, "mac-arm64", 1); err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range []struct{ kind, ver, want string }{{"zip", "1.0.0", store.ReleaseMirrored}, {"dmg", "1.0.1", store.ReleaseRemoved}, {"dmg", "1.0.2", store.ReleaseMirrored}} {
+		r, _ := f.st.DshReleaseByVersion(ctx, "mac-arm64", v.kind, v.ver)
+		if r.State != v.want {
+			t.Errorf("%s %s 状态 %s，期望 %s", v.kind, v.ver, r.State, v.want)
+		}
 	}
 }
