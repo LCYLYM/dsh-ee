@@ -14,7 +14,7 @@ export default async function (t) {
     const page = await newPage(t);
     await login(page, "admin", ADMIN_PW);
     await page.goto(`${BASE}/start`);
-    await page.getByRole("heading", { name: "首次部署向导" }).waitFor();
+    await page.getByRole("progressbar").waitFor();
     await page.getByText("模型供应商", { exact: false }).first().waitFor();
     await page.getByText("员工额度", { exact: false }).first().waitFor();
     await shot(page, "onboarding-guide");

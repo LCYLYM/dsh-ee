@@ -2,6 +2,11 @@ export default {
   onboarding: {
     title: "首次部署向导",
     desc: "按清单完成必做配置；已经完成的步骤会自动跳过。",
+    kicker: "WELCOME TO DSH-EE",
+    heroTitle: "把企业能力，一次性配置到位",
+    heroDesc: "跟随清晰的步骤完成首次部署。每一步都有明确去向，完成后自动进入工作台。",
+    progress: "部署进度 {{done}}/{{total}}",
+    requiredLabel: "必做步骤",
     optional: "可选",
     done: "已完成",
     next: "下一步",

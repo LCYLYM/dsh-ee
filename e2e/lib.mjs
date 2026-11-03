@@ -82,7 +82,7 @@ export async function login(page, username, password) {
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
   await Promise.race([
     page.waitForURL((u) => !u.pathname.startsWith("/start")),
-    page.getByRole("heading", { name: /首次部署向导|First-time setup guide/ }).waitFor(),
+    page.getByRole("progressbar").waitFor(),
   ]);
 }
 
