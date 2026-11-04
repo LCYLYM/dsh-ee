@@ -77,7 +77,7 @@ function section(createElement: (...args: any[]) => any, title: string, ...child
   );
 }
 
-export function enterprisePanel(createElement: (...args: any[]) => any, org: string, state: EnterprisePanelState, actions: EnterprisePanelActions) {
+export function enterprisePanel(createElement: (...args: any[]) => any, org: string, state: EnterprisePanelState, actions: EnterprisePanelActions, AppsPanel?: any) {
   const { data, failed, busy, notice, doctor } = state;
   const me = data?.me;
   const quota = effectiveQuota(data?.usage);
@@ -101,6 +101,7 @@ export function enterprisePanel(createElement: (...args: any[]) => any, org: str
         createElement("dd", { key: `${label}-value`, style: { margin: 0 } }, value),
       ]),
     ));
+    if (AppsPanel) children.push(createElement(AppsPanel, { key: "apps" }));
     children.push(section(createElement, "本月额度",
       quota === undefined ? "额度信息不可用" : quota === null ? "不限额" : createElement("div", {},
         createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 7 } },

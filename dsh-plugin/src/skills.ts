@@ -11,6 +11,8 @@ export interface CatalogApp {
   launch: "new" | "resume";
   version: number;
   missing?: string[];
+  asset_id?: number;
+  web_url?: string;
 }
 
 export interface SkillsHandle {
@@ -91,7 +93,7 @@ export async function registerSkills(ctx: DshContext, config: PluginConfig, http
     },
     readApps: async () => {
       await refresh();
-      return catalog.apps ?? [];
+      return (catalog.apps ?? []).map((app: CatalogApp) => ({ ...app, web_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : undefined }));
     },
     refreshNow: async () => {
       if (await refresh()) {

@@ -110,6 +110,7 @@ type dshApp struct {
 	Starters    []string `json:"starters"`
 	Launch      string   `json:"launch"`
 	Version     int      `json:"version"`
+	AssetID     int64    `json:"asset_id"`
 	// 依赖的技能、连接里，当前员工没有权限的，前端提示「部分能力不可用」
 	Missing []string `json:"missing,omitempty"`
 }
@@ -193,7 +194,7 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 				if starters == nil {
 					starters = []string{}
 				}
-				c.Apps = append(c.Apps, dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Version: lv.Version})
+				c.Apps = append(c.Apps, dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Version: lv.Version, AssetID: a.ID})
 			}
 		case store.KindConnection:
 			c.conns = append(c.conns, &dshConn{asset: a, version: lv.Version, spec: sp})

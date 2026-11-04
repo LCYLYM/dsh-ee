@@ -4,8 +4,9 @@ import { z } from "zod";
 import { brandMark, brandName, type BrandViewData } from "./brand-view.js";
 import type { EnterpriseOverview } from "./overview.js";
 import { enterpriseHeader, enterprisePanel, enterpriseTabId, registerEnterpriseStatus, type DoctorViewData } from "./status-view.js";
+import { registerApps } from "./apps-client.js";
 
-export const inject = ["slots", "remote", "sidebarRightTabs", "sidebarRight"];
+export const inject = ["slots", "remote", "sidebarRightTabs", "sidebarRight", "sessions", "conversation", "workspaces"];
 
 const clientRemote = createTypertRemoteInfo({
   package: "__DSH_EE_PACKAGE__",
@@ -78,6 +79,7 @@ export async function apply(ctx: any): Promise<void> {
     const remote = remoteCtx.remote.dshEE;
     const overview = createOverviewStore(remote);
     const useOverview = (_remote?: any) => overview.use();
+    const { AppsPanel } = registerApps(ctx, remote, useOverview, unwrapRemote);
     let brand: BrandViewData;
     try {
       brand = unwrapRemote(await remote.brand());
@@ -116,7 +118,7 @@ export async function apply(ctx: any): Promise<void> {
         setDoctor(undefined);
         void state.refresh();
       };
-      return enterprisePanel(createElement, org, { ...state, notice, doctor }, { login: () => void login(), refresh, doctor: () => void diagnose() });
+      return enterprisePanel(createElement, org, { ...state, notice, doctor }, { login: () => void login(), refresh, doctor: () => void diagnose() }, AppsPanel);
     };
     const EnterpriseHeader = () => {
       const state = useOverview(remote);

@@ -27,7 +27,7 @@ __export(client_exports, {
   inject: () => inject
 });
 module.exports = __toCommonJS(client_exports);
-var import_react = require("react");
+var import_react2 = require("react");
 
 // node_modules/@deepseek-ai/dsh-typert-protocol/lib/index.js
 var TYPERT_OWNED_VALUE = Symbol.for("dsh.typert.owned-value");
@@ -19895,10 +19895,10 @@ function date4(params) {
 }
 
 // src/brand-view.ts
-function brandMark(createElement2, brand, props = {}) {
+function brandMark(createElement3, brand, props = {}) {
   const size = props.size ?? 32;
   if (brand.logo_url) {
-    return createElement2("img", {
+    return createElement3("img", {
       src: brand.logo_url,
       alt: brand.name,
       width: size,
@@ -19907,7 +19907,7 @@ function brandMark(createElement2, brand, props = {}) {
     });
   }
   const letter = (brand.name.trim().charAt(0) || "\u4F01").toUpperCase();
-  return createElement2("span", {
+  return createElement3("span", {
     "aria-label": brand.name,
     style: {
       width: size,
@@ -19923,8 +19923,8 @@ function brandMark(createElement2, brand, props = {}) {
     }
   }, letter);
 }
-function brandName(createElement2, brand) {
-  return createElement2("span", { "data-dsh-ee-brand": brand.revision || "neutral" }, brand.name);
+function brandName(createElement3, brand) {
+  return createElement3("span", { "data-dsh-ee-brand": brand.revision || "neutral" }, brand.name);
 }
 
 // src/status-view.ts
@@ -19959,34 +19959,34 @@ function adminRemaining(me, now = Date.now()) {
   if (minutes >= 60) return `\u8FD8\u5269 ${Math.floor(minutes / 60)} \u5C0F\u65F6 ${minutes % 60} \u5206\u949F`;
   return `\u8FD8\u5269 ${minutes} \u5206\u949F`;
 }
-function button(createElement2, label, onClick, busy = false) {
-  return createElement2("button", {
+function button(createElement3, label, onClick, busy = false) {
+  return createElement3("button", {
     type: "button",
     onClick,
     disabled: busy,
     style: { padding: "6px 10px", border: "1px solid currentColor", borderRadius: 6, background: "transparent", color: "inherit", cursor: busy ? "wait" : "pointer", opacity: busy ? 0.55 : 1 }
   }, label);
 }
-function section(createElement2, title, ...children) {
-  return createElement2(
+function section(createElement3, title, ...children) {
+  return createElement3(
     "section",
     { style: { marginTop: 18, paddingTop: 14, borderTop: "1px solid color-mix(in srgb, currentColor 14%, transparent)" } },
-    createElement2("h3", { style: { margin: "0 0 10px", fontSize: 13 } }, title),
+    createElement3("h3", { style: { margin: "0 0 10px", fontSize: 13 } }, title),
     ...children
   );
 }
-function enterprisePanel(createElement2, org, state, actions) {
+function enterprisePanel(createElement3, org, state, actions, AppsPanel) {
   const { data, failed, busy, notice, doctor } = state;
   const me = data?.me;
   const quota = effectiveQuota(data?.usage);
-  const children = [createElement2("h2", { key: "title", style: { margin: "0 0 16px", fontSize: 16 } }, org)];
+  const children = [createElement3("h2", { key: "title", style: { margin: "0 0 16px", fontSize: 16 } }, org)];
   if (!data || !me) {
-    children.push(createElement2("p", { key: "state", style: { lineHeight: 1.6 } }, failed ? "\u672A\u767B\u5F55\u6216\u8FDE\u63A5\u4E0D\u53EF\u7528\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55\u3002" : "\u6B63\u5728\u8BFB\u53D6\u4F01\u4E1A\u8D26\u53F7\u2026"));
-    if (failed) children.push(createElement2(
+    children.push(createElement3("p", { key: "state", style: { lineHeight: 1.6 } }, failed ? "\u672A\u767B\u5F55\u6216\u8FDE\u63A5\u4E0D\u53EF\u7528\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55\u3002" : "\u6B63\u5728\u8BFB\u53D6\u4F01\u4E1A\u8D26\u53F7\u2026"));
+    if (failed) children.push(createElement3(
       "div",
       { key: "actions", style: { display: "flex", gap: 8 } },
-      button(createElement2, busy ? "\u6B63\u5728\u53D1\u8D77\u767B\u5F55\u2026" : "\u767B\u5F55", actions.login, busy),
-      button(createElement2, "\u5237\u65B0", actions.refresh, busy)
+      button(createElement3, busy ? "\u6B63\u5728\u53D1\u8D77\u767B\u5F55\u2026" : "\u767B\u5F55", actions.login, busy),
+      button(createElement3, "\u5237\u65B0", actions.refresh, busy)
     ));
   } else {
     const rows = [
@@ -19995,72 +19995,73 @@ function enterprisePanel(createElement2, org, state, actions) {
       ["\u4EE4\u724C\u6709\u6548\u671F", me.expires_at ? `${me.expires_at.slice(0, 10)} \u5230\u671F` : "\u957F\u671F\u6709\u6548"],
       ["\u7BA1\u7406\u6A21\u5F0F", adminRemaining(me)]
     ];
-    children.push(createElement2(
+    children.push(createElement3(
       "dl",
       { key: "account", style: { margin: 0, display: "grid", gridTemplateColumns: "80px 1fr", gap: "12px 8px" } },
       ...rows.flatMap(([label, value]) => [
-        createElement2("dt", { key: `${label}-label`, style: { opacity: 0.65 } }, label),
-        createElement2("dd", { key: `${label}-value`, style: { margin: 0 } }, value)
+        createElement3("dt", { key: `${label}-label`, style: { opacity: 0.65 } }, label),
+        createElement3("dd", { key: `${label}-value`, style: { margin: 0 } }, value)
       ])
     ));
+    if (AppsPanel) children.push(createElement3(AppsPanel, { key: "apps" }));
     children.push(section(
-      createElement2,
+      createElement3,
       "\u672C\u6708\u989D\u5EA6",
-      quota === void 0 ? "\u989D\u5EA6\u4FE1\u606F\u4E0D\u53EF\u7528" : quota === null ? "\u4E0D\u9650\u989D" : createElement2(
+      quota === void 0 ? "\u989D\u5EA6\u4FE1\u606F\u4E0D\u53EF\u7528" : quota === null ? "\u4E0D\u9650\u989D" : createElement3(
         "div",
         {},
-        createElement2(
+        createElement3(
           "div",
           { style: { display: "flex", justifyContent: "space-between", marginBottom: 7 } },
-          createElement2("span", {}, `${formatTokens(quota.used)} / ${formatTokens(quota.limit)}`),
-          createElement2("span", { style: { color: quota.usedRatio >= 0.9 ? "#d97706" : "inherit" } }, `\u5269\u4F59 ${quota.remainingPercent}%`)
+          createElement3("span", {}, `${formatTokens(quota.used)} / ${formatTokens(quota.limit)}`),
+          createElement3("span", { style: { color: quota.usedRatio >= 0.9 ? "#d97706" : "inherit" } }, `\u5269\u4F59 ${quota.remainingPercent}%`)
         ),
-        createElement2(
+        createElement3(
           "div",
           { role: "progressbar", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(quota.usedRatio * 100), style: { height: 6, borderRadius: 3, overflow: "hidden", background: "color-mix(in srgb, currentColor 12%, transparent)" } },
-          createElement2("div", { style: { width: `${quota.usedRatio * 100}%`, height: "100%", background: quota.usedRatio >= 0.9 ? "#d97706" : "#2563eb" } })
+          createElement3("div", { style: { width: `${quota.usedRatio * 100}%`, height: "100%", background: quota.usedRatio >= 0.9 ? "#d97706" : "#2563eb" } })
         )
       )
     ));
     children.push(section(
-      createElement2,
+      createElement3,
       "\u4F01\u4E1A\u6A21\u578B",
-      createElement2("div", {}, `\u9ED8\u8BA4\uFF1A${data.default_model || "\u672A\u8BBE\u7F6E"}`),
-      createElement2("div", { style: { marginTop: 6, opacity: 0.75, lineHeight: 1.5 } }, data.models.length ? data.models.join("\u3001") : "\u6CA1\u6709\u53EF\u7528\u6A21\u578B\u6216\u6A21\u578B\u5217\u8868\u4E0D\u53EF\u7528")
+      createElement3("div", {}, `\u9ED8\u8BA4\uFF1A${data.default_model || "\u672A\u8BBE\u7F6E"}`),
+      createElement3("div", { style: { marginTop: 6, opacity: 0.75, lineHeight: 1.5 } }, data.models.length ? data.models.join("\u3001") : "\u6CA1\u6709\u53EF\u7528\u6A21\u578B\u6216\u6A21\u578B\u5217\u8868\u4E0D\u53EF\u7528")
     ));
     children.push(section(
-      createElement2,
+      createElement3,
       "\u63A5\u5165\u72B6\u6001",
-      createElement2("div", { style: { lineHeight: 1.6 } }, `\u63D2\u4EF6 ${data.version}${data.latest_version && data.latest_version !== data.version ? ` \xB7 \u65B0\u7248\u672C ${data.latest_version}` : " \xB7 \u5DF2\u662F\u6700\u65B0"}`),
-      createElement2(
+      createElement3("div", { style: { lineHeight: 1.6 } }, `\u63D2\u4EF6 ${data.version}${data.latest_version && data.latest_version !== data.version ? ` \xB7 \u65B0\u7248\u672C ${data.latest_version}` : " \xB7 \u5DF2\u662F\u6700\u65B0"}`),
+      createElement3(
         "div",
         { style: { display: "flex", gap: 8, marginTop: 10 } },
-        button(createElement2, busy ? "\u8BCA\u65AD\u4E2D\u2026" : "\u8BCA\u65AD", actions.doctor, busy),
-        button(createElement2, "\u5237\u65B0", actions.refresh, busy)
+        button(createElement3, busy ? "\u8BCA\u65AD\u4E2D\u2026" : "\u8BCA\u65AD", actions.doctor, busy),
+        button(createElement3, "\u5237\u65B0", actions.refresh, busy)
       )
     ));
   }
-  if (notice) children.push(createElement2("p", { key: "notice", role: "status", style: { lineHeight: 1.6, overflowWrap: "anywhere" } }, notice));
+  if (notice) children.push(createElement3("p", { key: "notice", role: "status", style: { lineHeight: 1.6, overflowWrap: "anywhere" } }, notice));
   if (doctor) children.push(section(
-    createElement2,
+    createElement3,
     `\u8BCA\u65AD\u7ED3\u679C\uFF1A${doctor.summary}`,
-    createElement2(
+    createElement3(
       "ul",
       { style: { margin: 0, paddingLeft: 18, lineHeight: 1.6 } },
-      ...doctor.checks.map((check2) => createElement2("li", { key: check2.id, style: { color: check2.status === "ok" ? "inherit" : check2.status === "warn" ? "#d97706" : "#d92d20" } }, `${check2.title}${check2.fix ? `\uFF1B${check2.fix}` : ""}`))
+      ...doctor.checks.map((check2) => createElement3("li", { key: check2.id, style: { color: check2.status === "ok" ? "inherit" : check2.status === "warn" ? "#d97706" : "#d92d20" } }, `${check2.title}${check2.fix ? `\uFF1B${check2.fix}` : ""}`))
     )
   ));
-  return createElement2("main", {
+  return createElement3("main", {
     "data-dsh-ee-ui": "panel",
     "data-dsh-ee-state": data ? "connected" : failed ? "disconnected" : "loading",
     style: { padding: 16, color: "inherit", fontSize: 13 }
   }, ...children);
 }
-function enterpriseHeader(createElement2, data, failed, onClick) {
+function enterpriseHeader(createElement3, data, failed, onClick) {
   const me = data?.me;
   const quota = effectiveQuota(data?.usage);
   const label = !me ? failed ? "\u4F01\u4E1A \xB7 \u672A\u767B\u5F55" : "\u4F01\u4E1A \xB7 \u68C0\u67E5\u4E2D" : me.admin_live ? `\u7BA1\u7406\u6A21\u5F0F \xB7 ${adminRemaining(me)}` : quota ? `\u4F01\u4E1A\u6A21\u578B \xB7 \u5269\u4F59 ${quota.remainingPercent}%` : `\u4F01\u4E1A\u6A21\u578B \xB7 ${me.username}`;
-  return createElement2("button", {
+  return createElement3("button", {
     type: "button",
     onClick,
     "data-dsh-ee-ui": "header",
@@ -20087,8 +20088,325 @@ function registerEnterpriseStatus(ctx, org, EnterprisePanel, EnterpriseHeader) {
   ));
 }
 
+// src/apps-client.ts
+var import_react = require("react");
+
+// src/apps-view.ts
+var buttonStyle = { border: 0, background: "transparent", color: "inherit", cursor: "pointer", padding: 0, textAlign: "left" };
+function appIcon(createElement3, app) {
+  return createElement3("span", {
+    "aria-hidden": true,
+    style: { width: 30, height: 30, flex: "0 0 30px", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "color-mix(in srgb, currentColor 10%, transparent)", fontSize: 16 }
+  }, app.icon || Array.from(app.title)[0] || "?");
+}
+function appTile(createElement3, app, onOpen) {
+  return createElement3(
+    "button",
+    {
+      type: "button",
+      onClick: onOpen,
+      title: app.description,
+      style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, minWidth: 0, flex: 1, padding: "5px 0" }
+    },
+    appIcon(createElement3, app),
+    createElement3("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title)
+  );
+}
+function appMenu(createElement3, app, actions) {
+  return createElement3(
+    "details",
+    { style: { position: "relative", flex: "0 0 auto" } },
+    createElement3("summary", { "aria-label": `${app.title}\u66F4\u591A\u64CD\u4F5C`, style: { cursor: "pointer", listStyle: "none", padding: "4px 6px" } }, "\u22EF"),
+    createElement3(
+      "div",
+      { style: { position: "absolute", right: 0, zIndex: 20, minWidth: 130, padding: 6, borderRadius: 7, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", boxShadow: "0 5px 20px #0002" } },
+      createElement3("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.fill(app) }, "\u586B\u8FDB\u8F93\u5165\u6846"),
+      createElement3("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.web(app) }, "\u5728\u7F51\u9875\u67E5\u770B")
+    )
+  );
+}
+function appRow(createElement3, app, actions) {
+  return createElement3(
+    "div",
+    { key: app.name, style: { display: "flex", alignItems: "center", gap: 4 } },
+    appTile(createElement3, app, () => actions.open(app)),
+    app.missing?.length ? createElement3("span", { title: `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528") : null,
+    appMenu(createElement3, app, actions)
+  );
+}
+function appsSection(createElement3, state, actions) {
+  if (!state.loggedIn) {
+    return createElement3(
+      "section",
+      { "data-dsh-ee-ui": "apps", style: { padding: "10px 12px", fontSize: 13 } },
+      createElement3("div", { style: { marginBottom: 8 } }, "\u767B\u5F55\u540E\u67E5\u770B\u4F01\u4E1A\u5E94\u7528"),
+      createElement3("button", { type: "button", onClick: actions.login, style: { ...buttonStyle, border: "1px solid currentColor", borderRadius: 6, padding: "5px 10px" } }, "\u767B\u5F55")
+    );
+  }
+  if (!state.apps.length) return null;
+  const query = state.query?.trim().toLowerCase() ?? "";
+  const filtered = state.apps.filter((app) => !query || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(query));
+  const shown = state.expanded ? filtered : filtered.slice(0, 6);
+  return createElement3(
+    "section",
+    { "data-dsh-ee-ui": "apps", style: { padding: "10px 12px", fontSize: 13 } },
+    createElement3("h2", { style: { margin: "0 0 7px", fontSize: 13 } }, "\u4F01\u4E1A\u5E94\u7528"),
+    state.apps.length > 8 ? createElement3("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }) : null,
+    createElement3("div", { style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement3, app, actions))),
+    !state.expanded && filtered.length > 6 ? createElement3("button", { type: "button", onClick: actions.toggle, style: { ...buttonStyle, marginTop: 7, opacity: 0.7 } }, `\u66F4\u591A\uFF08${filtered.length - 6}\uFF09`) : null,
+    state.notice ? createElement3("p", { role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null
+  );
+}
+function heroAppsMenu(createElement3, apps, onOpen, query = "", onSearch = () => {
+}) {
+  if (!apps.length) return null;
+  const normalized = query.trim().toLowerCase();
+  const shown = apps.filter((app) => !normalized || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(normalized)).slice(0, 8);
+  return createElement3(
+    "details",
+    { "data-dsh-ee-ui": "hero-apps", style: { position: "relative", display: "inline-block" } },
+    createElement3("summary", { style: { cursor: "pointer", listStyle: "none", fontSize: 12, padding: "4px 7px", whiteSpace: "nowrap" } }, "\u4F01\u4E1A\u5E94\u7528"),
+    createElement3(
+      "div",
+      { style: { position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 30, width: 280, padding: 8, borderRadius: 8, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 8px 30px #0003" } },
+      apps.length > 8 ? createElement3("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: query, onChange: (event) => onSearch(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid #8886", background: "transparent", color: "inherit" } }) : null,
+      createElement3("div", { style: { display: "grid", gap: 4 } }, ...shown.map((app) => createElement3(
+        "button",
+        {
+          key: app.name,
+          type: "button",
+          onClick: () => onOpen(app),
+          style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, padding: 7, borderRadius: 6, width: "100%" }
+        },
+        appIcon(createElement3, app),
+        createElement3(
+          "span",
+          { style: { minWidth: 0 } },
+          createElement3("span", { style: { display: "block", fontSize: 13 } }, app.title),
+          createElement3("span", { style: { display: "block", fontSize: 11, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.starters[0] || app.description)
+        )
+      )))
+    )
+  );
+}
+function startText(app, starter) {
+  return `/${app.name}${starter ? `
+${starter}` : ""}`;
+}
+
+// src/host-session.ts
+function currentSessionOf(snapshot) {
+  if (typeof snapshot?.current === "string") return snapshot.current;
+  const rows = Object.values(snapshot?.byId ?? {});
+  return rows.find((row) => (row?.retainedBy?.mainView ?? 0) > 0)?.id ?? "";
+}
+async function openSession(ctx, id) {
+  const ui = typeof ctx?.get === "function" ? ctx.get("uiWorkspace") : void 0;
+  if (typeof ui?.openSession === "function") {
+    await ui.openSession(id);
+    return;
+  }
+  if (typeof ctx?.sessions?.open === "function") {
+    await ctx.sessions.open(id);
+    return;
+  }
+  throw new Error("\u5BBF\u4E3B\u4E0D\u652F\u6301\u5207\u6362\u4F1A\u8BDD");
+}
+async function createSession(ctx) {
+  let workspace;
+  if (typeof ctx?.workspaces?.initializeDefault === "function") {
+    workspace = await ctx.workspaces.initializeDefault();
+  } else if (typeof ctx?.workspaces?.create === "function") {
+    const snapshot = ctx.sessions?.list?.getSnapshot?.();
+    const id = currentSessionOf(snapshot);
+    const cwd = snapshot?.byId?.[id]?.cwd;
+    if (!cwd) throw new Error("\u5F53\u524D\u4F1A\u8BDD\u6CA1\u6709\u53EF\u7528\u4E8E\u65B0\u5EFA\u4F1A\u8BDD\u7684\u5DE5\u4F5C\u76EE\u5F55");
+    workspace = await ctx.workspaces.create({ path: cwd });
+  } else {
+    throw new Error("\u5BBF\u4E3B\u4E0D\u652F\u6301\u521B\u5EFA\u5DE5\u4F5C\u533A");
+  }
+  if (typeof workspace?.workspaceId !== "string" || !workspace.workspaceId || typeof ctx?.sessions?.create !== "function") {
+    throw new Error("\u65E0\u6CD5\u4E3A\u65B0\u4F1A\u8BDD\u53D6\u5F97\u5DE5\u4F5C\u533A");
+  }
+  return ctx.sessions.create({ workspaceId: workspace.workspaceId });
+}
+function checkSendResult(result) {
+  if (result?.kind === "error" || result?.ok === false) {
+    throw new Error(result.text || result.error?.message || result.error?.code || "\u5BBF\u4E3B\u62D2\u7EDD\u4E86\u6D88\u606F");
+  }
+}
+async function sendToSession(ctx, id, text) {
+  const sessions = ctx?.sessions;
+  const send = async (session2) => {
+    if (session2 && typeof ctx?.conversation?.sendSession === "function") {
+      checkSendResult(await ctx.conversation.sendSession(session2, text, [], "queue"));
+      return;
+    }
+    if (session2 && typeof session2.prompt === "function") {
+      checkSendResult(await session2.prompt([{ type: "text", text }], "queue"));
+      return;
+    }
+    throw new Error("\u5BBF\u4E3B\u4E0D\u652F\u6301\u53D1\u9001\u6D88\u606F");
+  };
+  if (typeof sessions?.using === "function") {
+    await sessions.using(id, { source: "dshEEApps" }, async (ref) => {
+      const binding = await ref.ready;
+      await send(binding.session);
+    });
+    return;
+  }
+  let session;
+  for (let i = 0; i < 10; i++) {
+    session = sessions?.binding?.(id)?.session;
+    if (session) break;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  await send(session);
+}
+function fillInput(ctx, text) {
+  try {
+    const resolver = ctx?.conversation?.input;
+    if (typeof resolver?.for !== "function") return false;
+    const snapshot = ctx.sessions?.list?.getSnapshot?.();
+    const id = currentSessionOf(snapshot);
+    const scope = id ? ctx.sessions?.scope?.(id) : null;
+    if (!scope) return false;
+    const input2 = resolver.for(scope);
+    const state = input2?.state?.getSnapshot?.();
+    if (!state || typeof state.draft !== "string" || !Number.isInteger(state.draftRev) || !["plain", "claimed"].includes(state.phase) || !Array.isArray(state.occurrences)) return false;
+    const compactReferences = typeof snapshot?.current !== "string";
+    let end = state.draft.length;
+    let previousEnd = 0;
+    for (const item of state.occurrences) {
+      if (!Number.isInteger(item.offset) || !Number.isInteger(item.length) || item.length < 0 || item.offset < previousEnd || item.offset + item.length > state.draft.length) return false;
+      previousEnd = item.offset + item.length;
+      if (compactReferences) end += 1 - item.length;
+    }
+    const span = { start: end, end, draftRev: state.draftRev };
+    const addition = (state.draft.trim() ? "\n\n" : "") + text;
+    const inserted = typeof input2.actions?.insertText === "function" ? input2.actions.insertText(addition, span) === true : scope.bail?.("slash/input-insert-text", { text: addition, span }) === true;
+    if (inserted) {
+      try {
+        input2.focus?.();
+      } catch {
+      }
+    }
+    return inserted;
+  } catch {
+    return false;
+  }
+}
+
+// src/apps-client.ts
+function registerApps(ctx, remote, useOverview, unwrapRemote2) {
+  let snapshot = { apps: [], busy: false };
+  let started = false;
+  const listeners = /* @__PURE__ */ new Set();
+  const update = (patch) => {
+    snapshot = { ...snapshot, ...patch };
+    for (const listener of listeners) listener();
+  };
+  const refresh = async () => {
+    update({ busy: true });
+    try {
+      const apps = unwrapRemote2(await remote.apps());
+      update({ apps: Array.isArray(apps) ? apps : [] });
+    } catch {
+      update({ apps: [] });
+    } finally {
+      update({ busy: false });
+    }
+  };
+  const useApps = () => {
+    const [local, setLocal] = (0, import_react.useState)(snapshot);
+    (0, import_react.useEffect)(() => {
+      const listener = () => setLocal(snapshot);
+      listeners.add(listener);
+      listener();
+      void refresh();
+      if (!started) {
+        started = true;
+        setInterval(() => void refresh(), 6e4);
+      }
+      return () => {
+        listeners.delete(listener);
+      };
+    }, []);
+    return local;
+  };
+  const copy = async (app) => {
+    const command = `/${app.name}`;
+    await navigator.clipboard?.writeText(command);
+    return `\u5DF2\u590D\u5236 ${command}\uFF0C\u7C98\u8D34\u5230\u8F93\u5165\u6846\u53D1\u9001`;
+  };
+  const fill = async (app) => {
+    if (fillInput(ctx, `/${app.name}`)) return "\u5DF2\u586B\u8FDB\u8F93\u5165\u6846\uFF0C\u786E\u8BA4\u540E\u53D1\u9001";
+    return copy(app);
+  };
+  const launchNew = async (app) => {
+    const id = await createSession(ctx);
+    await openSession(ctx, id);
+    await sendToSession(ctx, id, startText(app));
+  };
+  const launchHero = async (app) => {
+    const id = currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
+    if (!id) throw new Error("\u5F53\u524D\u6CA1\u6709\u7A7A\u767D\u4F1A\u8BDD");
+    await sendToSession(ctx, id, startText(app, app.starters[0]));
+  };
+  const openWithFallback = async (app, launch) => {
+    try {
+      await launch(app);
+      return "";
+    } catch {
+      return fill(app);
+    }
+  };
+  const web = (app) => {
+    if (app.web_url) window.open(app.web_url, "_blank", "noopener,noreferrer");
+  };
+  const useActions = (setNotice, launch) => ({
+    login: () => {
+      void remote.login().then((result) => setNotice(unwrapRemote2(result)?.text || "\u8BF7\u5728\u6D4F\u89C8\u5668\u5B8C\u6210\u4F01\u4E1A\u767B\u5F55\u3002")).catch(() => setNotice("\u53D1\u8D77\u767B\u5F55\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002"));
+    },
+    open: (app) => {
+      void openWithFallback(app, launch).then(setNotice);
+    },
+    fill: (app) => {
+      void fill(app).then(setNotice);
+    },
+    web,
+    toggle: () => {
+    },
+    search: () => {
+    }
+  });
+  const AppsSection = () => {
+    const overview = useOverview();
+    const state = useApps();
+    const [expanded, setExpanded] = (0, import_react.useState)(false);
+    const [query, setQuery] = (0, import_react.useState)("");
+    const [notice, setNotice] = (0, import_react.useState)("");
+    if (!overview.data && !overview.failed) return null;
+    const actions = { ...useActions(setNotice, launchNew), toggle: () => setExpanded(!expanded), search: setQuery };
+    return appsSection(import_react.createElement, { apps: state.apps, loggedIn: !!overview.data?.me, expanded, query, notice }, actions);
+  };
+  const HeroApps = () => {
+    const state = useApps();
+    const [query, setQuery] = (0, import_react.useState)("");
+    const [, setNotice] = (0, import_react.useState)("");
+    const open2 = (app) => {
+      void openWithFallback(app, launchHero).then(setNotice);
+    };
+    return heroAppsMenu(import_react.createElement, state.apps, open2, query, setQuery);
+  };
+  const AppsPanel = () => (0, import_react.createElement)(AppsSection);
+  ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({ name: "sidebar.footer.action", id: "dsh-ee-apps", order: 30, label: "\u4F01\u4E1A\u5E94\u7528" }, AppsSection));
+  ctx.slots.inject("conversation.hero.options", () => ctx.slots.register({ name: "conversation.hero.options", id: "dsh-ee-apps", order: 100, label: "\u4F01\u4E1A\u5E94\u7528" }, HeroApps));
+  return { AppsPanel };
+}
+
 // src/client.ts
-var inject = ["slots", "remote", "sidebarRightTabs", "sidebarRight"];
+var inject = ["slots", "remote", "sidebarRightTabs", "sidebarRight", "sessions", "conversation", "workspaces"];
 var clientRemote = createTypertRemoteInfo({
   package: "__DSH_EE_PACKAGE__",
   methods: {
@@ -20127,8 +20445,8 @@ function createOverviewStore(remote) {
     }
   };
   const use = () => {
-    const [local, setLocal] = (0, import_react.useState)(snapshot);
-    (0, import_react.useEffect)(() => {
+    const [local, setLocal] = (0, import_react2.useState)(snapshot);
+    (0, import_react2.useEffect)(() => {
       const listener = () => setLocal(snapshot);
       listeners.add(listener);
       listener();
@@ -20150,6 +20468,7 @@ async function apply(ctx) {
     const remote = remoteCtx.remote.dshEE;
     const overview = createOverviewStore(remote);
     const useOverview = (_remote) => overview.use();
+    const { AppsPanel } = registerApps(ctx, remote, useOverview, unwrapRemote);
     let brand;
     try {
       brand = unwrapRemote(await remote.brand());
@@ -20159,8 +20478,8 @@ async function apply(ctx) {
     const org = brand?.name || "\u4F01\u4E1A";
     const EnterprisePanel = () => {
       const state = useOverview(remote);
-      const [notice, setNotice] = (0, import_react.useState)("");
-      const [doctor, setDoctor] = (0, import_react.useState)(void 0);
+      const [notice, setNotice] = (0, import_react2.useState)("");
+      const [doctor, setDoctor] = (0, import_react2.useState)(void 0);
       const login = async () => {
         state.setBusy(true);
         try {
@@ -20187,7 +20506,7 @@ async function apply(ctx) {
         setDoctor(void 0);
         void state.refresh();
       };
-      return enterprisePanel(import_react.createElement, org, { ...state, notice, doctor }, { login: () => void login(), refresh, doctor: () => void diagnose() });
+      return enterprisePanel(import_react2.createElement, org, { ...state, notice, doctor }, { login: () => void login(), refresh, doctor: () => void diagnose() }, AppsPanel);
     };
     const EnterpriseHeader = () => {
       const state = useOverview(remote);
@@ -20195,14 +20514,14 @@ async function apply(ctx) {
         ctx.sidebarRight.openTab("dsh-ee-enterprise");
         if (state.failed) void remote.login().catch(() => void 0);
       };
-      return enterpriseHeader(import_react.createElement, state.data, state.failed, onClick);
+      return enterpriseHeader(import_react2.createElement, state.data, state.failed, onClick);
     };
     registerEnterpriseStatus(ctx, org, EnterprisePanel, EnterpriseHeader);
     if (!TAKEOVER) return;
     if (!brand || brand.enabled === false) brand = { enabled: false, name: org, logo_url: "", revision: "" };
     brand = { ...brand, name: org };
-    const EnterpriseBrandMark = (props) => brandMark(import_react.createElement, brand, props);
-    const EnterpriseBrandName = () => brandName(import_react.createElement, brand);
+    const EnterpriseBrandMark = (props) => brandMark(import_react2.createElement, brand, props);
+    const EnterpriseBrandName = () => brandName(import_react2.createElement, brand);
     ctx.slots.inject("sidebar.brand.mark", () => ctx.slots.inject("sidebar.brand.name", () => ctx.slots.inject("conversation.hero.brand.mark", function* () {
       yield ctx.slots.register({ name: "sidebar.brand.mark" }, EnterpriseBrandMark);
       yield ctx.slots.register({ name: "sidebar.brand.name" }, EnterpriseBrandName);

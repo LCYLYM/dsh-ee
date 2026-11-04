@@ -403,7 +403,7 @@ async function registerSkills(ctx, config, http) {
     },
     readApps: async () => {
       await refresh();
-      return catalog.apps ?? [];
+      return (catalog.apps ?? []).map((app) => ({ ...app, web_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : void 0 }));
     },
     refreshNow: async () => {
       if (await refresh()) {
