@@ -1,6 +1,7 @@
 import { createElement, useEffect, useState } from "react";
 import { appsSection, heroAppsMenu, startText, type AppsViewActions } from "./apps-view.js";
-import { createSession, currentSessionOf, fillInput, openSession, sendToSession } from "./host-session.js";
+import { fillInput } from "./host-session.js";
+import { createLauncher, singleFlight } from "./app-launcher.js";
 import type { CatalogApp } from "./skills.js";
 import type { AppBindingMap } from "./app-bindings.js";
 import { applicationStatus, createSessionSnapshotAdapter, visibleAppStatus } from "./session-status.js";
@@ -22,7 +23,7 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     snapshot = { ...snapshot, ...patch };
     for (const listener of listeners) listener();
   };
-  const refresh = async () => {
+  const refresh = singleFlight(async () => {
     update({ busy: true });
     try {
       const apps = unwrapRemote(await remote.apps());
@@ -40,7 +41,12 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     } finally {
       update({ busy: false });
     }
-  };
+  });
+  // 目录轮询跟着插件的生命周期走：插件卸载或热重载时撤销
+  ctx.effect(() => {
+    const timer = setInterval(() => { if (started) void refresh(); }, 60_000);
+    return () => clearInterval(timer);
+  });
   const readSessions = () => adaptSessions(ctx.sessions?.list?.getSnapshot?.(), ctx.get("uiSession")?.sessionStatus);
   ctx.effect(() => {
     update({ sessionSnapshot: readSessions() });
@@ -53,11 +59,8 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
       const listener = () => setLocal(snapshot);
       listeners.add(listener);
       listener();
+      started = true;
       void refresh();
-      if (!started) {
-        started = true;
-        setInterval(() => void refresh(), 60_000);
-      }
       return () => { listeners.delete(listener); };
     }, []);
     return local;
@@ -81,41 +84,19 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     if (id) seen.add(`${app.name}:${id}`);
     update({ sessionSnapshot: snapshot.sessionSnapshot });
   };
-  const launchNew = async (app: CatalogApp) => {
-    const id = await createSession(ctx);
-    await openSession(ctx, id);
-    await bind(app, id).catch(() => undefined);
-    await sendToSession(ctx, id, startText(app));
-  };
+  const launcher = createLauncher(ctx, { bind });
   const launchSidebar = async (app: CatalogApp) => {
     const id = snapshot.bindings[app.name]?.sessionId;
     const archived = ctx.workspaces?.list?.getSnapshot?.()?.archivedSessionIds;
     const listed = !Array.isArray(snapshot.sessionSnapshot?.ids) || snapshot.sessionSnapshot.ids.includes(id);
     if (app.launch === "resume" && id && listed && snapshot.sessionSnapshot?.byId?.[id] && !archived?.includes?.(id)) {
       markSeen(app);
-      try {
-        await openSession(ctx, id);
-        return;
-      } catch {
-        await launchNew(app);
-        return;
-      }
+      await launcher.resume(app, id);
+      return;
     }
-    await launchNew(app);
+    await launcher.launchNew(app);
   };
-  const launchHero = async (app: CatalogApp) => {
-    const id = currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
-    if (!id) throw new Error("当前没有空白会话");
-    await sendToSession(ctx, id, startText(app, app.starters[0]));
-  };
-  const openWithFallback = async (app: CatalogApp, launch: (app: CatalogApp) => Promise<void>) => {
-    try {
-      await launch(app);
-      return "";
-    } catch {
-      return fill(app);
-    }
-  };
+  const openWithFallback = (app: CatalogApp, launch: (app: CatalogApp) => Promise<void>) => launcher.run(() => launch(app), () => fill(app));
   const web = (app: CatalogApp) => {
     if (app.web_url) window.open(app.web_url, "_blank", "noopener,noreferrer");
   };
@@ -123,7 +104,7 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
   const useActions = (setNotice: (notice: string) => void, launch: (app: CatalogApp) => Promise<void>): AppsViewActions => ({
     login: () => { void remote.login().then((result: any) => setNotice(unwrapRemote(result)?.text || "请在浏览器完成企业登录。")).catch(() => setNotice("发起登录失败，请稍后重试。")); },
     open: (app) => { markSeen(app); void openWithFallback(app, launch).then(setNotice); },
-    newSession: (app) => { void openWithFallback(app, launchNew).then(setNotice); },
+    newSession: (app) => { void openWithFallback(app, (target) => launcher.launchNew(target)).then(setNotice); },
     unbind: (app) => { void remote.unbindApp({ name: app.name }).then((result: any) => { const bindings = unwrapRemote(result); update({ bindings }); setNotice("已解除绑定"); }).catch(() => setNotice("解除绑定失败，请稍后重试。")); },
     fill: (app) => { void fill(app).then(setNotice); },
     web,
@@ -149,7 +130,7 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     const state = useApps();
     const [query, setQuery] = useState("");
     const [notice, setNotice] = useState("");
-    const open = (app: CatalogApp) => { void openWithFallback(app, launchHero).then(setNotice); };
+    const open = (app: CatalogApp) => { void openWithFallback(app, launcher.launchHero).then(setNotice); };
     return heroAppsMenu(createElement, state.apps, open, query, setQuery, notice);
   };
   const AppsPanel = () => createElement(AppsSection);

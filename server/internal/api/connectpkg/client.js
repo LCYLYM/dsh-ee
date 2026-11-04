@@ -20302,6 +20302,73 @@ function fillInput(ctx, text) {
   }
 }
 
+// src/app-launcher.ts
+var SendUnknownError = class extends Error {
+  constructor(cause) {
+    super("\u6D88\u606F\u53EF\u80FD\u6CA1\u6709\u53D1\u51FA\uFF0C\u8BF7\u67E5\u770B\u4F1A\u8BDD\u540E\u518D\u8BD5");
+    this.cause = cause;
+  }
+};
+var sendUnknownNotice = "\u6D88\u606F\u53EF\u80FD\u6CA1\u6709\u53D1\u51FA\uFF0C\u8BF7\u67E5\u770B\u4F1A\u8BDD\u540E\u518D\u8BD5";
+async function sendOnce(ctx, id, text) {
+  try {
+    await sendToSession(ctx, id, text);
+  } catch (error62) {
+    throw new SendUnknownError(error62);
+  }
+}
+function createLauncher(ctx, deps) {
+  const after = async (app, id) => {
+    try {
+      await deps.afterLaunch?.(app, id);
+    } catch {
+    }
+  };
+  const bind = (app, id) => deps.bind(app, id).catch(() => void 0);
+  const launchNew = async (app, starter) => {
+    const id = await createSession(ctx);
+    await openSession(ctx, id);
+    await bind(app, id);
+    await sendOnce(ctx, id, startText(app, starter));
+    await after(app, id);
+  };
+  const launchHero = async (app) => {
+    const id = currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
+    if (!id) throw new Error("\u5F53\u524D\u6CA1\u6709\u7A7A\u767D\u4F1A\u8BDD");
+    await sendOnce(ctx, id, startText(app, app.starters[0]));
+    await bind(app, id);
+    await after(app, id);
+  };
+  const resume = async (app, id) => {
+    try {
+      await openSession(ctx, id);
+    } catch {
+      await launchNew(app);
+      return;
+    }
+    await after(app, id);
+  };
+  const run = async (launch, fallback) => {
+    try {
+      await launch();
+      return "";
+    } catch (error62) {
+      if (error62 instanceof SendUnknownError) return sendUnknownNotice;
+      return fallback();
+    }
+  };
+  return { launchNew, launchHero, resume, run };
+}
+function singleFlight(fn) {
+  let running;
+  return () => {
+    if (!running) running = fn().finally(() => {
+      running = void 0;
+    });
+    return running;
+  };
+}
+
 // src/session-status.ts
 function createSessionSnapshotAdapter() {
   const previousRunning = /* @__PURE__ */ new Map();
@@ -20375,7 +20442,7 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     snapshot = { ...snapshot, ...patch };
     for (const listener of listeners) listener();
   };
-  const refresh = async () => {
+  const refresh = singleFlight(async () => {
     update({ busy: true });
     try {
       const apps = unwrapRemote2(await remote.apps());
@@ -20393,7 +20460,13 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     } finally {
       update({ busy: false });
     }
-  };
+  });
+  ctx.effect(() => {
+    const timer = setInterval(() => {
+      if (started) void refresh();
+    }, 6e4);
+    return () => clearInterval(timer);
+  });
   const readSessions = () => adaptSessions(ctx.sessions?.list?.getSnapshot?.(), ctx.get("uiSession")?.sessionStatus);
   ctx.effect(() => {
     update({ sessionSnapshot: readSessions() });
@@ -20408,11 +20481,8 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
       const listener = () => setLocal(snapshot);
       listeners.add(listener);
       listener();
+      started = true;
       void refresh();
-      if (!started) {
-        started = true;
-        setInterval(() => void refresh(), 6e4);
-      }
       return () => {
         listeners.delete(listener);
       };
@@ -20437,41 +20507,19 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     if (id) seen.add(`${app.name}:${id}`);
     update({ sessionSnapshot: snapshot.sessionSnapshot });
   };
-  const launchNew = async (app) => {
-    const id = await createSession(ctx);
-    await openSession(ctx, id);
-    await bind(app, id).catch(() => void 0);
-    await sendToSession(ctx, id, startText(app));
-  };
+  const launcher = createLauncher(ctx, { bind });
   const launchSidebar = async (app) => {
     const id = snapshot.bindings[app.name]?.sessionId;
     const archived = ctx.workspaces?.list?.getSnapshot?.()?.archivedSessionIds;
     const listed = !Array.isArray(snapshot.sessionSnapshot?.ids) || snapshot.sessionSnapshot.ids.includes(id);
     if (app.launch === "resume" && id && listed && snapshot.sessionSnapshot?.byId?.[id] && !archived?.includes?.(id)) {
       markSeen(app);
-      try {
-        await openSession(ctx, id);
-        return;
-      } catch {
-        await launchNew(app);
-        return;
-      }
+      await launcher.resume(app, id);
+      return;
     }
-    await launchNew(app);
+    await launcher.launchNew(app);
   };
-  const launchHero = async (app) => {
-    const id = currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
-    if (!id) throw new Error("\u5F53\u524D\u6CA1\u6709\u7A7A\u767D\u4F1A\u8BDD");
-    await sendToSession(ctx, id, startText(app, app.starters[0]));
-  };
-  const openWithFallback = async (app, launch) => {
-    try {
-      await launch(app);
-      return "";
-    } catch {
-      return fill(app);
-    }
-  };
+  const openWithFallback = (app, launch) => launcher.run(() => launch(app), () => fill(app));
   const web = (app) => {
     if (app.web_url) window.open(app.web_url, "_blank", "noopener,noreferrer");
   };
@@ -20484,7 +20532,7 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
       void openWithFallback(app, launch).then(setNotice);
     },
     newSession: (app) => {
-      void openWithFallback(app, launchNew).then(setNotice);
+      void openWithFallback(app, (target) => launcher.launchNew(target)).then(setNotice);
     },
     unbind: (app) => {
       void remote.unbindApp({ name: app.name }).then((result) => {
@@ -20521,7 +20569,7 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     const [query, setQuery] = (0, import_react.useState)("");
     const [notice, setNotice] = (0, import_react.useState)("");
     const open2 = (app) => {
-      void openWithFallback(app, launchHero).then(setNotice);
+      void openWithFallback(app, launcher.launchHero).then(setNotice);
     };
     return heroAppsMenu(import_react.createElement, state.apps, open2, query, setQuery, notice);
   };
