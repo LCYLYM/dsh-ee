@@ -351,7 +351,12 @@ func (s *Store) UpdateAsset(ctx context.Context, id int64, p AssetPatch) error {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
+		var existing int64
+		err := s.db.QueryRowContext(ctx, "SELECT id FROM assets WHERE id = ?", id).Scan(&existing)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
 	}
 	return nil
 }

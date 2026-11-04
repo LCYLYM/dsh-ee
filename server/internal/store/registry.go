@@ -318,7 +318,15 @@ func updateCatalog(ctx context.Context, e execer, name string, p CatalogPatch) e
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
+		var existing string
+		queryer := e.(interface {
+			QueryRowContext(context.Context, string, ...any) *sql.Row
+		})
+		err := queryer.QueryRowContext(ctx, "SELECT name FROM npm_packages WHERE name = ?", name).Scan(&existing)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
 	}
 	return nil
 }
