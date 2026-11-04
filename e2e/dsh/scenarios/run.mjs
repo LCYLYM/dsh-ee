@@ -115,6 +115,9 @@ async function main() {
     const botEnv = scenarioEnv('bot', botToken)
     botEnv.NPM_CONFIG_USERCONFIG = legacyEnv.NPM_CONFIG_USERCONFIG
     botEnv.npm_config_userconfig = legacyEnv.npm_config_userconfig
+    const botProfile = path.join(botEnv.DSH_HOME, 'profiles/headless')
+    fs.mkdirSync(botProfile, { recursive: true })
+    fs.copyFileSync(path.join(legacyEnv.DSH_HOME, 'profiles/headless/.npmrc'), path.join(botProfile, '.npmrc'))
     await command(['plugin', '--profile', 'headless', 'add', `${published.package}@latest`], botEnv, { echo: true })
     assert.ok(!fs.existsSync(path.join(botEnv.DSH_HOME, '.env')))
     const botOutput = await command(['headless', '--json', 'Run the bot environment-only turn'], botEnv)

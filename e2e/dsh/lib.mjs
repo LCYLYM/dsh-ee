@@ -80,6 +80,7 @@ export function createDsh({ dsh, repo, chrome, workspaceLabel }) {
     const input = page.locator('textarea:visible, [contenteditable=true]:visible').first()
     await waitFor(() => input.isVisible(), 'chat input')
     await input.fill(task)
+    if (task.startsWith('/')) await input.press('Escape')
     await input.press('Enter')
   }
 
