@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -60,6 +61,9 @@ func TestSetupScripts(t *testing.T) {
 		if !strings.Contains(sh, want) {
 			t.Errorf("setup.sh 缺少 %q", want)
 		}
+	}
+	if bad := regexp.MustCompile(`\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]`).FindString(sh); bad != "" {
+		t.Errorf("变量后紧跟非 ASCII 字符，必须用花括号：%q", bad)
 	}
 	file := filepath.Join(t.TempDir(), "setup.sh")
 	if err := os.WriteFile(file, []byte(sh), 0o600); err != nil {

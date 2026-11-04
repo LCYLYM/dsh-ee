@@ -63,7 +63,7 @@ write_profile_npmrc() {
   } >> "$file.tmp"
   mv "$file.tmp" "$file"
   chmod 600 "$file"
-  echo "✔ 已写入 $file（只对 DSH 生效，不改 ~/.npmrc）"
+  echo "✔ 已写入 ${file}（只对 DSH 生效，不改 ~/.npmrc）"
 }
 check_token() {
   printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | curl -fsS -K - "$BASE/api/dsh/whoami" >/dev/null

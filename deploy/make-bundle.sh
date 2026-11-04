@@ -18,7 +18,7 @@ out="deploy/out/$name"
 
 rm -rf "$out" && mkdir -p "$out"
 
-echo "· 构建 dsh-ee 镜像（linux/$arch）"
+echo "· 构建 dsh-ee 镜像（linux/${arch}）"
 docker buildx build --platform "linux/$arch" --build-arg VERSION="$version" -t "dsh-ee:$version" --load .
 
 images=("dsh-ee:$version")

@@ -69,7 +69,7 @@ if [ "$db" = external ] && ! grep -q '^DSH_EE_DSN=.' .env; then
   exit 1
 fi
 
-echo "· 启动（$files）"
+echo "· 启动（${files}）"
 docker compose up -d
 
 port="$(sed -n 's/^DSH_EE_PORT=//p' .env)"
