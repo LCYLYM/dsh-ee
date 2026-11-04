@@ -193,12 +193,15 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 				if starters == nil {
 					starters = []string{}
 				}
-				c.Apps = append(c.Apps, dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Version: lv.Version, Missing: missingAppCapabilities(sp, c)})
+				c.Apps = append(c.Apps, dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Version: lv.Version})
 			}
 		case store.KindConnection:
 			c.conns = append(c.conns, &dshConn{asset: a, version: lv.Version, spec: sp})
 			connIDs = append(connIDs, a.ID)
 		}
+	}
+	for i := range c.Apps {
+		c.Apps[i].Missing = missingAppCapabilities(c.specs[c.Apps[i].Name], c)
 	}
 	if len(connIDs) > 0 {
 		tools, err := s.store.ConnectionTools(ctx, connIDs...)

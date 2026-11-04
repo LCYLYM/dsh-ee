@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/hikariming/dsh-ee/server/internal/api"
+	"github.com/hikariming/dsh-ee/server/internal/rbac"
 	"github.com/hikariming/dsh-ee/server/internal/secret"
 	"github.com/hikariming/dsh-ee/server/internal/store"
 )
@@ -633,6 +634,22 @@ func TestHub(t *testing.T) {
 	expect(t, "审计", code, 200, body)
 	if !strings.Contains(string(body), "connection:crm") {
 		t.Fatalf("审计日志应记录能力操作：%s", body)
+	}
+}
+
+func TestDshCatalogAppMissingAfterDependency(t *testing.T) {
+	f := newPrincipalFixture(t)
+	u := f.user(t, "app-dependency-order", nil)
+	f.token(t, u.ID, "ee_at_dep_order", []string{rbac.ScopeHub}, nil, nil)
+	code, body := f.admin.do("POST", "/api/hub", map[string]any{"kind": "app", "slug": "app-before-skill", "delivery": "auto", "spec": map[string]any{
+		"title": "先建应用", "description": "验证依赖顺序", "persona": "你是测试助手。", "skills": []string{"later-skill"}}}, nil)
+	expect(t, "先建依赖技能的微应用", code, 201, body)
+	code, body = f.admin.do("POST", "/api/hub", map[string]any{"kind": "skill", "slug": "later-skill", "delivery": "auto", "spec": map[string]any{
+		"title": "后建技能", "description": "验证依赖顺序", "body": "后上线的技能正文。"}}, nil)
+	expect(t, "后建并上线技能", code, 201, body)
+	c := (dshClient{t: t, base: f.ts.URL, token: "ee_at_dep_order"}).catalog()
+	if len(c.Apps) != 1 || len(c.Apps[0].Missing) != 0 {
+		t.Fatalf("目录建完后依赖技能已可用，不应误报缺失：%+v", c.Apps)
 	}
 }
 
