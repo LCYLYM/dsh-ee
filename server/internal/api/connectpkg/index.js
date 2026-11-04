@@ -401,6 +401,10 @@ async function registerSkills(ctx, config, http) {
       await refresh();
       return catalog.brand ?? { enabled: true, name: config.org, logo_url: "", revision: "" };
     },
+    readApps: async () => {
+      await refresh();
+      return catalog.apps ?? [];
+    },
     refreshNow: async () => {
       if (await refresh()) {
         invalidate();
@@ -2764,8 +2768,8 @@ function validateName(subject, value) {
 }
 
 // src/brand.ts
-var _doctor_dec, _login_dec, _overview_dec, _brand_dec, _a, _init;
-var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _a) {
+var _doctor_dec, _login_dec, _overview_dec, _apps_dec, _brand_dec, _a, _init;
+var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _a) {
   constructor(ctx, actions) {
     super(ctx, "dshEE");
     this.actions = actions;
@@ -2773,6 +2777,9 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
   }
   async brand() {
     return this.actions.readBrand();
+  }
+  async apps() {
+    return this.actions.readApps();
   }
   async overview() {
     return this.actions.readOverview();
@@ -2786,6 +2793,7 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "brand", _brand_dec, DshEEClientService);
+__decorateElement(_init, 1, "apps", _apps_dec, DshEEClientService);
 __decorateElement(_init, 1, "overview", _overview_dec, DshEEClientService);
 __decorateElement(_init, 1, "login", _login_dec, DshEEClientService);
 __decorateElement(_init, 1, "doctor", _doctor_dec, DshEEClientService);
@@ -2885,6 +2893,7 @@ function apply(ctx, input) {
     skills = await registerSkills(ctx, config, http);
     registerBrand(ctx, {
       readBrand: skills.readBrand,
+      readApps: skills.readApps,
       readOverview: () => readEnterpriseOverview(config, http, bridge),
       login: () => commands.login(),
       doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge)

@@ -3,6 +3,7 @@ import type { DshContext } from "./dsh.js";
 
 export interface ClientServiceActions {
   readBrand: () => Promise<any>;
+  readApps: () => Promise<any>;
   readOverview: () => Promise<any>;
   login: () => Promise<any>;
   doctor: () => Promise<any>;
@@ -16,6 +17,11 @@ export class DshEEClientService extends TypertRemoteService {
   @Remote
   async brand(): Promise<any> {
     return this.actions.readBrand();
+  }
+
+  @Remote
+  async apps(): Promise<any> {
+    return this.actions.readApps();
   }
 
   @Remote

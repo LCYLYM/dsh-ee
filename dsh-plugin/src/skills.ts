@@ -2,8 +2,20 @@ import type { DshContext, PluginConfig } from "./dsh.js";
 import type { HttpClient } from "./http.js";
 import { installRequired } from "./plugins.js";
 
+export interface CatalogApp {
+  name: string;
+  title: string;
+  description: string;
+  icon?: string;
+  starters: string[];
+  launch: "new" | "resume";
+  version: number;
+  missing?: string[];
+}
+
 export interface SkillsHandle {
   readBrand: () => Promise<any>;
+  readApps: () => Promise<CatalogApp[]>;
   /** 立刻重新拉目录（登录之后用），有变化就通知 DSH 刷新技能列表。 */
   refreshNow: () => Promise<void>;
 }
@@ -76,6 +88,10 @@ export async function registerSkills(ctx: DshContext, config: PluginConfig, http
     readBrand: async () => {
       await refresh();
       return catalog.brand ?? { enabled: true, name: config.org, logo_url: "", revision: "" };
+    },
+    readApps: async () => {
+      await refresh();
+      return catalog.apps ?? [];
     },
     refreshNow: async () => {
       if (await refresh()) {

@@ -26,11 +26,12 @@ test("skills provider registers even when dsh-ee is unreachable at startup", asy
       return new Response(JSON.stringify({ content: "正文" }));
     },
   };
-  await registerSkills(ctx as any, normalizeConfig({ base: "http://localhost" }), http as any);
+  const skills = await registerSkills(ctx as any, normalizeConfig({ base: "http://localhost" }), http as any);
   assert.ok(provider, "离线启动也应注册技能来源");
   assert.deepEqual(await provider.list(), []);
   online = true;
   const listed = await provider.list();
   assert.equal(listed[0]?.name, "expense", "恢复联网后应能列出技能");
+  assert.deepEqual(await skills.readApps(), [], "旧服务端没有 apps 字段时返回空数组");
   provider.abort();
 });

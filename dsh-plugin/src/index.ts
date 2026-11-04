@@ -42,6 +42,7 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
     skills = await registerSkills(ctx, config, http);
     registerBrand(ctx, {
       readBrand: skills.readBrand,
+      readApps: skills.readApps,
       readOverview: () => readEnterpriseOverview(config, http, bridge),
       login: () => commands.login(),
       doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge),
