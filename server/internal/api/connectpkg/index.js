@@ -2785,11 +2785,11 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
   async appBindings() {
     return this.actions.readAppBindings();
   }
-  async bindApp(name2, sessionId) {
-    return this.actions.bindApp(name2, sessionId);
+  async bindApp(request) {
+    return this.actions.bindApp(request.name, request.sessionId);
   }
-  async unbindApp(name2) {
-    return this.actions.unbindApp(name2);
+  async unbindApp(request) {
+    return this.actions.unbindApp(request.name);
   }
   async overview() {
     return this.actions.readOverview();
