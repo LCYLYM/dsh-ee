@@ -1,5 +1,7 @@
 # 微应用工作台交接说明：给执行 agent 的完整工作指令
 
+> **当前进度（2026-11-04）**：W0、W1 已完成（报告 `docs/workbench-report.md`，到 f909aff），审查结论与第二轮任务见 **§12，从 §12 开始做**。
+>
 > 你（执行 agent）要独立完成本文的 **W0～W4**：把能力中心里的「微应用」从「只能输入 `/名字` 启动」改成 DSH 里看得见、点一下就能用的「企业应用」工作台。做完写一份报告 `docs/workbench-report.md`，由另一个 agent 审查。
 >
 > 环境搭建（Go、TiDB 测试库、启动本地 dsh-ee、浏览器 E2E）照抄 [agent-connect-phase-a-handoff.md](agent-connect-phase-a-handoff.md) §1，本文不再重复。接入插件的界面背景见 [dsh-plugin-ui.md](dsh-plugin-ui.md)，能力中心的设计见 [capability-hub.md](capability-hub.md)。
@@ -293,3 +295,49 @@ fillInput(ctx, text): boolean                // 填进当前输入框，不发�
 5. 绑定存在 `$DSH_HOME/dsh-ee/apps.json`，原子写，损坏可恢复；没有存 localStorage、没有存服务端。
 6. 状态「本轮结束」不是绿色、没有「成功」字样。
 7. W0 停点确实停过（报告里有用户确认的记录）；W4 没有合进正式功能。
+
+## 12. 第二轮（2026-11-04 审查 W0、W1 后调整，以本节为准）
+
+### 12.1 审查结论
+
+- **W0 通过，用户已确认按报告 §7 的建议进入 W2**：侧栏用 `sidebar.footer.action`，首屏用 `conversation.hero.options`，企业面板保留一份兜底入口；客户端 `inject` 加 `sessions`、`conversation`、`workspaces`，`connectManifest` 不变。
+- **W1 有一个缺陷，必须先修（R1）**。
+- **报告 §6 第 3 条里的 `setup.sh` 报错是真实的安装问题（R2）**，员工在 Mac 上执行 `curl … | sh` 时可能直接失败，优先级高于 W2。
+
+### 12.2 R1：微应用的「缺失能力」算早了
+
+`dsh.go` 的 `userCatalog` 在遍历 `on` 的循环**里面**调用 `missingAppCapabilities(sp, c)`，这时 `c.assets` 还没填满。只要微应用排在它依赖的技能或连接前面（例如先建了微应用、后建技能），这个技能就会被误报为缺失。`appContent()` 是在目录建完以后才调用的，所以 `/名字` 的指令没有受影响，只有 `catalog.apps[].missing` 有错。
+
+- 修法：循环里先把 `dshApp` 加进去，不填 `Missing`；循环结束后（`c.assets` 已经完整），再遍历 `c.Apps` 补上 `Missing`。补的时候要在算 `Revision` 哈希**之前**。
+- 测试（`hub_test.go`）：**先**建一个依赖技能 `x` 的微应用，**后**建技能 `x` 并上线，两者都授权给同一个员工，断言 `apps[].missing` 为空。用改动前的代码跑这个测试，要能看到它失败，并在报告里记下来。
+- 提交：`工作台/R1：缺失能力在目录建完后再计算`。
+
+### 12.3 R2：`setup.sh` 在 Mac 上可能因中文标点报错
+
+`setup.go` 第 66 行 `echo "✔ 已写入 $file（只对 DSH 生效…）"`。macOS 自带的 `sh` 是 bash 3.2，在 UTF-8 环境下可能把紧跟在变量名后面的全角括号字节也当成变量名的一部分，再加上 `set -u`，就会报 `file�: unbound variable` 并退出。执行 agent 在 W0 实测时复现过。
+
+- 修法：生成的 shell 脚本里，凡是 `$变量名` 后面紧跟非 ASCII 字符的，一律改成 `${变量名}`。至少包括 `setup.go:66`；顺手把 `deploy/install.sh:72`、`deploy/make-bundle.sh:21`、`scripts/test-oceanbase.sh:23` 也改了（这几个在服务器上跑，风险低，但写法统一）。PowerShell 部分（`Write-Host`）不用改。
+- 测试：在 `setup_test.go` 的 `TestSetupScripts` 里加一个断言：生成的 `setup.sh` 里没有匹配 `\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]` 的地方。再在 Mac 上用 `LANG=zh_CN.UTF-8 LC_ALL=zh_CN.UTF-8 /bin/sh` 实跑一次 `setup.sh --token <测试令牌>`（隔离的 `HOME` 和 `DSH_HOME`），确认不再报错，把结果写进报告。
+- 提交：`修复：setup.sh 中文标点前的变量改用花括号`（这个不属于工作台，提交前缀用「修复」）。
+
+### 12.4 W2 按 W0 结果调整的地方（其余照 §5）
+
+1. **新建会话**：`createSession` 固定走 `workspaces.initializeDefault()` → `sessions.create({ workspaceId })`。`initializeDefault` 不存在时，才退回带 `cwd` 的 `workspaces.create`；都没有就抛错，由调用方降级成「填进输入框」。
+2. **首屏不做卡片网格**。W0 发现 `conversation.hero.options` 是「New Session」右侧的一行小控件，和默认工作区、模式选择挤在同一行，放不下 4 张卡片。改为：
+   - 首屏只放**一个**紧凑按钮「企业应用」（`order: 100`），点开后弹出一个小列表（图标 + 标题 + 第一条示例问题），列表最多 8 项，超过时出现搜索框；
+   - 点列表里的应用，就在当前空白会话里发 `startText(app, 第一条示例问题)`，规则照 §5 W2-4；
+   - 弹出层用宿主的公共组件（`@deepseek-ai/dsh-client-ui-primitives` 里有就用；没有就用一个绝对定位的 `div`，挂在按钮自己的容器里），**不要**往 `document.body` 里插节点，也不要查找页面结构。
+   - `apps-view.ts` 里的 `heroApps` 改名为 `heroAppsMenu`，单测相应调整。
+3. **侧栏**：`sidebar.footer.action` 用 `id: "dsh-ee-apps"`、`order: 30`（W0 实测不冲突）。
+4. **W1-3 的计数在 W2 收尾时验证**：`run-w.mjs` 里点一次应用卡片后，调管理端的运营统计（或直接查 `asset_usage` 相关接口）确认这个微应用的使用次数加 1。
+5. **Mac Desktop**：W2 做完、接入插件生成正式版本后，如果你能用**隔离的** `DSH_HOME` 启动 Desktop（不碰真实 `~/.dsh`），就按报告 §3 的五步自己验证；做不到就写清楚原因，留给用户。
+
+### 12.5 第二轮的顺序与停点
+
+```
+R2（setup.sh）→ R1（缺失能力）→ W2 → W3 → W4 实验 → 报告
+```
+
+- 没有新的停点：W2、W3 连续做完。W4 照旧只出结论。
+- 报告：在 `docs/workbench-report.md` 末尾追加「第二轮」一节，结构照 §10，不要改写第一轮的内容。
+- 提交信息末尾的 `Co-Authored-By` 写你实际的模型名；邮箱写你所属厂商的 noreply 地址，不知道就写 `noreply@example.com`，不要沿用别人的。
