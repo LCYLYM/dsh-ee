@@ -200,12 +200,25 @@ func TestHub(t *testing.T) {
 
 	// ---- 技能：员工提交 → 待审核 → 管理员通过 ----
 	skill := map[string]any{"kind": "skill", "slug": "expense-policy", "spec": map[string]any{
-		"title": "报销制度", "description": "差旅与报销标准", "when_to_use": "员工问能不能报销时", "body": "住宿每晚 1300 元以内。"}}
+		"title": "报销制度", "description": "差旅与报销标准", "when_to_use": "员工问能不能报销时", "body": "住宿每晚 1300 元以内。", "icon": "🧾", "launch": "resume"}}
 	code, body = alice.do("POST", "/api/hub", skill, nil)
 	expect(t, "提交技能", code, 201, body)
 	expenseID := decodeAs[struct{ Asset store.Asset }](t, body).Asset.ID
 	if decodeAs[struct{ Status string }](t, body).Status != "pending" {
 		t.Fatalf("白名单模式下员工提交应待审核：%s", body)
+	}
+	code, body = alice.do("GET", fmt.Sprintf("/api/hub/%d", expenseID), nil, nil)
+	expect(t, "读取技能详情", code, 200, body)
+	cleared := decodeAs[struct {
+		Asset struct {
+			Spec struct {
+				Icon   string `json:"icon"`
+				Launch string `json:"launch"`
+			}
+		}
+	}](t, body)
+	if cleared.Asset.Spec.Icon != "" || cleared.Asset.Spec.Launch != "" {
+		t.Fatalf("非微应用不应保留图标与打开方式：%s", body)
 	}
 	code, body = alice.do("POST", "/api/hub", skill, nil)
 	expect(t, "标识重复", code, 409, body)
@@ -416,9 +429,31 @@ func TestHub(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, body = admin.do("POST", "/api/hub", map[string]any{"kind": "app", "slug": "expense-assistant", "delivery": "auto",
-		"spec": map[string]any{"title": "报销助手", "description": "帮你判断能不能报", "persona": "你是报销助手。",
+		"spec": map[string]any{"title": "报销助手", "description": "帮你判断能不能报", "persona": "你是报销助手。", "icon": " 🧾 ", "launch": " resume ",
 			"starters": []string{"这张发票能报吗？"}, "skills": []string{"expense-policy"}, "connections": []string{"crm"}, "plugins": []string{"dsh-ledger"}}}, nil)
 	expect(t, "微应用", code, 201, body)
+	appID := decodeAs[struct{ Asset store.Asset }](t, body).Asset.ID
+	code, body = admin.do("GET", fmt.Sprintf("/api/hub/%d", appID), nil, nil)
+	expect(t, "读取微应用详情", code, 200, body)
+	savedApp := decodeAs[struct {
+		Asset struct {
+			Spec struct {
+				Icon   string `json:"icon"`
+				Launch string `json:"launch"`
+			}
+		}
+	}](t, body)
+	if savedApp.Asset.Spec.Icon != "🧾" || savedApp.Asset.Spec.Launch != "resume" {
+		t.Fatalf("微应用图标与打开方式应去空格并保存：%s", body)
+	}
+	for _, tc := range []struct{ name, icon, launch string }{
+		{"图标过长", strings.Repeat("🧾", 9), "new"},
+		{"打开方式非法", "🧾", "later"},
+	} {
+		code, body = admin.do("POST", "/api/hub", map[string]any{"kind": "app", "slug": "invalid-app", "spec": map[string]any{
+			"title": "非法微应用", "description": "校验", "persona": "校验", "icon": tc.icon, "launch": tc.launch}}, nil)
+		expect(t, tc.name, code, 400, body)
+	}
 	c = dsh["alice"].catalog()
 	if !slices.Contains(c.skillNames(), "expense-assistant") || len(c.Required) != 1 || c.Required[0].Name != "dsh-ledger" || c.Required[0].Reason != "app:expense-assistant" {
 		t.Fatalf("微应用与其依赖的插件：%+v", c)

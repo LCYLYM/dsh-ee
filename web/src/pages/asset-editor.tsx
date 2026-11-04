@@ -24,7 +24,7 @@ function emptySpec(kind: AssetKind): AssetSpec {
     case "prompt":
       return { title: "", description: "", body: "" };
     case "app":
-      return { title: "", description: "", persona: "", starters: [], skills: [], connections: [], plugins: [] };
+      return { title: "", description: "", persona: "", starters: [], icon: "", launch: "new", skills: [], connections: [], plugins: [] };
     case "connection":
       return { title: "", description: "", type: "mcp", url: "", auth: { type: "none" }, instructions: "", openapi: "", timeout_seconds: 30 };
   }
@@ -220,7 +220,7 @@ function AssetEditor() {
       case "prompt":
         return { ...base, body: spec.body };
       case "app":
-        return { ...base, persona: spec.persona, starters: (spec.starters ?? []).filter(Boolean), skills: spec.skills, connections: spec.connections, plugins: spec.plugins };
+        return { ...base, persona: spec.persona, starters: (spec.starters ?? []).filter(Boolean), icon: spec.icon, launch: spec.launch, skills: spec.skills, connections: spec.connections, plugins: spec.plugins };
       case "connection":
         return { ...base, type: spec.type, url: spec.url, auth: spec.auth, instructions: spec.instructions, timeout_seconds: spec.timeout_seconds, ...(spec.type === "openapi" ? { openapi: spec.openapi } : {}) };
     }
@@ -311,6 +311,21 @@ function AssetEditor() {
         {kind === "prompt" && <Section>{bodyField(t("editor.promptBodyHint"))}</Section>}
         {kind === "app" && (
           <Section>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={t("editor.icon")} hint={t("editor.iconHint")}>
+                <input className={inputCls} value={spec.icon ?? ""} onChange={(e) => set({ icon: e.target.value })} placeholder="🧾" />
+              </Field>
+              <Field label={t("editor.launch")}>
+                <Segmented
+                  value={spec.launch ?? "new"}
+                  onChange={(v) => set({ launch: v })}
+                  options={[
+                    { value: "new", label: t("editor.launchNew") },
+                    { value: "resume", label: t("editor.launchResume") },
+                  ]}
+                />
+              </Field>
+            </div>
             <Field label={t("editor.persona")} hint={t("editor.personaHint")}>
               <textarea className={cx(textareaCls, "h-48")} value={spec.persona ?? ""} onChange={(e) => set({ persona: e.target.value })} />
             </Field>

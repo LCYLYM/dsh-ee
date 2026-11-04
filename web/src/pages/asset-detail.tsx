@@ -199,7 +199,7 @@ function AssetDetail() {
 
       <div className="mb-6 flex flex-wrap items-start gap-4">
         <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-700">
-          <Icon size={28} strokeWidth={1.5} />
+          {a.kind === "app" && a.spec.icon ? <span className="text-3xl">{a.spec.icon}</span> : <Icon size={28} strokeWidth={1.5} />}
         </span>
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{a.spec.title}</h1>

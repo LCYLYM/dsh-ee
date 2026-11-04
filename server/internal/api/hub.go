@@ -41,6 +41,10 @@ type assetSpec struct {
 	Skills      []string `json:"skills,omitempty"`
 	Connections []string `json:"connections,omitempty"`
 	Plugins     []string `json:"plugins,omitempty"`
+	// 微应用：在 DSH 里显示的图标（一个 emoji，留空用名字首字）
+	Icon string `json:"icon,omitempty"`
+	// 微应用：点开时怎么开始 —— "new"（每次新会话，默认）或 "resume"（回到上次的会话）
+	Launch string `json:"launch,omitempty"`
 
 	// 连接：mcp（上游 MCP 服务地址）或 openapi（接口根地址 + 文档）
 	Type         string    `json:"type,omitempty"`
@@ -89,6 +93,7 @@ func validateSpec(kind string, sp *assetSpec) string {
 			sp.ModelInvocable, sp.WhenToUse = nil, ""
 		}
 		sp.Persona, sp.Starters, sp.Skills, sp.Connections, sp.Plugins = "", nil, nil, nil, nil
+		sp.Icon, sp.Launch = "", ""
 		sp.Type, sp.URL, sp.Auth, sp.OpenAPI, sp.Instructions = "", "", nil, "", ""
 	case store.KindApp:
 		sp.Persona = strings.TrimSpace(sp.Persona)
@@ -100,6 +105,14 @@ func validateSpec(kind string, sp *assetSpec) string {
 		}
 		if sp.Description == "" {
 			return "说明必填"
+		}
+		sp.Icon = strings.TrimSpace(sp.Icon)
+		if !limitRunes(sp.Icon, 8) {
+			return "图标最多 8 个字符"
+		}
+		sp.Launch = strings.TrimSpace(sp.Launch)
+		if sp.Launch != "" && sp.Launch != "new" && sp.Launch != "resume" {
+			return "打开方式只能是 new / resume"
 		}
 		clean := func(xs []string, max int, valid func(string) bool, what string) ([]string, string) {
 			out := []string{}
@@ -174,6 +187,7 @@ func validateSpec(kind string, sp *assetSpec) string {
 		}
 		sp.Body, sp.WhenToUse, sp.ModelInvocable = "", "", nil
 		sp.Persona, sp.Starters, sp.Skills, sp.Connections, sp.Plugins = "", nil, nil, nil, nil
+		sp.Icon, sp.Launch = "", ""
 	default:
 		return "未知的能力类型"
 	}

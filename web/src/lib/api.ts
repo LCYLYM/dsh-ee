@@ -509,6 +509,8 @@ export interface AssetSpec {
   model_invocable?: boolean;
   persona?: string;
   starters?: string[];
+  icon?: string;
+  launch?: "new" | "resume";
   skills?: string[];
   connections?: string[];
   plugins?: string[];

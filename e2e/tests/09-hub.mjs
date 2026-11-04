@@ -18,6 +18,7 @@ export default async function (t) {
   await login(admin, "admin", ADMIN_PW);
   const skill = `e2e-skill-${tag}`;
   const prompt = `e2e-prompt-${tag}`;
+  const app = `e2e-app-${tag}`;
   const conn = `e2e-health-${tag}`;
 
   // ---- 管理员写一个技能：有审核权限，直接上架 ----
@@ -78,6 +79,24 @@ export default async function (t) {
   assert(p && p.user_invocable && !p.model_invocable, "作者的提示词通过后应在 DSH 里，只给人调用：" + JSON.stringify(cat.data));
   step("审核通过后，提示词出现在作者的 DSH 里（/命令）");
 
+  // ---- 微应用：配置图标与打开方式，详情页和列表显示图标 ----
+  await admin.goto(`${BASE}/assets/new?kind=app`);
+  await admin.getByLabel("标识").fill(app);
+  await admin.getByLabel("标题").fill(`E2E 报销助手 ${tag}`);
+  await admin.getByLabel("说明").fill("帮你判断费用能不能报销");
+  await admin.getByLabel("图标（可选）").fill("🧾");
+  await admin.getByRole("button", { name: "回到上次会话", exact: true }).click();
+  await admin.getByLabel("人设与工作方式").fill("你是企业报销助手，先询问费用类型，再给出报销建议。");
+  await admin.getByLabel("示例问题（每行一个，最多 6 个）").fill("这张发票能报吗？");
+  await admin.getByRole("button", { name: "提交", exact: true }).click();
+  await admin.waitForURL(/\/assets\/\d+$/);
+  await admin.getByText("🧾", { exact: true }).first().waitFor();
+  step("微应用能保存图标与打开方式，详情页显示图标");
+  await admin.goto(`${BASE}/apps`);
+  const appRow = admin.locator("li", { hasText: `E2E 报销助手 ${tag}` });
+  await appRow.getByText("🧾", { exact: true }).waitFor();
+  await shot(admin, "hub-app-icon");
+
   // ---- 企业连接：OpenAPI，指向 dsh-ee 自己的 /healthz ----
   const doc = JSON.stringify({ openapi: "3.0.0", info: { title: "Health" }, paths: { "/healthz": { get: { operationId: "health", summary: "服务健康状态" } }, "/healthz/x": { post: { operationId: "poke" } } } });
   await admin.goto(`${BASE}/assets/new?kind=connection`);
@@ -121,7 +140,7 @@ export default async function (t) {
 
   // 收尾：下架连接，免得影响别的测试
   const assets = (await api(admin, "GET", "/api/hub")).data.assets;
-  for (const a of assets.filter((x) => [skill, prompt, conn].includes(x.slug))) {
+  for (const a of assets.filter((x) => [skill, prompt, app, conn].includes(x.slug))) {
     await api(admin, "DELETE", `/api/hub/${a.id}`);
   }
 }

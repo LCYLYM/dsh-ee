@@ -25,6 +25,7 @@ function AppRow({ a, bySlug, busy, onToggle }: { a: HubAsset; bySlug: Map<string
     <li className="grid gap-x-6 gap-y-3 border-t border-neutral-100 px-5 py-5 first:border-t-0 md:grid-cols-[1fr_280px_auto] md:items-start">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
+          {a.spec.icon && <span className="text-xl">{a.spec.icon}</span>}
           <Link to={assetPath(a.id)} className="text-base font-medium text-neutral-900 hover:underline">
             {a.spec.title}
           </Link>
