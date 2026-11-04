@@ -306,7 +306,13 @@ func (s *Store) UpdatePackageCatalog(ctx context.Context, name string, p Catalog
 	return updateCatalog(ctx, s.db, name, p)
 }
 
-func updateCatalog(ctx context.Context, e execer, name string, p CatalogPatch) error {
+// queryExecer 是 *sql.DB 与 *sql.Tx 共有的读写方法：零影响行时要再查一次记录在不在。
+type queryExecer interface {
+	execer
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+func updateCatalog(ctx context.Context, e queryExecer, name string, p CatalogPatch) error {
 	sets, args := p.sets()
 	if len(sets) == 0 {
 		return nil
@@ -319,10 +325,7 @@ func updateCatalog(ctx context.Context, e execer, name string, p CatalogPatch) e
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		var existing string
-		queryer := e.(interface {
-			QueryRowContext(context.Context, string, ...any) *sql.Row
-		})
-		err := queryer.QueryRowContext(ctx, "SELECT name FROM npm_packages WHERE name = ?", name).Scan(&existing)
+		err := e.QueryRowContext(ctx, "SELECT name FROM npm_packages WHERE name = ?", name).Scan(&existing)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}
