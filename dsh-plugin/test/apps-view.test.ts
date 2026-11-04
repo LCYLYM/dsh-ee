@@ -50,3 +50,8 @@ test("状态点 need 黄、busy 蓝、done 灰，菜单支持重开与解绑", (
   assert.match(text, /解除绑定/);
   assert.doesNotMatch(text, /成功/);
 });
+
+test("首屏降级提示实际渲染在菜单里", () => {
+  const menu = heroAppsMenu(createElement, [app(1)], () => {}, "", () => {}, "已复制 /app-1");
+  assert.match(JSON.stringify(menu), /已复制 \/app-1/);
+});

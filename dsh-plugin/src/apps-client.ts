@@ -148,9 +148,9 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
   const HeroApps = () => {
     const state = useApps();
     const [query, setQuery] = useState("");
-    const [, setNotice] = useState("");
+    const [notice, setNotice] = useState("");
     const open = (app: CatalogApp) => { void openWithFallback(app, launchHero).then(setNotice); };
-    return heroAppsMenu(createElement, state.apps, open, query, setQuery);
+    return heroAppsMenu(createElement, state.apps, open, query, setQuery, notice);
   };
   const AppsPanel = () => createElement(AppsSection);
 

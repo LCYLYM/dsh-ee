@@ -77,7 +77,7 @@ export function appsSection(createElement: (...args: any[]) => any, state: AppsV
     state.notice ? createElement("p", { role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null);
 }
 
-export function heroAppsMenu(createElement: (...args: any[]) => any, apps: CatalogApp[], onOpen: (app: CatalogApp) => void, query = "", onSearch: (query: string) => void = () => {}) {
+export function heroAppsMenu(createElement: (...args: any[]) => any, apps: CatalogApp[], onOpen: (app: CatalogApp) => void, query = "", onSearch: (query: string) => void = () => {}, notice = "") {
   if (!apps.length) return null;
   const normalized = query.trim().toLowerCase();
   const shown = apps.filter((app) => !normalized || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(normalized)).slice(0, 8);
@@ -92,7 +92,8 @@ export function heroAppsMenu(createElement: (...args: any[]) => any, apps: Catal
       appIcon(createElement, app),
       createElement("span", { style: { minWidth: 0 } },
         createElement("span", { style: { display: "block", fontSize: 13 } }, app.title),
-        createElement("span", { style: { display: "block", fontSize: 11, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.starters[0] || app.description)))))));
+        createElement("span", { style: { display: "block", fontSize: 11, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.starters[0] || app.description))))),
+      notice ? createElement("p", { role: "status", style: { margin: "7px 4px 0", fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" } }, notice) : null));
 }
 
 export function startText(app: CatalogApp, starter?: string): string {

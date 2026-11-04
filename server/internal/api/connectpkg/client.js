@@ -20162,7 +20162,7 @@ function appsSection(createElement3, state, actions) {
   );
 }
 function heroAppsMenu(createElement3, apps, onOpen, query = "", onSearch = () => {
-}) {
+}, notice = "") {
   if (!apps.length) return null;
   const normalized = query.trim().toLowerCase();
   const shown = apps.filter((app) => !normalized || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(normalized)).slice(0, 8);
@@ -20189,7 +20189,8 @@ function heroAppsMenu(createElement3, apps, onOpen, query = "", onSearch = () =>
           createElement3("span", { style: { display: "block", fontSize: 13 } }, app.title),
           createElement3("span", { style: { display: "block", fontSize: 11, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.starters[0] || app.description)
         )
-      )))
+      ))),
+      notice ? createElement3("p", { role: "status", style: { margin: "7px 4px 0", fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" } }, notice) : null
     )
   );
 }
@@ -20518,11 +20519,11 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
   const HeroApps = () => {
     const state = useApps();
     const [query, setQuery] = (0, import_react.useState)("");
-    const [, setNotice] = (0, import_react.useState)("");
+    const [notice, setNotice] = (0, import_react.useState)("");
     const open2 = (app) => {
       void openWithFallback(app, launchHero).then(setNotice);
     };
-    return heroAppsMenu(import_react.createElement, state.apps, open2, query, setQuery);
+    return heroAppsMenu(import_react.createElement, state.apps, open2, query, setQuery, notice);
   };
   const AppsPanel = () => (0, import_react.createElement)(AppsSection);
   ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({ name: "sidebar.footer.action", id: "dsh-ee-apps", order: 30, label: "\u4F01\u4E1A\u5E94\u7528" }, AppsSection));
