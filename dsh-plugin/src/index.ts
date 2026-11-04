@@ -5,8 +5,9 @@ import { registerCommands } from "./commands.js";
 import { registerSkills } from "./skills.js";
 import { McpBridge } from "./bridge.js";
 import { registerApproval } from "./approval.js";
-import { registerDoctor } from "./doctor.js";
+import { registerDoctor, runLocalDoctor } from "./doctor.js";
 import { registerBrand } from "./brand.js";
+import { readEnterpriseOverview } from "./overview.js";
 import { uploadPackage } from "./upload.js";
 import type { DshContext, PluginConfig } from "./dsh.js";
 
@@ -33,13 +34,18 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
     const current = await tokens.resolve();
     if (current?.value) await tokens.syncNpmrc(current.value).catch(() => false);
     let skills: Awaited<ReturnType<typeof registerSkills>> | undefined;
-    registerCommands(ctx, config, tokens, async () => {
+    const commands = registerCommands(ctx, config, tokens, async () => {
       bridge.wake();
       await Promise.all([bridge.sync().catch(() => undefined), skills?.refreshNow()]);
     });
     registerDoctor(ctx, config, tokens, http, bridge);
     skills = await registerSkills(ctx, config, http);
-    registerBrand(ctx, skills.readBrand);
+    registerBrand(ctx, {
+      readBrand: skills.readBrand,
+      readOverview: () => readEnterpriseOverview(config, http, bridge),
+      login: () => commands.login(),
+      doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge),
+    });
     await bridge.start();
     return () => bridge.stop();
   });

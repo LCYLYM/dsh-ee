@@ -19927,28 +19927,279 @@ function brandName(createElement2, brand) {
   return createElement2("span", { "data-dsh-ee-brand": brand.revision || "neutral" }, brand.name);
 }
 
+// src/status-view.ts
+var enterpriseTabId = "__DSH_EE_PACKAGE__";
+function effectiveQuota(usage) {
+  if (!usage) return void 0;
+  const quotas = [usage.quota, ...usage.current_token ? [usage.current_token] : []].filter((quota) => quota.monthly_token_limit !== null && quota.monthly_token_limit !== void 0);
+  if (!quotas.length) return null;
+  const selected = quotas.reduce((best, quota) => {
+    const limit2 = quota.monthly_token_limit;
+    const remaining = Math.max(0, limit2 - quota.month_tokens);
+    const bestRemaining = Math.max(0, best.monthly_token_limit - best.month_tokens);
+    return remaining < bestRemaining ? quota : best;
+  });
+  const limit = selected.monthly_token_limit;
+  const used = selected.month_tokens;
+  return {
+    used,
+    limit,
+    remainingPercent: limit > 0 ? Math.max(0, Math.floor((limit - used) / limit * 100)) : 0,
+    usedRatio: limit > 0 ? Math.min(1, Math.max(0, used / limit)) : 1
+  };
+}
+function formatTokens(value) {
+  if (value >= 1e6) return `${Number((value / 1e6).toFixed(1))}m`;
+  if (value >= 1e3) return `${Number((value / 1e3).toFixed(1))}k`;
+  return String(value);
+}
+function adminRemaining(me, now = Date.now()) {
+  if (!me.admin_live || !me.admin_until) return me.admin_live ? "\u5DF2\u5F00\u542F" : "\u672A\u5F00\u542F";
+  const minutes = Math.max(0, Math.ceil((new Date(me.admin_until).getTime() - now) / 6e4));
+  if (minutes >= 60) return `\u8FD8\u5269 ${Math.floor(minutes / 60)} \u5C0F\u65F6 ${minutes % 60} \u5206\u949F`;
+  return `\u8FD8\u5269 ${minutes} \u5206\u949F`;
+}
+function button(createElement2, label, onClick, busy = false) {
+  return createElement2("button", {
+    type: "button",
+    onClick,
+    disabled: busy,
+    style: { padding: "6px 10px", border: "1px solid currentColor", borderRadius: 6, background: "transparent", color: "inherit", cursor: busy ? "wait" : "pointer", opacity: busy ? 0.55 : 1 }
+  }, label);
+}
+function section(createElement2, title, ...children) {
+  return createElement2(
+    "section",
+    { style: { marginTop: 18, paddingTop: 14, borderTop: "1px solid color-mix(in srgb, currentColor 14%, transparent)" } },
+    createElement2("h3", { style: { margin: "0 0 10px", fontSize: 13 } }, title),
+    ...children
+  );
+}
+function enterprisePanel(createElement2, org, state, actions) {
+  const { data, failed, busy, notice, doctor } = state;
+  const me = data?.me;
+  const quota = effectiveQuota(data?.usage);
+  const children = [createElement2("h2", { key: "title", style: { margin: "0 0 16px", fontSize: 16 } }, org)];
+  if (!data || !me) {
+    children.push(createElement2("p", { key: "state", style: { lineHeight: 1.6 } }, failed ? "\u672A\u767B\u5F55\u6216\u8FDE\u63A5\u4E0D\u53EF\u7528\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55\u3002" : "\u6B63\u5728\u8BFB\u53D6\u4F01\u4E1A\u8D26\u53F7\u2026"));
+    if (failed) children.push(createElement2(
+      "div",
+      { key: "actions", style: { display: "flex", gap: 8 } },
+      button(createElement2, busy ? "\u6B63\u5728\u53D1\u8D77\u767B\u5F55\u2026" : "\u767B\u5F55", actions.login, busy),
+      button(createElement2, "\u5237\u65B0", actions.refresh, busy)
+    ));
+  } else {
+    const rows = [
+      ["\u8D26\u53F7", me.username],
+      ["\u90E8\u95E8", me.department || "\u672A\u8BBE\u7F6E"],
+      ["\u4EE4\u724C\u6709\u6548\u671F", me.expires_at ? `${me.expires_at.slice(0, 10)} \u5230\u671F` : "\u957F\u671F\u6709\u6548"],
+      ["\u7BA1\u7406\u6A21\u5F0F", adminRemaining(me)]
+    ];
+    children.push(createElement2(
+      "dl",
+      { key: "account", style: { margin: 0, display: "grid", gridTemplateColumns: "80px 1fr", gap: "12px 8px" } },
+      ...rows.flatMap(([label, value]) => [
+        createElement2("dt", { key: `${label}-label`, style: { opacity: 0.65 } }, label),
+        createElement2("dd", { key: `${label}-value`, style: { margin: 0 } }, value)
+      ])
+    ));
+    children.push(section(
+      createElement2,
+      "\u672C\u6708\u989D\u5EA6",
+      quota === void 0 ? "\u989D\u5EA6\u4FE1\u606F\u4E0D\u53EF\u7528" : quota === null ? "\u4E0D\u9650\u989D" : createElement2(
+        "div",
+        {},
+        createElement2(
+          "div",
+          { style: { display: "flex", justifyContent: "space-between", marginBottom: 7 } },
+          createElement2("span", {}, `${formatTokens(quota.used)} / ${formatTokens(quota.limit)}`),
+          createElement2("span", { style: { color: quota.usedRatio >= 0.9 ? "#d97706" : "inherit" } }, `\u5269\u4F59 ${quota.remainingPercent}%`)
+        ),
+        createElement2(
+          "div",
+          { role: "progressbar", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(quota.usedRatio * 100), style: { height: 6, borderRadius: 3, overflow: "hidden", background: "color-mix(in srgb, currentColor 12%, transparent)" } },
+          createElement2("div", { style: { width: `${quota.usedRatio * 100}%`, height: "100%", background: quota.usedRatio >= 0.9 ? "#d97706" : "#2563eb" } })
+        )
+      )
+    ));
+    children.push(section(
+      createElement2,
+      "\u4F01\u4E1A\u6A21\u578B",
+      createElement2("div", {}, `\u9ED8\u8BA4\uFF1A${data.default_model || "\u672A\u8BBE\u7F6E"}`),
+      createElement2("div", { style: { marginTop: 6, opacity: 0.75, lineHeight: 1.5 } }, data.models.length ? data.models.join("\u3001") : "\u6CA1\u6709\u53EF\u7528\u6A21\u578B\u6216\u6A21\u578B\u5217\u8868\u4E0D\u53EF\u7528")
+    ));
+    children.push(section(
+      createElement2,
+      "\u63A5\u5165\u72B6\u6001",
+      createElement2("div", { style: { lineHeight: 1.6 } }, `\u63D2\u4EF6 ${data.version}${data.latest_version && data.latest_version !== data.version ? ` \xB7 \u65B0\u7248\u672C ${data.latest_version}` : " \xB7 \u5DF2\u662F\u6700\u65B0"}`),
+      createElement2(
+        "div",
+        { style: { display: "flex", gap: 8, marginTop: 10 } },
+        button(createElement2, busy ? "\u8BCA\u65AD\u4E2D\u2026" : "\u8BCA\u65AD", actions.doctor, busy),
+        button(createElement2, "\u5237\u65B0", actions.refresh, busy)
+      )
+    ));
+  }
+  if (notice) children.push(createElement2("p", { key: "notice", role: "status", style: { lineHeight: 1.6, overflowWrap: "anywhere" } }, notice));
+  if (doctor) children.push(section(
+    createElement2,
+    `\u8BCA\u65AD\u7ED3\u679C\uFF1A${doctor.summary}`,
+    createElement2(
+      "ul",
+      { style: { margin: 0, paddingLeft: 18, lineHeight: 1.6 } },
+      ...doctor.checks.map((check2) => createElement2("li", { key: check2.id, style: { color: check2.status === "ok" ? "inherit" : check2.status === "warn" ? "#d97706" : "#d92d20" } }, `${check2.title}${check2.fix ? `\uFF1B${check2.fix}` : ""}`))
+    )
+  ));
+  return createElement2("main", {
+    "data-dsh-ee-ui": "panel",
+    "data-dsh-ee-state": data ? "connected" : failed ? "disconnected" : "loading",
+    style: { padding: 16, color: "inherit", fontSize: 13 }
+  }, ...children);
+}
+function enterpriseHeader(createElement2, data, failed, onClick) {
+  const me = data?.me;
+  const quota = effectiveQuota(data?.usage);
+  const label = !me ? failed ? "\u4F01\u4E1A \xB7 \u672A\u767B\u5F55" : "\u4F01\u4E1A \xB7 \u68C0\u67E5\u4E2D" : me.admin_live ? `\u7BA1\u7406\u6A21\u5F0F \xB7 ${adminRemaining(me)}` : quota ? `\u4F01\u4E1A\u6A21\u578B \xB7 \u5269\u4F59 ${quota.remainingPercent}%` : `\u4F01\u4E1A\u6A21\u578B \xB7 ${me.username}`;
+  return createElement2("button", {
+    type: "button",
+    onClick,
+    "data-dsh-ee-ui": "header",
+    "data-dsh-ee-state": me ? "connected" : failed ? "disconnected" : "loading",
+    "aria-label": label,
+    title: me ? `${me.username}${me.department ? `\uFF08${me.department}\uFF09` : ""}` : "\u91CD\u65B0\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7",
+    style: { whiteSpace: "nowrap", fontSize: 12, color: me ? "inherit" : failed ? "#d92d20" : "inherit", background: "transparent", border: 0, padding: 0, cursor: "pointer" }
+  }, label);
+}
+function registerEnterpriseStatus(ctx, org, EnterprisePanel, EnterpriseHeader) {
+  ctx.effect(() => ctx.sidebarRightTabs.register({
+    id: enterpriseTabId,
+    kind: "dsh-ee-enterprise",
+    title: () => org,
+    guide: [{ id: "open", order: 10, title: () => org, description: () => "\u67E5\u770B\u4F01\u4E1A\u8D26\u53F7\u3001\u989D\u5EA6\u3001\u6A21\u578B\u4E0E\u63A5\u5165\u72B6\u6001" }]
+  }));
+  ctx.slots.inject("sidebar.right.pane.tab", () => ctx.slots.register(
+    { name: "sidebar.right.pane.tab", key: enterpriseTabId },
+    EnterprisePanel
+  ));
+  ctx.slots.inject("conversation.session.header.utilities", () => ctx.slots.register(
+    { name: "conversation.session.header.utilities", id: "dsh-ee-status", order: 100, label: org },
+    EnterpriseHeader
+  ));
+}
+
 // src/client.ts
-var inject = ["slots", "remote"];
-var brandRemote = createTypertRemoteInfo({
+var inject = ["slots", "remote", "sidebarRightTabs", "sidebarRight"];
+var clientRemote = createTypertRemoteInfo({
   package: "__DSH_EE_PACKAGE__",
   methods: {
-    "dshEE/brand": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }
+    "dshEE/brand": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/overview": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/login": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/doctor": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }
   }
 }, external_exports);
 var TAKEOVER = String("__DSH_EE_BRAND_TAKEOVER__") === "true";
+function unwrapRemote(result) {
+  if (result && typeof result === "object") {
+    if (result.error) throw new Error(typeof result.error === "string" ? result.error : result.error.message || "\u4F01\u4E1A\u8FDC\u7A0B\u8C03\u7528\u5931\u8D25");
+    if (result.ok === false) throw new Error("\u4F01\u4E1A\u8FDC\u7A0B\u8C03\u7528\u5931\u8D25");
+    if ("value" in result) return result.value;
+  }
+  return result;
+}
+function createOverviewStore(remote) {
+  let snapshot = { failed: false, busy: false };
+  let started = false;
+  const listeners = /* @__PURE__ */ new Set();
+  const update = (patch) => {
+    snapshot = { ...snapshot, ...patch };
+    for (const listener of listeners) listener();
+  };
+  const refresh = async () => {
+    update({ busy: true });
+    try {
+      update({ data: unwrapRemote(await remote.overview()), failed: false });
+    } catch {
+      update({ failed: true });
+    } finally {
+      update({ busy: false });
+    }
+  };
+  const use = () => {
+    const [local, setLocal] = (0, import_react.useState)(snapshot);
+    (0, import_react.useEffect)(() => {
+      const listener = () => setLocal(snapshot);
+      listeners.add(listener);
+      listener();
+      if (!started) {
+        started = true;
+        void refresh();
+      }
+      return () => {
+        listeners.delete(listener);
+      };
+    }, []);
+    return { ...local, setBusy: (busy) => update({ busy }), refresh };
+  };
+  return { use };
+}
 async function apply(ctx) {
-  if (!TAKEOVER) return;
-  await ctx.remote.$mount(brandRemote);
-  ctx.inject(["remote.dshEE"], async (brandCtx) => {
+  await ctx.remote.$mount(clientRemote);
+  ctx.inject(["remote.dshEE"], async (remoteCtx) => {
+    const remote = remoteCtx.remote.dshEE;
+    const overview = createOverviewStore(remote);
+    const useOverview = (_remote) => overview.use();
     let brand;
     try {
-      const result = await brandCtx.remote.dshEE.brand();
-      brand = result && typeof result === "object" && "value" in result ? result.value : result;
+      brand = unwrapRemote(await remote.brand());
     } catch {
       brand = { enabled: true, name: "\u4F01\u4E1A", logo_url: "", revision: "" };
     }
-    if (!brand || brand.enabled === false) brand = { enabled: false, name: brand?.name || "\u4F01\u4E1A", logo_url: "", revision: "" };
-    brand = { ...brand, name: brand.name || "\u4F01\u4E1A" };
+    const org = brand?.name || "\u4F01\u4E1A";
+    const EnterprisePanel = () => {
+      const state = useOverview(remote);
+      const [notice, setNotice] = (0, import_react.useState)("");
+      const [doctor, setDoctor] = (0, import_react.useState)(void 0);
+      const login = async () => {
+        state.setBusy(true);
+        try {
+          const result = unwrapRemote(await remote.login());
+          setNotice(result?.text || "\u8BF7\u5728\u6D4F\u89C8\u5668\u5B8C\u6210\u4F01\u4E1A\u767B\u5F55\u3002");
+        } catch {
+          setNotice("\u53D1\u8D77\u767B\u5F55\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u540E\u91CD\u8BD5\u3002");
+        } finally {
+          state.setBusy(false);
+        }
+      };
+      const diagnose = async () => {
+        state.setBusy(true);
+        try {
+          setDoctor(unwrapRemote(await remote.doctor()));
+        } catch {
+          setNotice("\u8BCA\u65AD\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u540E\u91CD\u8BD5\u3002");
+        } finally {
+          state.setBusy(false);
+        }
+      };
+      const refresh = () => {
+        setNotice("");
+        setDoctor(void 0);
+        void state.refresh();
+      };
+      return enterprisePanel(import_react.createElement, org, { ...state, notice, doctor }, { login: () => void login(), refresh, doctor: () => void diagnose() });
+    };
+    const EnterpriseHeader = () => {
+      const state = useOverview(remote);
+      const onClick = () => {
+        ctx.sidebarRight.openTab("dsh-ee-enterprise");
+        if (state.failed) void remote.login().catch(() => void 0);
+      };
+      return enterpriseHeader(import_react.createElement, state.data, state.failed, onClick);
+    };
+    registerEnterpriseStatus(ctx, org, EnterprisePanel, EnterpriseHeader);
+    if (!TAKEOVER) return;
+    if (!brand || brand.enabled === false) brand = { enabled: false, name: org, logo_url: "", revision: "" };
+    brand = { ...brand, name: org };
     const EnterpriseBrandMark = (props) => brandMark(import_react.createElement, brand, props);
     const EnterpriseBrandName = () => brandName(import_react.createElement, brand);
     ctx.slots.inject("sidebar.brand.mark", () => ctx.slots.inject("sidebar.brand.name", () => ctx.slots.inject("conversation.hero.brand.mark", function* () {

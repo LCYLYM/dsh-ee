@@ -243,73 +243,76 @@ function parseSetupCode(rawInput) {
 }
 function registerCommands(ctx, config, tokens, onLogin = async () => {
 }) {
-  const commands = ctx.get("commands");
-  if (!commands) return;
   const flow = new DeviceFlow(config);
   let pending = null;
-  const register = (definition) => {
-    const dispose = commands.register(definition);
-    ctx.effect(() => dispose);
-  };
-  register({
-    name: "ee-login",
-    description: "\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7\uFF08\u53EF\u4EE5\u5E26\u4E0A\u7F51\u9875\u300C\u5F00\u59CB\u4F7F\u7528\u300D\u9875\u7ED9\u7684\u63A5\u5165\u7801\uFF09",
-    input: { hint: "[\u63A5\u5165\u7801]" },
-    handler: async (invocation) => {
-      if (pending) return { kind: "success", text: `\u8BF7\u5728\u6D4F\u89C8\u5668\u786E\u8BA4\uFF0C\u786E\u8BA4\u7801 ${pending.code}\uFF0C\u94FE\u63A5 ${pending.url}` };
-      const setupCode = parseSetupCode(invocation?.rawInput);
-      if (String(invocation?.rawInput ?? "").trim() && !setupCode) return { kind: "error", text: "\u63A5\u5165\u7801\u683C\u5F0F\u4E0D\u5BF9\uFF0C\u5E94\u5F62\u5982 ABCD-EFGH\uFF1B\u4E0D\u5E26\u63A5\u5165\u7801\u76F4\u63A5\u8F93\u5165 /ee-login \u4E5F\u53EF\u4EE5" };
-      const started = await flow.start(setupCode);
-      const url = started.verification_uri_complete;
-      if (!setupCode) openBrowser(url);
-      const task = (async () => {
-        try {
-          const result = await flow.wait(started.device_code, started.interval);
-          await tokens.set(result.access_token);
-          await tokens.syncNpmrc(result.access_token);
-          await onLogin().catch(() => void 0);
-        } finally {
-          pending = null;
-        }
-      })();
-      pending = { code: started.user_code, url, task };
-      void task.catch(() => void 0);
-      if (setupCode) return { kind: "success", text: `\u56DE\u5230 dsh-ee \u7F51\u9875\u7684\u300C\u5F00\u59CB\u4F7F\u7528\u300D\u9875\uFF0C\u6838\u5BF9\u786E\u8BA4\u7801 ${started.user_code} \u540E\u70B9\u300C\u786E\u8BA4\u6388\u6743\u300D\uFF08\u7F51\u9875\u5173\u4E86\u7684\u8BDD\u6253\u5F00 ${url}\uFF09\u3002\u786E\u8BA4\u540E\u56DE\u5230\u8FD9\u91CC\u7EE7\u7EED\u5BF9\u8BDD\u3002` };
-      return { kind: "success", text: `\u8BF7\u5728\u6D4F\u89C8\u5668\u786E\u8BA4\uFF0C\u786E\u8BA4\u7801 ${started.user_code}\uFF0C\u94FE\u63A5 ${url}` };
-    }
-  });
-  register({
-    name: "ee-status",
-    description: "\u67E5\u770B\u4F01\u4E1A\u767B\u5F55\u72B6\u6001",
-    handler: async () => {
-      const current = await tokens.resolve();
-      if (!current) return { kind: "success", text: "\u672A\u767B\u5F55\uFF0C\u5728\u5BF9\u8BDD\u6846\u8F93\u5165 /ee-login" };
-      const response = await fetch(`${config.base}/api/dsh/whoami`, { headers: { Authorization: `Bearer ${current.value}` } });
-      if (!response.ok) return { kind: "success", text: "\u767B\u5F55\u5DF2\u5931\u6548\uFF0C\u5728\u5BF9\u8BDD\u6846\u8F93\u5165 /ee-login" };
-      const me = await response.json();
-      const matches = await tokens.npmrcMatches(current.value);
-      const expiry = me.expires_at ? ` \xB7 ${new Date(me.expires_at).toLocaleDateString()} \u5230\u671F` : " \xB7 \u957F\u671F\u6709\u6548";
-      return { kind: "success", text: `\u5DF2\u767B\u5F55 ${me.username}\uFF08${me.department}\uFF09\xB7 \u4EE4\u724C ${me.token_prefix}${expiry} \xB7 \u63D2\u4EF6 ${config.version} \xB7 npmrc ${matches ? "\u4E00\u81F4" : "\u4E0D\u4E00\u81F4"}` };
-    }
-  });
-  register({
-    name: "ee-logout",
-    description: "\u9000\u51FA\u4F01\u4E1A\u8D26\u53F7",
-    handler: async () => {
-      const current = await tokens.resolve();
-      if (!current) return { kind: "success", text: "\u5F53\u524D\u6CA1\u6709\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7" };
-      const revoked = await fetch(`${config.base}/api/dsh/logout`, { method: "POST", headers: { Authorization: `Bearer ${current.value}` } }).then((response) => response.ok, () => false);
-      await tokens.unset();
-      const left = await tokens.resolve();
-      if (left?.value === current.value) {
-        return {
-          kind: "error",
-          text: `${revoked ? "\u5DF2\u5728\u670D\u52A1\u7AEF\u540A\u9500\u8BE5\u4EE4\u724C\uFF0C" : ""}\u4F46\u5B83\u6765\u81EA\u73AF\u5883\u53D8\u91CF\u6216 $DSH_HOME/.env\uFF08${config.tokenRef}\uFF09\uFF0C\u8BF7\u624B\u52A8\u5220\u9664\u540E\u91CD\u542F DSH`
-        };
+  const login = async (rawInput) => {
+    if (pending) return { kind: "success", text: `\u8BF7\u5728\u6D4F\u89C8\u5668\u786E\u8BA4\uFF0C\u786E\u8BA4\u7801 ${pending.code}\uFF0C\u94FE\u63A5 ${pending.url}` };
+    const setupCode = parseSetupCode(rawInput);
+    if (String(rawInput ?? "").trim() && !setupCode) return { kind: "error", text: "\u63A5\u5165\u7801\u683C\u5F0F\u4E0D\u5BF9\uFF0C\u5E94\u5F62\u5982 ABCD-EFGH\uFF1B\u4E0D\u5E26\u63A5\u5165\u7801\u76F4\u63A5\u8F93\u5165 /ee-login \u4E5F\u53EF\u4EE5" };
+    const started = await flow.start(setupCode);
+    const url = started.verification_uri_complete;
+    if (!setupCode) openBrowser(url);
+    const task = (async () => {
+      try {
+        const result = await flow.wait(started.device_code, started.interval);
+        await tokens.set(result.access_token);
+        await tokens.syncNpmrc(result.access_token);
+        await onLogin().catch(() => void 0);
+      } finally {
+        pending = null;
       }
-      return { kind: "success", text: revoked ? "\u5DF2\u9000\u51FA\u4F01\u4E1A\u8D26\u53F7" : "\u672C\u673A\u5DF2\u9000\u51FA\uFF1B\u8FDE\u4E0D\u4E0A dsh-ee\uFF0C\u4EE4\u724C\u672A\u80FD\u5728\u670D\u52A1\u7AEF\u540A\u9500\uFF0C\u53EF\u5728\u7F51\u9875\u300C\u6211\u7684\u4EE4\u724C\u300D\u91CC\u540A\u9500" };
-    }
-  });
+    })();
+    pending = { code: started.user_code, url, task };
+    void task.catch(() => void 0);
+    if (setupCode) return { kind: "success", text: `\u56DE\u5230 dsh-ee \u7F51\u9875\u7684\u300C\u5F00\u59CB\u4F7F\u7528\u300D\u9875\uFF0C\u6838\u5BF9\u786E\u8BA4\u7801 ${started.user_code} \u540E\u70B9\u300C\u786E\u8BA4\u6388\u6743\u300D\uFF08\u7F51\u9875\u5173\u4E86\u7684\u8BDD\u6253\u5F00 ${url}\uFF09\u3002\u786E\u8BA4\u540E\u56DE\u5230\u8FD9\u91CC\u7EE7\u7EED\u5BF9\u8BDD\u3002` };
+    return { kind: "success", text: `\u8BF7\u5728\u6D4F\u89C8\u5668\u786E\u8BA4\uFF0C\u786E\u8BA4\u7801 ${started.user_code}\uFF0C\u94FE\u63A5 ${url}` };
+  };
+  const commands = ctx.get("commands");
+  if (commands) {
+    const register = (definition) => {
+      const dispose = commands.register(definition);
+      ctx.effect(() => dispose);
+    };
+    register({
+      name: "ee-login",
+      description: "\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7\uFF08\u53EF\u4EE5\u5E26\u4E0A\u7F51\u9875\u300C\u5F00\u59CB\u4F7F\u7528\u300D\u9875\u7ED9\u7684\u63A5\u5165\u7801\uFF09",
+      input: { hint: "[\u63A5\u5165\u7801]" },
+      handler: (invocation) => login(invocation?.rawInput)
+    });
+    register({
+      name: "ee-status",
+      description: "\u67E5\u770B\u4F01\u4E1A\u767B\u5F55\u72B6\u6001",
+      handler: async () => {
+        const current = await tokens.resolve();
+        if (!current) return { kind: "success", text: "\u672A\u767B\u5F55\uFF0C\u5728\u5BF9\u8BDD\u6846\u8F93\u5165 /ee-login" };
+        const response = await fetch(`${config.base}/api/dsh/whoami`, { headers: { Authorization: `Bearer ${current.value}` } });
+        if (!response.ok) return { kind: "success", text: "\u767B\u5F55\u5DF2\u5931\u6548\uFF0C\u5728\u5BF9\u8BDD\u6846\u8F93\u5165 /ee-login" };
+        const me = await response.json();
+        const matches = await tokens.npmrcMatches(current.value);
+        const expiry = me.expires_at ? ` \xB7 ${new Date(me.expires_at).toLocaleDateString()} \u5230\u671F` : " \xB7 \u957F\u671F\u6709\u6548";
+        return { kind: "success", text: `\u5DF2\u767B\u5F55 ${me.username}\uFF08${me.department}\uFF09\xB7 \u4EE4\u724C ${me.token_prefix}${expiry} \xB7 \u63D2\u4EF6 ${config.version} \xB7 npmrc ${matches ? "\u4E00\u81F4" : "\u4E0D\u4E00\u81F4"}` };
+      }
+    });
+    register({
+      name: "ee-logout",
+      description: "\u9000\u51FA\u4F01\u4E1A\u8D26\u53F7",
+      handler: async () => {
+        const current = await tokens.resolve();
+        if (!current) return { kind: "success", text: "\u5F53\u524D\u6CA1\u6709\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7" };
+        const revoked = await fetch(`${config.base}/api/dsh/logout`, { method: "POST", headers: { Authorization: `Bearer ${current.value}` } }).then((response) => response.ok, () => false);
+        await tokens.unset();
+        const left = await tokens.resolve();
+        if (left?.value === current.value) {
+          return {
+            kind: "error",
+            text: `${revoked ? "\u5DF2\u5728\u670D\u52A1\u7AEF\u540A\u9500\u8BE5\u4EE4\u724C\uFF0C" : ""}\u4F46\u5B83\u6765\u81EA\u73AF\u5883\u53D8\u91CF\u6216 $DSH_HOME/.env\uFF08${config.tokenRef}\uFF09\uFF0C\u8BF7\u624B\u52A8\u5220\u9664\u540E\u91CD\u542F DSH`
+          };
+        }
+        return { kind: "success", text: revoked ? "\u5DF2\u9000\u51FA\u4F01\u4E1A\u8D26\u53F7" : "\u672C\u673A\u5DF2\u9000\u51FA\uFF1B\u8FDE\u4E0D\u4E0A dsh-ee\uFF0C\u4EE4\u724C\u672A\u80FD\u5728\u670D\u52A1\u7AEF\u540A\u9500\uFF0C\u53EF\u5728\u7F51\u9875\u300C\u6211\u7684\u4EE4\u724C\u300D\u91CC\u540A\u9500" };
+      }
+    });
+  }
+  return { login };
 }
 
 // src/plugins.ts
@@ -2761,22 +2764,60 @@ function validateName(subject, value) {
 }
 
 // src/brand.ts
-var _brand_dec, _a, _init;
-var DshEEBrandService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _a) {
-  constructor(ctx, readBrand) {
+var _doctor_dec, _login_dec, _overview_dec, _brand_dec, _a, _init;
+var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _a) {
+  constructor(ctx, actions) {
     super(ctx, "dshEE");
-    this.readBrand = readBrand;
+    this.actions = actions;
     __runInitializers(_init, 5, this);
   }
   async brand() {
-    return this.readBrand();
+    return this.actions.readBrand();
+  }
+  async overview() {
+    return this.actions.readOverview();
+  }
+  async login() {
+    return this.actions.login();
+  }
+  async doctor() {
+    return this.actions.doctor();
   }
 };
 _init = __decoratorStart(_a);
-__decorateElement(_init, 1, "brand", _brand_dec, DshEEBrandService);
-__decoratorMetadata(_init, DshEEBrandService);
-function registerBrand(ctx, readBrand) {
-  return new DshEEBrandService(ctx, readBrand);
+__decorateElement(_init, 1, "brand", _brand_dec, DshEEClientService);
+__decorateElement(_init, 1, "overview", _overview_dec, DshEEClientService);
+__decorateElement(_init, 1, "login", _login_dec, DshEEClientService);
+__decorateElement(_init, 1, "doctor", _doctor_dec, DshEEClientService);
+__decoratorMetadata(_init, DshEEClientService);
+function registerBrand(ctx, actions) {
+  return new DshEEClientService(ctx, actions);
+}
+
+// src/overview.ts
+async function bridgeJson(bridge, name2, args) {
+  const result = await bridge.callTool(name2, args);
+  if (result?.isError) throw new Error("\u4F01\u4E1A\u5DE5\u5177\u8C03\u7528\u5931\u8D25");
+  if (result?.structuredContent) return result.structuredContent;
+  const text = result?.content?.find((part) => part.type === "text")?.text;
+  if (typeof text !== "string") throw new Error("\u4F01\u4E1A\u5DE5\u5177\u6CA1\u6709\u8FD4\u56DE JSON");
+  return JSON.parse(text);
+}
+async function readEnterpriseOverview(config, http, bridge) {
+  const me = await http.json("/api/dsh/whoami");
+  const [usage, modelList, doctor] = await Promise.all([
+    bridgeJson(bridge, "ee_me", { action: "usage" }).catch(() => void 0),
+    http.json("/v1/models").catch(() => void 0),
+    bridgeJson(bridge, "ee_doctor", { action: "check" }).catch(() => void 0)
+  ]);
+  return {
+    me,
+    usage,
+    models: modelList?.data?.map((model) => model.id) ?? [],
+    default_model: doctor?.default_model,
+    version: config.version,
+    latest_version: doctor?.connect_version
+  };
 }
 
 // src/upload.ts
@@ -2836,13 +2877,18 @@ function apply(ctx, input) {
     const current = await tokens.resolve();
     if (current?.value) await tokens.syncNpmrc(current.value).catch(() => false);
     let skills;
-    registerCommands(ctx, config, tokens, async () => {
+    const commands = registerCommands(ctx, config, tokens, async () => {
       bridge.wake();
       await Promise.all([bridge.sync().catch(() => void 0), skills?.refreshNow()]);
     });
     registerDoctor(ctx, config, tokens, http, bridge);
     skills = await registerSkills(ctx, config, http);
-    registerBrand(ctx, skills.readBrand);
+    registerBrand(ctx, {
+      readBrand: skills.readBrand,
+      readOverview: () => readEnterpriseOverview(config, http, bridge),
+      login: () => commands.login(),
+      doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge)
+    });
     await bridge.start();
     return () => bridge.stop();
   });

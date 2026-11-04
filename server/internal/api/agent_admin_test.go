@@ -117,6 +117,15 @@ func TestAdminModeMatrix(t *testing.T) {
 	check("开启前", liveAgent, want{requestAdmin: true})
 	code, body = f.elevate(t, f.admin, live.ID, adminPassword, 1)
 	expect(t, "开启管理模式", code, 200, body)
+	code, body = f.admin.do("GET", "/api/dsh/whoami", nil, bearer("ee_at_adm_live"))
+	expect(t, "whoami 返回管理模式到期时间", code, 200, body)
+	var whoami struct {
+		AdminLive  bool       `json:"admin_live"`
+		AdminUntil *time.Time `json:"admin_until"`
+	}
+	if err := json.Unmarshal(body, &whoami); err != nil || !whoami.AdminLive || whoami.AdminUntil == nil {
+		t.Fatalf("管理模式信息不对：%s", body)
+	}
 	check("开启后", liveAgent, want{users: true, adminTokens: true, endAdmin: true})
 	// Agent 不能自己开启：工具里没有这个 action，直接传也被拒绝
 	if text := liveAgent.fail("ee_tokens", map[string]any{"action": "elevate", "id": "current"}); !strings.Contains(text, "action 必须是") {
