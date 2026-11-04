@@ -126,10 +126,23 @@ func (d dshClient) toolNames() []string {
 type catalog struct {
 	Skills []struct {
 		Name           string `json:"name"`
+		Title          string `json:"title"`
 		Kind           string `json:"kind"`
+		Description    string `json:"description"`
 		ModelInvocable bool   `json:"model_invocable"`
 		UserInvocable  bool   `json:"user_invocable"`
+		Version        int    `json:"version"`
 	} `json:"skills"`
+	Apps []struct {
+		Name        string   `json:"name"`
+		Title       string   `json:"title"`
+		Description string   `json:"description"`
+		Icon        string   `json:"icon"`
+		Starters    []string `json:"starters"`
+		Launch      string   `json:"launch"`
+		Version     int      `json:"version"`
+		Missing     []string `json:"missing"`
+	} `json:"apps"`
 	Required []struct {
 		Name   string `json:"name"`
 		Reason string `json:"reason"`
@@ -225,8 +238,8 @@ func TestHub(t *testing.T) {
 	bad := map[string]any{"kind": "skill", "slug": "Bad_Name", "spec": skill["spec"]}
 	code, body = alice.do("POST", "/api/hub", bad, nil)
 	expect(t, "标识不合法", code, 400, body)
-	if len(dsh["alice"].catalog().Skills) != 0 {
-		t.Fatal("待审核的技能不应下发")
+	if initial := dsh["alice"].catalog(); len(initial.Skills) != 0 || initial.Apps == nil {
+		t.Fatalf("待审核的技能不应下发，空微应用目录应为 []：%+v", initial)
 	}
 	code, body = admin.do("GET", "/api/admin/hub/review", nil, nil)
 	expect(t, "审核队列", code, 200, body)
@@ -454,9 +467,49 @@ func TestHub(t *testing.T) {
 			"title": "非法微应用", "description": "校验", "persona": "校验", "icon": tc.icon, "launch": tc.launch}}, nil)
 		expect(t, tc.name, code, 400, body)
 	}
+	code, body = admin.do("POST", "/api/hub", map[string]any{"kind": "app", "slug": "alpha-app", "delivery": "auto", "spec": map[string]any{
+		"title": "A 先排", "description": "验证默认打开方式", "persona": "你是测试助手。"}}, nil)
+	expect(t, "默认打开方式的微应用", code, 201, body)
 	c = dsh["alice"].catalog()
 	if !slices.Contains(c.skillNames(), "expense-assistant") || len(c.Required) != 1 || c.Required[0].Name != "dsh-ledger" || c.Required[0].Reason != "app:expense-assistant" {
 		t.Fatalf("微应用与其依赖的插件：%+v", c)
+	}
+	if len(c.Apps) != 2 || c.Apps[0].Name != "alpha-app" || c.Apps[1].Name != "expense-assistant" {
+		t.Fatalf("微应用目录应按标题排序：%+v", c.Apps)
+	}
+	if c.Apps[0].Launch != "new" || c.Apps[0].Starters == nil {
+		t.Fatalf("默认打开方式应为 new，空示例问题应为 []：%+v", c.Apps[0])
+	}
+	app := c.Apps[1]
+	if app.Title != "报销助手" || app.Description != "帮你判断能不能报" || app.Icon != "🧾" || app.Launch != "resume" || app.Version != 1 || len(app.Missing) != 0 || !slices.Equal(app.Starters, []string{"这张发票能报吗？"}) {
+		t.Fatalf("微应用目录内容不对：%+v", app)
+	}
+	legacySkill := false
+	for _, sk := range c.Skills {
+		if sk.Name == "expense-assistant" {
+			legacySkill = sk.Title == app.Title && sk.Description == app.Description && sk.Kind == "app" && !sk.ModelInvocable && sk.UserInvocable && sk.Version == 1
+		}
+	}
+	if !legacySkill {
+		t.Fatalf("旧版插件使用的 skills 条目不应改变：%+v", c.Skills)
+	}
+	oldRevision := c.Revision
+	code, body = admin.do("POST", fmt.Sprintf("/api/hub/%d/versions", appID), map[string]any{"spec": map[string]any{
+		"title": "报销助手", "description": "帮你判断能不能报", "persona": "你是报销助手。", "icon": "💰", "launch": "resume",
+		"starters": []string{"这张发票能报吗？"}, "skills": []string{"expense-policy"}, "connections": []string{"crm"}, "plugins": []string{"dsh-ledger"}}}, nil)
+	expect(t, "只改图标的新版本", code, 201, body)
+	updated := dsh["alice"].catalog()
+	if updated.Revision == oldRevision || len(updated.Apps) != 2 || updated.Apps[1].Icon != "💰" || updated.Apps[1].Version != 2 {
+		t.Fatalf("改图标后目录与 ETag 应变化：old=%s new=%+v", oldRevision, updated)
+	}
+	code, body, header := dsh["alice"].do("GET", "/api/dsh/catalog", nil, map[string]string{"If-None-Match": `"` + oldRevision + `"`})
+	expect(t, "旧 ETag 失效", code, 200, body)
+	if header.Get("ETag") != `"`+updated.Revision+`"` {
+		t.Fatalf("ETag 应使用新目录修订号：%q", header.Get("ETag"))
+	}
+	bobCatalog := dsh["bob"].catalog()
+	if len(bobCatalog.Apps) != 2 || !slices.Equal(bobCatalog.Apps[1].Missing, []string{"expense-policy"}) {
+		t.Fatalf("bob 的微应用目录应标记缺失依赖：%+v", bobCatalog.Apps)
 	}
 	_, body, _ = dsh["alice"].do("GET", "/api/dsh/skills/expense-assistant", nil, nil)
 	content := decodeAs[struct{ Content string }](t, body).Content
@@ -474,6 +527,15 @@ func TestHub(t *testing.T) {
 	expect(t, "插件设为自动安装", code, 200, body)
 	if c := dsh["bob"].catalog(); len(c.Required) != 1 || c.Required[0].Reason != "policy" {
 		t.Fatalf("插件策略：%+v", c)
+	}
+	code, body = admin.do("PATCH", fmt.Sprintf("/api/hub/%d", appID), map[string]any{"scope": map[string]any{"departments": []string{"研发效能部"}}}, nil)
+	expect(t, "收窄微应用范围", code, 200, body)
+	outside := dsh["bob"].catalog()
+	if slices.Contains(outside.skillNames(), "expense-assistant") || len(outside.Apps) != 1 || outside.Apps[0].Name != "alpha-app" {
+		t.Fatalf("范围外的员工不应看到微应用：%+v", outside)
+	}
+	if inside := dsh["alice"].catalog(); len(inside.Apps) != 2 {
+		t.Fatalf("范围内的员工仍应看到微应用：%+v", inside.Apps)
 	}
 
 	// ---- 接入令牌也能调模型网关 ----

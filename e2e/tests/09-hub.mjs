@@ -88,10 +88,16 @@ export default async function (t) {
   await admin.getByRole("button", { name: "回到上次会话", exact: true }).click();
   await admin.getByLabel("人设与工作方式").fill("你是企业报销助手，先询问费用类型，再给出报销建议。");
   await admin.getByLabel("示例问题（每行一个，最多 6 个）").fill("这张发票能报吗？");
+  await admin.getByRole("button", { name: "范围内的人自动生效", exact: true }).click();
   await admin.getByRole("button", { name: "提交", exact: true }).click();
   await admin.waitForURL(/\/assets\/\d+$/);
   await admin.getByText("🧾", { exact: true }).first().waitFor();
-  step("微应用能保存图标与打开方式，详情页显示图标");
+  cat = await dsh(token, "GET", "/api/dsh/catalog");
+  const catalogApp = cat.data.apps.find((a) => a.name === app);
+  const legacyApp = cat.data.skills.find((s) => s.name === app);
+  assert(catalogApp?.icon === "🧾" && catalogApp.launch === "resume" && catalogApp.starters[0] === "这张发票能报吗？", "DSH 微应用目录：" + JSON.stringify(cat.data));
+  assert(legacyApp?.title === catalogApp.title && legacyApp.kind === "app" && legacyApp.user_invocable && !legacyApp.model_invocable, "旧 skills 条目保持兼容");
+  step("微应用能保存图标与打开方式，详情页显示图标，DSH 目录单独列出且保留旧 skills 条目");
   await admin.goto(`${BASE}/apps`);
   const appRow = admin.locator("li", { hasText: `E2E 报销助手 ${tag}` });
   await appRow.getByText("🧾", { exact: true }).waitFor();

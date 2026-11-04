@@ -102,6 +102,18 @@ type dshSkill struct {
 	Version        int    `json:"version"`
 }
 
+type dshApp struct {
+	Name        string   `json:"name"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Icon        string   `json:"icon,omitempty"`
+	Starters    []string `json:"starters"`
+	Launch      string   `json:"launch"`
+	Version     int      `json:"version"`
+	// 依赖的技能、连接里，当前员工没有权限的，前端提示「部分能力不可用」
+	Missing []string `json:"missing,omitempty"`
+}
+
 type dshPlugin struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
@@ -117,7 +129,9 @@ type dshConn struct {
 }
 
 type dshCatalog struct {
-	Skills   []dshSkill  `json:"skills"`
+	Skills []dshSkill `json:"skills"`
+	// 员工可用的微应用，给接入插件画「企业应用」入口；旧插件忽略这个字段
+	Apps     []dshApp    `json:"apps"`
 	Required []dshPlugin `json:"required_plugins"`
 	Revision string      `json:"revision"`
 	// 企业连接在 DSH 里的工具前缀（mcp__<server_name>__）
@@ -154,7 +168,7 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	if err != nil {
 		return nil, err
 	}
-	c := &dshCatalog{Skills: []dshSkill{}, Required: []dshPlugin{}, ServerName: s.mcpServerNameCtx(ctx),
+	c := &dshCatalog{Skills: []dshSkill{}, Apps: []dshApp{}, Required: []dshPlugin{}, ServerName: s.mcpServerNameCtx(ctx),
 		assets: map[string]*store.Asset{}, specs: map[string]*assetSpec{}}
 	var connIDs []int64
 	for _, a := range on {
@@ -170,6 +184,17 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 			c.Skills = append(c.Skills, dshSkill{Name: a.Slug, Title: sp.Title, Kind: a.Kind, Description: sp.Description, WhenToUse: sp.WhenToUse, ModelInvocable: model, UserInvocable: true, Version: lv.Version})
 		case store.KindPrompt, store.KindApp:
 			c.Skills = append(c.Skills, dshSkill{Name: a.Slug, Title: sp.Title, Kind: a.Kind, Description: sp.Description, ModelInvocable: false, UserInvocable: true, Version: lv.Version})
+			if a.Kind == store.KindApp {
+				launch := sp.Launch
+				if launch == "" {
+					launch = "new"
+				}
+				starters := sp.Starters
+				if starters == nil {
+					starters = []string{}
+				}
+				c.Apps = append(c.Apps, dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Version: lv.Version, Missing: missingAppCapabilities(sp, c)})
+			}
 		case store.KindConnection:
 			c.conns = append(c.conns, &dshConn{asset: a, version: lv.Version, spec: sp})
 			connIDs = append(connIDs, a.ID)
@@ -244,6 +269,12 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 		}
 	}
 	sort.Slice(c.Skills, func(i, j int) bool { return c.Skills[i].Name < c.Skills[j].Name })
+	sort.Slice(c.Apps, func(i, j int) bool {
+		if c.Apps[i].Title == c.Apps[j].Title {
+			return c.Apps[i].Name < c.Apps[j].Name
+		}
+		return c.Apps[i].Title < c.Apps[j].Title
+	})
 	sort.Slice(c.Required, func(i, j int) bool { return c.Required[i].Name < c.Required[j].Name })
 	sort.Slice(c.conns, func(i, j int) bool { return c.conns[i].asset.Slug < c.conns[j].asset.Slug })
 
@@ -255,6 +286,7 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	// 修订号：目录里任何会影响 DSH 的东西变了，它就变
 	h := sha256.New()
 	_ = json.NewEncoder(h).Encode(c.Skills)
+	_ = json.NewEncoder(h).Encode(c.Apps)
 	_ = json.NewEncoder(h).Encode(c.Required)
 	_ = json.NewEncoder(h).Encode(c.Brand)
 	for _, name := range slices.Sorted(maps.Keys(c.system)) {
@@ -355,6 +387,16 @@ func (s *Server) handleDshSkill(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"skill": skill, "content": content})
 }
 
+func missingAppCapabilities(sp *assetSpec, c *dshCatalog) []string {
+	var missing []string
+	for _, slug := range append(append([]string{}, sp.Skills...), sp.Connections...) {
+		if c.assets[slug] == nil {
+			missing = append(missing, slug)
+		}
+	}
+	return missing
+}
+
 // appContent 把微应用写成一段 /命令 指令：人设与工作方式，加上它能用的企业能力。
 func appContent(sp *assetSpec, c *dshCatalog) string {
 	var b strings.Builder
@@ -378,13 +420,7 @@ func appContent(sp *assetSpec, c *dshCatalog) string {
 		b.WriteString(strings.Join(lines, "\n"))
 		b.WriteString("\n")
 	}
-	var missing []string
-	for _, slug := range append(append([]string{}, sp.Skills...), sp.Connections...) {
-		if c.assets[slug] == nil {
-			missing = append(missing, slug)
-		}
-	}
-	if len(missing) > 0 {
+	if missing := missingAppCapabilities(sp, c); len(missing) > 0 {
 		fmt.Fprintf(&b, "\n注意：这些能力不在当前用户的可用范围内，不要尝试调用：%s\n", strings.Join(missing, "、"))
 	}
 	if len(sp.Starters) > 0 {
