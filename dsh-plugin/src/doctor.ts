@@ -4,6 +4,7 @@ import type { McpBridge } from "./bridge.js";
 import type { DshContext, PluginConfig } from "./dsh.js";
 import type { HttpClient } from "./http.js";
 import type { TokenManager } from "./token.js";
+import type { AppBindings } from "./app-bindings.js";
 
 export interface Check {
   id: string;
@@ -31,9 +32,10 @@ export function compareVersions(a: string, b: string): number {
   return x.pre < y.pre ? -1 : 1;
 }
 
-export async function runLocalDoctor(ctx: DshContext, config: PluginConfig, tokens: TokenManager, http: HttpClient, bridge: McpBridge): Promise<{ summary: string; checks: Check[] }> {
+export async function runLocalDoctor(ctx: DshContext, config: PluginConfig, tokens: TokenManager, http: HttpClient, bridge: McpBridge, bindings?: AppBindings): Promise<{ summary: string; checks: Check[] }> {
   const checks: Check[] = [];
   const add = (check: Check) => checks.push(check);
+  if (bindings?.warning()) add({ id: "app_bindings", status: "warn", title: bindings.warning(), fix: "重新打开微应用会建立新绑定；原损坏文件无需手动删除" });
 
   const current = await tokens.resolve();
   if (!current?.value) {
@@ -134,13 +136,13 @@ function summarize(checks: Check[]): string {
 }
 
 /** 注册本机只读工具 ee_local_doctor。修复交给模型用 DSH 自带的文件 / shell 工具做（有 DSH 自己的审批），这里不改任何文件。 */
-export function registerDoctor(ctx: DshContext, config: PluginConfig, tokens: TokenManager, http: HttpClient, bridge: McpBridge): void {
+export function registerDoctor(ctx: DshContext, config: PluginConfig, tokens: TokenManager, http: HttpClient, bridge: McpBridge, bindings?: AppBindings): void {
   const dispose = ctx.tools.register({
     name: "ee_local_doctor",
     description: "检查这台电脑上 DSH 与企业工作台 dsh-ee 的接入：登录凭据、令牌是否有效、.npmrc、接入插件版本、必装插件、模型、企业工具同步，并附带服务端检查。只读，不修改任何东西。",
     parameters: { type: "object", properties: {} },
     output: { schema: {}, render: (_args: unknown, value: unknown) => [{ type: "text", text: JSON.stringify(value) }] },
-    execute: async () => runLocalDoctor(ctx, config, tokens, http, bridge),
+    execute: async () => runLocalDoctor(ctx, config, tokens, http, bridge, bindings),
   });
   ctx.effect(() => dispose);
 }

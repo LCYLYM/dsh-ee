@@ -8,11 +8,19 @@ import { registerApps } from "./apps-client.js";
 
 export const inject = ["slots", "remote", "sidebarRightTabs", "sidebarRight", "sessions", "conversation", "workspaces"];
 
+const jsonParameter = (name: string) => {
+  const codec = { mode: "strict" as const, typeSymbol: "string", create: () => z.string() };
+  return { name, source: "json" as const, codec, strictCodec: codec };
+};
+
 const clientRemote = createTypertRemoteInfo({
   package: "__DSH_EE_PACKAGE__",
   methods: {
     "dshEE/brand": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/apps": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
+    "dshEE/appBindings": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
+    "dshEE/bindApp": { service: "dshEE", parameters: [jsonParameter("name"), jsonParameter("sessionId")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
+    "dshEE/unbindApp": { service: "dshEE", parameters: [jsonParameter("name")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/overview": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/login": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/doctor": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },

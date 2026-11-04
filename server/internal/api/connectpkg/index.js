@@ -158,22 +158,22 @@ var HttpClient = class {
   constructor(tokens) {
     this.tokens = tokens;
   }
-  async fetch(path4, init = {}) {
+  async fetch(path5, init = {}) {
     const current = await this.tokens.resolve();
     const headers = new Headers(init.headers);
     if (current?.value) headers.set("Authorization", `Bearer ${current.value}`);
     const config = this.tokens.config;
     if (!headers.has("X-DshEE-Client")) headers.set("X-DshEE-Client", `dsh-connect/${config.version || "dev"}`);
     if (!headers.has("X-DshEE-Host")) headers.set("X-DshEE-Host", dshHost());
-    const response = await fetch(`${config.base}${path4}`, { ...init, headers });
+    const response = await fetch(`${config.base}${path5}`, { ...init, headers });
     if (response.status === 401 && current?.value) {
       const body = await response.clone().json().catch(() => null);
       if (body?.code?.startsWith("token_")) await this.tokens.invalidate(current.value);
     }
     return response;
   }
-  async json(path4, init) {
-    const response = await this.fetch(path4, init);
+  async json(path5, init) {
+    const response = await this.fetch(path5, init);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   }
@@ -643,9 +643,10 @@ function compareVersions(a, b) {
   if (!y.pre) return -1;
   return x.pre < y.pre ? -1 : 1;
 }
-async function runLocalDoctor(ctx, config, tokens, http, bridge) {
+async function runLocalDoctor(ctx, config, tokens, http, bridge, bindings) {
   const checks = [];
   const add = (check) => checks.push(check);
+  if (bindings?.warning()) add({ id: "app_bindings", status: "warn", title: bindings.warning(), fix: "\u91CD\u65B0\u6253\u5F00\u5FAE\u5E94\u7528\u4F1A\u5EFA\u7ACB\u65B0\u7ED1\u5B9A\uFF1B\u539F\u635F\u574F\u6587\u4EF6\u65E0\u9700\u624B\u52A8\u5220\u9664" });
   const current = await tokens.resolve();
   if (!current?.value) {
     add({ id: "credential", status: "fail", title: "\u672C\u673A\u6CA1\u6709\u4F01\u4E1A\u767B\u5F55\u51ED\u636E", fix: "\u5728\u5BF9\u8BDD\u6846\u8F93\u5165 /ee-login \u767B\u5F55" });
@@ -716,13 +717,13 @@ function summarize(checks) {
   const warns = checks.filter((c) => c.status === "warn").length;
   return fails ? `${fails} \u9879\u5931\u8D25\uFF0C${warns} \u9879\u9700\u8981\u6CE8\u610F` : warns ? `${warns} \u9879\u9700\u8981\u6CE8\u610F` : "\u5168\u90E8\u6B63\u5E38";
 }
-function registerDoctor(ctx, config, tokens, http, bridge) {
+function registerDoctor(ctx, config, tokens, http, bridge, bindings) {
   const dispose = ctx.tools.register({
     name: "ee_local_doctor",
     description: "\u68C0\u67E5\u8FD9\u53F0\u7535\u8111\u4E0A DSH \u4E0E\u4F01\u4E1A\u5DE5\u4F5C\u53F0 dsh-ee \u7684\u63A5\u5165\uFF1A\u767B\u5F55\u51ED\u636E\u3001\u4EE4\u724C\u662F\u5426\u6709\u6548\u3001.npmrc\u3001\u63A5\u5165\u63D2\u4EF6\u7248\u672C\u3001\u5FC5\u88C5\u63D2\u4EF6\u3001\u6A21\u578B\u3001\u4F01\u4E1A\u5DE5\u5177\u540C\u6B65\uFF0C\u5E76\u9644\u5E26\u670D\u52A1\u7AEF\u68C0\u67E5\u3002\u53EA\u8BFB\uFF0C\u4E0D\u4FEE\u6539\u4EFB\u4F55\u4E1C\u897F\u3002",
     parameters: { type: "object", properties: {} },
     output: { schema: {}, render: (_args, value) => [{ type: "text", text: JSON.stringify(value) }] },
-    execute: async () => runLocalDoctor(ctx, config, tokens, http, bridge)
+    execute: async () => runLocalDoctor(ctx, config, tokens, http, bridge, bindings)
   });
   ctx.effect(() => dispose);
 }
@@ -2768,8 +2769,8 @@ function validateName(subject, value) {
 }
 
 // src/brand.ts
-var _doctor_dec, _login_dec, _overview_dec, _apps_dec, _brand_dec, _a, _init;
-var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _a) {
+var _doctor_dec, _login_dec, _overview_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _apps_dec, _brand_dec, _a, _init;
+var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _a) {
   constructor(ctx, actions) {
     super(ctx, "dshEE");
     this.actions = actions;
@@ -2780,6 +2781,15 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
   }
   async apps() {
     return this.actions.readApps();
+  }
+  async appBindings() {
+    return this.actions.readAppBindings();
+  }
+  async bindApp(name2, sessionId) {
+    return this.actions.bindApp(name2, sessionId);
+  }
+  async unbindApp(name2) {
+    return this.actions.unbindApp(name2);
   }
   async overview() {
     return this.actions.readOverview();
@@ -2794,6 +2804,9 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "brand", _brand_dec, DshEEClientService);
 __decorateElement(_init, 1, "apps", _apps_dec, DshEEClientService);
+__decorateElement(_init, 1, "appBindings", _appBindings_dec, DshEEClientService);
+__decorateElement(_init, 1, "bindApp", _bindApp_dec, DshEEClientService);
+__decorateElement(_init, 1, "unbindApp", _unbindApp_dec, DshEEClientService);
 __decorateElement(_init, 1, "overview", _overview_dec, DshEEClientService);
 __decorateElement(_init, 1, "login", _login_dec, DshEEClientService);
 __decorateElement(_init, 1, "doctor", _doctor_dec, DshEEClientService);
@@ -2864,6 +2877,68 @@ async function uploadPackage(http, args) {
   return { content: [{ type: "text", text: JSON.stringify(body) }], isError: false };
 }
 
+// src/app-bindings.ts
+import fs3 from "node:fs";
+import path4 from "node:path";
+var AppBindings = class {
+  constructor(file = path4.join(dshHome(), "dsh-ee", "apps.json")) {
+    this.file = file;
+  }
+  sequence = 0;
+  warningMessage = "";
+  list() {
+    return this.read().bindings;
+  }
+  warning() {
+    return this.warningMessage;
+  }
+  bind(name2, sessionId) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name2) || name2.length > 48) throw new Error("\u5FAE\u5E94\u7528\u540D\u4E0D\u5408\u6CD5");
+    if (typeof sessionId !== "string" || !sessionId.trim() || sessionId.length > 256) throw new Error("\u4F1A\u8BDD id \u4E0D\u5408\u6CD5");
+    const bindings = this.list();
+    bindings[name2] = { sessionId: sessionId.trim(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+    this.write(bindings);
+    return bindings;
+  }
+  unbind(name2) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name2) || name2.length > 48) throw new Error("\u5FAE\u5E94\u7528\u540D\u4E0D\u5408\u6CD5");
+    const bindings = this.list();
+    delete bindings[name2];
+    this.write(bindings);
+    return bindings;
+  }
+  read() {
+    this.warningMessage = "";
+    if (!fs3.existsSync(this.file)) return { version: 1, bindings: {} };
+    try {
+      const value = JSON.parse(fs3.readFileSync(this.file, "utf8"));
+      if (value?.version !== 1 || !value.bindings || typeof value.bindings !== "object" || Array.isArray(value.bindings)) throw new Error("invalid");
+      const bindings = {};
+      for (const [name2, binding] of Object.entries(value.bindings)) {
+        const sessionId = binding?.sessionId;
+        const updatedAt = binding?.updatedAt;
+        if (typeof sessionId === "string" && sessionId && typeof updatedAt === "string") bindings[name2] = { sessionId, updatedAt };
+      }
+      return { version: 1, bindings };
+    } catch {
+      this.warningMessage = `\u5FAE\u5E94\u7528\u4F1A\u8BDD\u7ED1\u5B9A\u6587\u4EF6\u5DF2\u635F\u574F\uFF0C\u5DF2\u6309\u7A7A\u7ED1\u5B9A\u5904\u7406\uFF08${this.file}\uFF09`;
+      return { version: 1, bindings: {} };
+    }
+  }
+  write(bindings) {
+    fs3.mkdirSync(path4.dirname(this.file), { recursive: true, mode: 448 });
+    const temp = `${this.file}.${process.pid}.${++this.sequence}.tmp`;
+    try {
+      fs3.writeFileSync(temp, JSON.stringify({ version: 1, bindings }, null, 2) + "\n", { mode: 384 });
+      fs3.renameSync(temp, this.file);
+      fs3.chmodSync(this.file, 384);
+      this.warningMessage = "";
+    } finally {
+      if (fs3.existsSync(temp)) fs3.unlinkSync(temp);
+    }
+  }
+};
+
 // src/index.ts
 var name = "dsh-ee-connect";
 var inject = {
@@ -2889,14 +2964,21 @@ function apply(ctx, input) {
       bridge.wake();
       await Promise.all([bridge.sync().catch(() => void 0), skills?.refreshNow()]);
     });
-    registerDoctor(ctx, config, tokens, http, bridge);
+    const appBindings = new AppBindings();
+    registerDoctor(ctx, config, tokens, http, bridge, appBindings);
     skills = await registerSkills(ctx, config, http);
     registerBrand(ctx, {
       readBrand: skills.readBrand,
       readApps: skills.readApps,
+      readAppBindings: async () => appBindings.list(),
+      bindApp: async (name2, sessionId) => {
+        if (!(await skills.readApps()).some((app) => app.name === name2)) throw new Error("\u76EE\u5F55\u91CC\u6CA1\u6709\u8FD9\u4E2A\u5FAE\u5E94\u7528");
+        return appBindings.bind(name2, sessionId);
+      },
+      unbindApp: async (name2) => appBindings.unbind(name2),
       readOverview: () => readEnterpriseOverview(config, http, bridge),
       login: () => commands.login(),
-      doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge)
+      doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge, appBindings)
     });
     await bridge.start();
     return () => bridge.stop();

@@ -9,6 +9,7 @@ import { registerDoctor, runLocalDoctor } from "./doctor.js";
 import { registerBrand } from "./brand.js";
 import { readEnterpriseOverview } from "./overview.js";
 import { uploadPackage } from "./upload.js";
+import { AppBindings } from "./app-bindings.js";
 import type { DshContext, PluginConfig } from "./dsh.js";
 
 export const name = "dsh-ee-connect";
@@ -38,14 +39,21 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
       bridge.wake();
       await Promise.all([bridge.sync().catch(() => undefined), skills?.refreshNow()]);
     });
-    registerDoctor(ctx, config, tokens, http, bridge);
+    const appBindings = new AppBindings();
+    registerDoctor(ctx, config, tokens, http, bridge, appBindings);
     skills = await registerSkills(ctx, config, http);
     registerBrand(ctx, {
       readBrand: skills.readBrand,
       readApps: skills.readApps,
+      readAppBindings: async () => appBindings.list(),
+      bindApp: async (name, sessionId) => {
+        if (!(await skills!.readApps()).some((app) => app.name === name)) throw new Error("目录里没有这个微应用");
+        return appBindings.bind(name, sessionId);
+      },
+      unbindApp: async (name) => appBindings.unbind(name),
       readOverview: () => readEnterpriseOverview(config, http, bridge),
       login: () => commands.login(),
-      doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge),
+      doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge, appBindings),
     });
     await bridge.start();
     return () => bridge.stop();

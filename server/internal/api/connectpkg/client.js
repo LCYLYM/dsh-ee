@@ -20407,11 +20407,18 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
 
 // src/client.ts
 var inject = ["slots", "remote", "sidebarRightTabs", "sidebarRight", "sessions", "conversation", "workspaces"];
+var jsonParameter = (name) => {
+  const codec2 = { mode: "strict", typeSymbol: "string", create: () => external_exports.string() };
+  return { name, source: "json", codec: codec2, strictCodec: codec2 };
+};
 var clientRemote = createTypertRemoteInfo({
   package: "__DSH_EE_PACKAGE__",
   methods: {
     "dshEE/brand": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/apps": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/appBindings": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/bindApp": { service: "dshEE", parameters: [jsonParameter("name"), jsonParameter("sessionId")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/unbindApp": { service: "dshEE", parameters: [jsonParameter("name")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/overview": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/login": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/doctor": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }

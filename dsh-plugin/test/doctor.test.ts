@@ -110,3 +110,10 @@ test("服务端 Agent 检查不可用时不算失败", async () => {
     assert.ok(!checks.some((c) => c.status === "fail"));
   });
 });
+
+test("绑定文件损坏时 doctor 报 warn", async () => {
+  const f = fixture({});
+  const bindings = { warning: () => "微应用会话绑定文件已损坏" };
+  const { checks } = await runLocalDoctor(f.ctx as any, config, f.tokens as any, f.http as any, f.bridge as any, bindings as any);
+  assert.equal(byId(checks).app_bindings.status, "warn");
+});

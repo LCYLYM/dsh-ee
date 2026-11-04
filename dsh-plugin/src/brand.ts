@@ -5,6 +5,9 @@ export interface ClientServiceActions {
   readBrand: () => Promise<any>;
   readApps: () => Promise<any>;
   readOverview: () => Promise<any>;
+  readAppBindings: () => Promise<any>;
+  bindApp: (name: string, sessionId: string) => Promise<any>;
+  unbindApp: (name: string) => Promise<any>;
   login: () => Promise<any>;
   doctor: () => Promise<any>;
 }
@@ -22,6 +25,21 @@ export class DshEEClientService extends TypertRemoteService {
   @Remote
   async apps(): Promise<any> {
     return this.actions.readApps();
+  }
+
+  @Remote
+  async appBindings(): Promise<any> {
+    return this.actions.readAppBindings();
+  }
+
+  @Remote
+  async bindApp(name: string, sessionId: string): Promise<any> {
+    return this.actions.bindApp(name, sessionId);
+  }
+
+  @Remote
+  async unbindApp(name: string): Promise<any> {
+    return this.actions.unbindApp(name);
   }
 
   @Remote
