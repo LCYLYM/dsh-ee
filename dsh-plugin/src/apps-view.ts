@@ -1,4 +1,5 @@
 import type { CatalogApp } from "./skills.js";
+import type { AppSessionStatus } from "./session-status.js";
 
 export interface AppsViewState {
   apps: CatalogApp[];
@@ -7,6 +8,7 @@ export interface AppsViewState {
   query?: string;
   busy?: boolean;
   notice?: string;
+  statuses?: Record<string, AppSessionStatus | undefined>;
 }
 
 export interface AppsViewActions {
@@ -14,6 +16,8 @@ export interface AppsViewActions {
   open: (app: CatalogApp) => void;
   fill: (app: CatalogApp) => void;
   web: (app: CatalogApp) => void;
+  newSession: (app: CatalogApp) => void;
+  unbind: (app: CatalogApp) => void;
   toggle: () => void;
   search: (query: string) => void;
 }
@@ -40,12 +44,16 @@ function appMenu(createElement: (...args: any[]) => any, app: CatalogApp, action
   return createElement("details", { style: { position: "relative", flex: "0 0 auto" } },
     createElement("summary", { "aria-label": `${app.title}更多操作`, style: { cursor: "pointer", listStyle: "none", padding: "4px 6px" } }, "⋯"),
     createElement("div", { style: { position: "absolute", right: 0, zIndex: 20, minWidth: 130, padding: 6, borderRadius: 7, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", boxShadow: "0 5px 20px #0002" } },
+      createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.newSession(app) }, "新开一个会话"),
       createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.fill(app) }, "填进输入框"),
-      createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.web(app) }, "在网页查看")));
+      createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.web(app) }, "在网页查看"),
+      createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.unbind(app) }, "解除绑定")));
 }
 
-function appRow(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions) {
-  return createElement("div", { key: app.name, style: { display: "flex", alignItems: "center", gap: 4 } },
+function appRow(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions, status?: AppSessionStatus) {
+  const statusView = status === "need" ? { label: "待你决定", color: "#d97706" } : status === "busy" ? { label: "工作中", color: "#2563eb" } : status === "done" ? { label: "本轮结束", color: "#737373" } : undefined;
+  return createElement("div", { key: app.name, "data-dsh-ee-app": app.name, style: { display: "flex", alignItems: "center", gap: 4 } },
+    statusView ? createElement("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
     appTile(createElement, app, () => actions.open(app)),
     app.missing?.length ? createElement("span", { title: `不可用：${app.missing.join("、")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "部分能力不可用") : null,
     appMenu(createElement, app, actions));
@@ -64,7 +72,7 @@ export function appsSection(createElement: (...args: any[]) => any, state: AppsV
   return createElement("section", { "data-dsh-ee-ui": "apps", style: { padding: "10px 12px", fontSize: 13 } },
     createElement("h2", { style: { margin: "0 0 7px", fontSize: 13 } }, "企业应用"),
     state.apps.length > 8 ? createElement("input", { "aria-label": "搜索企业应用", value: state.query ?? "", onChange: (event: any) => actions.search(event.target.value), placeholder: "搜索…", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }) : null,
-    createElement("div", { style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement, app, actions))),
+    createElement("div", { style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement, app, actions, state.statuses?.[app.name]))),
     !state.expanded && filtered.length > 6 ? createElement("button", { type: "button", onClick: actions.toggle, style: { ...buttonStyle, marginTop: 7, opacity: 0.7 } }, `更多（${filtered.length - 6}）`) : null,
     state.notice ? createElement("p", { role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null);
 }

@@ -2,14 +2,20 @@ import { createElement, useEffect, useState } from "react";
 import { appsSection, heroAppsMenu, startText, type AppsViewActions } from "./apps-view.js";
 import { createSession, currentSessionOf, fillInput, openSession, sendToSession } from "./host-session.js";
 import type { CatalogApp } from "./skills.js";
+import type { AppBindingMap } from "./app-bindings.js";
+import { applicationStatus, createSessionSnapshotAdapter, visibleAppStatus } from "./session-status.js";
 
 interface AppsSnapshot {
   apps: CatalogApp[];
+  bindings: AppBindingMap;
+  sessionSnapshot?: any;
   busy: boolean;
 }
 
 export function registerApps(ctx: any, remote: any, useOverview: () => any, unwrapRemote: (result: any) => any) {
-  let snapshot: AppsSnapshot = { apps: [], busy: false };
+  let snapshot: AppsSnapshot = { apps: [], bindings: {}, busy: false };
+  const adaptSessions = createSessionSnapshotAdapter();
+  const seen = new Set<string>();
   let started = false;
   const listeners = new Set<() => void>();
   const update = (patch: Partial<AppsSnapshot>) => {
@@ -23,10 +29,24 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
       update({ apps: Array.isArray(apps) ? apps : [] });
     } catch {
       update({ apps: [] });
+    }
+    try {
+      if (typeof remote.appBindings === "function") {
+        const bindings = unwrapRemote(await remote.appBindings());
+        if (bindings && typeof bindings === "object") update({ bindings });
+      }
+    } catch {
+      update({ bindings: {} });
     } finally {
       update({ busy: false });
     }
   };
+  const readSessions = () => adaptSessions(ctx.sessions?.list?.getSnapshot?.(), ctx.get("uiSession")?.sessionStatus);
+  ctx.effect(() => {
+    update({ sessionSnapshot: readSessions() });
+    const disposals = [ctx.sessions?.list?.subscribe?.(() => update({ sessionSnapshot: readSessions() })), ctx.get("uiSession")?.sessionStatus?.subscribe?.(() => update({ sessionSnapshot: readSessions() }))];
+    return () => { for (const dispose of disposals) if (typeof dispose === "function") dispose(); };
+  });
   const useApps = () => {
     const [local, setLocal] = useState(snapshot);
     useEffect(() => {
@@ -52,10 +72,36 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     if (fillInput(ctx, `/${app.name}`)) return "已填进输入框，确认后发送";
     return copy(app);
   };
+  const bind = async (app: CatalogApp, id: string) => {
+    const bindings = unwrapRemote(await remote.bindApp({ name: app.name, sessionId: id }));
+    if (bindings && typeof bindings === "object") update({ bindings });
+  };
+  const markSeen = (app: CatalogApp) => {
+    const id = snapshot.bindings[app.name]?.sessionId;
+    if (id) seen.add(`${app.name}:${id}`);
+    update({ sessionSnapshot: snapshot.sessionSnapshot });
+  };
   const launchNew = async (app: CatalogApp) => {
     const id = await createSession(ctx);
     await openSession(ctx, id);
+    await bind(app, id).catch(() => undefined);
     await sendToSession(ctx, id, startText(app));
+  };
+  const launchSidebar = async (app: CatalogApp) => {
+    const id = snapshot.bindings[app.name]?.sessionId;
+    const archived = ctx.workspaces?.list?.getSnapshot?.()?.archivedSessionIds;
+    const listed = !Array.isArray(snapshot.sessionSnapshot?.ids) || snapshot.sessionSnapshot.ids.includes(id);
+    if (app.launch === "resume" && id && listed && snapshot.sessionSnapshot?.byId?.[id] && !archived?.includes?.(id)) {
+      markSeen(app);
+      try {
+        await openSession(ctx, id);
+        return;
+      } catch {
+        await launchNew(app);
+        return;
+      }
+    }
+    await launchNew(app);
   };
   const launchHero = async (app: CatalogApp) => {
     const id = currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
@@ -76,7 +122,9 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
 
   const useActions = (setNotice: (notice: string) => void, launch: (app: CatalogApp) => Promise<void>): AppsViewActions => ({
     login: () => { void remote.login().then((result: any) => setNotice(unwrapRemote(result)?.text || "请在浏览器完成企业登录。")).catch(() => setNotice("发起登录失败，请稍后重试。")); },
-    open: (app) => { void openWithFallback(app, launch).then(setNotice); },
+    open: (app) => { markSeen(app); void openWithFallback(app, launch).then(setNotice); },
+    newSession: (app) => { void openWithFallback(app, launchNew).then(setNotice); },
+    unbind: (app) => { void remote.unbindApp({ name: app.name }).then((result: any) => { const bindings = unwrapRemote(result); update({ bindings }); setNotice("已解除绑定"); }).catch(() => setNotice("解除绑定失败，请稍后重试。")); },
     fill: (app) => { void fill(app).then(setNotice); },
     web,
     toggle: () => {},
@@ -90,8 +138,12 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     const [query, setQuery] = useState("");
     const [notice, setNotice] = useState("");
     if (!overview.data && !overview.failed) return null;
-    const actions = { ...useActions(setNotice, launchNew), toggle: () => setExpanded(!expanded), search: setQuery };
-    return appsSection(createElement, { apps: state.apps, loggedIn: !!overview.data?.me, expanded, query, notice }, actions);
+    const actions = { ...useActions(setNotice, launchSidebar), toggle: () => setExpanded(!expanded), search: setQuery };
+    const statuses = Object.fromEntries(state.apps.map((app) => {
+      const id = state.bindings[app.name]?.sessionId;
+      return [app.name, id ? visibleAppStatus(applicationStatus(state.sessionSnapshot, id), `${app.name}:${id}`, seen) : undefined];
+    }));
+    return appsSection(createElement, { apps: state.apps, loggedIn: !!overview.data?.me, expanded, query, notice, statuses }, actions);
   };
   const HeroApps = () => {
     const state = useApps();

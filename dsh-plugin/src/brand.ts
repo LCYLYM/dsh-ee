@@ -33,13 +33,13 @@ export class DshEEClientService extends TypertRemoteService {
   }
 
   @Remote
-  async bindApp(name: string, sessionId: string): Promise<any> {
-    return this.actions.bindApp(name, sessionId);
+  async bindApp(request: { name: string; sessionId: string }): Promise<any> {
+    return this.actions.bindApp(request.name, request.sessionId);
   }
 
   @Remote
-  async unbindApp(name: string): Promise<any> {
-    return this.actions.unbindApp(name);
+  async unbindApp(request: { name: string }): Promise<any> {
+    return this.actions.unbindApp(request.name);
   }
 
   @Remote

@@ -20120,15 +20120,19 @@ function appMenu(createElement3, app, actions) {
     createElement3(
       "div",
       { style: { position: "absolute", right: 0, zIndex: 20, minWidth: 130, padding: 6, borderRadius: 7, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", boxShadow: "0 5px 20px #0002" } },
+      createElement3("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.newSession(app) }, "\u65B0\u5F00\u4E00\u4E2A\u4F1A\u8BDD"),
       createElement3("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.fill(app) }, "\u586B\u8FDB\u8F93\u5165\u6846"),
-      createElement3("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.web(app) }, "\u5728\u7F51\u9875\u67E5\u770B")
+      createElement3("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.web(app) }, "\u5728\u7F51\u9875\u67E5\u770B"),
+      createElement3("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.unbind(app) }, "\u89E3\u9664\u7ED1\u5B9A")
     )
   );
 }
-function appRow(createElement3, app, actions) {
+function appRow(createElement3, app, actions, status) {
+  const statusView = status === "need" ? { label: "\u5F85\u4F60\u51B3\u5B9A", color: "#d97706" } : status === "busy" ? { label: "\u5DE5\u4F5C\u4E2D", color: "#2563eb" } : status === "done" ? { label: "\u672C\u8F6E\u7ED3\u675F", color: "#737373" } : void 0;
   return createElement3(
     "div",
-    { key: app.name, style: { display: "flex", alignItems: "center", gap: 4 } },
+    { key: app.name, "data-dsh-ee-app": app.name, style: { display: "flex", alignItems: "center", gap: 4 } },
+    statusView ? createElement3("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
     appTile(createElement3, app, () => actions.open(app)),
     app.missing?.length ? createElement3("span", { title: `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528") : null,
     appMenu(createElement3, app, actions)
@@ -20152,7 +20156,7 @@ function appsSection(createElement3, state, actions) {
     { "data-dsh-ee-ui": "apps", style: { padding: "10px 12px", fontSize: 13 } },
     createElement3("h2", { style: { margin: "0 0 7px", fontSize: 13 } }, "\u4F01\u4E1A\u5E94\u7528"),
     state.apps.length > 8 ? createElement3("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }) : null,
-    createElement3("div", { style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement3, app, actions))),
+    createElement3("div", { style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement3, app, actions, state.statuses?.[app.name]))),
     !state.expanded && filtered.length > 6 ? createElement3("button", { type: "button", onClick: actions.toggle, style: { ...buttonStyle, marginTop: 7, opacity: 0.7 } }, `\u66F4\u591A\uFF08${filtered.length - 6}\uFF09`) : null,
     state.notice ? createElement3("p", { role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null
   );
@@ -20297,9 +20301,73 @@ function fillInput(ctx, text) {
   }
 }
 
+// src/session-status.ts
+function createSessionSnapshotAdapter() {
+  const previousRunning = /* @__PURE__ */ new Map();
+  const stopped = /* @__PURE__ */ new Set();
+  return (snapshot, statusSource) => {
+    if (!snapshot || typeof snapshot.current === "string") return snapshot;
+    const statuses = statusSource?.getSnapshot?.();
+    const byId = {};
+    const subagentsByParent = { ...snapshot.subagentsByParent };
+    for (const [id, row] of Object.entries(snapshot.byId ?? {})) {
+      const status = statuses?.get?.(id);
+      const running = status?.running ?? row.running;
+      if (running === true) stopped.delete(id);
+      else if (running === false && previousRunning.get(id) === true) stopped.add(id);
+      if (typeof running === "boolean") previousRunning.set(id, running);
+      byId[id] = {
+        ...row,
+        running,
+        pendingInteraction: status ? status.pendingInteraction : row.pendingInteraction,
+        completed: running !== true && (stopped.has(id) || status?.completionUnread === true || row.completed === true)
+      };
+      const children = snapshot.projectionsBySession?.[id]?.values?.subagentCatalog ?? row.projectionValues?.subagentCatalog;
+      if (Array.isArray(children)) subagentsByParent[id] = children;
+    }
+    if (snapshot.phase === "ready") {
+      for (const id of previousRunning.keys()) if (!byId[id]) {
+        previousRunning.delete(id);
+        stopped.delete(id);
+      }
+    }
+    return { ...snapshot, byId, subagentsByParent };
+  };
+}
+function childSessionIdsOf(snapshot, sid) {
+  const children = /* @__PURE__ */ new Set();
+  for (const [id, row] of Object.entries(snapshot?.byId ?? {})) {
+    if (id !== sid && row?.parentId === sid) children.add(id);
+  }
+  const catalog = snapshot?.subagentsByParent?.[sid];
+  const rows = Array.isArray(catalog) ? catalog : catalog?.entries ?? catalog?.items ?? [];
+  if (Array.isArray(rows)) for (const row of rows) {
+    const id = row?.sessionId ?? row?.id;
+    if (typeof id === "string" && id !== sid) children.add(id);
+  }
+  return children;
+}
+function applicationStatus(snapshot, sid) {
+  if (!snapshot?.byId?.[sid]) return void 0;
+  const ids = [sid, ...childSessionIdsOf(snapshot, sid)];
+  if (ids.some((id) => snapshot.byId[id]?.pendingInteraction != null)) return "need";
+  if (ids.some((id) => snapshot.byId[id]?.running === true)) return "busy";
+  if (ids.some((id) => snapshot.byId[id]?.completed === true)) return "done";
+  return void 0;
+}
+function visibleAppStatus(status, key, seen) {
+  if (status !== "done") {
+    seen.delete(key);
+    return status;
+  }
+  return seen.has(key) ? void 0 : status;
+}
+
 // src/apps-client.ts
 function registerApps(ctx, remote, useOverview, unwrapRemote2) {
-  let snapshot = { apps: [], busy: false };
+  let snapshot = { apps: [], bindings: {}, busy: false };
+  const adaptSessions = createSessionSnapshotAdapter();
+  const seen = /* @__PURE__ */ new Set();
   let started = false;
   const listeners = /* @__PURE__ */ new Set();
   const update = (patch) => {
@@ -20313,10 +20381,26 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
       update({ apps: Array.isArray(apps) ? apps : [] });
     } catch {
       update({ apps: [] });
+    }
+    try {
+      if (typeof remote.appBindings === "function") {
+        const bindings = unwrapRemote2(await remote.appBindings());
+        if (bindings && typeof bindings === "object") update({ bindings });
+      }
+    } catch {
+      update({ bindings: {} });
     } finally {
       update({ busy: false });
     }
   };
+  const readSessions = () => adaptSessions(ctx.sessions?.list?.getSnapshot?.(), ctx.get("uiSession")?.sessionStatus);
+  ctx.effect(() => {
+    update({ sessionSnapshot: readSessions() });
+    const disposals = [ctx.sessions?.list?.subscribe?.(() => update({ sessionSnapshot: readSessions() })), ctx.get("uiSession")?.sessionStatus?.subscribe?.(() => update({ sessionSnapshot: readSessions() }))];
+    return () => {
+      for (const dispose of disposals) if (typeof dispose === "function") dispose();
+    };
+  });
   const useApps = () => {
     const [local, setLocal] = (0, import_react.useState)(snapshot);
     (0, import_react.useEffect)(() => {
@@ -20343,10 +20427,36 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     if (fillInput(ctx, `/${app.name}`)) return "\u5DF2\u586B\u8FDB\u8F93\u5165\u6846\uFF0C\u786E\u8BA4\u540E\u53D1\u9001";
     return copy(app);
   };
+  const bind = async (app, id) => {
+    const bindings = unwrapRemote2(await remote.bindApp({ name: app.name, sessionId: id }));
+    if (bindings && typeof bindings === "object") update({ bindings });
+  };
+  const markSeen = (app) => {
+    const id = snapshot.bindings[app.name]?.sessionId;
+    if (id) seen.add(`${app.name}:${id}`);
+    update({ sessionSnapshot: snapshot.sessionSnapshot });
+  };
   const launchNew = async (app) => {
     const id = await createSession(ctx);
     await openSession(ctx, id);
+    await bind(app, id).catch(() => void 0);
     await sendToSession(ctx, id, startText(app));
+  };
+  const launchSidebar = async (app) => {
+    const id = snapshot.bindings[app.name]?.sessionId;
+    const archived = ctx.workspaces?.list?.getSnapshot?.()?.archivedSessionIds;
+    const listed = !Array.isArray(snapshot.sessionSnapshot?.ids) || snapshot.sessionSnapshot.ids.includes(id);
+    if (app.launch === "resume" && id && listed && snapshot.sessionSnapshot?.byId?.[id] && !archived?.includes?.(id)) {
+      markSeen(app);
+      try {
+        await openSession(ctx, id);
+        return;
+      } catch {
+        await launchNew(app);
+        return;
+      }
+    }
+    await launchNew(app);
   };
   const launchHero = async (app) => {
     const id = currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
@@ -20369,7 +20479,18 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
       void remote.login().then((result) => setNotice(unwrapRemote2(result)?.text || "\u8BF7\u5728\u6D4F\u89C8\u5668\u5B8C\u6210\u4F01\u4E1A\u767B\u5F55\u3002")).catch(() => setNotice("\u53D1\u8D77\u767B\u5F55\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002"));
     },
     open: (app) => {
+      markSeen(app);
       void openWithFallback(app, launch).then(setNotice);
+    },
+    newSession: (app) => {
+      void openWithFallback(app, launchNew).then(setNotice);
+    },
+    unbind: (app) => {
+      void remote.unbindApp({ name: app.name }).then((result) => {
+        const bindings = unwrapRemote2(result);
+        update({ bindings });
+        setNotice("\u5DF2\u89E3\u9664\u7ED1\u5B9A");
+      }).catch(() => setNotice("\u89E3\u9664\u7ED1\u5B9A\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002"));
     },
     fill: (app) => {
       void fill(app).then(setNotice);
@@ -20387,8 +20508,12 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     const [query, setQuery] = (0, import_react.useState)("");
     const [notice, setNotice] = (0, import_react.useState)("");
     if (!overview.data && !overview.failed) return null;
-    const actions = { ...useActions(setNotice, launchNew), toggle: () => setExpanded(!expanded), search: setQuery };
-    return appsSection(import_react.createElement, { apps: state.apps, loggedIn: !!overview.data?.me, expanded, query, notice }, actions);
+    const actions = { ...useActions(setNotice, launchSidebar), toggle: () => setExpanded(!expanded), search: setQuery };
+    const statuses = Object.fromEntries(state.apps.map((app) => {
+      const id = state.bindings[app.name]?.sessionId;
+      return [app.name, id ? visibleAppStatus(applicationStatus(state.sessionSnapshot, id), `${app.name}:${id}`, seen) : void 0];
+    }));
+    return appsSection(import_react.createElement, { apps: state.apps, loggedIn: !!overview.data?.me, expanded, query, notice, statuses }, actions);
   };
   const HeroApps = () => {
     const state = useApps();
@@ -20408,7 +20533,7 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
 // src/client.ts
 var inject = ["slots", "remote", "sidebarRightTabs", "sidebarRight", "sessions", "conversation", "workspaces"];
 var jsonParameter = (name) => {
-  const codec2 = { mode: "strict", typeSymbol: "string", create: () => external_exports.string() };
+  const codec2 = { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() };
   return { name, source: "json", codec: codec2, strictCodec: codec2 };
 };
 var clientRemote = createTypertRemoteInfo({
@@ -20417,8 +20542,8 @@ var clientRemote = createTypertRemoteInfo({
     "dshEE/brand": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/apps": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/appBindings": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
-    "dshEE/bindApp": { service: "dshEE", parameters: [jsonParameter("name"), jsonParameter("sessionId")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
-    "dshEE/unbindApp": { service: "dshEE", parameters: [jsonParameter("name")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/bindApp": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/unbindApp": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/overview": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/login": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/doctor": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }

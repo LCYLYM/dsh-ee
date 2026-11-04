@@ -4,7 +4,7 @@ import path from 'node:path'
 import { waitFor } from '../lib.mjs'
 import { startFakeLlm, textResponse } from '../spikes/fake-llm.mjs'
 import {
-  modelRequest, openPage, prepare, repo, save, scenarioEnv, setupDevice, startServer, startWeb, stopProcess, stopWeb, work,
+  forTask, modelRequest, openPage, prepare, repo, save, scenarioEnv, setupDevice, startServer, startWeb, stopProcess, stopWeb, work,
 } from './harness.mjs'
 
 const shots = path.join(repo, 'e2e/shots/workbench-w2')
@@ -23,6 +23,11 @@ async function main() {
       kind: 'app', slug: 'scenario-w2-app', delivery: 'auto',
       spec: { title: appTitle, description: '验证企业应用工作台', persona: '你是 W2 企业报销助手。', icon: '🧾', launch: 'new', starters: [starter] },
     }, 201)).data
+    const resumeTitle = 'W3 连续助手'
+    await admin.request('POST', '/api/hub', {
+      kind: 'app', slug: 'scenario-w3-resume', delivery: 'auto',
+      spec: { title: resumeTitle, description: '验证应用会话绑定', persona: '你是 W3 连续助手。', icon: '🔁', launch: 'resume', starters: ['继续'] },
+    }, 201)
     const published = (await admin.request('POST', '/api/admin/connect/publish', {}, 200)).data
     const script = path.join(work, 'setup.sh')
     fs.writeFileSync(script, await (await fetch(`${server.base}/setup.sh`)).text(), { mode: 0o700 })
@@ -32,6 +37,7 @@ async function main() {
     const opened = await openPage(web.url)
     browser = opened.browser
     const page = opened.page
+    page.on('console', (message) => fs.appendFileSync(path.join(work, 'browser-console.log'), `${message.type()}: ${message.text()}\n`))
     const side = page.locator('section[data-dsh-ee-ui="apps"]')
     await side.getByRole('button', { name: appTitle, exact: true }).waitFor({ timeout: 30_000 })
     const hero = page.locator('[data-dsh-ee-ui="hero-apps"]')
@@ -59,11 +65,40 @@ async function main() {
     const heroRequest = await modelRequest(fake, `/scenario-w2-app\n${starter}`)
     assert.ok(JSON.stringify(heroRequest.body).includes(appTitle), '首屏菜单应携带示例并加载微应用')
 
+    // W3：第一次新建并绑定；第二次只切回；归档后再次点击新建并换绑定。
+    const resumeCommand = '/scenario-w3-resume'
+    fake.script(resumeCommand, [textResponse(resumeTitle)])
+    await side.getByRole('button', { name: resumeTitle, exact: true }).click()
+    await modelRequest(fake, resumeCommand)
+    const bindingsFile = path.join(env.DSH_HOME, 'dsh-ee/apps.json')
+    await waitFor(() => fs.existsSync(bindingsFile), '应用绑定文件')
+    const firstBinding = JSON.parse(fs.readFileSync(bindingsFile, 'utf8')).bindings[resumeCommand.slice(1)].sessionId
+    assert.ok(firstBinding, '第一次启动应记录会话绑定')
+    const resumeRow = side.locator('[data-dsh-ee-app="scenario-w3-resume"]')
+    await resumeRow.getByLabel('本轮结束', { exact: true }).waitFor()
+    await page.getByText('New Session', { exact: true }).first().click()
+    const beforeResume = fake.requests.length
+    await side.getByRole('button', { name: resumeTitle, exact: true }).click()
+    await page.waitForTimeout(1500)
+    assert.equal(fake.requests.length, beforeResume, 'resume 第二次打开不应再发消息')
+    assert.equal(JSON.parse(fs.readFileSync(bindingsFile, 'utf8')).bindings[resumeCommand.slice(1)].sessionId, firstBinding)
+    assert.equal(await resumeRow.getByLabel('本轮结束', { exact: true }).count(), 0, '打开后 done 状态应消失')
+    await page.screenshot({ path: path.join(shots, 'w3-resume.png'), fullPage: true })
+
+    await page.getByText('script exhausted', { exact: true }).first().hover()
+    await page.getByRole('button', { name: 'Archive session', exact: true }).click()
+    await page.waitForTimeout(800)
+    await side.getByRole('button', { name: resumeTitle, exact: true }).click()
+    await waitFor(() => forTask(fake, resumeCommand).length >= 2, '归档后重新创建应用会话')
+    const secondBinding = JSON.parse(fs.readFileSync(bindingsFile, 'utf8')).bindings[resumeCommand.slice(1)].sessionId
+    assert.notEqual(secondBinding, firstBinding, '原会话不存在后应新建并重新绑定')
+
     save('w2', {
       status: 'pass', plugin: published.version, sidebarLaunch: true, heroLaunch: true,
       firstMessage: '/scenario-w2-app', heroFirstMessage: `/scenario-w2-app\n${starter}`, usage: 1,
     })
-    console.log(`\nW2 真实 DSH 场景通过，结果：${work}`)
+    save('w3', { status: 'pass', resumeSameSession: true, doneClearedAfterOpen: true, recreatedAfterArchive: true, firstBinding, secondBinding })
+    console.log(`\nW2/W3 真实 DSH 场景通过，结果：${work}`)
   } catch (error) {
     fs.writeFileSync(path.join(work, 'failure-w2.txt'), error.stack ?? String(error))
     if (browser) {
