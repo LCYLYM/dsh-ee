@@ -472,7 +472,7 @@ F1～F4 → B0 实验（停下问用户）→ B1 → B2 → B3 → B4 → B5 →
 
 ### 14.3 B1：服务端配置、校验和编辑
 
-- `assetSpec` 加 `Workbench *appWorkbench \`json:"workbench,omitempty"\``，结构照设计文档的 JSON；只对 `kind=app` 保留，其它 kind 清空（照 `Icon`、`Launch` 的写法）。
+- `assetSpec` 加 `` Workbench *appWorkbench `json:"workbench,omitempty"` ``，结构照设计文档的 JSON；只对 `kind=app` 保留，其它 kind 清空（照 `Icon`、`Launch` 的写法）。
 - 校验（`validateSpec`）。错误消息用中文，并且说明是第几个窗格的第几个组件：
   - 最多 4 个窗格；窗格 `id` 是 slug 且不重复；`type` 只能是 `panel` / `web`；
   - `web.url` 必须是 http/https，长度 ≤ 2048；
@@ -481,7 +481,7 @@ F1～F4 → B0 实验（停下问用户）→ B1 → B2 → B3 → B4 → B5 →
   - `table.columns` ≤ 12 列；`row_actions` ≤ 3 个；`form.fields` ≤ 12 个，`kind` 只能是 `text` / `number` / `date` / `select`（`select` 要有 `options`，≤ 20 项）；
   - 所有 `prompt` ≤ 1000 字，里面只允许 `{{row.<字段>}}`、`{{form.<字段名>}}` 两种占位符，引用的表单字段必须存在；
   - `format` 只能是空、`money`、`number`、`percent`、`date`。
-- 目录：`dshApp` 加 `Workbench *appWorkbench \`json:"workbench,omitempty"\``，原样下发（算进 `Revision`）。员工对某个 `source` 工具没有权限时，不要在服务端删掉组件，交给前端显示「无权限」。
+- 目录：`dshApp` 加 `` Workbench *appWorkbench `json:"workbench,omitempty"` ``，原样下发（算进 `Revision`）。员工对某个 `source` 工具没有权限时，不要在服务端删掉组件，交给前端显示「无权限」。
 - `appContent()` 在末尾**追加**一节「## 工作台」（不改前面已有的段落）：列出窗格和组件标题；说明「用户在面板上点按钮或提交表单时，会以普通消息的形式发给你」；有 `board` 组件时，说明用哪个工具、什么时候更新看板（工具名以 B4 实际注册的为准）。
 - 网页编辑器（`asset-editor.tsx` 的微应用部分）：加「工作台」一节，包含：
   - JSON 文本框，保存前调服务端校验，错误显示在文本框下方；
