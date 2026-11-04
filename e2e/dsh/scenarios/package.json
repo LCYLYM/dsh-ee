@@ -3,11 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node run.mjs && node run-b.mjs && node run-c.mjs && node run-d.mjs",
+    "test": "node run.mjs && node run-b.mjs && node run-c.mjs && node run-d.mjs && node run-w.mjs",
     "test:a": "node run.mjs",
     "test:b": "node run-b.mjs",
     "test:c": "node run-c.mjs",
-    "test:d": "node run-d.mjs"
+    "test:d": "node run-d.mjs",
+    "test:w": "node run-w.mjs"
   },
   "dependencies": {
     "playwright-core": "^1.64.1"
