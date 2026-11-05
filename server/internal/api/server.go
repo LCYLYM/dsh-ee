@@ -271,7 +271,8 @@ func (s *Server) RunBackground(ctx context.Context) {
 		return
 	}
 	go s.runConnect(ctx)
-	t := time.NewTicker(6 * time.Hour)
+	// 启动一分钟后先查一次：只靠 6 小时的定时器的话，重启得勤就一直轮不到
+	t := time.NewTimer(time.Minute)
 	defer t.Stop()
 	for {
 		select {
@@ -284,6 +285,7 @@ func (s *Server) RunBackground(ctx context.Context) {
 			} else if j != nil {
 				s.log.Info("发现上游新版本，已开始同步", "job", j.ID, "count", j.Total)
 			}
+			t.Reset(6 * time.Hour)
 		}
 	}
 }

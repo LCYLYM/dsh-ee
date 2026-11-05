@@ -548,6 +548,23 @@ func TestRegistry(t *testing.T) {
 		if idx := decodeAs[registry.Index](t, body); len(idx.Plugins) != 2 {
 			t.Fatalf("索引应有 2 个插件：%s", body)
 		}
+
+		// dshfind 目录落后于 npm 时，以上游 registry 的 latest 为准，旧的目录版本不算「有新版」
+		up.mu.Lock()
+		up.feeds[0]["versions"] = []map[string]any{{"version": "1.0.0", "publishTimestamp": 1780000000}}
+		up.mu.Unlock()
+		code, body = admin.do("GET", "/api/admin/upstream/feed?refresh=1", nil, nil)
+		expect(t, "dshfind 目录", code, 200, body)
+		type feedRow struct {
+			Name           string `json:"name"`
+			UpstreamLatest string `json:"upstream_latest"`
+			LocalVersion   string `json:"local_version"`
+			Newer          bool   `json:"newer"`
+		}
+		feed := decodeAs[struct{ Plugins []feedRow }](t, body)
+		if len(feed.Plugins) != 1 || feed.Plugins[0].UpstreamLatest != "2.0.0" || feed.Plugins[0].LocalVersion != "2.0.0" || feed.Plugins[0].Newer {
+			t.Fatalf("应按 npm latest 判断新版本：%s", body)
+		}
 	})
 
 	t.Run("只用已预载的包", func(t *testing.T) {

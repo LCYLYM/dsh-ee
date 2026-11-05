@@ -329,6 +329,39 @@ func nonRegistrySpec(spec string) bool {
 
 // ---- 已预载插件的新版本 ----
 
+// UpstreamLatest 并发查上游 registry 的 dist-tags.latest（走包信息缓存）；查不到的包不出现在结果里。
+// dshfind 目录里的版本常常落后 npm 好几个版本，判断「上游有新版」要以这里为准。
+func (s *Service) UpstreamLatest(ctx context.Context, names []string) map[string]string {
+	out := map[string]string{}
+	set, err := s.settings(ctx)
+	if err != nil || UpstreamBase(set) == "" {
+		return out
+	}
+	base := UpstreamBase(set)
+	var (
+		mu  sync.Mutex
+		wg  sync.WaitGroup
+		sem = make(chan struct{}, mirrorWorkers)
+	)
+	for _, name := range names {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			doc, err := s.up.Packument(ctx, base, name, 0)
+			if err != nil || doc.DistTags["latest"] == "" {
+				return
+			}
+			mu.Lock()
+			out[name] = doc.DistTags["latest"]
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	return out
+}
+
 // CheckUpdates 检查已镜像的上游插件有没有新版本，按 upstream.autoSync 设置同步。
 func (s *Service) CheckUpdates(ctx context.Context, by int64) (*store.SyncJob, error) {
 	set, err := s.settings(ctx)

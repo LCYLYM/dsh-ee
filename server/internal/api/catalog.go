@@ -851,6 +851,10 @@ type feedItem struct {
 	// 本地状态：已镜像的版本与审核状态
 	LocalVersion string `json:"local_version"`
 	LocalStatus  string `json:"local_status"`
+	// 上游 registry 的 latest（只查已镜像的包）；dshfind 目录的版本常常落后
+	UpstreamLatest string `json:"upstream_latest,omitempty"`
+	// 上游有比本地更新的版本
+	Newer        bool   `json:"newer"`
 	DepCount     *int   `json:"dep_count"`
 	ClosureSize  *int64 `json:"closure_size"`
 	OfflineReady *bool  `json:"offline_ready"`
@@ -892,15 +896,27 @@ func (s *Server) handleUpstreamFeed(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	var mirrored []string
+	for _, p := range pkgs {
+		if p.Origin == store.OriginUpstream {
+			mirrored = append(mirrored, p.Name)
+		}
+	}
+	latest := s.registry.UpstreamLatest(r.Context(), mirrored)
 	out := make([]feedItem, 0, len(plugins))
 	for _, p := range plugins {
-		it := feedItem{FeedPlugin: p}
+		it := feedItem{FeedPlugin: p, UpstreamLatest: latest[p.Name]}
 		if pkg := byName[p.Name]; pkg != nil {
 			if v := visibleLatest(pkg, versions[p.Name]); v != nil {
 				it.LocalVersion, it.LocalStatus = v.Version, v.Status
 			}
 			it.DepCount, it.ClosureSize, it.OfflineReady = pkg.DepCount, pkg.ClosureSize, pkg.OfflineReady
 		}
+		upVer := it.UpstreamLatest
+		if upVer == "" {
+			upVer = p.Version
+		}
+		it.Newer = it.LocalVersion != "" && upVer != "" && registry.CompareVersions(upVer, it.LocalVersion) > 0
 		out = append(out, it)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"plugins": out, "fetched_at": at})
