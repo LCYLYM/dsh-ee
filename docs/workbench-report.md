@@ -178,3 +178,72 @@ bf0f4b7 工作台/W3-2：实现应用会话恢复与状态点
 - W4 是有意不做，不是待合入功能。
 - Windows 专项、分栏工作区、产物挂载与 worktable 入驻仍不在本轮范围。
 - 本轮 Desktop 已验证 W2 启动；W3 的恢复/归档重建由真实 web profile 覆盖。
+
+# 第三轮（F1～F4、B1～B6）
+
+完成日期：2026-11-05。用户额度恢复后，由我（Claude）直接实现，不再交给执行 agent。需要真实 DSH 和 Mac Desktop 的验证写在 [workbench-verify.md](workbench-verify.md)，由用户执行。
+
+## 1. 提交列表
+
+```text
+af54cae 工作台/F1～F3：启动流程补绑定、发送失败不再填入、刷新可撤销
+169ac61 工作台/F4：updateCatalog 改用编译期接口，去掉运行时类型断言
+9f5e005 工作台/B1：微应用的工作台配置、校验、下发与编辑
+00887b2 工作台/B2～B4：右侧栏业务面板、按钮发给 AI、AI 看板
+9b4dc8d 工作台/B5：有上线的 web 窗格时在接入插件补丁里打开官方浏览器
+00b7fd0 工作台/B6：演示数据加只读连接与「插件导购」业务工作台
+514d5f0 测试：09-hub 加工作台编辑步骤（本机磁盘不足未运行，留给用户验证）
+9969790 工作台：窗格打开互不影响，刷新后标签页自己拉目录
+```
+
+## 2. 完成情况
+
+| 任务 | 状态 | 证据 |
+|---|---|---|
+| F1～F3 | 完成 | 启动流程抽到 `app-launcher.ts`，6 项单测（首屏绑定、发送失败不填入、发送前失败才填入、附加动作失败不影响、resume、并发刷新合并） |
+| F4 | 完成 | `queryExecer` 接口；`TestHub` 通过 |
+| B0 实验 | **没做** | 本机没有真实 DSH。能靠读上游源码回答的写进了实现（见 §4），其余变成 [workbench-verify.md](workbench-verify.md) 的 V1～V12、D1～D2 |
+| B1 | 完成 | `workbench.go` 校验；`TestWorkbench` 覆盖 14 条拒绝情况与下发、指令、ETag；把只读检查改坏后测试确实失败（已复原） |
+| B2～B4 | 完成，未在真实 DSH 验证 | 13 项新单测 + 自查修复 2 处（§5） |
+| B5 | 完成 | `TestConnectBrowserForWebPanes`：无 web 窗格、只有面板、待审核、已上线四种情况 |
+| B6 | 完成 | 在本机临时服务上实跑两次 seed，员工令牌能调用 `ee-catalog__list_plugins`（`readOnlyHint: true`），指令里有「工作台」一节 |
+| §13.6 发布说明 | 未做 | 需要用户实测的升级命令，见 verify §4 |
+| §13.7 Desktop 补验 | 未做 | 见 verify §3 |
+
+## 3. 验证结果
+
+| 项目 | 结果 |
+|---|---|
+| `go vet ./...` | 通过 |
+| `go test ./internal/api`（内存 TiDB 8.5.8） | 通过（142 秒） |
+| `cd dsh-plugin && npm test` | 75/75 |
+| `npx tsc --noEmit`（dsh-plugin、web） | 通过 |
+| `vite build` | 通过（输出到临时目录后删除） |
+| 浏览器 E2E、`e2e/dsh/scenarios` | **没跑**：本机磁盘只剩约 400 MB，`make build` 加浏览器会再次占满 |
+
+## 4. 靠读上游源码定下的做法（B0 原本要实测的问题）
+
+| 问题 | 结论与依据（`.tools/upstream` ce7073d5） | 还要实测 |
+|---|---|---|
+| 新会话里何时能开右侧栏 | `ctx.sidebarRight` 的写操作作用于屏幕上的会话（`service.ts` 的 `require()`，没有就抛错）。所以先等 `sidebarRight.mounted` 变成新会话（最多 5 秒）再打开 | V1 |
+| 刷新后能否恢复 | README 写明导航参数不属于布局状态，因此用资源地址 `dsh-resource://dsh-ee-workbench/<应用>/<窗格>` 加上 `patterns`，标签页从 `useTabInfo().tab.navigation.address` / `contentId` 还原 | V6 |
+| 分栏 | `openResource(..., { preferNewPane: true })`，放不下时退回同一栏 | V1 |
+| 浏览器 | `openTab('browser', { params: { url } })`（ui-sidebar-browser README）；web profile 由 B5 的补丁打开；没注册时 `openTab` 会抛错，所以每个窗格单独 try | V1、V7 |
+| 取数 | 插件后端 `bridge.callTool('<连接>__<工具>')`；只读判断用 `tools/list` 的 `annotations.readOnlyHint` | V2、V10 |
+| 看板写到哪个会话 | 工具 `execute(args, exec)` 的 `exec` 是 `ToolRunContext`，`exec.agent.session.id` 是调用方会话（`packages/core/tools/src/contracts.ts`）；拿不到时退回应用绑定的会话 | V5 |
+
+## 5. 偏差与决定
+
+1. **F1～F3 合成一个提交**：三处改动在同一个新模块 `app-launcher.ts` 里，拆开反而不好审。
+2. **`ee_workbench` 直接用 `ctx.tools.register` 注册**，没有走 `bridge.registerLocal`：后者只能给服务端已有工具加本机 action，而服务端并没有这个工具。
+3. **看板文件名**：`<应用>--<会话>.json`，会话 id 含特殊字符时改用它的哈希，避免路径问题。
+4. **组件 `markdown` 按纯文字显示**（保留换行），不解析 Markdown，也不解析 HTML，与「看板只当文字」一致。
+5. **i18n 键名用 `appWorkbench`**：`portal.ts` 里已经有 `workbench` 键，同名会覆盖。
+6. **演示数据用 dsh-ee 自己的插件索引做只读数据源**，演示应用改成「插件导购」而不是「报销助手」：演示环境里没有报销系统，用真实可调用的数据比假数据更能看出效果。
+7. **自查修复两处**（`9969790`）：某个窗格打不开不再影响其余窗格；刷新后标签页比侧栏先出现时自己拉目录，不误报「已经不可用」。
+8. **磁盘**：测试中途磁盘满过一次。原因是我自己的 TiDB 在数据目录被删后仍占着文件；已停掉，改用内存 TiDB。另外 `.tools/tidb-test`（2.6 GB）和 `/tmp` 下其它会话的 TiDB 目录不是我建的，没动。
+
+## 6. 留给用户的事
+
+- 按 [workbench-verify.md](workbench-verify.md) 验证，把结果发回来；不通过的项我来修。
+- 升级路径实测后，我再写 `docs/workbench-release.md`。
