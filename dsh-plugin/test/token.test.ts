@@ -43,6 +43,33 @@ test("invalidate only clears the failed token", async () => {
   assert.equal(ctx.values.has("DSHEE_TOKEN"), false);
 });
 
+test("凭据库不可用时本地文件与 .env 兜底", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "ee-token-fallback-"));
+  process.env.DSH_HOME = home;
+  const ctx = { get: () => undefined };
+  const tokens = new TokenManager(ctx as any, normalizeConfig({ base: "http://localhost" }));
+  await tokens.set("ee_at_local");
+  assert.equal(fs.readFileSync(tokens.tokenPath(), "utf8").trim(), "ee_at_local");
+  assert.equal(fs.statSync(tokens.tokenPath()).mode & 0o777, 0o600);
+  assert.match(fs.readFileSync(tokens.envPath(), "utf8"), /DSHEE_TOKEN=ee_at_local/);
+  assert.equal((await tokens.resolve())?.value, "ee_at_local");
+  await tokens.unset("ee_at_local");
+  assert.equal(await tokens.resolve(), undefined);
+  assert.equal(fs.existsSync(tokens.tokenPath()), false);
+  assert.doesNotMatch(fs.readFileSync(tokens.envPath(), "utf8"), /DSHEE_TOKEN/);
+});
+
+test("unset 不动别人的 .env 令牌", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "ee-env-"));
+  process.env.DSH_HOME = home;
+  fs.writeFileSync(path.join(home, ".env"), "DSHEE_TOKEN=ci-token\nOTHER=1\n");
+  const tokens = new TokenManager({ get: () => undefined } as any, normalizeConfig({ base: "http://localhost" }));
+  await tokens.unset("different");
+  assert.match(fs.readFileSync(tokens.envPath(), "utf8"), /DSHEE_TOKEN=ci-token/);
+  await tokens.unset("ci-token");
+  assert.doesNotMatch(fs.readFileSync(tokens.envPath(), "utf8"), /DSHEE_TOKEN/);
+});
+
 test("npmrc 写进 profile 目录：保留其它行，替换令牌，补上作用域，不碰 ~/.npmrc", async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "ee-npmrc-"));
   process.env.HOME = home;

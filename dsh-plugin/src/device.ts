@@ -18,6 +18,7 @@ export class DeviceFlow {
     const response = await this.fetchImpl(`${this.config.base}/api/device/code`, {
       method: "POST",
       headers: { "content-type": "application/json" },
+      signal: AbortSignal.timeout(30_000),
       body: JSON.stringify({ client_name: os.hostname(), client_os: `${process.platform} ${os.release()}`, client_version: this.config.version, ...(setupCode ? { setup_code: setupCode } : {}) }),
     });
     if (!response.ok) {
@@ -33,7 +34,8 @@ export class DeviceFlow {
     while (Date.now() < deadline) {
       if (signal?.aborted) throw new Error("设备登录已取消");
       const response = await this.fetchImpl(`${this.config.base}/api/device/token`, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ device_code: deviceCode }), signal,
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ device_code: deviceCode }),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
       });
       const body = await response.json() as { error?: string; access_token?: string; scopes?: string[]; user?: { username: string; department: string }; expires_at?: string };
       if (body.access_token) return body as any;

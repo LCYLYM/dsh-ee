@@ -100,14 +100,65 @@ var TokenManager = class {
     this.ctx = ctx;
     this.config = config;
   }
+  tokenPath() {
+    return path2.join(dshHome(), "dsh-ee", "token");
+  }
+  envPath() {
+    return path2.join(dshHome(), ".env");
+  }
   async resolve() {
-    return this.ctx.get("credentials")?.resolve(this.config.tokenRef);
+    let stored;
+    try {
+      stored = await this.ctx.get("credentials")?.resolve?.(this.config.tokenRef);
+    } catch {
+      stored = void 0;
+    }
+    if (stored?.value) return stored;
+    try {
+      const value = fs.readFileSync(this.tokenPath(), "utf8").trim();
+      if (value) return { value, source: "file" };
+    } catch {
+    }
+    return void 0;
   }
   async set(value) {
-    await this.ctx.get("credentials").set(this.config.tokenRef, value);
+    const file = this.tokenPath();
+    fs.mkdirSync(path2.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${value}
+`, { mode: 384 });
+    try {
+      await this.ctx.get("credentials")?.set(this.config.tokenRef, value);
+    } catch {
+    }
+    this.writeEnvToken(value);
   }
-  async unset() {
-    await this.ctx.get("credentials").unset(this.config.tokenRef);
+  async unset(expected) {
+    fs.rmSync(this.tokenPath(), { force: true });
+    try {
+      await this.ctx.get("credentials")?.unset(this.config.tokenRef);
+    } catch {
+    }
+    this.stripEnvToken(expected);
+  }
+  writeEnvToken(value) {
+    const file = this.envPath();
+    const before = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+    const kept = before.split(/\r?\n/).filter((line) => line.trim() && !line.startsWith(`${this.config.tokenRef}=`));
+    const after = `${[...kept, `${this.config.tokenRef}=${value}`].join("\n")}
+`;
+    if (after === before) return;
+    fs.mkdirSync(path2.dirname(file), { recursive: true });
+    fs.writeFileSync(file, after, { mode: 384 });
+  }
+  stripEnvToken(expected) {
+    const file = this.envPath();
+    if (!fs.existsSync(file)) return;
+    const prefix = `${this.config.tokenRef}=`;
+    const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
+    const hit = lines.find((line) => line.startsWith(prefix));
+    if (!hit) return;
+    if (expected !== void 0 && hit.slice(prefix.length) !== expected) return;
+    fs.writeFileSync(file, lines.filter((line) => line !== hit).join("\n"), { mode: 384 });
   }
   pendingPath() {
     return path2.join(dshHome(), "dsh-ee", "token.pending");
@@ -127,7 +178,7 @@ var TokenManager = class {
   async invalidate(failedToken) {
     const current = await this.resolve();
     if (current?.value !== failedToken) return false;
-    await this.unset();
+    await this.unset(failedToken);
     return true;
   }
   /** 把企业作用域与令牌写进 profile 的 .npmrc，其它行原样保留；内容没变就不写。返回是否改动了文件。 */
@@ -158,14 +209,16 @@ var HttpClient = class {
   constructor(tokens) {
     this.tokens = tokens;
   }
-  async fetch(path6, init = {}) {
+  async fetch(path6, init = {}, timeoutMs = 3e4) {
     const current = await this.tokens.resolve();
     const headers = new Headers(init.headers);
     if (current?.value) headers.set("Authorization", `Bearer ${current.value}`);
     const config = this.tokens.config;
     if (!headers.has("X-DshEE-Client")) headers.set("X-DshEE-Client", `dsh-connect/${config.version || "dev"}`);
     if (!headers.has("X-DshEE-Host")) headers.set("X-DshEE-Host", dshHost());
-    const response = await fetch(`${config.base}${path6}`, { ...init, headers });
+    const timeout = timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : void 0;
+    const signal = init.signal && timeout ? AbortSignal.any([init.signal, timeout]) : timeout ?? init.signal ?? void 0;
+    const response = await fetch(`${config.base}${path6}`, { ...init, headers, signal });
     if (response.status === 401 && current?.value) {
       const body = await response.clone().json().catch(() => null);
       if (body?.code?.startsWith("token_")) await this.tokens.invalidate(current.value);
@@ -192,6 +245,7 @@ var DeviceFlow = class {
     const response = await this.fetchImpl(`${this.config.base}/api/device/code`, {
       method: "POST",
       headers: { "content-type": "application/json" },
+      signal: AbortSignal.timeout(3e4),
       body: JSON.stringify({ client_name: os2.hostname(), client_os: `${process.platform} ${os2.release()}`, client_version: this.config.version, ...setupCode ? { setup_code: setupCode } : {} })
     });
     if (!response.ok) {
@@ -209,7 +263,7 @@ var DeviceFlow = class {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ device_code: deviceCode }),
-        signal
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(3e4)]) : AbortSignal.timeout(3e4)
       });
       const body = await response.json();
       if (body.access_token) return body;
@@ -285,7 +339,7 @@ function registerCommands(ctx, config, tokens, onLogin = async () => {
       handler: async () => {
         const current = await tokens.resolve();
         if (!current) return { kind: "success", text: "\u672A\u767B\u5F55\uFF0C\u5728\u5BF9\u8BDD\u6846\u8F93\u5165 /ee-login" };
-        const response = await fetch(`${config.base}/api/dsh/whoami`, { headers: { Authorization: `Bearer ${current.value}` } });
+        const response = await fetch(`${config.base}/api/dsh/whoami`, { headers: { Authorization: `Bearer ${current.value}` }, signal: AbortSignal.timeout(3e4) });
         if (!response.ok) return { kind: "success", text: "\u767B\u5F55\u5DF2\u5931\u6548\uFF0C\u5728\u5BF9\u8BDD\u6846\u8F93\u5165 /ee-login" };
         const me = await response.json();
         const matches = await tokens.npmrcMatches(current.value);
@@ -299,8 +353,8 @@ function registerCommands(ctx, config, tokens, onLogin = async () => {
       handler: async () => {
         const current = await tokens.resolve();
         if (!current) return { kind: "success", text: "\u5F53\u524D\u6CA1\u6709\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7" };
-        const revoked = await fetch(`${config.base}/api/dsh/logout`, { method: "POST", headers: { Authorization: `Bearer ${current.value}` } }).then((response) => response.ok, () => false);
-        await tokens.unset();
+        const revoked = await fetch(`${config.base}/api/dsh/logout`, { method: "POST", headers: { Authorization: `Bearer ${current.value}` }, signal: AbortSignal.timeout(3e4) }).then((response) => response.ok, () => false);
+        await tokens.unset(current.value);
         const left = await tokens.resolve();
         if (left?.value === current.value) {
           return {
@@ -350,8 +404,10 @@ async function registerSkills(ctx, config, http) {
     }
   };
   const install = () => installRequired(ctx, config, catalog.required_plugins).catch(() => void 0);
-  await refresh();
-  await install();
+  void (async () => {
+    await refresh();
+    await install();
+  })();
   let invalidate = () => {
   };
   ctx.skills.registerProvider((control) => {
@@ -455,13 +511,13 @@ var McpBridge = class {
   /** 服务端在 tools/list 里标了 readOnlyHint 的工具（服务端工具名）；工作台取数只能用它们 */
   readOnly = /* @__PURE__ */ new Set();
   status = { lastSyncAt: 0, tools: 0, error: "" };
-  async rpc(method, params) {
+  async rpc(method, params, timeoutMs = 3e4) {
     const headers = { "content-type": "application/json", accept: "application/json, text/event-stream" };
     if (this.session) headers["Mcp-Session-Id"] = this.session;
-    const response = await this.http.fetch("/mcp", { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+    const response = await this.http.fetch("/mcp", { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) }, timeoutMs);
     if (response.status === 404) {
       this.session = "";
-      return this.rpc(method, params);
+      return this.rpc(method, params, timeoutMs);
     }
     if (!response.ok) throw new Error(`MCP ${method} HTTP ${response.status}`);
     this.session = response.headers.get("mcp-session-id") || this.session;
@@ -524,7 +580,7 @@ ${canonArgs(args)}`, body.preview);
       execute: async (args) => {
         const local = this.local.get(`${tool.name}.${args?.action}`);
         if (local) return local(args);
-        const result = await this.rpc("tools/call", { name: tool.name, arguments: args });
+        const result = await this.rpc("tools/call", { name: tool.name, arguments: args }, 0);
         this.remember(name2, args, result);
         return result;
       }
@@ -568,7 +624,7 @@ ${canonArgs(args)}`, body.preview);
       let delay = 1e3;
       while (!signal.aborted) {
         try {
-          const response = await this.http.fetch("/mcp", { headers: { accept: "text/event-stream" }, signal });
+          const response = await this.http.fetch("/mcp", { headers: { accept: "text/event-stream" }, signal }, 0);
           const reader = response.ok ? response.body?.getReader() : void 0;
           if (reader) {
             delay = 1e3;
@@ -3253,23 +3309,23 @@ function apply(ctx, input) {
     const appBindings = new AppBindings();
     const boards = new BoardStore();
     registerDoctor(ctx, config, tokens, http, bridge, appBindings);
-    skills = await registerSkills(ctx, config, http);
+    const skillsReady = registerSkills(ctx, config, http).then((loaded) => skills = loaded);
     registerBrand(ctx, {
-      readBrand: skills.readBrand,
-      readApps: skills.readApps,
-      readAvailableApps: skills.readAvailableApps,
+      readBrand: async () => (await skillsReady).readBrand(),
+      readApps: async () => (await skillsReady).readApps(),
+      readAvailableApps: async () => (await skillsReady).readAvailableApps(),
       setAppSubscription: async (name2, enabled) => {
         const result = await setAppSubscription(http, name2, enabled);
-        if (result.ok) await skills.refreshNow();
+        if (result.ok) await skills?.refreshNow();
         return result;
       },
       readAppBindings: async () => appBindings.list(),
       bindApp: async (name2, sessionId) => {
-        if (!(await skills.readApps()).some((app) => app.name === name2)) throw new Error("\u76EE\u5F55\u91CC\u6CA1\u6709\u8FD9\u4E2A\u5FAE\u5E94\u7528");
+        if (!(await (await skillsReady).readApps()).some((app) => app.name === name2)) throw new Error("\u76EE\u5F55\u91CC\u6CA1\u6709\u8FD9\u4E2A\u5FAE\u5E94\u7528");
         return appBindings.bind(name2, sessionId);
       },
       unbindApp: async (name2) => appBindings.unbind(name2),
-      workbenchData: async (request) => readWidgetData(await skills.readApps(), bridge, request),
+      workbenchData: async (request) => readWidgetData(await (await skillsReady).readApps(), bridge, request),
       readBoard: async (request) => boards.read(String(request?.app ?? ""), String(request?.sessionId ?? "")) ?? null,
       readKBDoc: (request) => readKBDoc(bridge, request),
       readOverview: () => readEnterpriseOverview(config, http, bridge),
@@ -3282,6 +3338,7 @@ function apply(ctx, input) {
       boundSession: (app) => appBindings.list()[app]?.sessionId,
       tools: bridge
     });
+    await skillsReady;
     await bridge.start();
     return () => {
       disposeWorkbenchTool();

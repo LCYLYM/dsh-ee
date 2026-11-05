@@ -46,8 +46,10 @@ export async function registerSkills(ctx: DshContext, config: PluginConfig, http
     }
   };
   const install = () => installRequired(ctx, config, catalog.required_plugins).catch(() => undefined);
-  await refresh();
-  await install();
+  void (async () => {
+    await refresh();
+    await install();
+  })();
 
   let invalidate: () => void = () => {};
   ctx.skills.registerProvider((control: any) => {

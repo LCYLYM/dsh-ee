@@ -44,23 +44,23 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
     const appBindings = new AppBindings();
     const boards = new BoardStore();
     registerDoctor(ctx, config, tokens, http, bridge, appBindings);
-    skills = await registerSkills(ctx, config, http);
+    const skillsReady = registerSkills(ctx, config, http).then((loaded) => (skills = loaded));
     registerBrand(ctx, {
-      readBrand: skills.readBrand,
-      readApps: skills.readApps,
-      readAvailableApps: skills.readAvailableApps,
+      readBrand: async () => (await skillsReady).readBrand(),
+      readApps: async () => (await skillsReady).readApps(),
+      readAvailableApps: async () => (await skillsReady).readAvailableApps(),
       setAppSubscription: async (name, enabled) => {
         const result = await setAppSubscription(http, name, enabled);
-        if (result.ok) await skills!.refreshNow();
+        if (result.ok) await skills?.refreshNow();
         return result;
       },
       readAppBindings: async () => appBindings.list(),
       bindApp: async (name, sessionId) => {
-        if (!(await skills!.readApps()).some((app) => app.name === name)) throw new Error("目录里没有这个微应用");
+        if (!(await (await skillsReady).readApps()).some((app) => app.name === name)) throw new Error("目录里没有这个微应用");
         return appBindings.bind(name, sessionId);
       },
       unbindApp: async (name) => appBindings.unbind(name),
-      workbenchData: async (request) => readWidgetData(await skills!.readApps(), bridge, request),
+      workbenchData: async (request) => readWidgetData(await (await skillsReady).readApps(), bridge, request),
       readBoard: async (request) => boards.read(String(request?.app ?? ""), String(request?.sessionId ?? "")) ?? null,
       readKBDoc: (request) => readKBDoc(bridge, request),
       readOverview: () => readEnterpriseOverview(config, http, bridge),
@@ -73,6 +73,7 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
       boundSession: (app) => appBindings.list()[app]?.sessionId,
       tools: bridge,
     });
+    await skillsReady;
     await bridge.start();
     return () => {
       disposeWorkbenchTool();

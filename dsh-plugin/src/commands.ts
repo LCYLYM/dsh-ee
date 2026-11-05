@@ -63,7 +63,7 @@ export function registerCommands(ctx: DshContext, config: PluginConfig, tokens: 
       handler: async () => {
         const current = await tokens.resolve();
         if (!current) return { kind: "success", text: "未登录，在对话框输入 /ee-login" };
-        const response = await fetch(`${config.base}/api/dsh/whoami`, { headers: { Authorization: `Bearer ${current.value}` } });
+        const response = await fetch(`${config.base}/api/dsh/whoami`, { headers: { Authorization: `Bearer ${current.value}` }, signal: AbortSignal.timeout(30_000) });
         if (!response.ok) return { kind: "success", text: "登录已失效，在对话框输入 /ee-login" };
         const me = await response.json() as { username: string; department: string; token_prefix: string; expires_at?: string; client_name?: string };
         const matches = await tokens.npmrcMatches(current.value);
@@ -77,9 +77,9 @@ export function registerCommands(ctx: DshContext, config: PluginConfig, tokens: 
       handler: async () => {
         const current = await tokens.resolve();
         if (!current) return { kind: "success", text: "当前没有登录企业账号" };
-        const revoked = await fetch(`${config.base}/api/dsh/logout`, { method: "POST", headers: { Authorization: `Bearer ${current.value}` } })
+        const revoked = await fetch(`${config.base}/api/dsh/logout`, { method: "POST", headers: { Authorization: `Bearer ${current.value}` }, signal: AbortSignal.timeout(30_000) })
           .then((response) => response.ok, () => false);
-        await tokens.unset();
+        await tokens.unset(current.value);
         // unset 只能清掉 DSH 凭据库里的值；令牌若来自环境变量或 $DSH_HOME/.env，DSH 仍会读到它
         const left = await tokens.resolve();
         if (left?.value === current.value) {

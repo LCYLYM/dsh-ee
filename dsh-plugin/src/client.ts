@@ -53,21 +53,30 @@ interface OverviewSnapshot {
   busy: boolean;
 }
 
+const OVERVIEW_TIMEOUT_MS = 20_000;
+
 function createOverviewStore(remote: any) {
   let snapshot: OverviewSnapshot = { failed: false, busy: false };
-  let started = false;
+  let inflight = false;
   const listeners = new Set<() => void>();
   const update = (patch: Partial<OverviewSnapshot>) => {
     snapshot = { ...snapshot, ...patch };
     for (const listener of listeners) listener();
   };
   const refresh = async () => {
+    if (inflight) return;
+    inflight = true;
     update({ busy: true });
     try {
-      update({ data: unwrapRemote(await remote.overview()), failed: false });
+      const data = unwrapRemote(await Promise.race([
+        remote.overview(),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("读取企业账号超时")), OVERVIEW_TIMEOUT_MS)),
+      ]));
+      update(data?.me ? { data, failed: false } : { failed: true });
     } catch {
       update({ failed: true });
     } finally {
+      inflight = false;
       update({ busy: false });
     }
   };
@@ -77,13 +86,10 @@ function createOverviewStore(remote: any) {
       const listener = () => setLocal(snapshot);
       listeners.add(listener);
       listener();
-      if (!started) {
-        started = true;
-        void refresh();
-      }
+      if (!snapshot.data) void refresh();
       return () => { listeners.delete(listener); };
     }, []);
-    return { ...local, setBusy: (busy: boolean) => update({ busy }), refresh };
+    return { ...local, hasData: () => !!snapshot.data, setBusy: (busy: boolean) => update({ busy }), refresh };
   };
   return { use };
 }
@@ -100,7 +106,10 @@ export async function apply(ctx: any): Promise<void> {
     apps.setWorkbenchOpener(workbench.openWorkbench);
     let brand: BrandViewData;
     try {
-      brand = unwrapRemote(await remote.brand());
+      brand = unwrapRemote(await Promise.race([
+        remote.brand(),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("读取企业品牌超时")), 10_000)),
+      ]));
     } catch {
       brand = { enabled: true, name: "企业", logo_url: "", revision: "" };
     }
@@ -115,6 +124,12 @@ export async function apply(ctx: any): Promise<void> {
         try {
           const result = unwrapRemote(await remote.login());
           setNotice(result?.text || "请在浏览器完成企业登录。");
+          void (async () => {
+            for (let i = 0; i < 36 && !state.hasData(); i++) {
+              await new Promise((resolve) => setTimeout(resolve, 5000));
+              await state.refresh();
+            }
+          })();
         } catch {
           setNotice("发起登录失败，请检查网络后重试。");
         } finally {

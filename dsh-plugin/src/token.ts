@@ -20,16 +20,72 @@ export function npmrcState(ctx: DshContext, config: PluginConfig, token: string)
 export class TokenManager {
   constructor(private ctx: DshContext, private config: PluginConfig) {}
 
+  tokenPath(): string {
+    return path.join(dshHome(), "dsh-ee", "token");
+  }
+
+  envPath(): string {
+    return path.join(dshHome(), ".env");
+  }
+
   async resolve(): Promise<{ value: string; source: string } | undefined> {
-    return this.ctx.get("credentials")?.resolve(this.config.tokenRef);
+    let stored: { value: string; source: string } | undefined;
+    try {
+      stored = await this.ctx.get("credentials")?.resolve?.(this.config.tokenRef);
+    } catch {
+      stored = undefined;
+    }
+    if (stored?.value) return stored;
+    try {
+      const value = fs.readFileSync(this.tokenPath(), "utf8").trim();
+      if (value) return { value, source: "file" };
+    } catch {
+      // 没有本地令牌
+    }
+    return undefined;
   }
 
   async set(value: string): Promise<void> {
-    await this.ctx.get("credentials").set(this.config.tokenRef, value);
+    const file = this.tokenPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${value}\n`, { mode: 0o600 });
+    try {
+      await this.ctx.get("credentials")?.set(this.config.tokenRef, value);
+    } catch {
+      // 凭据库不可用时本地文件与 .env 兜底
+    }
+    this.writeEnvToken(value);
   }
 
-  async unset(): Promise<void> {
-    await this.ctx.get("credentials").unset(this.config.tokenRef);
+  async unset(expected?: string): Promise<void> {
+    fs.rmSync(this.tokenPath(), { force: true });
+    try {
+      await this.ctx.get("credentials")?.unset(this.config.tokenRef);
+    } catch {
+      // 同上
+    }
+    this.stripEnvToken(expected);
+  }
+
+  private writeEnvToken(value: string): void {
+    const file = this.envPath();
+    const before = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+    const kept = before.split(/\r?\n/).filter((line) => line.trim() && !line.startsWith(`${this.config.tokenRef}=`));
+    const after = `${[...kept, `${this.config.tokenRef}=${value}`].join("\n")}\n`;
+    if (after === before) return;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, after, { mode: 0o600 });
+  }
+
+  private stripEnvToken(expected?: string): void {
+    const file = this.envPath();
+    if (!fs.existsSync(file)) return;
+    const prefix = `${this.config.tokenRef}=`;
+    const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
+    const hit = lines.find((line) => line.startsWith(prefix));
+    if (!hit) return;
+    if (expected !== undefined && hit.slice(prefix.length) !== expected) return;
+    fs.writeFileSync(file, lines.filter((line) => line !== hit).join("\n"), { mode: 0o600 });
   }
 
   pendingPath(): string {
@@ -52,7 +108,7 @@ export class TokenManager {
   async invalidate(failedToken: string): Promise<boolean> {
     const current = await this.resolve();
     if (current?.value !== failedToken) return false;
-    await this.unset();
+    await this.unset(failedToken);
     return true;
   }
 

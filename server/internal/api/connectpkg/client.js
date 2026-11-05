@@ -21407,21 +21407,29 @@ function unwrapRemote(result) {
   }
   return result;
 }
+var OVERVIEW_TIMEOUT_MS = 2e4;
 function createOverviewStore(remote) {
   let snapshot = { failed: false, busy: false };
-  let started = false;
+  let inflight = false;
   const listeners = /* @__PURE__ */ new Set();
   const update = (patch) => {
     snapshot = { ...snapshot, ...patch };
     for (const listener of listeners) listener();
   };
   const refresh = async () => {
+    if (inflight) return;
+    inflight = true;
     update({ busy: true });
     try {
-      update({ data: unwrapRemote(await remote.overview()), failed: false });
+      const data = unwrapRemote(await Promise.race([
+        remote.overview(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("\u8BFB\u53D6\u4F01\u4E1A\u8D26\u53F7\u8D85\u65F6")), OVERVIEW_TIMEOUT_MS))
+      ]));
+      update(data?.me ? { data, failed: false } : { failed: true });
     } catch {
       update({ failed: true });
     } finally {
+      inflight = false;
       update({ busy: false });
     }
   };
@@ -21431,15 +21439,12 @@ function createOverviewStore(remote) {
       const listener = () => setLocal(snapshot);
       listeners.add(listener);
       listener();
-      if (!started) {
-        started = true;
-        void refresh();
-      }
+      if (!snapshot.data) void refresh();
       return () => {
         listeners.delete(listener);
       };
     }, []);
-    return { ...local, setBusy: (busy) => update({ busy }), refresh };
+    return { ...local, hasData: () => !!snapshot.data, setBusy: (busy) => update({ busy }), refresh };
   };
   return { use };
 }
@@ -21455,7 +21460,10 @@ async function apply(ctx) {
     apps.setWorkbenchOpener(workbench.openWorkbench);
     let brand;
     try {
-      brand = unwrapRemote(await remote.brand());
+      brand = unwrapRemote(await Promise.race([
+        remote.brand(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("\u8BFB\u53D6\u4F01\u4E1A\u54C1\u724C\u8D85\u65F6")), 1e4))
+      ]));
     } catch {
       brand = { enabled: true, name: "\u4F01\u4E1A", logo_url: "", revision: "" };
     }
@@ -21469,6 +21477,12 @@ async function apply(ctx) {
         try {
           const result = unwrapRemote(await remote.login());
           setNotice(result?.text || "\u8BF7\u5728\u6D4F\u89C8\u5668\u5B8C\u6210\u4F01\u4E1A\u767B\u5F55\u3002");
+          void (async () => {
+            for (let i = 0; i < 36 && !state.hasData(); i++) {
+              await new Promise((resolve) => setTimeout(resolve, 5e3));
+              await state.refresh();
+            }
+          })();
         } catch {
           setNotice("\u53D1\u8D77\u767B\u5F55\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u540E\u91CD\u8BD5\u3002");
         } finally {

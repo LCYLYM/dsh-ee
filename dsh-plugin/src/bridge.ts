@@ -48,13 +48,13 @@ export class McpBridge {
 
   constructor(private ctx: DshContext, private config: PluginConfig, private http: HttpClient) {}
 
-  private async rpc(method: string, params?: unknown): Promise<any> {
+  private async rpc(method: string, params?: unknown, timeoutMs = 30_000): Promise<any> {
     const headers: Record<string, string> = { "content-type": "application/json", accept: "application/json, text/event-stream" };
     if (this.session) headers["Mcp-Session-Id"] = this.session;
-    const response = await this.http.fetch("/mcp", { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+    const response = await this.http.fetch("/mcp", { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) }, timeoutMs);
     if (response.status === 404) {
       this.session = "";
-      return this.rpc(method, params);
+      return this.rpc(method, params, timeoutMs);
     }
     if (!response.ok) throw new Error(`MCP ${method} HTTP ${response.status}`);
     this.session = response.headers.get("mcp-session-id") || this.session;
@@ -124,7 +124,7 @@ export class McpBridge {
       execute: async (args: any) => {
         const local = this.local.get(`${tool.name}.${args?.action}`);
         if (local) return local(args);
-        const result = await this.rpc("tools/call", { name: tool.name, arguments: args });
+        const result = await this.rpc("tools/call", { name: tool.name, arguments: args }, 0);
         this.remember(name, args, result);
         return result;
       },
@@ -172,7 +172,7 @@ export class McpBridge {
       let delay = 1000;
       while (!signal.aborted) {
         try {
-          const response = await this.http.fetch("/mcp", { headers: { accept: "text/event-stream" }, signal });
+          const response = await this.http.fetch("/mcp", { headers: { accept: "text/event-stream" }, signal }, 0);
           const reader = response.ok ? response.body?.getReader() : undefined;
           if (reader) {
             delay = 1000;
