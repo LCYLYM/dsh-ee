@@ -78,6 +78,7 @@ export default {
       use: { title: "员工使用", desc: "一条命令接入企业源，之后照常使用 DSH 和工作台里的微应用。" },
     },
     nav: { how: "工作方式", workbench: "工作台", control: "可控与审计", deploy: "部署" },
+    scene: { windowTag: "DSH 客户端", eeTag: "企业私有部署", clientTag: "员工本机", send: "发送", calling: "调用企业能力 {{pkg}}", result: "交付结果", audited: "本次调用已记录到审计日志" },
     enter: "进入工作台",
     heroLine1: "全链路信创的",
     heroLine2: "可控智能工作台",

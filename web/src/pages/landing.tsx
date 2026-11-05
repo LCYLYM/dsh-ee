@@ -5,8 +5,8 @@ import { auditLog, clientPlatforms, microApps } from "../mock/data";
 import { PageLink } from "../lib/menus";
 import { LangSwitch } from "../components/lang-switch";
 import { ThemeToggle } from "../components/theme-toggle";
+import { LandingHeroScene } from "../components/landing-hero-scene";
 import { cx } from "../components/ui";
-import { isZh } from "../i18n";
 import { useTranslation } from "react-i18next";
 
 /** 图里可点的四类企业资产：点哪一类，dsh-ee 与 DSH 两栏就换成它真实走过的那条链。 */
@@ -39,6 +39,27 @@ function useReveal() {
 
 const delay = (ms: number) => ({ "--d": `${ms}ms` }) as React.CSSProperties;
 
+/** 章节编号：01 / 工作方式 这种 eyebrow。 */
+function Eyebrow({ n, label }: { n: string; label: string }) {
+  return (
+    <div data-reveal className="mb-8 flex items-center gap-3 font-mono text-sm tracking-wide text-brand-600">
+      <span>{n} /</span>
+      <span className="text-neutral-600">{label}</span>
+      <span aria-hidden className="h-px flex-1 bg-neutral-200" />
+    </div>
+  );
+}
+
+/** 区块上下边界的「+」角标。 */
+function CornerMarks() {
+  return (
+    <>
+      <span aria-hidden className="absolute top-0 left-5 -translate-y-1/2 font-mono text-neutral-300 sm:left-8">+</span>
+      <span aria-hidden className="absolute top-0 right-5 -translate-y-1/2 font-mono text-neutral-300 sm:right-8">+</span>
+    </>
+  );
+}
+
 function Arrow({ label, reverse }: { label: string; reverse?: boolean }) {
   const Icon = reverse ? ArrowLeft : ArrowRight;
   return (
@@ -50,7 +71,7 @@ function Arrow({ label, reverse }: { label: string; reverse?: boolean }) {
         )}
       >
         <span className={cx("flow-line h-8 w-0.5 lg:h-0.5 lg:w-12", reverse && "flow-line-rev")} />
-        <Icon size={16} className="rotate-90 text-neutral-900 lg:rotate-0" />
+        <Icon size={16} className="rotate-90 text-brand-600 lg:rotate-0" />
       </div>
       <span className="ml-2 text-sm whitespace-nowrap text-neutral-700 lg:mt-2 lg:ml-0">{label}</span>
     </div>
@@ -59,7 +80,7 @@ function Arrow({ label, reverse }: { label: string; reverse?: boolean }) {
 
 function Step({ name, children }: { name: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white/10 px-4 py-3">
+    <div className="rounded-xl bg-white/10 px-4 py-3">
       <div className="text-sm font-medium text-white">{name}</div>
       <div className="mt-0.5 text-sm text-white/85">{children}</div>
     </div>
@@ -71,8 +92,8 @@ function Diagram() {
   const [i, setI] = useState(0);
   const s = sources[i];
   return (
-    <div className="grid lg:grid-cols-[1fr_auto_1.1fr_auto_1fr]">
-      <div className="bg-neutral-100 p-5">
+    <div className="grid overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-[0_24px_80px_-32px_rgba(20,26,61,0.18)] lg:grid-cols-[1fr_auto_1.1fr_auto_1fr]">
+      <div className="bg-neutral-50 p-5 md:p-6">
         <h3 className="text-lg font-semibold text-neutral-900">{t("landing.diagram.assets")}</h3>
         <p className="mt-1 text-sm text-neutral-700">{t("landing.diagram.assetsHint")}</p>
         <div className="mt-4 flex flex-col gap-1.5" role="radiogroup" aria-label={t("landing.diagram.pickAsset")}>
@@ -84,8 +105,8 @@ function Diagram() {
               aria-checked={i === j}
               onClick={() => setI(j)}
               className={cx(
-                "px-4 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
-                i === j ? "bg-foreground text-background" : "bg-card text-foreground hover:bg-neutral-50",
+                "rounded-xl px-4 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
+                i === j ? "bg-foreground text-background" : "bg-card text-foreground hover:bg-white",
               )}
             >
               <div className="font-medium">{t(`landing.sources.${x.key}.title`)}</div>
@@ -97,7 +118,7 @@ function Diagram() {
 
       <Arrow label={t("landing.diagram.package")} />
 
-      <div className="bg-brand-600 p-5 text-white">
+      <div className="bg-brand-600 p-5 text-white md:p-6">
         <h3 className="text-lg font-semibold">dsh-ee</h3>
         <p className="mt-1 text-sm text-white/85">{t(`landing.sources.${s.key}.asset`)}</p>
         <div className="mt-4 flex flex-col gap-1.5" aria-live="polite">
@@ -113,10 +134,10 @@ function Diagram() {
         <Arrow label={t("landing.diagram.up")} reverse />
       </div>
 
-      <div className="on-dark flex flex-col bg-neutral-950 p-5 text-white">
+      <div className="on-dark flex flex-col bg-neutral-950 p-5 text-white md:p-6">
         <h3 className="text-lg font-semibold">{t("landing.diagram.run")}</h3>
         <p className="mt-1 text-sm text-white/75">{t("landing.diagram.runHint")}</p>
-        <pre className="mt-4 flex-1 overflow-x-auto bg-black px-4 py-3 text-[13px] leading-relaxed whitespace-pre-wrap text-neutral-300">
+        <pre className="mt-4 flex-1 overflow-x-auto rounded-xl bg-black px-4 py-3 text-[13px] leading-relaxed whitespace-pre-wrap text-neutral-300">
           <code>
             <span className="text-neutral-500">$</span> dsh plugin add {s.pkg}
             {"\n"}
@@ -137,11 +158,11 @@ function WorkbenchFragment() {
   const { t } = useTranslation();
   const apps = [...microApps].sort((a, b) => b.runs - a.runs).slice(0, 4);
   return (
-    <div data-ui className="grid overflow-hidden border border-neutral-200 bg-neutral-50 text-sm sm:grid-cols-[150px_1fr]">
+    <div data-ui className="grid overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50 text-sm shadow-[0_24px_80px_-32px_rgba(20,26,61,0.2)] sm:grid-cols-[150px_1fr]">
       <div className="hidden flex-col gap-0.5 border-r border-neutral-200 p-3 sm:flex">
         <div className="px-2 pb-3 font-semibold text-neutral-900">dsh-ee</div>
         {(["overview", "apps", "market", "setup"] as const).map((n) => (
-          <div key={n} className={cx("rounded-md px-2 py-1.5", n === "apps" ? "bg-neutral-200/70 text-neutral-900" : "text-neutral-700")}>
+          <div key={n} className={cx("rounded-lg px-2 py-1.5", n === "apps" ? "bg-neutral-200/70 text-neutral-900" : "text-neutral-700")}>
             {t(`landing.fragment.nav.${n}`)}
           </div>
         ))}
@@ -157,7 +178,7 @@ function WorkbenchFragment() {
                   {t("landing.fragment.runs", { department: m.department, runs: m.runs.toLocaleString() })}
                 </div>
               </div>
-              <span className="shrink-0 rounded-md border border-neutral-300 px-2.5 py-1 text-xs text-neutral-800">{t("landing.fragment.openInDsh")}</span>
+              <span className="shrink-0 rounded-lg border border-neutral-300 px-2.5 py-1 text-xs text-neutral-800">{t("landing.fragment.openInDsh")}</span>
             </li>
           ))}
         </ul>
@@ -171,7 +192,7 @@ function AuditFragment() {
   const { t } = useTranslation();
   const total = clientPlatforms.reduce((a, c) => a + c.count, 0);
   return (
-    <div data-ui className="on-dark border border-neutral-800 bg-neutral-900 text-sm">
+    <div data-ui className="on-dark rounded-2xl border border-neutral-800 bg-neutral-900 text-sm shadow-[0_0_0_1px_rgba(77,107,254,0.15),0_24px_80px_-32px_rgba(0,0,0,0.6)]">
       <div className="flex items-baseline justify-between px-5 pt-4 pb-2">
         <span className="font-medium text-white">{t("landing.fragment.auditLog")}</span>
         <span className="text-xs text-neutral-400">{t("landing.fragment.today")}</span>
@@ -196,7 +217,7 @@ function AuditFragment() {
         </div>
         <div className="flex h-2 gap-0.5">
           {clientPlatforms.map((c) => (
-            <div key={c.os} className={c.xinchuang ? "bg-brand-400" : "bg-neutral-600"} style={{ width: `${(c.count / total) * 100}%` }} />
+            <div key={c.os} className={cx("rounded-full", c.xinchuang ? "bg-brand-400" : "bg-neutral-600")} style={{ width: `${(c.count / total) * 100}%` }} />
           ))}
         </div>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-300">
@@ -222,10 +243,10 @@ export default function Landing() {
   useReveal();
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-neutral-200">
+      <header className="sticky top-0 z-10 border-b border-neutral-200/70 bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-[1360px] items-center gap-8 px-5 sm:px-8">
           <Link to="/" className="flex items-center gap-2 font-semibold">
-            <span className="flex h-7 w-7 items-center justify-center bg-brand-500 text-white">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-500 text-white">
               <Puzzle size={16} />
             </span>
             dsh-ee
@@ -242,7 +263,7 @@ export default function Landing() {
           </nav>
           <Link
             to="/go"
-            className="bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 active:translate-y-px"
+            className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 active:translate-y-px"
           >
             {t("landing.enter")}
           </Link>
@@ -250,52 +271,55 @@ export default function Landing() {
       </header>
 
       <main>
-        <section className="mx-auto max-w-[1360px] px-5 pt-16 pb-12 sm:px-8 lg:pt-24">
-          {/* 英文标题更长：占满整行，说明文字放到下面，保证标题两行以内 */}
-          <div className={cx("grid gap-8", isZh() ? "lg:grid-cols-[1.35fr_1fr] lg:items-end" : "[&>div]:max-w-2xl")}>
+        {/* 首屏：居中标题 + 动态线稿场景 */}
+        <section className="landing-grid-bg relative overflow-hidden">
+          <div className="landing-grid-fade absolute inset-0" aria-hidden />
+          <div className="relative mx-auto max-w-[1360px] px-5 pt-16 pb-10 text-center sm:px-8 lg:pt-24">
             <h1
               data-reveal
-              className={cx(
-                "leading-[1.02] font-bold tracking-[-0.035em]",
-                isZh() ? "text-[clamp(2.5rem,6.4vw,5.75rem)]" : "text-[clamp(2rem,5vw,4.5rem)]",
-              )}
+              className="mx-auto max-w-4xl text-[clamp(2.25rem,5.6vw,5rem)] leading-[1.05] font-bold tracking-[-0.035em] text-brand-950"
             >
               {t("landing.heroLine1")}
               <br />
               {t("landing.heroLine2")}
             </h1>
-            <div data-reveal style={delay(90)}>
-              <p className="text-lg leading-relaxed text-neutral-800">
-                {t("landing.heroDesc")}
-              </p>
-              <div className="mt-6 flex items-center gap-6">
-                <Link
-                  to="/go"
-                  className="inline-flex items-center gap-2 bg-brand-600 px-5 py-3 font-medium text-white transition hover:bg-brand-700 active:translate-y-px"
-                >
-                  {t("landing.enter")} <ArrowRight size={16} />
-                </Link>
-                <a href="#how" className="font-medium text-neutral-900 underline decoration-neutral-300 underline-offset-4 hover:decoration-neutral-900">
-                  {t("landing.seeHow")}
-                </a>
-              </div>
+            <p data-reveal className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-neutral-700" style={delay(90)}>
+              {t("landing.heroDesc")}
+            </p>
+            <div data-reveal className="mt-8 flex items-center justify-center gap-6" style={delay(160)}>
+              <Link
+                to="/go"
+                className="inline-flex items-center gap-2 rounded-full bg-brand-600 px-6 py-3 font-medium text-white shadow-[0_10px_30px_-10px_rgba(59,91,219,0.6)] transition hover:bg-brand-700 active:translate-y-px"
+              >
+                {t("landing.enter")} <ArrowRight size={16} />
+              </Link>
+              <a href="#how" className="font-medium text-neutral-900 underline decoration-neutral-300 underline-offset-4 hover:decoration-neutral-900">
+                {t("landing.seeHow")}
+              </a>
             </div>
+          </div>
+          <div className="relative">
+            <LandingHeroScene sources={sources} />
           </div>
         </section>
 
-        <section id="how" aria-labelledby="how-title" className="mx-auto max-w-[1360px] scroll-mt-6 px-5 pb-32 sm:px-8">
+        <section id="how" aria-labelledby="how-title" className="relative mx-auto max-w-[1360px] scroll-mt-6 border-t border-neutral-100 px-5 pt-20 pb-32 sm:px-8">
+          <CornerMarks />
           <h2 id="how-title" className="sr-only">
             {t("landing.howTitle")}
           </h2>
+          <Eyebrow n="01" label={t("landing.nav.how")} />
           <div data-reveal style={delay(180)}>
             <Diagram />
           </div>
         </section>
 
-        <section id="workbench" className="scroll-mt-6 bg-neutral-100 py-28">
+        <section id="workbench" className="relative scroll-mt-6 border-t border-neutral-100 bg-brand-50/40 py-28">
+          <CornerMarks />
           <div className="mx-auto grid max-w-[1360px] gap-12 px-5 sm:px-8 lg:grid-cols-[1fr_1.1fr] lg:items-center">
             <div>
-              <h2 data-reveal className={h2}>
+              <Eyebrow n="02" label={t("landing.nav.workbench")} />
+              <h2 data-reveal className={cx(h2, "text-brand-950")}>
                 {t("landing.wbLine1")}
                 <br />
                 {t("landing.wbLine2")}
@@ -320,9 +344,14 @@ export default function Landing() {
           </div>
         </section>
 
-        <section id="control" className="on-dark scroll-mt-6 bg-neutral-950 py-28 text-white">
+        <section id="control" className="on-dark relative scroll-mt-6 bg-brand-950 py-28 text-white">
           <div className="mx-auto grid max-w-[1360px] gap-12 px-5 sm:px-8 lg:grid-cols-2">
             <div>
+              <div data-reveal className="mb-8 flex items-center gap-3 font-mono text-sm tracking-wide text-brand-300">
+                <span>03 /</span>
+                <span className="text-neutral-400">{t("landing.nav.control")}</span>
+                <span aria-hidden className="h-px flex-1 bg-white/15" />
+              </div>
               <h2 data-reveal className={h2}>
                 {t("landing.controlLine1")}
                 <br />
@@ -343,24 +372,29 @@ export default function Landing() {
           </div>
         </section>
 
-        <section id="deploy" className="mx-auto grid max-w-[1360px] scroll-mt-6 gap-12 px-5 py-28 sm:px-8 lg:grid-cols-[1fr_1.1fr]">
+        <section id="deploy" className="relative mx-auto grid max-w-[1360px] scroll-mt-6 gap-12 border-t border-neutral-100 px-5 py-28 sm:px-8 lg:grid-cols-[1fr_1.1fr]">
+          <CornerMarks />
           <div>
-            <h2 data-reveal className={h2}>
+            <Eyebrow n="04" label={t("landing.nav.deploy")} />
+            <h2 data-reveal className={cx(h2, "text-brand-950")}>
               {t("landing.deployLine1")}
               <br />
               {t("landing.deployLine2")}
             </h2>
             <ol className="mt-10 space-y-6">
               {steps.map((st, j) => (
-                <li key={st} data-reveal style={delay(j * 70)}>
-                  <div className="text-lg font-semibold">{t(`landing.steps.${st}.title`)}</div>
-                  <div className="mt-1 text-neutral-800">{t(`landing.steps.${st}.desc`)}</div>
+                <li key={st} data-reveal className="flex gap-4" style={delay(j * 70)}>
+                  <span aria-hidden className="mt-1 font-mono text-sm text-brand-500">{String(j + 1).padStart(2, "0")}</span>
+                  <div>
+                    <div className="text-lg font-semibold">{t(`landing.steps.${st}.title`)}</div>
+                    <div className="mt-1 text-neutral-800">{t(`landing.steps.${st}.desc`)}</div>
+                  </div>
                 </li>
               ))}
             </ol>
           </div>
           <div data-reveal className="self-center" style={delay(120)}>
-            <pre className="on-dark overflow-x-auto bg-neutral-950 p-6 text-sm leading-7 text-neutral-200">
+            <pre className="on-dark overflow-x-auto rounded-2xl bg-neutral-950 p-6 text-sm leading-7 text-neutral-200 shadow-[0_24px_80px_-32px_rgba(20,26,61,0.4)]">
               <code>
                 <span className="text-neutral-500">{t("landing.codeServer")}</span>
                 {"\n"}docker compose up -d{"\n\n"}
@@ -381,7 +415,7 @@ export default function Landing() {
             <p className="max-w-xl text-2xl leading-snug font-semibold">{t("landing.closing")}</p>
             <Link
               to="/go"
-              className="inline-flex items-center gap-2 bg-white px-5 py-3 font-medium text-brand-700 transition hover:bg-brand-50 active:translate-y-px"
+              className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 font-medium text-brand-700 transition hover:bg-brand-50 active:translate-y-px"
             >
               {t("landing.enter")} <ArrowRight size={16} />
             </Link>

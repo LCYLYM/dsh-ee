@@ -80,6 +80,7 @@ export default {
       use: { title: "Use", desc: "Employees connect once with a single command, then keep using DSH and the micro-apps in their workbench." },
     },
     nav: { how: "How it works", workbench: "Workbench", control: "Control & audit", deploy: "Deploy" },
+    scene: { windowTag: "DSH desktop", eeTag: "Self-hosted", clientTag: "Employee device", send: "Send", calling: "Using company capability {{pkg}}", result: "Result", audited: "This call is in the audit log" },
     enter: "Open workbench",
     heroLine1: "A controlled AI workbench",
     heroLine2: "on a domestic stack",
