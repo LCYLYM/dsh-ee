@@ -695,6 +695,25 @@ export interface SetupStep {
   how?: string;
 }
 
+/** 示例内容里的一项：created 这次新建 / exists 已经有了 / missing 还没有 / failed 没建成。 */
+export interface DemoItem {
+  kind: "kb" | "connection" | "skill" | "prompt" | "app" | "user";
+  slug: string;
+  title: string;
+  result: "created" | "exists" | "missing" | "failed";
+  error?: string;
+}
+
+export interface DemoStatus {
+  items: DemoItem[];
+  imported: boolean;
+}
+
+export interface DemoImport {
+  items: DemoItem[];
+  accounts: { username: string; display_name: string; department: string; password?: string }[];
+}
+
 export interface SetupStatus {
   steps: SetupStep[];
   required_done: boolean;
@@ -1074,6 +1093,8 @@ export const api = {
   adminConnect: () => request<{ state: ConnectState; package?: string; stale?: boolean; patch?: string }>("GET", "/api/admin/connect"),
   publishConnect: (force = false) => request<ConnectState>("POST", "/api/admin/connect/publish", { force }),
   setupStatus: () => request<SetupStatus>("GET", "/api/admin/setup-status"),
+  demoStatus: () => request<DemoStatus>("GET", "/api/admin/demo"),
+  importDemo: () => request<DemoImport>("POST", "/api/admin/demo"),
   welcome: () => request<{ show: boolean; dismissed: boolean; connected: boolean }>("GET", "/api/me/welcome"),
   putWelcome: (dismissed: boolean) => request<{ dismissed: boolean }>("PUT", "/api/me/welcome", { dismissed }),
   getStarted: (admin: boolean) => request<GetStarted>("POST", "/api/me/get-started", { admin }),

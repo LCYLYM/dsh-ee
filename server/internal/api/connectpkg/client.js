@@ -19975,13 +19975,25 @@ function section(createElement4, title, ...children) {
     ...children
   );
 }
+function failureText(failure2) {
+  switch (failure2?.reason) {
+    case "auth":
+      return "\u8FD8\u6CA1\u6709\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7\uFF0C\u6216\u767B\u5F55\u5DF2\u5931\u6548\uFF0C\u8BF7\u767B\u5F55\u3002";
+    case "server":
+      return `dsh-ee \u8FD4\u56DE\u9519\u8BEF\uFF08${failure2.detail}\uFF09\uFF0C\u8BF7\u7A0D\u540E\u5237\u65B0\u3002`;
+    case "unreachable":
+      return `\u8FDE\u4E0D\u4E0A dsh-ee\uFF08${failure2.base}\uFF0C${failure2.detail}\uFF09\u3002\u8BF7\u786E\u8BA4\u8FD9\u53F0\u7535\u8111\u80FD\u5728\u6D4F\u89C8\u5668\u91CC\u6253\u5F00\u8FD9\u4E2A\u5730\u5740\uFF1B\u5730\u5740\u4E0D\u5BF9\u7684\u8BDD\uFF0C\u5728 DSH \u7684\u300C\u8BBE\u7F6E \u2192 dsh-ee\u300D\u91CC\u6539\u6210\u80FD\u6253\u5F00\u7684\u5730\u5740\u5E76\u6D4B\u8BD5\u3002`;
+    default:
+      return "\u672A\u767B\u5F55\u6216\u8FDE\u63A5\u4E0D\u53EF\u7528\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55\u3002";
+  }
+}
 function enterprisePanel(createElement4, org, state, actions, AppsPanel) {
-  const { data, failed, busy, notice, doctor } = state;
+  const { data, failed, failure: failure2, busy, notice, doctor } = state;
   const me = data?.me;
   const quota = effectiveQuota(data?.usage);
   const children = [createElement4("h2", { key: "title", style: { margin: "0 0 16px", fontSize: 16 } }, org)];
   if (!data || !me) {
-    children.push(createElement4("p", { key: "state", style: { lineHeight: 1.6 } }, failed ? "\u672A\u767B\u5F55\u6216\u8FDE\u63A5\u4E0D\u53EF\u7528\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55\u3002" : "\u6B63\u5728\u8BFB\u53D6\u4F01\u4E1A\u8D26\u53F7\u2026"));
+    children.push(createElement4("p", { key: "state", style: { lineHeight: 1.6 } }, failed ? failureText(failure2) : "\u6B63\u5728\u8BFB\u53D6\u4F01\u4E1A\u8D26\u53F7\u2026"));
     if (failed) children.push(createElement4(
       "div",
       { key: "actions", style: { display: "flex", gap: 8 } },
@@ -20308,23 +20320,37 @@ async function openSession(ctx, id) {
   }
   throw new Error("\u5BBF\u4E3B\u4E0D\u652F\u6301\u5207\u6362\u4F1A\u8BDD");
 }
+function currentWorkspaceId(ctx) {
+  const items = ctx?.workspaces?.list?.getSnapshot?.()?.items;
+  if (!Array.isArray(items) || items.length === 0) return void 0;
+  const snapshot = ctx.sessions?.list?.getSnapshot?.();
+  const id = currentSessionOf(snapshot);
+  const cwd = snapshot?.byId?.[id]?.cwd;
+  const hit = items.find((w) => id && Array.isArray(w?.sessionIds) && w.sessionIds.includes(id)) ?? items.find((w) => cwd && w?.path === cwd) ?? items[0];
+  return typeof hit?.workspaceId === "string" && hit.workspaceId ? hit.workspaceId : void 0;
+}
 async function createSession(ctx) {
-  let workspace;
-  if (typeof ctx?.workspaces?.initializeDefault === "function") {
-    workspace = await ctx.workspaces.initializeDefault();
-  } else if (typeof ctx?.workspaces?.create === "function") {
-    const snapshot = ctx.sessions?.list?.getSnapshot?.();
-    const id = currentSessionOf(snapshot);
-    const cwd = snapshot?.byId?.[id]?.cwd;
-    if (!cwd) throw new Error("\u5F53\u524D\u4F1A\u8BDD\u6CA1\u6709\u53EF\u7528\u4E8E\u65B0\u5EFA\u4F1A\u8BDD\u7684\u5DE5\u4F5C\u76EE\u5F55");
-    workspace = await ctx.workspaces.create({ path: cwd });
-  } else {
-    throw new Error("\u5BBF\u4E3B\u4E0D\u652F\u6301\u521B\u5EFA\u5DE5\u4F5C\u533A");
+  let workspaceId = currentWorkspaceId(ctx);
+  if (!workspaceId) {
+    let workspace;
+    if (typeof ctx?.workspaces?.initializeDefault === "function") {
+      workspace = await ctx.workspaces.initializeDefault();
+    } else if (typeof ctx?.workspaces?.create === "function") {
+      const snapshot = ctx.sessions?.list?.getSnapshot?.();
+      const id = currentSessionOf(snapshot);
+      const cwd = snapshot?.byId?.[id]?.cwd;
+      if (!cwd) throw new Error("\u5F53\u524D\u4F1A\u8BDD\u6CA1\u6709\u53EF\u7528\u4E8E\u65B0\u5EFA\u4F1A\u8BDD\u7684\u5DE5\u4F5C\u76EE\u5F55");
+      workspace = await ctx.workspaces.create({ path: cwd });
+    } else {
+      throw new Error("\u5BBF\u4E3B\u4E0D\u652F\u6301\u521B\u5EFA\u5DE5\u4F5C\u533A");
+    }
+    workspaceId = typeof workspace?.workspaceId === "string" && workspace.workspaceId ? workspace.workspaceId : void 0;
   }
-  if (typeof workspace?.workspaceId !== "string" || !workspace.workspaceId || typeof ctx?.sessions?.create !== "function") {
-    throw new Error("\u65E0\u6CD5\u4E3A\u65B0\u4F1A\u8BDD\u53D6\u5F97\u5DE5\u4F5C\u533A");
-  }
-  return ctx.sessions.create({ workspaceId: workspace.workspaceId });
+  if (!workspaceId) throw new Error("\u65E0\u6CD5\u4E3A\u65B0\u4F1A\u8BDD\u53D6\u5F97\u5DE5\u4F5C\u533A");
+  const ui = typeof ctx?.get === "function" ? ctx.get("uiWorkspace") : void 0;
+  if (typeof ui?.connectWorkspace === "function") return ui.connectWorkspace(workspaceId);
+  if (typeof ctx?.sessions?.create !== "function") throw new Error("\u5BBF\u4E3B\u4E0D\u652F\u6301\u65B0\u5EFA\u4F1A\u8BDD");
+  return ctx.sessions.create({ workspaceId });
 }
 function checkSendResult(result) {
   if (result?.kind === "error" || result?.ok === false) {
@@ -21081,7 +21107,7 @@ function panelView(h, pane, state, handlers) {
   const widgets = pane.widgets ?? [];
   return h(
     "div",
-    { "data-dsh-ee-ui": "workbench", style: { display: "grid", gap: 10, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } },
+    { "data-dsh-ee-ui": "workbench", style: { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } },
     state.notice ? h("p", { role: "status", style: { margin: 0, fontSize: 12, overflowWrap: "anywhere" } }, state.notice) : null,
     ...widgets.map((widget, index) => {
       const key = `w${index}`;
@@ -21110,7 +21136,7 @@ function missingPaneView(h) {
   return h("div", { style: { padding: 16, fontSize: 13, opacity: 0.7 } }, "\u8FD9\u4E2A\u5DE5\u4F5C\u53F0\u5DF2\u7ECF\u4E0D\u53EF\u7528\uFF1A\u5E94\u7528\u53EF\u80FD\u5DF2\u505C\u7528\uFF0C\u6216\u8005\u5DE5\u4F5C\u53F0\u914D\u7F6E\u6539\u4E86\u3002\u53EF\u4EE5\u5173\u6389\u8FD9\u4E2A\u6807\u7B7E\u9875\u3002");
 }
 function kbDocView(h, target, state, handlers) {
-  const wrap = (...children) => h("div", { "data-dsh-ee-ui": "kb-doc", style: { display: "grid", gap: 8, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } }, ...children);
+  const wrap = (...children) => h("div", { "data-dsh-ee-ui": "kb-doc", style: { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } }, ...children);
   if (!target) return wrap(h("div", { style: muted }, "\u70B9\u300C\u7B54\u6848\u4E0E\u51FA\u5904\u300D\u91CC\u7684\u5F15\u7528\uFF0C\u4F1A\u5728\u8FD9\u91CC\u6253\u5F00\u539F\u6587\u3002"));
   const note = stateNote(h, state);
   if (note) return wrap(h("strong", null, target.title || `\u6587\u6863 ${target.doc}`), note);
@@ -21373,6 +21399,139 @@ function registerWorkbench(ctx, deps) {
   };
 }
 
+// src/settings-view.ts
+var settingsSectionId = "dsh-ee";
+var muted2 = { opacity: 0.65 };
+function button3(createElement4, label, onClick, disabled, primary = false) {
+  return createElement4("button", {
+    type: "button",
+    onClick,
+    disabled,
+    style: {
+      padding: "6px 12px",
+      borderRadius: 6,
+      cursor: disabled ? "default" : "pointer",
+      opacity: disabled ? 0.55 : 1,
+      border: "1px solid currentColor",
+      color: "inherit",
+      fontWeight: primary ? 600 : 400,
+      background: primary ? "color-mix(in srgb, currentColor 12%, transparent)" : "transparent"
+    }
+  }, label);
+}
+function serverSettingsView(createElement4, state, actions) {
+  const { settings, draft, busy, test, notice, error: error62 } = state;
+  const children = [
+    createElement4("h2", { key: "title", style: { margin: "0 0 6px", fontSize: 16 } }, "dsh-ee \u8FDE\u63A5"),
+    createElement4(
+      "p",
+      { key: "desc", style: { margin: "0 0 18px", lineHeight: 1.6, ...muted2 } },
+      "\u63A5\u5165\u63D2\u4EF6\u901A\u8FC7\u8FD9\u4E2A\u5730\u5740\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7\u3001\u540C\u6B65\u4F01\u4E1A\u6280\u80FD\u548C\u5FAE\u5E94\u7528\u3001\u8C03\u7528\u4F01\u4E1A\u6A21\u578B\u3002\u8FDE\u4E0D\u4E0A\u65F6\uFF0C\u5148\u5728\u6D4F\u89C8\u5668\u91CC\u6253\u5F00 dsh-ee \u7F51\u9875\uFF0C\u628A\u80FD\u6253\u5F00\u7684\u5730\u5740\u586B\u5728\u8FD9\u91CC\u3002"
+    )
+  ];
+  if (!settings) {
+    children.push(createElement4("p", { key: "loading" }, error62 || "\u6B63\u5728\u8BFB\u53D6\u2026"));
+    return createElement4("div", { "data-dsh-ee-settings": "loading", style: { maxWidth: 640 } }, ...children);
+  }
+  children.push(createElement4("label", { key: "label", htmlFor: "dsh-ee-base", style: { display: "block", marginBottom: 6, fontWeight: 500 } }, "dsh-ee \u5730\u5740"));
+  children.push(createElement4("input", {
+    key: "input",
+    id: "dsh-ee-base",
+    type: "url",
+    value: draft,
+    placeholder: "https://ee.example.com",
+    spellCheck: false,
+    onChange: (event) => actions.setDraft(event.target.value),
+    onKeyDown: (event) => {
+      if (event.key === "Enter") actions.test();
+    },
+    style: { width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 6, border: "1px solid color-mix(in srgb, currentColor 30%, transparent)", background: "transparent", color: "inherit", font: "inherit" }
+  }));
+  children.push(createElement4(
+    "p",
+    { key: "packaged", style: { margin: "6px 0 0", fontSize: 12, lineHeight: 1.6, ...muted2 } },
+    settings.overridden ? `\u63D2\u4EF6\u5305\u91CC\u7684\u5730\u5740\u662F ${settings.packaged}\uFF0C\u4F60\u6539\u6210\u4E86\u73B0\u5728\u8FD9\u4E2A\u3002` : `\u8FD9\u662F\u7BA1\u7406\u5458\u53D1\u5E03\u63A5\u5165\u63D2\u4EF6\u65F6\u5199\u8FDB\u53BB\u7684\u5730\u5740\u3002`
+  ));
+  const changed = draft.trim().replace(/\/+$/, "") !== settings.base;
+  children.push(createElement4(
+    "div",
+    { key: "actions", style: { display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" } },
+    button3(createElement4, busy === "test" ? "\u6B63\u5728\u6D4B\u8BD5\u2026" : "\u6D4B\u8BD5\u8FDE\u63A5", actions.test, !!busy),
+    button3(createElement4, busy === "save" ? "\u6B63\u5728\u4FDD\u5B58\u2026" : "\u4FDD\u5B58", actions.save, !!busy || !changed, true),
+    settings.overridden ? button3(createElement4, "\u6062\u590D\u63D2\u4EF6\u5305\u91CC\u7684\u5730\u5740", actions.reset, !!busy) : null
+  ));
+  if (test) {
+    children.push(createElement4(
+      "ul",
+      { key: "checks", "data-dsh-ee-test": test.ok ? "ok" : "fail", style: { listStyle: "none", padding: 0, margin: "16px 0 0", display: "grid", gap: 8 } },
+      ...test.checks.map((check2) => createElement4(
+        "li",
+        { key: check2.id, style: { display: "flex", gap: 8, lineHeight: 1.5 } },
+        createElement4("span", { style: { color: check2.ok ? "#16a34a" : "#d92d20", fontWeight: 600 } }, check2.ok ? "\u2713" : "\u2715"),
+        createElement4("span", {}, check2.title, check2.detail ? createElement4("span", { style: { display: "block", fontSize: 12, ...muted2 } }, check2.detail) : null)
+      ))
+    ));
+  }
+  if (notice) children.push(createElement4("p", { key: "notice", style: { marginTop: 14, lineHeight: 1.6 } }, notice));
+  if (error62) children.push(createElement4("p", { key: "error", style: { marginTop: 14, color: "#d92d20", lineHeight: 1.6 } }, error62));
+  children.push(createElement4(
+    "p",
+    { key: "hint", style: { marginTop: 22, fontSize: 12, lineHeight: 1.6, ...muted2 } },
+    `\u6539\u5730\u5740\u53EA\u5F71\u54CD\u8FD9\u53F0\u7535\u8111\u3002\u5982\u679C\u5927\u5BB6\u90FD\u8FDE\u4E0D\u4E0A\uFF0C\u8BF7\u7BA1\u7406\u5458\u5728 dsh-ee \u7F51\u9875\u7684\u7CFB\u7EDF\u8BBE\u7F6E\u91CC\u586B\u5199\u300C\u8BBF\u95EE\u5730\u5740\u300D\uFF0C\u518D\u91CD\u65B0\u53D1\u5E03\u63A5\u5165\u63D2\u4EF6\u3002\u63A5\u5165\u63D2\u4EF6\u7248\u672C ${settings.version}\u3002`
+  ));
+  return createElement4("div", { "data-dsh-ee-settings": "ready", style: { maxWidth: 640 } }, ...children);
+}
+function registerServerSettings(ctx, deps) {
+  const { createElement: createElement4, useState: useState4, useEffect: useEffect4, remote, unwrapRemote: unwrapRemote2 } = deps;
+  const message = (error62) => error62 instanceof Error ? error62.message : String(error62);
+  const Section = () => {
+    const [state, setState] = useState4({ draft: "" });
+    const patch = (next) => setState((prev) => ({ ...prev, ...next }));
+    useEffect4(() => {
+      void (async () => {
+        try {
+          const settings = unwrapRemote2(await remote.serverSettings());
+          patch({ settings, draft: settings.base });
+        } catch (error62) {
+          patch({ error: `\u8BFB\u53D6\u8BBE\u7F6E\u5931\u8D25\uFF1A${message(error62)}` });
+        }
+      })();
+    }, []);
+    const test = async () => {
+      patch({ busy: "test", test: void 0, notice: void 0, error: void 0 });
+      try {
+        patch({ test: unwrapRemote2(await remote.testServer({ base: state.draft })) });
+      } catch (error62) {
+        patch({ error: `\u6D4B\u8BD5\u5931\u8D25\uFF1A${message(error62)}` });
+      } finally {
+        patch({ busy: void 0 });
+      }
+    };
+    const save = async (base) => {
+      patch({ busy: "save", notice: void 0, error: void 0 });
+      try {
+        const settings = unwrapRemote2(await remote.saveServer({ base }));
+        patch({ settings, draft: settings.base, notice: "\u5DF2\u4FDD\u5B58\u5E76\u751F\u6548\u3002\u4F01\u4E1A\u6280\u80FD\u3001\u5FAE\u5E94\u7528\u548C\u5DE5\u5177\u6B63\u5728\u6309\u65B0\u5730\u5740\u540C\u6B65\uFF1B\u767B\u5F55\u65E0\u6548\u7684\u8BDD\uFF0C\u53BB\u4FA7\u680F\u4F01\u4E1A\u9762\u677F\u91CD\u65B0\u767B\u5F55\u3002" });
+        deps.onSaved();
+      } catch (error62) {
+        patch({ error: `\u4FDD\u5B58\u5931\u8D25\uFF1A${message(error62)}` });
+      } finally {
+        patch({ busy: void 0 });
+      }
+    };
+    return serverSettingsView(createElement4, state, {
+      setDraft: (draft) => patch({ draft, test: void 0 }),
+      test: () => void test(),
+      save: () => void save(state.draft),
+      reset: () => void save(null)
+    });
+  };
+  ctx.slots.inject("settings.section", () => ctx.slots.register(
+    { name: "settings.section", id: settingsSectionId, order: 80, label: () => deps.label },
+    Section
+  ));
+}
+
 // src/client.ts
 var inject = ["slots", "remote", "sidebarRightTabs", "sidebarRight", "sessions", "conversation", "workspaces"];
 var jsonParameter = (name) => {
@@ -21395,7 +21554,10 @@ var clientRemote = createTypertRemoteInfo({
     "dshEE/board": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/overview": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/login": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
-    "dshEE/doctor": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }
+    "dshEE/doctor": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/serverSettings": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/testServer": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/saveServer": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }
   }
 }, external_exports);
 var TAKEOVER = String("__DSH_EE_BRAND_TAKEOVER__") === "true";
@@ -21425,9 +21587,9 @@ function createOverviewStore(remote) {
         remote.overview(),
         new Promise((_, reject) => setTimeout(() => reject(new Error("\u8BFB\u53D6\u4F01\u4E1A\u8D26\u53F7\u8D85\u65F6")), OVERVIEW_TIMEOUT_MS))
       ]));
-      update(data?.me ? { data, failed: false } : { failed: true });
+      update(data?.me ? { data, failed: false, failure: void 0 } : { failed: true, failure: data?.failure });
     } catch {
-      update({ failed: true });
+      update({ failed: true, failure: void 0 });
     } finally {
       inflight = false;
       update({ busy: false });
@@ -21446,13 +21608,14 @@ function createOverviewStore(remote) {
     }, []);
     return { ...local, hasData: () => !!snapshot.data, setBusy: (busy) => update({ busy }), refresh };
   };
-  return { use };
+  return { use, refresh };
 }
 async function apply(ctx) {
   await ctx.remote.$mount(clientRemote);
   ctx.inject(["remote.dshEE"], async (remoteCtx) => {
     const remote = remoteCtx.remote.dshEE;
     const overview = createOverviewStore(remote);
+    registerServerSettings(ctx, { createElement: import_react3.createElement, useState: import_react3.useState, useEffect: import_react3.useEffect, remote, unwrapRemote, label: "dsh-ee", onSaved: () => void overview.refresh() });
     const useOverview = (_remote) => overview.use();
     const apps = registerApps(ctx, remote, useOverview, unwrapRemote);
     const { AppsPanel } = apps;

@@ -78,6 +78,11 @@ func (sp *agentSpec) key() string { return sp.Tool + "." + sp.Action }
 // agentExcluded 是永久不开放给 Agent 的路由，必须写清原因。
 var agentExcluded = map[string]string{
 	"GET /healthz":                             "探活接口",
+	"GET /demo/travel/summary":                 "示例差旅系统，模型经企业连接调用",
+	"GET /demo/travel/claims":                  "示例差旅系统，模型经企业连接调用",
+	"POST /demo/travel/claims":                 "示例差旅系统，模型经企业连接调用",
+	"GET /api/admin/demo":                      "管理员在网页上导入示例内容",
+	"POST /api/admin/demo":                     "导入示例会建账号并把应用推给全员，由管理员在网页上操作，演示账号的密码不进模型上下文",
 	"GET /api/auth/methods":                    "登录页用",
 	"POST /api/auth/login":                     "登录由人完成",
 	"POST /api/auth/logout":                    "会话由网页管理",

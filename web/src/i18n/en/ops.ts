@@ -132,4 +132,17 @@ export default {
     approve: "Approve and publish",
     reject: "Reject",
   },
+  demo: {
+    title: "Demo content",
+    desc: "Import two knowledge bases, a demo travel system, a skill, a prompt, two micro-apps with workbenches (travel expense calculator, onboarding buddy) and two demo employees in one click, so people can see how everything works in DSH right away. Re-importing never overwrites existing content.",
+    import: "Import demo content",
+    importing: "Importing…",
+    imported: "Imported",
+    partial: "Partly imported",
+    confirm: "The two demo micro-apps will appear in everyone's DSH, and two demo employee accounts will be created. Import now?",
+    accounts: "Demo employee accounts (passwords are shown only once — write them down)",
+    failed: "failed",
+    tryIt: "Open the travel expense calculator from the DSH sidebar to try it. To remove the demo, delete the items marked \"示例\" in the hub, knowledge bases and users.",
+    kinds: { kb: "Knowledge base", connection: "Connection", skill: "Skill", prompt: "Prompt", app: "Micro-app", user: "Employee" },
+  },
 } satisfies Messages<typeof zh>;

@@ -15,6 +15,9 @@ export interface ClientServiceActions {
   readKBDoc: (request: { doc: number; version?: number; from: number; to: number }) => Promise<any>;
   login: () => Promise<any>;
   doctor: () => Promise<any>;
+  serverSettings: () => Promise<any>;
+  testServer: (request: { base?: string }) => Promise<any>;
+  saveServer: (request: { base?: string | null }) => Promise<any>;
 }
 
 export class DshEEClientService extends TypertRemoteService {
@@ -90,6 +93,21 @@ export class DshEEClientService extends TypertRemoteService {
   @Remote
   async doctor(): Promise<any> {
     return this.actions.doctor();
+  }
+
+  @Remote
+  async serverSettings(): Promise<any> {
+    return this.actions.serverSettings();
+  }
+
+  @Remote
+  async testServer(request: { base?: string }): Promise<any> {
+    return this.actions.testServer(request ?? {});
+  }
+
+  @Remote
+  async saveServer(request: { base?: string | null }): Promise<any> {
+    return this.actions.saveServer(request ?? {});
   }
 }
 

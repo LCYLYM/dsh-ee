@@ -18,23 +18,44 @@ export async function openSession(ctx: any, id: string): Promise<void> {
   throw new Error("宿主不支持切换会话");
 }
 
+/** 新会话放进哪个工作区：当前会话所在的；当前没有会话时用列表里的第一个。 */
+function currentWorkspaceId(ctx: any): string | undefined {
+  const items = ctx?.workspaces?.list?.getSnapshot?.()?.items;
+  if (!Array.isArray(items) || items.length === 0) return undefined;
+  const snapshot = ctx.sessions?.list?.getSnapshot?.();
+  const id = currentSessionOf(snapshot);
+  const cwd = snapshot?.byId?.[id]?.cwd;
+  const hit = items.find((w: any) => id && Array.isArray(w?.sessionIds) && w.sessionIds.includes(id))
+    ?? items.find((w: any) => cwd && w?.path === cwd)
+    ?? items[0];
+  return typeof hit?.workspaceId === "string" && hit.workspaceId ? hit.workspaceId : undefined;
+}
+
+// 0.2.2 起 initializeDefault 只在首次使用时建默认工作区，已有工作区或找不到「文稿」目录时返回空，
+// 所以先用已有的工作区，实在没有才让宿主建默认的。
 export async function createSession(ctx: any): Promise<string> {
-  let workspace: any;
-  if (typeof ctx?.workspaces?.initializeDefault === "function") {
-    workspace = await ctx.workspaces.initializeDefault();
-  } else if (typeof ctx?.workspaces?.create === "function") {
-    const snapshot = ctx.sessions?.list?.getSnapshot?.();
-    const id = currentSessionOf(snapshot);
-    const cwd = snapshot?.byId?.[id]?.cwd;
-    if (!cwd) throw new Error("当前会话没有可用于新建会话的工作目录");
-    workspace = await ctx.workspaces.create({ path: cwd });
-  } else {
-    throw new Error("宿主不支持创建工作区");
+  let workspaceId = currentWorkspaceId(ctx);
+  if (!workspaceId) {
+    let workspace: any;
+    if (typeof ctx?.workspaces?.initializeDefault === "function") {
+      workspace = await ctx.workspaces.initializeDefault();
+    } else if (typeof ctx?.workspaces?.create === "function") {
+      const snapshot = ctx.sessions?.list?.getSnapshot?.();
+      const id = currentSessionOf(snapshot);
+      const cwd = snapshot?.byId?.[id]?.cwd;
+      if (!cwd) throw new Error("当前会话没有可用于新建会话的工作目录");
+      workspace = await ctx.workspaces.create({ path: cwd });
+    } else {
+      throw new Error("宿主不支持创建工作区");
+    }
+    workspaceId = typeof workspace?.workspaceId === "string" && workspace.workspaceId ? workspace.workspaceId : undefined;
   }
-  if (typeof workspace?.workspaceId !== "string" || !workspace.workspaceId || typeof ctx?.sessions?.create !== "function") {
-    throw new Error("无法为新会话取得工作区");
-  }
-  return ctx.sessions.create({ workspaceId: workspace.workspaceId });
+  if (!workspaceId) throw new Error("无法为新会话取得工作区");
+  // uiWorkspace 会复用这个工作区里还没发过消息的空白会话，和点「New Session」一样
+  const ui = typeof ctx?.get === "function" ? ctx.get("uiWorkspace") : undefined;
+  if (typeof ui?.connectWorkspace === "function") return ui.connectWorkspace(workspaceId);
+  if (typeof ctx?.sessions?.create !== "function") throw new Error("宿主不支持新建会话");
+  return ctx.sessions.create({ workspaceId });
 }
 
 function checkSendResult(result: any) {

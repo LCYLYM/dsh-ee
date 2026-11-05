@@ -14,6 +14,7 @@ import { pluginPath } from "../../components/plugin-card";
 import { LoadState } from "../../components/api-ui";
 import { Badge, Card, CardHeader, PageHeader, Segmented } from "../../components/ui";
 import { PageLink } from "../../lib/menus";
+import { DemoImportCard } from "../../components/demo-import";
 import { useTranslation } from "react-i18next";
 
 const kindOrder: PluginKind[] = ["skill", "connector", "knowledge", "plugin"];
@@ -63,7 +64,7 @@ const DAYS = 14;
 export default function AdminDashboard() {
   const { t } = useTranslation();
   const { settings } = useStore();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const canAudit = can("audit.view");
   const [usageGroup, setUsageGroup] = useState<"user" | "token">("user");
   const stats = useApi(() => api.stats(DAYS, "token"));
@@ -83,6 +84,7 @@ export default function AdminDashboard() {
   return (
     <div>
       <PageHeader title={t("dashboard.title")} desc={[settings.orgName, t("dashboard.desc")].filter(Boolean).join(" · ")} />
+      {user?.is_super && <DemoImportCard />}
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3">
         <ChainPanel

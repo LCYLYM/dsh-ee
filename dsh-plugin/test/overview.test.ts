@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readEnterpriseOverview } from "../src/overview.js";
+import { overviewFailure, readEnterpriseOverview } from "../src/overview.js";
 
 const config = { version: "1.0.8" } as any;
 
@@ -37,4 +37,12 @@ test("额度或诊断不可用时仍返回账号和可用模型", async () => {
   assert.equal(result.usage, undefined);
   assert.deepEqual(result.models, ["chat"]);
   assert.equal(result.version, "1.0.8");
+});
+
+test("读不到账号时区分未登录、服务端错误与连不上", () => {
+  assert.equal(overviewFailure(config, new Error("HTTP 401")).reason, "auth");
+  assert.equal(overviewFailure(config, new Error("HTTP 502")).reason, "server");
+  const refused = overviewFailure(config, Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } }));
+  assert.deepEqual(refused, { reason: "unreachable", base: config.base, detail: "ECONNREFUSED" });
+  assert.equal(overviewFailure(config, new DOMException("The operation was aborted due to timeout", "TimeoutError")).detail, "连接超时");
 });

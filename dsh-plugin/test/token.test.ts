@@ -88,3 +88,27 @@ test("npmrc 写进 profile 目录：保留其它行，替换令牌，补上作�
   assert.equal(await tokens.syncNpmrc("new"), false, "内容没变不应重写");
   assert.equal(fs.existsSync(path.join(home, ".npmrc")), false);
 });
+
+test("凭据库可用时令牌只进凭据库，不写明文文件和 .env", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "ee-token-store-"));
+  process.env.DSH_HOME = home;
+  const ctx = context();
+  const tokens = new TokenManager(ctx as any, normalizeConfig({ base: "http://localhost" }));
+  fs.mkdirSync(path.dirname(tokens.tokenPath()), { recursive: true });
+  fs.writeFileSync(tokens.tokenPath(), "ee_at_stale\n");
+  await tokens.set("ee_at_store");
+  assert.equal(ctx.values.get("DSHEE_TOKEN"), "ee_at_store");
+  assert.equal(fs.existsSync(tokens.tokenPath()), false, "旧的兜底文件应删掉");
+  assert.equal(fs.existsSync(tokens.envPath()), false, "不应写 .env");
+  assert.equal((await tokens.resolve())?.value, "ee_at_store");
+});
+
+test("凭据库写入失败时才落本地文件与 .env", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "ee-token-broken-"));
+  process.env.DSH_HOME = home;
+  const ctx = { get: () => ({ async set() { throw new Error("locked"); }, async resolve() { return undefined; }, async unset() {} }) };
+  const tokens = new TokenManager(ctx as any, normalizeConfig({ base: "http://localhost" }));
+  await tokens.set("ee_at_fallback");
+  assert.equal((await tokens.resolve())?.value, "ee_at_fallback");
+  assert.match(fs.readFileSync(tokens.envPath(), "utf8"), /DSHEE_TOKEN=ee_at_fallback/);
+});

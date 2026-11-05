@@ -60,7 +60,7 @@ export async function runLocalDoctor(ctx: DshContext, config: PluginConfig, toke
     }
   } catch {
     reachable = false;
-    add({ id: "token", status: "fail", title: `连不上 dsh-ee（${config.base}）`, fix: "检查网络或 VPN；dsh-ee 重启时稍等再试" });
+    add({ id: "token", status: "fail", title: `连不上 dsh-ee（${config.base}）`, fix: "检查网络或 VPN；地址不对的话在 DSH 的「设置 → dsh-ee」里改成浏览器能打开的 dsh-ee 地址并测试" });
   }
 
   // npm 源令牌

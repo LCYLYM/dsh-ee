@@ -158,6 +158,17 @@ func (s *Store) GetKBase(ctx context.Context, id int64) (*KBase, error) {
 	return b, nil
 }
 
+// GetKBaseBySlug 按标识取知识库（带文档数）。
+func (s *Store) GetKBaseBySlug(ctx context.Context, slug string) (*KBase, error) {
+	var n int
+	b, err := scanKBase(s.db.QueryRowContext(ctx, "SELECT "+kbaseCols+", (SELECT COUNT(*) FROM kb_docs d WHERE d.base_id = b.id) FROM kb_bases b WHERE b.slug = ?", slug), &n)
+	if err != nil {
+		return nil, err
+	}
+	b.Docs = n
+	return b, nil
+}
+
 // ListKBases 列出全部知识库（带文档数），按标题排序。
 func (s *Store) ListKBases(ctx context.Context) ([]*KBase, error) {
 	rows, err := s.db.QueryContext(ctx, "SELECT "+kbaseCols+", (SELECT COUNT(*) FROM kb_docs d WHERE d.base_id = b.id) FROM kb_bases b ORDER BY b.title, b.id")

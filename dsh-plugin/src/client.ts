@@ -2,10 +2,11 @@ import { createElement, useEffect, useState } from "react";
 import { createTypertRemoteInfo } from "@deepseek-ai/dsh-typert-protocol";
 import { z } from "zod";
 import { brandMark, brandName, type BrandViewData } from "./brand-view.js";
-import type { EnterpriseOverview } from "./overview.js";
+import type { EnterpriseOverview, OverviewFailure } from "./overview.js";
 import { enterpriseHeader, enterprisePanel, enterpriseTabId, registerEnterpriseStatus, type DoctorViewData } from "./status-view.js";
 import { registerApps } from "./apps-client.js";
 import { registerWorkbench } from "./workbench-client.js";
+import { registerServerSettings } from "./settings-view.js";
 
 export const inject = ["slots", "remote", "sidebarRightTabs", "sidebarRight", "sessions", "conversation", "workspaces"];
 
@@ -31,6 +32,9 @@ const clientRemote = createTypertRemoteInfo({
     "dshEE/overview": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/login": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/doctor": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
+    "dshEE/serverSettings": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
+    "dshEE/testServer": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
+    "dshEE/saveServer": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
   },
 }, z);
 
@@ -50,6 +54,7 @@ function unwrapRemote(result: any): any {
 interface OverviewSnapshot {
   data?: EnterpriseOverview;
   failed: boolean;
+  failure?: OverviewFailure;
   busy: boolean;
 }
 
@@ -72,9 +77,9 @@ function createOverviewStore(remote: any) {
         remote.overview(),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error("读取企业账号超时")), OVERVIEW_TIMEOUT_MS)),
       ]));
-      update(data?.me ? { data, failed: false } : { failed: true });
+      update(data?.me ? { data, failed: false, failure: undefined } : { failed: true, failure: data?.failure });
     } catch {
-      update({ failed: true });
+      update({ failed: true, failure: undefined });
     } finally {
       inflight = false;
       update({ busy: false });
@@ -91,7 +96,7 @@ function createOverviewStore(remote: any) {
     }, []);
     return { ...local, hasData: () => !!snapshot.data, setBusy: (busy: boolean) => update({ busy }), refresh };
   };
-  return { use };
+  return { use, refresh };
 }
 
 export async function apply(ctx: any): Promise<void> {
@@ -99,6 +104,8 @@ export async function apply(ctx: any): Promise<void> {
   ctx.inject(["remote.dshEE"], async (remoteCtx: any) => {
     const remote = remoteCtx.remote.dshEE;
     const overview = createOverviewStore(remote);
+    // 设置页不等品牌：连不上 dsh-ee 时正是要靠它改地址
+    registerServerSettings(ctx, { createElement, useState: useState as any, useEffect, remote, unwrapRemote, label: "dsh-ee", onSaved: () => void overview.refresh() });
     const useOverview = (_remote?: any) => overview.use();
     const apps = registerApps(ctx, remote, useOverview, unwrapRemote);
     const { AppsPanel } = apps;

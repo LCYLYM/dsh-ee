@@ -34,6 +34,8 @@ type Options struct {
 	DataDir string
 	// 对外地址，用于生成 tarball 下载地址；为空时按请求推断。
 	PublicURL string
+	// 监听地址；示例里的演示差旅系统连接从这里访问 dsh-ee 自己。为空时用请求的 Host。
+	Addr string
 	// 管理模式里「小时」的长度，默认 1 小时；只给自动化测试缩短用。
 	AdminModeUnit time.Duration
 	// 访问上游 npm registry 与 dshfind 目录的客户端；测试里可替换。
@@ -59,6 +61,8 @@ type Server struct {
 	hub hubBroker
 	// 上游 MCP 连接的缓存，按资产 id
 	conns connClients
+	// 示例内容里演示差旅系统的内存数据
+	demo demoTravel
 	// 设置或模型变化后触发接入插件检查
 	connectKick chan struct{}
 	connectMu   sync.Mutex

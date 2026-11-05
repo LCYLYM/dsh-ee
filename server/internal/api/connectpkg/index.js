@@ -122,14 +122,19 @@ var TokenManager = class {
     return void 0;
   }
   async set(value) {
+    const credentials = this.ctx.get("credentials");
+    if (typeof credentials?.set === "function") {
+      try {
+        await credentials.set(this.config.tokenRef, value);
+        fs.rmSync(this.tokenPath(), { force: true });
+        return;
+      } catch {
+      }
+    }
     const file = this.tokenPath();
-    fs.mkdirSync(path2.dirname(file), { recursive: true });
+    fs.mkdirSync(path2.dirname(file), { recursive: true, mode: 448 });
     fs.writeFileSync(file, `${value}
 `, { mode: 384 });
-    try {
-      await this.ctx.get("credentials")?.set(this.config.tokenRef, value);
-    } catch {
-    }
     this.writeEnvToken(value);
   }
   async unset(expected) {
@@ -209,7 +214,7 @@ var HttpClient = class {
   constructor(tokens) {
     this.tokens = tokens;
   }
-  async fetch(path6, init = {}, timeoutMs = 3e4) {
+  async fetch(path7, init = {}, timeoutMs = 3e4) {
     const current = await this.tokens.resolve();
     const headers = new Headers(init.headers);
     if (current?.value) headers.set("Authorization", `Bearer ${current.value}`);
@@ -218,15 +223,15 @@ var HttpClient = class {
     if (!headers.has("X-DshEE-Host")) headers.set("X-DshEE-Host", dshHost());
     const timeout = timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : void 0;
     const signal = init.signal && timeout ? AbortSignal.any([init.signal, timeout]) : timeout ?? init.signal ?? void 0;
-    const response = await fetch(`${config.base}${path6}`, { ...init, headers, signal });
+    const response = await fetch(`${config.base}${path7}`, { ...init, headers, signal });
     if (response.status === 401 && current?.value) {
       const body = await response.clone().json().catch(() => null);
       if (body?.code?.startsWith("token_")) await this.tokens.invalidate(current.value);
     }
     return response;
   }
-  async json(path6, init) {
-    const response = await this.fetch(path6, init);
+  async json(path7, init) {
+    const response = await this.fetch(path7, init);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   }
@@ -658,6 +663,12 @@ ${canonArgs(args)}`, body.preview);
   wake() {
     this.wakeUp?.();
   }
+  /** 换了 dsh-ee 地址：断开旧的长连接和会话，连到新地址重新同步；已注册的工具留着，由同步增删。 */
+  async restart() {
+    this.controller?.abort();
+    this.session = "";
+    await this.start();
+  }
   stop() {
     this.controller?.abort();
     for (const dispose of this.disposers.values()) dispose();
@@ -738,7 +749,7 @@ async function runLocalDoctor(ctx, config, tokens, http, bridge, bindings) {
     }
   } catch {
     reachable = false;
-    add({ id: "token", status: "fail", title: `\u8FDE\u4E0D\u4E0A dsh-ee\uFF08${config.base}\uFF09`, fix: "\u68C0\u67E5\u7F51\u7EDC\u6216 VPN\uFF1Bdsh-ee \u91CD\u542F\u65F6\u7A0D\u7B49\u518D\u8BD5" });
+    add({ id: "token", status: "fail", title: `\u8FDE\u4E0D\u4E0A dsh-ee\uFF08${config.base}\uFF09`, fix: "\u68C0\u67E5\u7F51\u7EDC\u6216 VPN\uFF1B\u5730\u5740\u4E0D\u5BF9\u7684\u8BDD\u5728 DSH \u7684\u300C\u8BBE\u7F6E \u2192 dsh-ee\u300D\u91CC\u6539\u6210\u6D4F\u89C8\u5668\u80FD\u6253\u5F00\u7684 dsh-ee \u5730\u5740\u5E76\u6D4B\u8BD5" });
   }
   const npmrc = npmrcState(ctx, config, current.value);
   add(npmrc === "ok" ? { id: "npmrc", status: "ok", title: "DSH \u7684 .npmrc \u91CC\u4F01\u4E1A\u6E90\u914D\u7F6E\u4E0E\u5F53\u524D\u767B\u5F55\u4E00\u81F4", detail: npmrcPath(ctx) } : {
@@ -1125,26 +1136,26 @@ function createCallable(name2, proto, tracker) {
   defineProperty(self, "name", name2);
   return Object.setPrototypeOf(self, proto);
 }
-function handleError(info, reason, getOuterStack) {
+function handleError(info, reason2, getOuterStack) {
   const innerLines = info.error.stack.split("\n");
-  if (typeof reason?.stack !== "string") {
-    const outerError = new Error(reason);
+  if (typeof reason2?.stack !== "string") {
+    const outerError = new Error(reason2);
     const lines2 = outerError.stack.split("\n");
     lines2.splice(1, Infinity, ...getOuterStack());
     outerError.stack = lines2.join("\n");
     throw outerError;
   }
-  const lines = reason.stack.split("\n");
+  const lines = reason2.stack.split("\n");
   let index = lines.indexOf(innerLines[2]);
-  if (index === -1) throw reason;
+  if (index === -1) throw reason2;
   index -= info.offset;
   while (index > 0) {
     if (!lines[index - 1].endsWith(" (<anonymous>)")) break;
     index -= 1;
   }
   lines.splice(index, Infinity, ...getOuterStack());
-  reason.stack = lines.join("\n");
-  throw reason;
+  reason2.stack = lines.join("\n");
+  throw reason2;
 }
 function composeError(callback, getOuterStack = buildOuterStack()) {
   const info = {
@@ -1153,10 +1164,10 @@ function composeError(callback, getOuterStack = buildOuterStack()) {
   };
   try {
     const result = callback(info);
-    if (isObject(result) && "then" in result) return result.then(void 0, (reason) => handleError(info, reason, getOuterStack));
+    if (isObject(result) && "then" in result) return result.then(void 0, (reason2) => handleError(info, reason2, getOuterStack));
     else return result;
-  } catch (reason) {
-    handleError(info, reason, getOuterStack);
+  } catch (reason2) {
+    handleError(info, reason2, getOuterStack);
   }
 }
 function buildOuterStack(offset = 0) {
@@ -1994,7 +2005,7 @@ var Fiber = class {
       try {
         this.context.emit("internal/plugin", this);
       } catch (error) {
-        Promise.resolve(this.dispose()).catch((reason) => this.ctx.logger.error(reason));
+        Promise.resolve(this.dispose()).catch((reason2) => this.ctx.logger.error(reason2));
         throw error;
       }
       if (this.uid !== null && parent.fiber.state !== 5) {
@@ -2117,9 +2128,9 @@ var Fiber = class {
       return setupBarrier;
     };
     const disposeAfter = (setup) => {
-      return Promise.resolve(setup).then(() => dispose(), async (reason) => {
+      return Promise.resolve(setup).then(() => dispose(), async (reason2) => {
         await dispose();
-        throw reason;
+        throw reason2;
       });
     };
     const finalizeDisposal = (callback) => {
@@ -2152,7 +2163,7 @@ var Fiber = class {
     removeWrapper = this._disposables.push(wrapper);
     try {
       task = this._execute(runner);
-    } catch (reason) {
+    } catch (reason2) {
       executing = false;
       setupFailed = true;
       runner.epoch = false;
@@ -2160,10 +2171,10 @@ var Fiber = class {
       try {
         cleanup = finalizeDisposal(dispose);
       } finally {
-        rejectSetup?.(reason);
+        rejectSetup?.(reason2);
       }
       if (isObject(cleanup) && "then" in cleanup) cleanup.catch((error) => this.ctx.logger.error(error));
-      throw reason;
+      throw reason2;
     }
     executing = false;
     if (setupBarrier) Promise.resolve(task).then(resolveSetup, rejectSetup);
@@ -2284,9 +2295,9 @@ var Fiber = class {
         await this._execute(this._runner);
         this._error = void 0;
       }
-    } catch (reason) {
-      this.ctx.logger.error(reason);
-      this._error = reason;
+    } catch (reason2) {
+      this.ctx.logger.error(reason2);
+      this._error = reason2;
       this._runner.epoch = INACTIVE;
     }
     this._updateState(() => {
@@ -2305,8 +2316,8 @@ var Fiber = class {
           info.error = /* @__PURE__ */ new Error();
           await runDisposable(dispose);
         }, this._runner.getOuterStack);
-      } catch (reason) {
-        this.ctx.logger.error(reason);
+      } catch (reason2) {
+        this.ctx.logger.error(reason2);
       }
     }));
     this.store = void 0;
@@ -2841,8 +2852,8 @@ function validateName(subject, value) {
 }
 
 // src/brand.ts
-var _doctor_dec, _login_dec, _overview_dec, _kbDoc_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
-var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _kbDoc_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _a) {
+var _saveServer_dec, _testServer_dec, _serverSettings_dec, _doctor_dec, _login_dec, _overview_dec, _kbDoc_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
+var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _kbDoc_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _serverSettings_dec = [Remote], _testServer_dec = [Remote], _saveServer_dec = [Remote], _a) {
   constructor(ctx, actions) {
     super(ctx, "dshEE");
     this.actions = actions;
@@ -2890,6 +2901,15 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
   async doctor() {
     return this.actions.doctor();
   }
+  async serverSettings() {
+    return this.actions.serverSettings();
+  }
+  async testServer(request) {
+    return this.actions.testServer(request ?? {});
+  }
+  async saveServer(request) {
+    return this.actions.saveServer(request ?? {});
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "brand", _brand_dec, DshEEClientService);
@@ -2906,12 +2926,23 @@ __decorateElement(_init, 1, "kbDoc", _kbDoc_dec, DshEEClientService);
 __decorateElement(_init, 1, "overview", _overview_dec, DshEEClientService);
 __decorateElement(_init, 1, "login", _login_dec, DshEEClientService);
 __decorateElement(_init, 1, "doctor", _doctor_dec, DshEEClientService);
+__decorateElement(_init, 1, "serverSettings", _serverSettings_dec, DshEEClientService);
+__decorateElement(_init, 1, "testServer", _testServer_dec, DshEEClientService);
+__decorateElement(_init, 1, "saveServer", _saveServer_dec, DshEEClientService);
 __decoratorMetadata(_init, DshEEClientService);
 function registerBrand(ctx, actions) {
   return new DshEEClientService(ctx, actions);
 }
 
 // src/overview.ts
+function overviewFailure(config, error) {
+  const err = error;
+  const message = String(err?.message ?? error);
+  if (message === "HTTP 401") return { reason: "auth", base: config.base, detail: message };
+  if (/^HTTP \d+$/.test(message)) return { reason: "server", base: config.base, detail: message };
+  const detail = err?.name === "TimeoutError" ? "\u8FDE\u63A5\u8D85\u65F6" : err?.cause?.code || err?.cause?.message || message;
+  return { reason: "unreachable", base: config.base, detail };
+}
 async function bridgeJson(bridge, name2, args) {
   const result = await bridge.callTool(name2, args);
   if (result?.isError) throw new Error("\u4F01\u4E1A\u5DE5\u5177\u8C03\u7528\u5931\u8D25");
@@ -2937,10 +2968,122 @@ async function readEnterpriseOverview(config, http, bridge) {
   };
 }
 
-// src/upload.ts
+// src/server-settings.ts
 import fs2 from "node:fs";
-import os3 from "node:os";
 import path3 from "node:path";
+function serverSettingsPath() {
+  return path3.join(dshHome(), "dsh-ee", "server.json");
+}
+function normalizeBase(input) {
+  const raw = String(input ?? "").trim().replace(/\/+$/, "");
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:" || !url.host || url.username || url.password || url.search || url.hash) return void 0;
+    return raw;
+  } catch {
+    return void 0;
+  }
+}
+function readBaseOverride() {
+  try {
+    const data = JSON.parse(fs2.readFileSync(serverSettingsPath(), "utf8"));
+    return normalizeBase(data.base);
+  } catch {
+    return void 0;
+  }
+}
+function writeBaseOverride(base) {
+  const file = serverSettingsPath();
+  if (!base) {
+    fs2.rmSync(file, { force: true });
+    return;
+  }
+  fs2.mkdirSync(path3.dirname(file), { recursive: true, mode: 448 });
+  fs2.writeFileSync(file, `${JSON.stringify({ base }, null, 2)}
+`, { mode: 384 });
+}
+function reason(error) {
+  const err = error;
+  if (err?.name === "TimeoutError") return "\u8FDE\u63A5\u8D85\u65F6\uFF1A\u8FD9\u53F0\u7535\u8111\u8BBF\u95EE\u4E0D\u5230\u8FD9\u4E2A\u5730\u5740\uFF08\u5185\u7F51\u5730\u5740\u3001VPN \u6CA1\u8FDE\uFF0C\u6216\u8005\u88AB\u9632\u706B\u5899\u6321\u4F4F\uFF09";
+  const code = err?.cause?.code;
+  if (code === "ECONNREFUSED") return "\u8FDE\u63A5\u88AB\u62D2\u7EDD\uFF1A\u5730\u5740\u80FD\u627E\u5230\uFF0C\u4F46\u8FD9\u4E2A\u7AEF\u53E3\u4E0A\u6CA1\u6709\u670D\u52A1";
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") return "\u627E\u4E0D\u5230\u8FD9\u4E2A\u57DF\u540D\uFF1A\u68C0\u67E5\u62FC\u5199\uFF0C\u6216\u8005\u662F\u5426\u9700\u8981\u8FDE VPN";
+  if (code === "CERT_HAS_EXPIRED" || code?.startsWith?.("ERR_TLS") || code?.includes?.("CERT")) return `HTTPS \u8BC1\u4E66\u6709\u95EE\u9898\uFF08${code}\uFF09`;
+  return code || err?.cause?.message || err?.message || String(error);
+}
+var ServerSettingsService = class {
+  constructor(config, tokens, onChange, timeoutMs = 8e3) {
+    this.config = config;
+    this.tokens = tokens;
+    this.onChange = onChange;
+    this.timeoutMs = timeoutMs;
+    this.packaged = config.base;
+    const override = readBaseOverride();
+    if (override) config.base = override;
+  }
+  packaged;
+  read() {
+    return { base: this.config.base, packaged: this.packaged, overridden: this.config.base !== this.packaged, org: this.config.org, version: this.config.version };
+  }
+  /** 按顺序测：地址格式、能不能连上、是不是 dsh-ee、本机的登录在这台 dsh-ee 上还有没有效。 */
+  async test(input) {
+    const base = input === void 0 || input === "" ? this.config.base : normalizeBase(input);
+    const checks = [];
+    const done = (b) => ({ base: b, ok: checks.every((c) => c.ok), checks });
+    if (!base) {
+      checks.push({ id: "address", ok: false, title: "\u5730\u5740\u683C\u5F0F\u4E0D\u5BF9", detail: "\u8981\u5199\u5B8C\u6574\u7684 http:// \u6216 https:// \u5730\u5740\uFF0C\u4F8B\u5982 https://ee.example.com\uFF0C\u4E0D\u8981\u5E26\u8DEF\u5F84\u4EE5\u5916\u7684\u53C2\u6570" });
+      return done(String(input ?? ""));
+    }
+    const started = Date.now();
+    let health;
+    try {
+      health = await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(this.timeoutMs) });
+    } catch (error) {
+      checks.push({ id: "reach", ok: false, title: "\u8FDE\u4E0D\u4E0A", detail: reason(error) });
+      return done(base);
+    }
+    checks.push({ id: "reach", ok: true, title: `\u80FD\u8FDE\u4E0A\uFF08${Date.now() - started} ms\uFF09` });
+    const body = await health.json().catch(() => null);
+    if (!health.ok || body?.status !== "ok") {
+      checks.push({ id: "server", ok: false, title: "\u8FD9\u4E2A\u5730\u5740\u4E0A\u4E0D\u662F dsh-ee", detail: `\u8BBF\u95EE /healthz \u8FD4\u56DE HTTP ${health.status}\uFF1B\u786E\u8BA4\u5730\u5740\u662F dsh-ee \u7F51\u9875\u7684\u5730\u5740` });
+      return done(base);
+    }
+    checks.push({ id: "server", ok: true, title: `\u662F dsh-ee${body.version ? `\uFF08${body.version}\uFF09` : ""}` });
+    const current = await this.tokens.resolve();
+    if (!current?.value) {
+      checks.push({ id: "login", ok: false, title: "\u8FD9\u53F0\u7535\u8111\u8FD8\u6CA1\u6709\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7", detail: "\u4FDD\u5B58\u5730\u5740\u540E\uFF0C\u5728\u4FA7\u680F\u4F01\u4E1A\u9762\u677F\u70B9\u300C\u767B\u5F55\u300D\uFF0C\u6216\u5728\u5BF9\u8BDD\u6846\u8F93\u5165 /ee-login" });
+      return done(base);
+    }
+    try {
+      const me = await fetch(`${base}/api/dsh/whoami`, { headers: { Authorization: `Bearer ${current.value}` }, signal: AbortSignal.timeout(this.timeoutMs) });
+      if (me.ok) {
+        const who = await me.json();
+        checks.push({ id: "login", ok: true, title: `\u5DF2\u767B\u5F55 ${who.username ?? ""}${who.department ? `\uFF08${who.department}\uFF09` : ""}` });
+      } else {
+        checks.push({ id: "login", ok: false, title: "\u672C\u673A\u7684\u767B\u5F55\u5728\u8FD9\u53F0 dsh-ee \u4E0A\u65E0\u6548", detail: "\u4FDD\u5B58\u5730\u5740\u540E\u91CD\u65B0\u767B\u5F55\u5373\u53EF\uFF08\u4EE4\u724C\u662F\u6309 dsh-ee \u53D1\u7684\uFF0C\u6362\u4E86\u670D\u52A1\u5668\u8981\u91CD\u65B0\u767B\u5F55\uFF09" });
+      }
+    } catch (error) {
+      checks.push({ id: "login", ok: false, title: "\u68C0\u67E5\u767B\u5F55\u5931\u8D25", detail: reason(error) });
+    }
+    return done(base);
+  }
+  /** 保存地址并立即生效；传空或与插件包里的一样就恢复默认。 */
+  async save(input) {
+    const base = input === void 0 || input === null || input === "" ? this.packaged : normalizeBase(input);
+    if (!base) throw new Error("\u5730\u5740\u683C\u5F0F\u4E0D\u5BF9\uFF1A\u8981\u5199\u5B8C\u6574\u7684 http:// \u6216 https:// \u5730\u5740");
+    writeBaseOverride(base === this.packaged ? void 0 : base);
+    if (base !== this.config.base) {
+      this.config.base = base;
+      await this.onChange();
+    }
+    return this.read();
+  }
+};
+
+// src/upload.ts
+import fs3 from "node:fs";
+import os3 from "node:os";
+import path4 from "node:path";
 var MAX_BYTES = 128 * 1024 * 1024;
 function fail(text) {
   return { content: [{ type: "text", text }], isError: true };
@@ -2948,11 +3091,11 @@ function fail(text) {
 async function uploadPackage(http, args) {
   const raw = String(args.path ?? "").trim();
   if (!raw) return fail("\u7F3A\u5C11 path\uFF1A.tgz \u6587\u4EF6\u7684\u672C\u673A\u8DEF\u5F84");
-  const file = path3.resolve(raw.startsWith("~") ? path3.join(os3.homedir(), raw.slice(1)) : raw);
+  const file = path4.resolve(raw.startsWith("~") ? path4.join(os3.homedir(), raw.slice(1)) : raw);
   if (!/\.(tgz|tar\.gz)$/i.test(file)) return fail("\u53EA\u80FD\u4E0A\u4F20 npm pack \u751F\u6210\u7684 .tgz \u6587\u4EF6");
   let stat;
   try {
-    stat = fs2.statSync(file);
+    stat = fs3.statSync(file);
   } catch {
     return fail(`\u627E\u4E0D\u5230\u6587\u4EF6\uFF1A${file}`);
   }
@@ -2963,7 +3106,7 @@ async function uploadPackage(http, args) {
     response = await http.fetch("/api/agent/packages", {
       method: "POST",
       headers: { "content-type": "application/octet-stream" },
-      body: fs2.readFileSync(file)
+      body: fs3.readFileSync(file)
     });
   } catch {
     return fail("\u8FDE\u4E0D\u4E0A dsh-ee\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u6216 VPN");
@@ -2974,10 +3117,10 @@ async function uploadPackage(http, args) {
 }
 
 // src/app-bindings.ts
-import fs3 from "node:fs";
-import path4 from "node:path";
+import fs4 from "node:fs";
+import path5 from "node:path";
 var AppBindings = class {
-  constructor(file = path4.join(dshHome(), "dsh-ee", "apps.json")) {
+  constructor(file = path5.join(dshHome(), "dsh-ee", "apps.json")) {
     this.file = file;
   }
   sequence = 0;
@@ -3005,9 +3148,9 @@ var AppBindings = class {
   }
   read() {
     this.warningMessage = "";
-    if (!fs3.existsSync(this.file)) return { version: 1, bindings: {} };
+    if (!fs4.existsSync(this.file)) return { version: 1, bindings: {} };
     try {
-      const value = JSON.parse(fs3.readFileSync(this.file, "utf8"));
+      const value = JSON.parse(fs4.readFileSync(this.file, "utf8"));
       if (value?.version !== 1 || !value.bindings || typeof value.bindings !== "object" || Array.isArray(value.bindings)) throw new Error("invalid");
       const bindings = {};
       for (const [name2, binding] of Object.entries(value.bindings)) {
@@ -3022,15 +3165,15 @@ var AppBindings = class {
     }
   }
   write(bindings) {
-    fs3.mkdirSync(path4.dirname(this.file), { recursive: true, mode: 448 });
+    fs4.mkdirSync(path5.dirname(this.file), { recursive: true, mode: 448 });
     const temp = `${this.file}.${process.pid}.${++this.sequence}.tmp`;
     try {
-      fs3.writeFileSync(temp, JSON.stringify({ version: 1, bindings }, null, 2) + "\n", { mode: 384 });
-      fs3.renameSync(temp, this.file);
-      fs3.chmodSync(this.file, 384);
+      fs4.writeFileSync(temp, JSON.stringify({ version: 1, bindings }, null, 2) + "\n", { mode: 384 });
+      fs4.renameSync(temp, this.file);
+      fs4.chmodSync(this.file, 384);
       this.warningMessage = "";
     } finally {
-      if (fs3.existsSync(temp)) fs3.unlinkSync(temp);
+      if (fs4.existsSync(temp)) fs4.unlinkSync(temp);
     }
   }
 };
@@ -3051,8 +3194,8 @@ async function setAppSubscription(http, name2, enabled) {
 }
 
 // src/workbench-host.ts
-import fs4 from "node:fs";
-import path5 from "node:path";
+import fs5 from "node:fs";
+import path6 from "node:path";
 import { createHash } from "node:crypto";
 
 // src/workbench.ts
@@ -3176,7 +3319,7 @@ async function verifyCitations(tools, blocks) {
 }
 var safeName = /^[A-Za-z0-9_-]{1,80}$/;
 var BoardStore = class {
-  constructor(dir = path5.join(dshHome(), "dsh-ee", "boards")) {
+  constructor(dir = path6.join(dshHome(), "dsh-ee", "boards")) {
     this.dir = dir;
   }
   sequence = 0;
@@ -3184,11 +3327,11 @@ var BoardStore = class {
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(app) || app.length > 48) throw new Error("\u5FAE\u5E94\u7528\u540D\u4E0D\u5408\u6CD5");
     if (typeof sessionId !== "string" || !sessionId) throw new Error("\u4F1A\u8BDD id \u4E0D\u5408\u6CD5");
     const session = safeName.test(sessionId) ? sessionId : createHash("sha256").update(sessionId).digest("hex").slice(0, 32);
-    return path5.join(this.dir, `${app}--${session}.json`);
+    return path6.join(this.dir, `${app}--${session}.json`);
   }
   read(app, sessionId) {
     try {
-      const value = JSON.parse(fs4.readFileSync(this.file(app, sessionId), "utf8"));
+      const value = JSON.parse(fs5.readFileSync(this.file(app, sessionId), "utf8"));
       if (value?.app !== app || value?.sessionId !== sessionId || !Array.isArray(value?.blocks)) return void 0;
       return value;
     } catch {
@@ -3198,13 +3341,13 @@ var BoardStore = class {
   write(app, sessionId, blocks) {
     const file = this.file(app, sessionId);
     const board = { app, sessionId, updatedAt: (/* @__PURE__ */ new Date()).toISOString(), blocks };
-    fs4.mkdirSync(this.dir, { recursive: true, mode: 448 });
+    fs5.mkdirSync(this.dir, { recursive: true, mode: 448 });
     const temp = `${file}.${process.pid}.${++this.sequence}.tmp`;
     try {
-      fs4.writeFileSync(temp, JSON.stringify(board) + "\n", { mode: 384 });
-      fs4.renameSync(temp, file);
+      fs5.writeFileSync(temp, JSON.stringify(board) + "\n", { mode: 384 });
+      fs5.renameSync(temp, file);
     } finally {
-      if (fs4.existsSync(temp)) fs4.unlinkSync(temp);
+      if (fs5.existsSync(temp)) fs5.unlinkSync(temp);
     }
     return board;
   }
@@ -3295,6 +3438,13 @@ function apply(ctx, input) {
   const tokens = new TokenManager(ctx, config);
   const http = new HttpClient(tokens);
   const bridge = new McpBridge(ctx, config, http);
+  let refreshSkills;
+  const server = new ServerSettingsService(config, tokens, async () => {
+    const current = await tokens.resolve();
+    if (current?.value) await tokens.syncNpmrc(current.value).catch(() => false);
+    await bridge.restart();
+    await refreshSkills?.().catch(() => void 0);
+  });
   bridge.registerLocal("ee_plugins.upload", (args) => uploadPackage(http, args));
   registerApproval(ctx, bridge);
   ctx.effect(async () => {
@@ -3309,7 +3459,10 @@ function apply(ctx, input) {
     const appBindings = new AppBindings();
     const boards = new BoardStore();
     registerDoctor(ctx, config, tokens, http, bridge, appBindings);
-    const skillsReady = registerSkills(ctx, config, http).then((loaded) => skills = loaded);
+    const skillsReady = registerSkills(ctx, config, http).then((loaded) => {
+      refreshSkills = loaded.refreshNow;
+      return skills = loaded;
+    });
     registerBrand(ctx, {
       readBrand: async () => (await skillsReady).readBrand(),
       readApps: async () => (await skillsReady).readApps(),
@@ -3328,9 +3481,12 @@ function apply(ctx, input) {
       workbenchData: async (request) => readWidgetData(await (await skillsReady).readApps(), bridge, request),
       readBoard: async (request) => boards.read(String(request?.app ?? ""), String(request?.sessionId ?? "")) ?? null,
       readKBDoc: (request) => readKBDoc(bridge, request),
-      readOverview: () => readEnterpriseOverview(config, http, bridge),
+      readOverview: () => readEnterpriseOverview(config, http, bridge).catch((error) => ({ failure: overviewFailure(config, error) })),
       login: () => commands.login(),
-      doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge, appBindings)
+      doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge, appBindings),
+      serverSettings: async () => server.read(),
+      testServer: (request) => server.test(request?.base),
+      saveServer: (request) => server.save(request?.base)
     });
     const disposeWorkbenchTool = registerWorkbenchTool(ctx, {
       boards,

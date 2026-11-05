@@ -78,3 +78,26 @@ test("填入输入框支持 actions 与旧 bail，不发送；服务缺失返回
   assert.deepEqual(additions, ["/app", "/old"]);
   assert.equal(fillInput({ sessions: {}, conversation: {} }, "/none"), false);
 });
+
+test("已有工作区时新会话放进当前会话所在的工作区，不再要求宿主建默认工作区", async () => {
+  const connected: string[] = [];
+  const ctx = {
+    get: (name: string) => (name === "uiWorkspace" ? { connectWorkspace: async (id: string) => { connected.push(id); return "blank-in-" + id; } } : undefined),
+    workspaces: {
+      list: { getSnapshot: () => ({ items: [{ workspaceId: "w1", path: "/a", sessionIds: [] }, { workspaceId: "w2", path: "/b", sessionIds: ["cur"] }] }) },
+      initializeDefault: async () => { throw new Error("0.2.2 已有工作区时不该再调"); },
+    },
+    sessions: { list: { getSnapshot: () => ({ current: "cur", byId: { cur: { cwd: "/b" } } }) } },
+  };
+  assert.equal(await createSession(ctx), "blank-in-w2");
+  // 没有当前会话：用第一个工作区，没有 uiWorkspace 时直接建会话
+  const created: any[] = [];
+  const id = await createSession({
+    workspaces: { list: { getSnapshot: () => ({ items: [{ workspaceId: "w1", path: "/a", sessionIds: [] }] }) }, initializeDefault: async () => undefined },
+    sessions: { list: { getSnapshot: () => ({ byId: {} }) }, create: async (options: any) => { created.push(options); return "s-new"; } },
+  });
+  assert.equal(id, "s-new");
+  assert.deepEqual(created, [{ workspaceId: "w1" }]);
+  // 一个工作区都没有、宿主也不肯建默认的：报错，由调用方退回填输入框
+  await assert.rejects(createSession({ workspaces: { list: { getSnapshot: () => ({ items: [] }) }, initializeDefault: async () => undefined }, sessions: { create: async () => "never" } }), /无法为新会话取得工作区/);
+});

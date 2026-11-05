@@ -78,6 +78,7 @@ func run(log *slog.Logger) error {
 		Web:           webui.Handler(),
 		DataDir:       cfg.DataDir,
 		PublicURL:     cfg.PublicURL,
+		Addr:          cfg.Addr,
 		AdminModeUnit: cfg.AdminModeUnit,
 	}, log)
 

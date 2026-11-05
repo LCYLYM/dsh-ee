@@ -76,3 +76,10 @@ test("注册独立企业标签类型、正文和可共存的头部列表项", ()
   assert.equal(registrations[2].id, "dsh-ee-status");
   assert.equal(registrations[2].component, Header);
 });
+
+test("连不上时面板写出地址与原因，未登录时只提示登录", () => {
+  const unreachable = enterprisePanel(createElement, "示例企业", { failed: true, failure: { reason: "unreachable", base: "http://10.0.0.5:8080", detail: "连接超时" } }, actions);
+  assert.match(JSON.stringify(unreachable), /连不上 dsh-ee（http:\/\/10\.0\.0\.5:8080，连接超时）/);
+  const auth = enterprisePanel(createElement, "示例企业", { failed: true, failure: { reason: "auth", base: "http://x", detail: "HTTP 401" } }, actions);
+  assert.match(JSON.stringify(auth), /还没有登录企业账号/);
+});

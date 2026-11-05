@@ -46,14 +46,20 @@ export class TokenManager {
   }
 
   async set(value: string): Promise<void> {
-    const file = this.tokenPath();
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, `${value}\n`, { mode: 0o600 });
-    try {
-      await this.ctx.get("credentials")?.set(this.config.tokenRef, value);
-    } catch {
-      // 凭据库不可用时本地文件与 .env 兜底
+    const credentials = this.ctx.get("credentials");
+    if (typeof credentials?.set === "function") {
+      try {
+        await credentials.set(this.config.tokenRef, value);
+        // 进了凭据库就不留明文副本；以前兜底写下的旧令牌文件一并删掉
+        fs.rmSync(this.tokenPath(), { force: true });
+        return;
+      } catch {
+        // 凭据库写不进去时才落到本地文件与 .env
+      }
     }
+    const file = this.tokenPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(file, `${value}\n`, { mode: 0o600 });
     this.writeEnvToken(value);
   }
 

@@ -202,6 +202,13 @@ export class McpBridge {
     this.wakeUp?.();
   }
 
+  /** 换了 dsh-ee 地址：断开旧的长连接和会话，连到新地址重新同步；已注册的工具留着，由同步增删。 */
+  async restart(): Promise<void> {
+    this.controller?.abort();
+    this.session = "";
+    await this.start();
+  }
+
   stop(): void {
     this.controller?.abort();
     for (const dispose of this.disposers.values()) dispose();

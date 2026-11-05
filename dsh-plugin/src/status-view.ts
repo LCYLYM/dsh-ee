@@ -1,4 +1,4 @@
-import type { EnterpriseOverview, UsageViewData } from "./overview.js";
+import type { EnterpriseOverview, OverviewFailure, UsageViewData } from "./overview.js";
 
 export const enterpriseTabId = "__DSH_EE_PACKAGE__";
 
@@ -10,6 +10,7 @@ export interface DoctorViewData {
 export interface EnterprisePanelState {
   data?: EnterpriseOverview;
   failed: boolean;
+  failure?: OverviewFailure;
   busy?: boolean;
   notice?: string;
   doctor?: DoctorViewData;
@@ -77,13 +78,22 @@ function section(createElement: (...args: any[]) => any, title: string, ...child
   );
 }
 
+function failureText(failure?: OverviewFailure): string {
+  switch (failure?.reason) {
+    case "auth": return "还没有登录企业账号，或登录已失效，请登录。";
+    case "server": return `dsh-ee 返回错误（${failure.detail}），请稍后刷新。`;
+    case "unreachable": return `连不上 dsh-ee（${failure.base}，${failure.detail}）。请确认这台电脑能在浏览器里打开这个地址；地址不对的话，在 DSH 的「设置 → dsh-ee」里改成能打开的地址并测试。`;
+    default: return "未登录或连接不可用，请重新登录。";
+  }
+}
+
 export function enterprisePanel(createElement: (...args: any[]) => any, org: string, state: EnterprisePanelState, actions: EnterprisePanelActions, AppsPanel?: any) {
-  const { data, failed, busy, notice, doctor } = state;
+  const { data, failed, failure, busy, notice, doctor } = state;
   const me = data?.me;
   const quota = effectiveQuota(data?.usage);
   const children: any[] = [createElement("h2", { key: "title", style: { margin: "0 0 16px", fontSize: 16 } }, org)];
   if (!data || !me) {
-    children.push(createElement("p", { key: "state", style: { lineHeight: 1.6 } }, failed ? "未登录或连接不可用，请重新登录。" : "正在读取企业账号…"));
+    children.push(createElement("p", { key: "state", style: { lineHeight: 1.6 } }, failed ? failureText(failure) : "正在读取企业账号…"));
     if (failed) children.push(createElement("div", { key: "actions", style: { display: "flex", gap: 8 } },
       button(createElement, busy ? "正在发起登录…" : "登录", actions.login, busy),
       button(createElement, "刷新", actions.refresh, busy),

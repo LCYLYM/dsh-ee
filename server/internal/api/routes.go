@@ -66,6 +66,11 @@ func (s *Server) routes() []route {
 			writeJSON(w, 200, map[string]string{"status": "ok", "version": s.opts.Version})
 		}),
 
+		// 示例内容里的演示差旅系统，只认示例连接带的密钥
+		pub("GET /demo/travel/summary", s.handleDemoSummary),
+		pub("GET /demo/travel/claims", s.handleDemoClaims),
+		pub("POST /demo/travel/claims", s.handleDemoCreateClaim),
+
 		pub("GET /api/auth/methods", s.handleAuthMethods),
 		pub("POST /api/auth/login", s.handleLogin),
 		pub("POST /api/auth/logout", s.handleLogout),
@@ -101,6 +106,8 @@ func (s *Server) routes() []route {
 		usr("GET /api/me/get-started/{code}", s.handleSetupCodeStatus),
 
 		// 用户（分配额度、分发 key、分配角色的页面也需要列出用户）
+		prm("GET /api/admin/demo", s.handleDemoStatus, rbac.SettingsManage),
+		prm("POST /api/admin/demo", s.handleDemoImport, rbac.SettingsManage),
 		prm("GET /api/admin/users", s.handleListUsers, rbac.UsersView, rbac.UsersManage, rbac.QuotasManage, rbac.KeysManage, rbac.RolesManage),
 		prm("POST /api/admin/users", s.handleCreateUser, rbac.UsersManage),
 		prm("PATCH /api/admin/users/{id}", s.handleUpdateUser, rbac.UsersManage),

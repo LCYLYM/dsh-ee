@@ -193,7 +193,7 @@ export interface PanelState {
 /** 一个业务面板窗格：组件从上到下排列。 */
 export function panelView(h: H, pane: WorkbenchPane, state: PanelState, handlers: PanelHandlers) {
   const widgets = pane.widgets ?? [];
-  return h("div", { "data-dsh-ee-ui": "workbench", style: { display: "grid", gap: 10, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } },
+  return h("div", { "data-dsh-ee-ui": "workbench", style: { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } },
     state.notice ? h("p", { role: "status", style: { margin: 0, fontSize: 12, overflowWrap: "anywhere" } }, state.notice) : null,
     ...widgets.map((widget, index) => {
       const key = `w${index}`;
@@ -234,7 +234,7 @@ export interface DocPaneHandlers {
 
 /** 知识库原文：带行号，引用的几行高亮（data-kb-hit 标在第一行上，方便滚过去）。 */
 export function kbDocView(h: H, target: DocTarget | undefined, state: WidgetState | undefined, handlers: DocPaneHandlers) {
-  const wrap = (...children: any[]) => h("div", { "data-dsh-ee-ui": "kb-doc", style: { display: "grid", gap: 8, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } }, ...children);
+  const wrap = (...children: any[]) => h("div", { "data-dsh-ee-ui": "kb-doc", style: { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } }, ...children);
   if (!target) return wrap(h("div", { style: muted }, "点「答案与出处」里的引用，会在这里打开原文。"));
   const note = stateNote(h, state);
   if (note) return wrap(h("strong", null, target.title || `文档 ${target.doc}`), note);

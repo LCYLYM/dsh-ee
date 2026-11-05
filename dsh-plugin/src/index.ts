@@ -7,7 +7,8 @@ import { McpBridge } from "./bridge.js";
 import { registerApproval } from "./approval.js";
 import { registerDoctor, runLocalDoctor } from "./doctor.js";
 import { registerBrand } from "./brand.js";
-import { readEnterpriseOverview } from "./overview.js";
+import { overviewFailure, readEnterpriseOverview } from "./overview.js";
+import { ServerSettingsService } from "./server-settings.js";
 import { uploadPackage } from "./upload.js";
 import { AppBindings } from "./app-bindings.js";
 import { setAppSubscription } from "./app-subscription.js";
@@ -28,6 +29,14 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
   const tokens = new TokenManager(ctx, config);
   const http = new HttpClient(tokens);
   const bridge = new McpBridge(ctx, config, http);
+  let refreshSkills: (() => Promise<void>) | undefined;
+  // 员工在 DSH 设置里改过地址的话，从这里开始就用改过的地址
+  const server = new ServerSettingsService(config, tokens, async () => {
+    const current = await tokens.resolve();
+    if (current?.value) await tokens.syncNpmrc(current.value).catch(() => false);
+    await bridge.restart();
+    await refreshSkills?.().catch(() => undefined);
+  });
   bridge.registerLocal("ee_plugins.upload", (args) => uploadPackage(http, args));
   registerApproval(ctx, bridge);
 
@@ -44,7 +53,10 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
     const appBindings = new AppBindings();
     const boards = new BoardStore();
     registerDoctor(ctx, config, tokens, http, bridge, appBindings);
-    const skillsReady = registerSkills(ctx, config, http).then((loaded) => (skills = loaded));
+    const skillsReady = registerSkills(ctx, config, http).then((loaded) => {
+      refreshSkills = loaded.refreshNow;
+      return (skills = loaded);
+    });
     registerBrand(ctx, {
       readBrand: async () => (await skillsReady).readBrand(),
       readApps: async () => (await skillsReady).readApps(),
@@ -63,9 +75,12 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
       workbenchData: async (request) => readWidgetData(await (await skillsReady).readApps(), bridge, request),
       readBoard: async (request) => boards.read(String(request?.app ?? ""), String(request?.sessionId ?? "")) ?? null,
       readKBDoc: (request) => readKBDoc(bridge, request),
-      readOverview: () => readEnterpriseOverview(config, http, bridge),
+      readOverview: () => readEnterpriseOverview(config, http, bridge).catch((error) => ({ failure: overviewFailure(config, error) })),
       login: () => commands.login(),
       doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge, appBindings),
+      serverSettings: async () => server.read(),
+      testServer: (request) => server.test(request?.base),
+      saveServer: (request) => server.save(request?.base),
     });
     const disposeWorkbenchTool = registerWorkbenchTool(ctx, {
       boards,
