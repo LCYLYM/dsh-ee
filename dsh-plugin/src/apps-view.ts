@@ -18,6 +18,8 @@ export interface AppsViewActions {
   web: (app: CatalogApp) => void;
   newSession: (app: CatalogApp) => void;
   openWorkbench?: (app: CatalogApp) => void;
+  /** 新建会话并带着这条示例问题开始 */
+  startWith?: (app: CatalogApp, starter: string) => void;
   unbind: (app: CatalogApp) => void;
   toggle: () => void;
   search: (query: string) => void;
@@ -41,6 +43,20 @@ export function appTile(createElement: (...args: any[]) => any, app: CatalogApp,
   createElement("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title));
 }
 
+/** 「⋯」菜单里的示例问题：点一条就新建会话并带着它开始；超长的截断显示，悬停看全文。 */
+function starterItems(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions) {
+  const starters = (app.starters ?? []).filter(Boolean).slice(0, 6);
+  if (!starters.length || !actions.startWith) return [];
+  return [
+    createElement("div", { key: "starters-title", style: { padding: "7px 7px 3px", fontSize: 11, opacity: 0.6, borderTop: "1px solid color-mix(in srgb, currentColor 12%, transparent)", marginTop: 4 } }, "从示例问题开始"),
+    ...starters.map((starter, index) => createElement("button", {
+      key: `starter-${index}`, type: "button", title: starter,
+      style: { ...buttonStyle, display: "block", width: "100%", padding: 7, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+      onClick: () => actions.startWith!(app, starter),
+    }, starter)),
+  ];
+}
+
 function appMenu(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions) {
   return createElement("details", { style: { position: "relative", flex: "0 0 auto" } },
     createElement("summary", { "aria-label": `${app.title}更多操作`, style: { cursor: "pointer", listStyle: "none", padding: "4px 6px" } }, "⋯"),
@@ -49,7 +65,8 @@ function appMenu(createElement: (...args: any[]) => any, app: CatalogApp, action
       app.workbench?.panes?.length && actions.openWorkbench ? createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.openWorkbench!(app) }, "打开工作台") : null,
       createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.fill(app) }, "填进输入框"),
       createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.web(app) }, "在网页查看"),
-      createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.unbind(app) }, "解除绑定")));
+      createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.unbind(app) }, "解除绑定"),
+      ...starterItems(createElement, app, actions)));
 }
 
 function appRow(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions, status?: AppSessionStatus) {

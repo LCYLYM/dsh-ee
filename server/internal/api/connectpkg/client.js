@@ -20112,6 +20112,20 @@ function appTile(createElement4, app, onOpen) {
     createElement4("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title)
   );
 }
+function starterItems(createElement4, app, actions) {
+  const starters = (app.starters ?? []).filter(Boolean).slice(0, 6);
+  if (!starters.length || !actions.startWith) return [];
+  return [
+    createElement4("div", { key: "starters-title", style: { padding: "7px 7px 3px", fontSize: 11, opacity: 0.6, borderTop: "1px solid color-mix(in srgb, currentColor 12%, transparent)", marginTop: 4 } }, "\u4ECE\u793A\u4F8B\u95EE\u9898\u5F00\u59CB"),
+    ...starters.map((starter, index) => createElement4("button", {
+      key: `starter-${index}`,
+      type: "button",
+      title: starter,
+      style: { ...buttonStyle, display: "block", width: "100%", padding: 7, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+      onClick: () => actions.startWith(app, starter)
+    }, starter))
+  ];
+}
 function appMenu(createElement4, app, actions) {
   return createElement4(
     "details",
@@ -20124,7 +20138,8 @@ function appMenu(createElement4, app, actions) {
       app.workbench?.panes?.length && actions.openWorkbench ? createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.openWorkbench(app) }, "\u6253\u5F00\u5DE5\u4F5C\u53F0") : null,
       createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.fill(app) }, "\u586B\u8FDB\u8F93\u5165\u6846"),
       createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.web(app) }, "\u5728\u7F51\u9875\u67E5\u770B"),
-      createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.unbind(app) }, "\u89E3\u9664\u7ED1\u5B9A")
+      createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.unbind(app) }, "\u89E3\u9664\u7ED1\u5B9A"),
+      ...starterItems(createElement4, app, actions)
     )
   );
 }
@@ -20539,6 +20554,9 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     },
     newSession: (app) => {
       void openWithFallback(app, (target) => launcher.launchNew(target)).then(setNotice);
+    },
+    startWith: (app, starter) => {
+      void openWithFallback(app, (target) => launcher.launchNew(target, starter)).then(setNotice);
     },
     openWorkbench: (app) => {
       const id = snapshot.bindings[app.name]?.sessionId;

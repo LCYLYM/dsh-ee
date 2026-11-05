@@ -110,6 +110,7 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     login: () => { void remote.login().then((result: any) => setNotice(unwrapRemote(result)?.text || "请在浏览器完成企业登录。")).catch(() => setNotice("发起登录失败，请稍后重试。")); },
     open: (app) => { markSeen(app); void openWithFallback(app, launch).then(setNotice); },
     newSession: (app) => { void openWithFallback(app, (target) => launcher.launchNew(target)).then(setNotice); },
+    startWith: (app, starter) => { void openWithFallback(app, (target) => launcher.launchNew(target, starter)).then(setNotice); },
     openWorkbench: (app) => {
       const id = snapshot.bindings[app.name]?.sessionId;
       const current = ctx.sidebarRight?.mounted?.getSnapshot?.();

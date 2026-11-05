@@ -55,3 +55,22 @@ test("首屏降级提示实际渲染在菜单里", () => {
   const menu = heroAppsMenu(createElement, [app(1)], () => {}, "", () => {}, "已复制 /app-1");
   assert.match(JSON.stringify(menu), /已复制 \/app-1/);
 });
+
+test("「⋯」菜单列出示例问题，点一条带着它开始", () => {
+  const started: string[] = [];
+  const withStarters = { ...app(1), starters: ["问题一", "问".repeat(300), "", "三", "四", "五", "六", "七"] };
+  const section = appsSection(createElement, { apps: [withStarters], loggedIn: true }, { ...actions, startWith: (_app: CatalogApp, starter: string) => started.push(starter) });
+  const buttons: any[] = [];
+  const walk = (node: any) => {
+    if (!node || typeof node !== "object") return;
+    if (node.type === "button" && node.props?.title && withStarters.starters.includes(node.props.title)) buttons.push(node);
+    for (const child of (node.children ?? []).flat(Infinity)) walk(child);
+  };
+  walk(section);
+  assert.equal(buttons.length, 6);
+  assert.match(JSON.stringify(section), /从示例问题开始/);
+  buttons[0].props.onClick();
+  assert.deepEqual(started, ["问题一"]);
+  const plain = appsSection(createElement, { apps: [{ ...app(2), starters: [] }], loggedIn: true }, { ...actions, startWith: () => {} });
+  assert.doesNotMatch(JSON.stringify(plain), /从示例问题开始/);
+});
