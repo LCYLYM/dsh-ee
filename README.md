@@ -70,6 +70,7 @@ DSH_EE_SEED_ADMIN_PASSWORD='你的管理员密码' go run ./cmd/seed
 - 员工：`zhang.wei` / `li.na` / `sun.hao` / `chen.yu` / `zhou.lei` / `wang.fang`，初始密码默认 `dsh-ee-demo-2026`，可用 `DSH_EE_SEED_USER_PASSWORD` 覆盖；其中 `wang.fang` 故意不分配额度，用来演示 429。
 - 机器人：`rd-ci`（研发效能部 CI），负责人是 `zhang.wei`，每月 500 万 token，不能登录网页。
 - 上游：「DeepSeek（官方）」与「内部模型网关」，`deepseek-flash` 同时挂在两个上游上，用于演示故障转移。
+- 业务工作台：只读连接 `ee-catalog`（读 dsh-ee 自己公开的插件索引）和微应用「插件导购」（`plugin-guide`）。员工在 DSH 里打开它，右侧栏会出现指标、表格、表单、快捷按钮、说明、AI 看板和「能力中心」网页窗格；表格数据就是企业插件目录，没有上架插件时显示「暂无数据」。设计见 [docs/workbench-panels.md](./docs/workbench-panels.md)。
 - 凭据：每个演示员工与机器人各一个 `ee_at_`「演示接入」令牌；`zhang.wei` 另保留一个旧版「我的 DSH」key。明文只在第一次创建时打印。
 
 重复执行是幂等的：角色 / 用户 / 上游 / 凭据已存在时不会重建，额度与角色会对齐回演示值。上游 key 默认是占位值（`sk-demo-*`），连接检查会失败；接真实上游时用 `DSH_EE_SEED_DEEPSEEK_KEY` / `DSH_EE_SEED_GATEWAY_KEY` 传进去。

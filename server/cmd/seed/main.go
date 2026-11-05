@@ -124,6 +124,8 @@ func main() {
 
 	check(c.ensureProviders())
 
+	check(c.ensureWorkbenchDemo())
+
 	keys, err := c.ensureKeys(users)
 	check(err)
 	tokens, err := c.ensureTokens(users, botID)
@@ -307,6 +309,64 @@ func (c *client) ensureProviders() error {
 		}
 		fmt.Printf("上游  + %s（优先级 %d，%d 个模型）\n", p.Name, p.Priority, len(p.Models))
 	}
+	return nil
+}
+
+// ---- 业务工作台演示 ----
+
+// ensureWorkbenchDemo 建一个只读的 OpenAPI 连接（读 dsh-ee 自己公开的插件索引）和一个带工作台的微应用「插件导购」，
+// 让员工在 DSH 右侧栏看到指标、表格、表单、快捷按钮、说明、AI 看板和网页窗格。已存在就跳过。
+func (c *client) ensureWorkbenchDemo() error {
+	var out struct {
+		Assets []struct {
+			Slug string `json:"slug"`
+		} `json:"assets"`
+	}
+	if err := c.do("GET", "/api/hub", nil, &out); err != nil {
+		return err
+	}
+	have := map[string]bool{}
+	for _, a := range out.Assets {
+		have[a.Slug] = true
+	}
+	if !have["ee-catalog"] {
+		doc := `{"openapi":"3.0.0","info":{"title":"企业插件目录"},"paths":{"/index/dsh-index.json":{"get":{"operationId":"list_plugins","summary":"列出企业插件索引里的全部插件"}}}}`
+		spec := map[string]any{"title": "企业插件目录", "description": "dsh-ee 自己公开的插件索引（只读，演示用）", "type": "openapi", "url": c.base, "openapi": doc, "auth": map[string]any{"type": "none"}}
+		if err := c.do("POST", "/api/hub", map[string]any{"kind": "connection", "slug": "ee-catalog", "delivery": "auto", "spec": spec}, nil); err != nil {
+			return fmt.Errorf("创建演示连接：%w", err)
+		}
+		fmt.Println("连接  + ee-catalog（企业插件目录，只读）")
+	}
+	if have["plugin-guide"] {
+		return nil
+	}
+	source := map[string]any{"connection": "ee-catalog", "tool": "list_plugins"}
+	workbench := map[string]any{"panes": []any{
+		map[string]any{"type": "panel", "id": "main", "title": "插件导购", "widgets": []any{
+			map[string]any{"type": "metric", "title": "企业插件数", "source": source, "field": "plugins.length", "format": "number"},
+			map[string]any{"type": "table", "title": "企业插件", "source": source, "rows": "plugins",
+				"columns":     []any{map[string]any{"field": "title", "title": "名称"}, map[string]any{"field": "name", "title": "包名"}, map[string]any{"field": "author", "title": "作者"}},
+				"row_actions": []any{map[string]any{"label": "介绍一下", "prompt": "介绍企业插件 {{row.name}}（{{row.title}}）：它能做什么、适合谁、怎么安装。"}}},
+			map[string]any{"type": "form", "title": "帮我找插件",
+				"fields": []any{map[string]any{"name": "need", "label": "想解决什么问题", "kind": "text", "required": true}, map[string]any{"name": "role", "label": "我的岗位", "kind": "select", "options": []string{"研发", "产品", "运营", "财务", "其他"}}},
+				"submit": map[string]any{"label": "交给 AI 推荐", "prompt": "我是{{form.role}}，想解决：{{form.need}}。请从企业插件里推荐最合适的 1～3 个，说明理由。"}},
+			map[string]any{"type": "actions", "title": "快捷操作", "actions": []any{map[string]any{"label": "本周新上架", "prompt": "列出企业插件里最近上架的插件，各用一句话介绍。"}}},
+			map[string]any{"type": "markdown", "title": "说明", "text": "这是业务工作台的演示：左边对话，右边面板。\n点表格里的「介绍一下」或提交表单，会把一段话发给 AI；AI 处理完会更新下面的看板。"},
+			map[string]any{"type": "board", "title": "AI 看板"},
+		}},
+		map[string]any{"type": "web", "id": "hub", "title": "能力中心", "url": c.base + "/hub"},
+	}}
+	spec := map[string]any{
+		"title": "插件导购", "description": "帮员工找到合适的企业插件（业务工作台演示）", "icon": "🧭", "launch": "resume",
+		"persona":     "你是企业插件导购。根据员工的岗位和需求，从企业插件目录里推荐插件，说明它能做什么、怎么安装。需要数据时调用企业插件目录的工具。",
+		"starters":    []string{"有什么插件适合研发用？"},
+		"connections": []string{"ee-catalog"},
+		"workbench":   workbench,
+	}
+	if err := c.do("POST", "/api/hub", map[string]any{"kind": "app", "slug": "plugin-guide", "delivery": "auto", "spec": spec}, nil); err != nil {
+		return fmt.Errorf("创建演示微应用：%w", err)
+	}
+	fmt.Println("微应用 + plugin-guide（插件导购，带业务工作台）")
 	return nil
 }
 
