@@ -19,6 +19,18 @@
   --color-brand-900: #232e69;
   --color-brand-950: #141a3d;
   --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+
+  /* 落地页专用：墨绿字 + 青柠点缀，标题 Space Grotesk、正文 Geist（中文回落到系统字体） */
+  --color-lp-ink: #1e2b0e;
+  --color-lp-muted: #6e6e6e;
+  --color-lp-line: #e6ece1;
+  --color-lp-soft: #fbfbfb;
+  --color-lp-lime: #a7fb41;
+  --color-lp-green: #70c70e;
+  --color-lp-dark: #050806;
+  --color-lp-panel: #0d0d0d;
+  --font-lp-display: "Space Grotesk Variable", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-lp-body: "Geist Variable", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 /* 基础样式必须写在 @layer base 里：未分层的规则优先级高于 @layer 内的工具类，
@@ -32,13 +44,13 @@
 
 /* 落地页流程图的流动虚线 */
 .flow-line {
-  background-image: linear-gradient(to bottom, var(--color-neutral-900) 50%, transparent 50%);
+  background-image: linear-gradient(to bottom, var(--color-lp-ink) 50%, transparent 50%);
   background-size: 2px 10px;
   animation: flow-y 0.8s linear infinite;
 }
 @media (min-width: 64rem) {
   .flow-line {
-    background-image: linear-gradient(to right, var(--color-neutral-900) 50%, transparent 50%);
+    background-image: linear-gradient(to right, var(--color-lp-ink) 50%, transparent 50%);
     background-size: 10px 2px;
     animation-name: flow-x;
   }
@@ -47,6 +59,19 @@
 @keyframes flow-x { to { background-position: 10px 0; } }
 @media (prefers-reduced-motion: reduce) { .flow-line { animation: none; } }
 .flow-line-rev { animation-direction: reverse; }
+
+/* 落地页底纹：点阵（首屏与浅色章节）和深色章节顶部的绿色辉光 */
+.lp-dots {
+  background-image: radial-gradient(color-mix(in srgb, var(--color-lp-ink) 14%, transparent) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 85% 75% at 50% 0%, #000 35%, transparent 80%);
+}
+.lp-glow {
+  background:
+    radial-gradient(ellipse 70% 45% at 85% 0%, color-mix(in srgb, var(--color-lp-green) 45%, transparent), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 0% 100%, color-mix(in srgb, var(--color-lp-green) 18%, transparent), transparent 70%),
+    var(--color-lp-dark);
+}
 
 /* 落地页入场：脚本给 data-reveal 元素加 reveal-pending，进入视口再加 reveal-in */
 .reveal-pending {
@@ -178,6 +203,10 @@
    在 .dark 下把整条色阶翻转，等价于把浅色界面整体映射成深色界面，
    不用逐个页面改 class。数值与上面的 --background / --card / --foreground 对齐。 */
 .dark {
+  --color-lp-ink: #eef4e6;
+  --color-lp-muted: #a3aa9c;
+  --color-lp-line: #1f2a18;
+  --color-lp-soft: #0b0f09;
   --color-neutral-50: oklch(0.145 0 0);
   --color-neutral-100: oklch(0.205 0 0);
   --color-neutral-200: oklch(0.269 0 0);
