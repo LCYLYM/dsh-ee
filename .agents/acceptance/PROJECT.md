@@ -39,6 +39,14 @@ dsh-ee 是企业私有部署的 DSH 插件 / 能力市场：员工登录网页�
 - agent-browser session: `dsh-ee-<run-id>`（用完 `close`）；可执行文件在
   `~/Library/Application Support/LobeHub/bin/agent-browser/<ver>/agent-browser`（不在 PATH 时用全路径）
 
+### Desktop (Mac Electron)
+
+- App: `/Users/rqq/Downloads/DeepSeek Harness.app`（0.2.1-rc.5）；主程序为 `Contents/MacOS/DeepSeek Harness`，自带 CLI 为 `Contents/Resources/runtime/cli/bin/dsh`。
+- 隔离启动：直接 `spawn` 主程序，环境设置独立的 `HOME=/tmp/<run>/home`、`DSH_HOME=/tmp/<run>/dsh-home`、`DSH_PROFILES=desktop`；参数使用 `--user-data-dir=/tmp/<run>/electron-profile` 与 `--remote-debugging-port=<新端口>`。不要用真实 `~/.dsh`、`~/.npmrc` 或用户正在运行的 Desktop。
+- 初次安装：先无 CDP 启动并等待 `$DSH_HOME/profiles/desktop` 初始化，完全退出后运行隔离环境下的 `setup.sh --token <令牌>`，再用上述隔离参数和 CDP 端口重启。
+- CDP: `http://127.0.0.1:<端口>/json/version` 就绪后，用 `agent-browser --cdp <端口>` 或 Playwright `chromium.connectOverCDP` 连接；截图只取可见视口，不用 `--full` / `fullPage`。
+- 运行信息来源：已有脚本 `/private/tmp/dsh-ee-w2-desktop.mjs` 与本机安装路径；只停止本轮直接启动的隔离实例。
+
 ### CLI / API
 
 - Invocation: `curl` 直接打 `/v1/...`、`/api/...`、`/npm/...`；管理员动作可先 `POST /api/auth/login` 存 cookie jar。

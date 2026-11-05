@@ -111,7 +111,7 @@ export default async function (t) {
   await admin.getByLabel("说明").fill("带业务面板的微应用");
   await admin.getByLabel("人设与工作方式").fill("你是演示助手。");
   await admin.getByRole("button", { name: "范围内的人自动生效", exact: true }).click();
-  await admin.getByRole("button", { name: "插入示例", exact: true }).click();
+  await admin.getByRole("button", { name: /插入示例/ }).click();
   const wbBox = admin.getByPlaceholder('{ "panes": [ … ] }');
   assert((await wbBox.inputValue()).includes("报销工作台"), "插入示例后编辑框里应有示例工作台");
   await admin.getByRole("button", { name: "提交", exact: true }).click();
@@ -122,7 +122,7 @@ export default async function (t) {
     { type: "web", id: "hub", title: "能力中心", url: `${BASE}/hub` },
   ] }, null, 2));
   await admin.getByRole("button", { name: "预览", exact: true }).click();
-  await admin.getByText(`E2E 面板 ${tag}`).waitFor();
+  await admin.getByText(`E2E 面板 ${tag}`, { exact: true }).waitFor();
   await shot(admin, "hub-app-workbench");
   await admin.getByRole("button", { name: "提交", exact: true }).click();
   await admin.waitForURL(/\/assets\/\d+$/);
