@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AppWorkbench, WorkbenchWidget } from "../lib/api";
+import { api, type AppWorkbench, type ConnectionTool, type WorkbenchWidget } from "../lib/api";
 import { Button, cx, Field } from "./ui";
 
 const textareaCls = "w-full rounded-md border border-neutral-300 bg-card px-3 py-2 font-mono text-xs outline-none placeholder:text-neutral-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
@@ -85,9 +85,23 @@ export function WorkbenchPreview({ wb }: { wb: AppWorkbench }) {
   );
 }
 
-export function WorkbenchField({ text, onText, connections }: { text: string; onText: (text: string) => void; connections: string[] }) {
+/** 这个微应用依赖的连接里，能当数据源的工具：启用并且只读。 */
+function useSourceTools(connections: { slug: string; id: number }[]) {
+  const [tools, setTools] = useState<{ connection: string; tool: ConnectionTool }[]>([]);
+  const key = connections.map((c) => c.id).join(",");
+  useEffect(() => {
+    let live = true;
+    Promise.all(connections.map((c) => api.hubAsset(c.id).then((d) => (d.tools ?? []).map((tool) => ({ connection: c.slug, tool }))).catch(() => [])))
+      .then((lists) => { if (live) setTools(lists.flat().filter((x) => x.tool.enabled && x.tool.read_only)); });
+    return () => { live = false; };
+  }, [key]);
+  return tools;
+}
+
+export function WorkbenchField({ text, onText, connections, connectionIds = [] }: { text: string; onText: (text: string) => void; connections: string[]; connectionIds?: { slug: string; id: number }[] }) {
   const { t } = useTranslation();
   const [preview, setPreview] = useState(false);
+  const sources = useSourceTools(connectionIds);
   const parsed = parseWorkbench(text);
   return (
     <Field label={t("appWorkbench.label")} hint={t("appWorkbench.hint")}>
@@ -100,6 +114,23 @@ export function WorkbenchField({ text, onText, connections }: { text: string; on
         </Button>
       </div>
       <textarea className={cx(textareaCls, "h-72")} value={text} spellCheck={false} placeholder={t("appWorkbench.placeholder")} onChange={(e) => onText(e.target.value)} />
+      {connectionIds.length > 0 && (
+        <div className="mt-2 text-xs text-neutral-600">
+          <div className="mb-1 font-medium">{t("appWorkbench.sources")}</div>
+          {sources.length === 0 ? (
+            <div className="text-neutral-500">{t("appWorkbench.noSources")}</div>
+          ) : (
+            <ul className="grid gap-0.5">
+              {sources.map(({ connection, tool }) => (
+                <li key={connection + "/" + tool.name} className="truncate">
+                  <code className="font-mono">{`"source": { "connection": "${connection}", "tool": "${tool.name}" }`}</code>
+                  {tool.description && <span className="text-neutral-500"> · {tool.description}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {parsed.error && <p className="mt-1 text-xs text-red-600">{parsed.error === "panes" ? t("appWorkbench.needPanes") : t("appWorkbench.badJson", { error: parsed.error })}</p>}
       {preview && parsed.value && <div className="mt-3"><WorkbenchPreview wb={parsed.value} /></div>}
     </Field>

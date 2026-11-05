@@ -341,7 +341,12 @@ function AssetEditor() {
             <MultiPick label={t("editor.skills")} values={spec.skills ?? []} options={skillOptions} onChange={(v) => set({ skills: v })} />
             <MultiPick label={t("editor.connections")} values={spec.connections ?? []} options={connOptions} onChange={(v) => set({ connections: v })} />
             <MultiPick label={t("editor.plugins")} values={spec.plugins ?? []} options={pluginOptions} onChange={(v) => set({ plugins: v })} />
-            <WorkbenchField text={wbText} onText={setWbText} connections={spec.connections ?? []} />
+            <WorkbenchField
+              text={wbText}
+              onText={setWbText}
+              connections={spec.connections ?? []}
+              connectionIds={(spec.connections ?? []).flatMap((slug) => assets.filter((a) => a.kind === "connection" && a.slug === slug).map((a) => ({ slug, id: a.id })))}
+            />
           </Section>
         )}
         {kind === "connection" && (

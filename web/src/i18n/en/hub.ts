@@ -119,6 +119,8 @@ export default {
     badJson: "Invalid JSON: {{error}}",
     needPanes: "The top level needs a panes array",
     webPane: "Web page",
+    sources: "Tools usable as data sources (enabled, read-only tools of the selected connections):",
+    noSources: "The selected connections have no enabled read-only tools, so metric and table widgets cannot be used yet.",
     widget: { metric: "Metric", table: "Table", form: "Form", actions: "Quick actions", markdown: "Notes", board: "AI board" },
   },
   editor: {
