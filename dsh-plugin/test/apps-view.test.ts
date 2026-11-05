@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { appIcon, appsSection, heroAppsMenu, startText } from "../src/apps-view.js";
+import { appIcon, appsSection, heroAppsMenu, inProgressItems, inProgressView, startText } from "../src/apps-view.js";
 import type { CatalogApp } from "../src/skills.js";
 
 const createElement = (type: string, props: any, ...children: any[]) => ({ type, props, children });
@@ -73,4 +73,18 @@ test("「⋯」菜单列出示例问题，点一条带着它开始", () => {
   assert.deepEqual(started, ["问题一"]);
   const plain = appsSection(createElement, { apps: [{ ...app(2), starters: [] }], loggedIn: true }, { ...actions, startWith: () => {} });
   assert.doesNotMatch(JSON.stringify(plain), /从示例问题开始/);
+});
+
+test("「进行中」只列待你决定和工作中，待你决定在前，点击只切换", () => {
+  const apps = [app(1), app(2), app(3), app(4)];
+  const bindings = { "app-1": { sessionId: "s1" }, "app-2": { sessionId: "s2" }, "app-3": { sessionId: "s3" } };
+  const statuses: Record<string, any> = { s1: "busy", s2: "need", s3: "done" };
+  const items = inProgressItems(apps, bindings, (id) => statuses[id]);
+  assert.deepEqual(items.map((item) => `${item.app.name}:${item.status}`), ["app-2:need", "app-1:busy"]);
+  const opened: string[] = [];
+  const view = inProgressView(createElement, items, (item) => opened.push(item.sessionId));
+  assert.match(JSON.stringify(view), /进行中/);
+  view.children[1].children[0].props.onClick();
+  assert.deepEqual(opened, ["s2"]);
+  assert.equal(inProgressView(createElement, [], () => {}), null);
 });

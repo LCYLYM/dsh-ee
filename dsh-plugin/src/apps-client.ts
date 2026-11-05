@@ -1,6 +1,6 @@
 import { createElement, useEffect, useState } from "react";
-import { appsSection, heroAppsMenu, startText, type AppsViewActions } from "./apps-view.js";
-import { fillInput } from "./host-session.js";
+import { appsSection, heroAppsMenu, inProgressItems, inProgressView, startText, type AppsViewActions } from "./apps-view.js";
+import { fillInput, openSession } from "./host-session.js";
 import { createLauncher, singleFlight } from "./app-launcher.js";
 import type { CatalogApp } from "./skills.js";
 import type { AppBindingMap } from "./app-bindings.js";
@@ -148,7 +148,12 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     const open = (app: CatalogApp) => { void openWithFallback(app, launcher.launchHero).then(setNotice); };
     return heroAppsMenu(createElement, state.apps, open, query, setQuery, notice);
   };
-  const AppsPanel = () => createElement(AppsSection);
+  const InProgress = () => {
+    const state = useApps();
+    const items = inProgressItems(state.apps, state.bindings, (id) => applicationStatus(state.sessionSnapshot, id));
+    return inProgressView(createElement, items, (item) => { void openSession(ctx, item.sessionId).catch(() => undefined); });
+  };
+  const AppsPanel = () => createElement("div", null, createElement(InProgress), createElement(AppsSection));
 
   ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({ name: "sidebar.footer.action", id: "dsh-ee-apps", order: 30, label: "企业应用" }, AppsSection));
   ctx.slots.inject("conversation.hero.options", () => ctx.slots.register({ name: "conversation.hero.options", id: "dsh-ee-apps", order: 100, label: "企业应用" }, HeroApps));

@@ -20214,6 +20214,42 @@ function startText(app, starter) {
   return `/${app.name}${starter ? `
 ${starter}` : ""}`;
 }
+function inProgressItems(apps, bindings, statusOf) {
+  const items = [];
+  for (const app of apps) {
+    const sessionId = bindings[app.name]?.sessionId;
+    if (!sessionId) continue;
+    const status = statusOf(sessionId);
+    if (status === "need" || status === "busy") items.push({ app, sessionId, status });
+  }
+  return items.sort((a, b) => a.status === b.status ? 0 : a.status === "need" ? -1 : 1);
+}
+function inProgressView(createElement4, items, onOpen) {
+  if (!items.length) return null;
+  return createElement4(
+    "section",
+    { "data-dsh-ee-ui": "in-progress", style: { padding: "10px 12px", fontSize: 13 } },
+    createElement4("h2", { style: { margin: "0 0 7px", fontSize: 13 } }, "\u8FDB\u884C\u4E2D"),
+    createElement4("div", { style: { display: "grid", gap: 2 } }, ...items.map((item) => {
+      const label = item.status === "need" ? "\u5F85\u4F60\u51B3\u5B9A" : "\u5DE5\u4F5C\u4E2D";
+      const color = item.status === "need" ? "#d97706" : "#2563eb";
+      return createElement4(
+        "button",
+        {
+          key: item.app.name,
+          type: "button",
+          onClick: () => onOpen(item),
+          title: `${item.app.title}\uFF1A${label}`,
+          style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, padding: "5px 0", width: "100%" }
+        },
+        createElement4("span", { "aria-label": label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: color } }),
+        appIcon(createElement4, item.app),
+        createElement4("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, item.app.title),
+        createElement4("span", { style: { fontSize: 11, color } }, label)
+      );
+    }))
+  );
+}
 
 // src/host-session.ts
 function currentSessionOf(snapshot) {
@@ -20608,7 +20644,14 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     };
     return heroAppsMenu(import_react.createElement, state.apps, open2, query, setQuery, notice);
   };
-  const AppsPanel = () => (0, import_react.createElement)(AppsSection);
+  const InProgress = () => {
+    const state = useApps();
+    const items = inProgressItems(state.apps, state.bindings, (id) => applicationStatus(state.sessionSnapshot, id));
+    return inProgressView(import_react.createElement, items, (item) => {
+      void openSession(ctx, item.sessionId).catch(() => void 0);
+    });
+  };
+  const AppsPanel = () => (0, import_react.createElement)("div", null, (0, import_react.createElement)(InProgress), (0, import_react.createElement)(AppsSection));
   ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({ name: "sidebar.footer.action", id: "dsh-ee-apps", order: 30, label: "\u4F01\u4E1A\u5E94\u7528" }, AppsSection));
   ctx.slots.inject("conversation.hero.options", () => ctx.slots.register({ name: "conversation.hero.options", id: "dsh-ee-apps", order: 100, label: "\u4F01\u4E1A\u5E94\u7528" }, HeroApps));
   return {

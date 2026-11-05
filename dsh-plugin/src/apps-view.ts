@@ -118,3 +118,40 @@ export function heroAppsMenu(createElement: (...args: any[]) => any, apps: Catal
 export function startText(app: CatalogApp, starter?: string): string {
   return `/${app.name}${starter ? `\n${starter}` : ""}`;
 }
+
+export interface InProgressItem {
+  app: CatalogApp;
+  sessionId: string;
+  status: "need" | "busy";
+}
+
+/** 有绑定、并且「待你决定」或「工作中」的应用，待你决定在前；同状态保持原顺序。 */
+export function inProgressItems(apps: CatalogApp[], bindings: Record<string, { sessionId: string } | undefined>, statusOf: (sessionId: string) => AppSessionStatus | undefined): InProgressItem[] {
+  const items: InProgressItem[] = [];
+  for (const app of apps) {
+    const sessionId = bindings[app.name]?.sessionId;
+    if (!sessionId) continue;
+    const status = statusOf(sessionId);
+    if (status === "need" || status === "busy") items.push({ app, sessionId, status });
+  }
+  return items.sort((a, b) => (a.status === b.status ? 0 : a.status === "need" ? -1 : 1));
+}
+
+/** 企业面板里的「进行中」：点一项只切到对应会话，不发消息。没有就不显示。 */
+export function inProgressView(createElement: (...args: any[]) => any, items: InProgressItem[], onOpen: (item: InProgressItem) => void) {
+  if (!items.length) return null;
+  return createElement("section", { "data-dsh-ee-ui": "in-progress", style: { padding: "10px 12px", fontSize: 13 } },
+    createElement("h2", { style: { margin: "0 0 7px", fontSize: 13 } }, "进行中"),
+    createElement("div", { style: { display: "grid", gap: 2 } }, ...items.map((item) => {
+      const label = item.status === "need" ? "待你决定" : "工作中";
+      const color = item.status === "need" ? "#d97706" : "#2563eb";
+      return createElement("button", {
+        key: item.app.name, type: "button", onClick: () => onOpen(item), title: `${item.app.title}：${label}`,
+        style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, padding: "5px 0", width: "100%" },
+      },
+      createElement("span", { "aria-label": label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: color } }),
+      appIcon(createElement, item.app),
+      createElement("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, item.app.title),
+      createElement("span", { style: { fontSize: 11, color } }, label));
+    })));
+}
