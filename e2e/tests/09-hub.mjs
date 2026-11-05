@@ -103,6 +103,34 @@ export default async function (t) {
   await appRow.getByText("🧾", { exact: true }).waitFor();
   await shot(admin, "hub-app-icon");
 
+  // ---- 微应用工作台：插入示例 → 服务端拒绝不在依赖里的连接 → 改成合法配置 → 预览 → 保存并下发 ----
+  const wbApp = `e2e-wb-${tag}`;
+  await admin.goto(`${BASE}/assets/new?kind=app`);
+  await admin.getByLabel("标识").fill(wbApp);
+  await admin.getByLabel("标题").fill(`E2E 工作台 ${tag}`);
+  await admin.getByLabel("说明").fill("带业务面板的微应用");
+  await admin.getByLabel("人设与工作方式").fill("你是演示助手。");
+  await admin.getByRole("button", { name: "范围内的人自动生效", exact: true }).click();
+  await admin.getByRole("button", { name: "插入示例", exact: true }).click();
+  const wbBox = admin.getByPlaceholder('{ "panes": [ … ] }');
+  assert((await wbBox.inputValue()).includes("报销工作台"), "插入示例后编辑框里应有示例工作台");
+  await admin.getByRole("button", { name: "提交", exact: true }).click();
+  await admin.getByText("不在这个微应用的依赖连接里").waitFor();
+  step("工作台的数据源连接不在依赖里时，服务端拒绝并在页面上提示");
+  await wbBox.fill(JSON.stringify({ panes: [
+    { type: "panel", id: "main", title: `E2E 面板 ${tag}`, widgets: [{ type: "markdown", text: "演示说明" }, { type: "board", title: "AI 看板" }] },
+    { type: "web", id: "hub", title: "能力中心", url: `${BASE}/hub` },
+  ] }, null, 2));
+  await admin.getByRole("button", { name: "预览", exact: true }).click();
+  await admin.getByText(`E2E 面板 ${tag}`).waitFor();
+  await shot(admin, "hub-app-workbench");
+  await admin.getByRole("button", { name: "提交", exact: true }).click();
+  await admin.waitForURL(/\/assets\/\d+$/);
+  cat = await dsh(token, "GET", "/api/dsh/catalog");
+  const wbEntry = cat.data.apps.find((a) => a.name === wbApp);
+  assert(wbEntry?.workbench?.panes?.length === 2 && wbEntry.workbench.panes[1].url === `${BASE}/hub`, "DSH 目录应带上工作台：" + JSON.stringify(wbEntry));
+  step("工作台配置能预览、保存，并随目录下发");
+
   // ---- 企业连接：OpenAPI，指向 dsh-ee 自己的 /healthz ----
   const doc = JSON.stringify({ openapi: "3.0.0", info: { title: "Health" }, paths: { "/healthz": { get: { operationId: "health", summary: "服务健康状态" } }, "/healthz/x": { post: { operationId: "poke" } } } });
   await admin.goto(`${BASE}/assets/new?kind=connection`);
