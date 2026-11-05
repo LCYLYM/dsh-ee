@@ -18,6 +18,8 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
   const adaptSessions = createSessionSnapshotAdapter();
   const seen = new Set<string>();
   let started = false;
+  // 第一次拉目录是否已经结束：工作台标签页据此区分「还在加载」和「应用已经不在了」
+  let loaded = false;
   const listeners = new Set<() => void>();
   const update = (patch: Partial<AppsSnapshot>) => {
     snapshot = { ...snapshot, ...patch };
@@ -39,6 +41,7 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     } catch {
       update({ bindings: {} });
     } finally {
+      loaded = true;
       update({ busy: false });
     }
   });
@@ -151,6 +154,11 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
   return {
     AppsPanel,
     appsNow: () => snapshot.apps,
+    appsLoaded: () => loaded,
+    loadApps: () => {
+      started = true;
+      return refresh();
+    },
     subscribeApps: (listener: () => void) => {
       listeners.add(listener);
       return () => { listeners.delete(listener); };

@@ -225,3 +225,11 @@ test("已经打开过就不重复打开，除非手动要求；没有工作台�
   assert.equal(await openWorkbench({ sidebarRight: fake.sidebarRight }, { ...app, workbench: undefined }, "s1"), false);
   assert.equal(await waitMounted(fakeSidebar("other").sidebarRight, "s1", 20), false);
 });
+
+test("某个窗格打不开时其余照常打开", async () => {
+  const fake = fakeSidebar("s1");
+  fake.sidebarRight.openTab = () => { throw new Error("unknown kind browser"); };
+  const webFirst: CatalogApp = { ...app, workbench: { panes: [workbench.panes[1], workbench.panes[0]] } };
+  assert.equal(await openWorkbench({ sidebarRight: fake.sidebarRight }, webFirst, "s1"), true);
+  assert.deepEqual(fake.opened.map((item: any) => item[1]), ["dsh-resource://dsh-ee-workbench/expense-helper/main"]);
+});

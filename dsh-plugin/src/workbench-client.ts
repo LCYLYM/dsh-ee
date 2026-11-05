@@ -19,6 +19,10 @@ export interface WorkbenchDeps {
   remote: any;
   unwrapRemote: (result: any) => any;
   appsNow: () => CatalogApp[];
+  /** 第一次拉目录是否已经结束 */
+  appsLoaded: () => boolean;
+  /** 拉一次目录（刷新页面后，标签页可能比侧栏先出现） */
+  loadApps: () => Promise<void>;
   /** 订阅目录变化，返回撤销函数 */
   subscribeApps: (listener: () => void) => () => void;
 }
@@ -33,8 +37,16 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
 
   const useAppsList = () => {
     const [apps, setApps] = useState(deps.appsNow());
-    useEffect(() => deps.subscribeApps(() => setApps(deps.appsNow())), []);
-    return apps;
+    const [loaded, setLoaded] = useState(deps.appsLoaded());
+    useEffect(() => {
+      const dispose = deps.subscribeApps(() => {
+        setApps(deps.appsNow());
+        setLoaded(deps.appsLoaded());
+      });
+      if (!deps.appsLoaded()) void deps.loadApps();
+      return dispose;
+    }, []);
+    return { apps, loaded };
   };
 
   const WorkbenchTab = (props: any) => {
@@ -42,7 +54,7 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
     const address = info?.tab?.navigation?.address || info?.tab?.contentId || "";
     const visible = info?.tab?.visible !== false;
     const parsed = parseWorkbenchAddress(address);
-    const apps = useAppsList();
+    const { apps, loaded } = useAppsList();
     const app = apps.find((item) => item.name === parsed?.app);
     const pane = app?.workbench?.panes.find((item) => item.id === parsed?.pane && item.type === "panel");
 
@@ -89,7 +101,7 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
     // 右侧栏的「刷新」命令：重新取数
     useEffect(() => info?.tab?.actions?.bindCommands?.({ refresh: () => { loadAll(); void loadBoard(); } }), [info?.tab?.id, app?.version]);
 
-    if (!app || !pane) return missingPaneView(createElement);
+    if (!app || !pane) return loaded ? missingPaneView(createElement) : createElement("div", { style: { padding: 16, fontSize: 13, opacity: 0.65 } }, "加载中…");
 
     const send = (key: string, action: WorkbenchAction, values: { row?: any; form?: Record<string, any> }) => {
       if (sending.has(key)) return;

@@ -20438,6 +20438,7 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
   const adaptSessions = createSessionSnapshotAdapter();
   const seen = /* @__PURE__ */ new Set();
   let started = false;
+  let loaded = false;
   const listeners = /* @__PURE__ */ new Set();
   const update = (patch) => {
     snapshot = { ...snapshot, ...patch };
@@ -20459,6 +20460,7 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     } catch {
       update({ bindings: {} });
     } finally {
+      loaded = true;
       update({ busy: false });
     }
   });
@@ -20594,6 +20596,11 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
   return {
     AppsPanel,
     appsNow: () => snapshot.apps,
+    appsLoaded: () => loaded,
+    loadApps: () => {
+      started = true;
+      return refresh();
+    },
     subscribeApps: (listener) => {
       listeners.add(listener);
       return () => {
@@ -20709,15 +20716,20 @@ async function openWorkbench(ctx, app, sessionId, force = false) {
   if (!panes.length || typeof sidebarRight?.openResource !== "function") return false;
   if (!await waitMounted(sidebarRight, sessionId)) return false;
   if (!force && workbenchOpenIn(sidebarRight, sessionId, app.name)) return false;
+  let opened = 0;
   panes.forEach((pane, index) => {
     const placement = index === 1 ? { preferNewPane: true } : {};
-    if (pane.type === "web") {
-      sidebarRight.openTab("browser", { ...placement, params: { url: pane.url } });
-    } else {
-      sidebarRight.openResource(workbenchAddress(app.name, pane.id), placement);
+    try {
+      if (pane.type === "web") {
+        sidebarRight.openTab("browser", { ...placement, params: { url: pane.url } });
+      } else {
+        sidebarRight.openResource(workbenchAddress(app.name, pane.id), placement);
+      }
+      opened++;
+    } catch {
     }
   });
-  return true;
+  return opened > 0;
 }
 
 // src/workbench-view.ts
@@ -20916,15 +20928,23 @@ function registerWorkbench(ctx, deps) {
   };
   const useAppsList = () => {
     const [apps, setApps] = (0, import_react2.useState)(deps.appsNow());
-    (0, import_react2.useEffect)(() => deps.subscribeApps(() => setApps(deps.appsNow())), []);
-    return apps;
+    const [loaded, setLoaded] = (0, import_react2.useState)(deps.appsLoaded());
+    (0, import_react2.useEffect)(() => {
+      const dispose = deps.subscribeApps(() => {
+        setApps(deps.appsNow());
+        setLoaded(deps.appsLoaded());
+      });
+      if (!deps.appsLoaded()) void deps.loadApps();
+      return dispose;
+    }, []);
+    return { apps, loaded };
   };
   const WorkbenchTab = (props) => {
     const info = props.useTabInfo?.();
     const address = info?.tab?.navigation?.address || info?.tab?.contentId || "";
     const visible = info?.tab?.visible !== false;
     const parsed = parseWorkbenchAddress(address);
-    const apps = useAppsList();
+    const { apps, loaded } = useAppsList();
     const app = apps.find((item) => item.name === parsed?.app);
     const pane = app?.workbench?.panes.find((item) => item.id === parsed?.pane && item.type === "panel");
     const [data, setData] = (0, import_react2.useState)({});
@@ -20968,7 +20988,7 @@ function registerWorkbench(ctx, deps) {
       loadAll();
       void loadBoard();
     } }), [info?.tab?.id, app?.version]);
-    if (!app || !pane) return missingPaneView(import_react2.createElement);
+    if (!app || !pane) return loaded ? missingPaneView(import_react2.createElement) : (0, import_react2.createElement)("div", { style: { padding: 16, fontSize: 13, opacity: 0.65 } }, "\u52A0\u8F7D\u4E2D\u2026");
     const send = (key, action, values) => {
       if (sending.has(key)) return;
       const sessionId = onScreenSession(ctx);
@@ -21085,7 +21105,7 @@ async function apply(ctx) {
     const useOverview = (_remote) => overview.use();
     const apps = registerApps(ctx, remote, useOverview, unwrapRemote);
     const { AppsPanel } = apps;
-    const workbench = registerWorkbench(ctx, { remote, unwrapRemote, appsNow: apps.appsNow, subscribeApps: apps.subscribeApps });
+    const workbench = registerWorkbench(ctx, { remote, unwrapRemote, appsNow: apps.appsNow, appsLoaded: apps.appsLoaded, loadApps: apps.loadApps, subscribeApps: apps.subscribeApps });
     apps.setWorkbenchOpener(workbench.openWorkbench);
     let brand;
     try {

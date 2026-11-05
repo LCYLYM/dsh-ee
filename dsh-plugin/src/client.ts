@@ -92,7 +92,7 @@ export async function apply(ctx: any): Promise<void> {
     const useOverview = (_remote?: any) => overview.use();
     const apps = registerApps(ctx, remote, useOverview, unwrapRemote);
     const { AppsPanel } = apps;
-    const workbench = registerWorkbench(ctx, { remote, unwrapRemote, appsNow: apps.appsNow, subscribeApps: apps.subscribeApps });
+    const workbench = registerWorkbench(ctx, { remote, unwrapRemote, appsNow: apps.appsNow, appsLoaded: apps.appsLoaded, loadApps: apps.loadApps, subscribeApps: apps.subscribeApps });
     apps.setWorkbenchOpener(workbench.openWorkbench);
     let brand: BrandViewData;
     try {

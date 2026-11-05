@@ -38,13 +38,19 @@ export async function openWorkbench(ctx: any, app: CatalogApp, sessionId: string
   if (!panes.length || typeof sidebarRight?.openResource !== "function") return false;
   if (!(await waitMounted(sidebarRight, sessionId))) return false;
   if (!force && workbenchOpenIn(sidebarRight, sessionId, app.name)) return false;
+  let opened = 0;
   panes.forEach((pane, index) => {
     const placement = index === 1 ? { preferNewPane: true } : {};
-    if (pane.type === "web") {
-      sidebarRight.openTab("browser", { ...placement, params: { url: pane.url } });
-    } else {
-      sidebarRight.openResource(workbenchAddress(app.name, pane.id), placement);
+    try {
+      if (pane.type === "web") {
+        sidebarRight.openTab("browser", { ...placement, params: { url: pane.url } });
+      } else {
+        sidebarRight.openResource(workbenchAddress(app.name, pane.id), placement);
+      }
+      opened++;
+    } catch {
+      // 某个窗格打不开（例如 web profile 没开官方浏览器时 openTab('browser') 会抛错），其余窗格照常打开
     }
   });
-  return true;
+  return opened > 0;
 }
