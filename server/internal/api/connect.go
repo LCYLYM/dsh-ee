@@ -103,6 +103,14 @@ func (s *Server) buildConnect(ctx context.Context, base, version string) (string
 	if set.Brand.Enabled {
 		p.WriteString("- id: ui-brand-official\n  disabled: true\n")
 	}
+	// 有微应用的工作台要嵌网页时，打开官方浏览器标签页；没有就不动员工的 DSH 设置
+	web, err := s.anyLiveWebPane(ctx)
+	if err != nil {
+		return "", nil, "", err
+	}
+	if web {
+		p.WriteString("- id: ui-sidebar-browser\n  disabled: false\n")
+	}
 	var models []string
 	if set.Connect.Model {
 		ms, err := s.store.PublicModels(ctx)

@@ -403,3 +403,32 @@ func workbenchContent(wb *appWorkbench) string {
 	}
 	return b.String()
 }
+
+// anyLiveWebPane 看全公司有没有上线中的微应用配置了 web 窗格。接入插件补丁是按企业生成的，
+// 所以只要有一个，就在补丁里打开官方浏览器标签页（web profile 默认关着，Desktop 默认开着）。
+func (s *Server) anyLiveWebPane(ctx context.Context) (bool, error) {
+	assets, err := s.store.ListAssets(ctx, store.KindApp)
+	if err != nil {
+		return false, err
+	}
+	var ids []int64
+	for _, a := range assets {
+		if a.Status == store.AssetActive && a.LiveVersion > 0 {
+			ids = append(ids, a.ID)
+		}
+	}
+	live, err := s.store.LiveAssetVersions(ctx, ids)
+	if err != nil {
+		return false, err
+	}
+	for _, lv := range live {
+		if wb := parseSpec(lv.Spec).Workbench; wb != nil {
+			for _, p := range wb.Panes {
+				if p.Type == "web" {
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
+}
