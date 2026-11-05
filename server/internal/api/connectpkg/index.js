@@ -158,22 +158,22 @@ var HttpClient = class {
   constructor(tokens) {
     this.tokens = tokens;
   }
-  async fetch(path5, init = {}) {
+  async fetch(path6, init = {}) {
     const current = await this.tokens.resolve();
     const headers = new Headers(init.headers);
     if (current?.value) headers.set("Authorization", `Bearer ${current.value}`);
     const config = this.tokens.config;
     if (!headers.has("X-DshEE-Client")) headers.set("X-DshEE-Client", `dsh-connect/${config.version || "dev"}`);
     if (!headers.has("X-DshEE-Host")) headers.set("X-DshEE-Host", dshHost());
-    const response = await fetch(`${config.base}${path5}`, { ...init, headers });
+    const response = await fetch(`${config.base}${path6}`, { ...init, headers });
     if (response.status === 401 && current?.value) {
       const body = await response.clone().json().catch(() => null);
       if (body?.code?.startsWith("token_")) await this.tokens.invalidate(current.value);
     }
     return response;
   }
-  async json(path5, init) {
-    const response = await this.fetch(path5, init);
+  async json(path6, init) {
+    const response = await this.fetch(path6, init);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   }
@@ -448,6 +448,8 @@ var McpBridge = class {
   metas = /* @__PURE__ */ new Map();
   previews = /* @__PURE__ */ new Map();
   local = /* @__PURE__ */ new Map();
+  /** 服务端在 tools/list 里标了 readOnlyHint 的工具（服务端工具名）；工作台取数只能用它们 */
+  readOnly = /* @__PURE__ */ new Set();
   status = { lastSyncAt: 0, tools: 0, error: "" };
   async rpc(method, params) {
     const headers = { "content-type": "application/json", accept: "application/json, text/event-stream" };
@@ -470,6 +472,14 @@ var McpBridge = class {
   /** 直接调服务端工具（本机诊断用）。 */
   async callTool(name2, args) {
     return this.rpc("tools/call", { name: name2, arguments: args });
+  }
+  /** 当前员工能用、并且服务端标为只读的工具；没权限的工具不在 tools/list 里，也就不在这里。 */
+  isReadOnlyTool(serverName) {
+    return this.readOnly.has(serverName);
+  }
+  /** 当前员工能不能用这个工具（服务端按权限列出的工具）。 */
+  hasTool(serverName) {
+    return [...this.serverNames.values()].includes(serverName);
   }
   /** 这次调用该不该先让用户批准；只读的返回 undefined。 */
   approval(fullName, args) {
@@ -501,6 +511,7 @@ ${canonArgs(args)}`, body.preview);
     const actions = tool._meta?.dshee?.actions;
     if (actions && typeof actions === "object") this.metas.set(name2, actions);
     this.serverNames.set(name2, tool.name);
+    if (tool.annotations?.readOnlyHint === true) this.readOnly.add(tool.name);
     const dispose = this.ctx.tools.register({
       name: name2,
       description: tool.description || tool.name,
@@ -518,6 +529,7 @@ ${canonArgs(args)}`, body.preview);
       dispose();
       this.metas.delete(name2);
       this.serverNames.delete(name2);
+      this.readOnly.delete(tool.name);
     });
   }
   async sync() {
@@ -2769,8 +2781,8 @@ function validateName(subject, value) {
 }
 
 // src/brand.ts
-var _doctor_dec, _login_dec, _overview_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _apps_dec, _brand_dec, _a, _init;
-var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _a) {
+var _doctor_dec, _login_dec, _overview_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _apps_dec, _brand_dec, _a, _init;
+var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _a) {
   constructor(ctx, actions) {
     super(ctx, "dshEE");
     this.actions = actions;
@@ -2791,6 +2803,12 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
   async unbindApp(request) {
     return this.actions.unbindApp(request.name);
   }
+  async workbenchData(request) {
+    return this.actions.workbenchData(request);
+  }
+  async board(request) {
+    return this.actions.readBoard(request);
+  }
   async overview() {
     return this.actions.readOverview();
   }
@@ -2807,6 +2825,8 @@ __decorateElement(_init, 1, "apps", _apps_dec, DshEEClientService);
 __decorateElement(_init, 1, "appBindings", _appBindings_dec, DshEEClientService);
 __decorateElement(_init, 1, "bindApp", _bindApp_dec, DshEEClientService);
 __decorateElement(_init, 1, "unbindApp", _unbindApp_dec, DshEEClientService);
+__decorateElement(_init, 1, "workbenchData", _workbenchData_dec, DshEEClientService);
+__decorateElement(_init, 1, "board", _board_dec, DshEEClientService);
 __decorateElement(_init, 1, "overview", _overview_dec, DshEEClientService);
 __decorateElement(_init, 1, "login", _login_dec, DshEEClientService);
 __decorateElement(_init, 1, "doctor", _doctor_dec, DshEEClientService);
@@ -2939,6 +2959,156 @@ var AppBindings = class {
   }
 };
 
+// src/workbench-host.ts
+import fs4 from "node:fs";
+import path5 from "node:path";
+import { createHash } from "node:crypto";
+
+// src/workbench.ts
+function toolValue(result) {
+  if (result?.isError) {
+    const text2 = (result.content ?? []).filter((part) => part?.type === "text").map((part) => part.text).join("\n");
+    throw new Error(text2 || "\u4F01\u4E1A\u5DE5\u5177\u8C03\u7528\u5931\u8D25");
+  }
+  if (result?.structuredContent !== void 0) return result.structuredContent;
+  const text = (result?.content ?? []).filter((part) => part?.type === "text").map((part) => String(part.text)).join("\n");
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+var maxBoardBytes = 32 << 10;
+function checkBoardBlocks(blocks) {
+  if (!Array.isArray(blocks) || blocks.length === 0) return { error: "blocks \u5FC5\u987B\u662F\u975E\u7A7A\u6570\u7EC4" };
+  if (blocks.length > 20) return { error: "\u770B\u677F\u6700\u591A 20 \u5757" };
+  if (new TextEncoder().encode(JSON.stringify(blocks)).length > maxBoardBytes) return { error: "\u770B\u677F\u5185\u5BB9\u4E0D\u80FD\u8D85\u8FC7 32 KB" };
+  const out = [];
+  const text = (value) => value === null || value === void 0 ? "" : String(value);
+  for (const [index, block] of blocks.entries()) {
+    const where = `\u7B2C ${index + 1} \u5757`;
+    switch (block?.type) {
+      case "text":
+        if (typeof block.text !== "string" || !block.text.trim()) return { error: `${where}\uFF1Atext \u4E0D\u80FD\u4E3A\u7A7A` };
+        out.push({ type: "text", text: block.text });
+        break;
+      case "list":
+        if (!Array.isArray(block.items) || block.items.length === 0 || block.items.length > 50) return { error: `${where}\uFF1Aitems \u8981\u6709 1\uFF5E50 \u9879` };
+        out.push({ type: "list", items: block.items.map(text) });
+        break;
+      case "table":
+        if (!Array.isArray(block.columns) || block.columns.length === 0 || block.columns.length > 12) return { error: `${where}\uFF1Acolumns \u8981\u6709 1\uFF5E12 \u5217` };
+        if (!Array.isArray(block.rows) || block.rows.length > 50 || !block.rows.every((row) => Array.isArray(row))) return { error: `${where}\uFF1Arows \u5FC5\u987B\u662F\u6700\u591A 50 \u884C\u7684\u4E8C\u7EF4\u6570\u7EC4` };
+        out.push({ type: "table", columns: block.columns.map(text), rows: block.rows.map((row) => row.map(text)) });
+        break;
+      default:
+        return { error: `${where}\uFF1Atype \u53EA\u80FD\u662F text\u3001list \u6216 table` };
+    }
+  }
+  return { blocks: out };
+}
+
+// src/workbench-host.ts
+function findWidget(apps, request) {
+  const app = apps.find((item) => item.name === request?.app);
+  const pane = app?.workbench?.panes.find((item) => item.id === request?.pane && item.type === "panel");
+  return Number.isInteger(request?.widget) ? pane?.widgets?.[request.widget] : void 0;
+}
+async function readWidgetData(apps, tools, request) {
+  const widget = findWidget(apps, request);
+  if (!widget?.source) return { error: "\u76EE\u5F55\u91CC\u6CA1\u6709\u8FD9\u4E2A\u7EC4\u4EF6" };
+  const name2 = `${widget.source.connection}__${widget.source.tool}`;
+  if (!tools.hasTool(name2)) return { forbidden: true };
+  if (!tools.isReadOnlyTool(name2)) return { error: "\u8FD9\u4E2A\u6570\u636E\u6E90\u4E0D\u662F\u53EA\u8BFB\u5DE5\u5177\uFF0C\u9762\u677F\u4E0D\u80FD\u7528\u5B83\u53D6\u6570" };
+  try {
+    return { value: toolValue(await tools.callTool(name2, widget.source.args ?? {})) };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+var safeName = /^[A-Za-z0-9_-]{1,80}$/;
+var BoardStore = class {
+  constructor(dir = path5.join(dshHome(), "dsh-ee", "boards")) {
+    this.dir = dir;
+  }
+  sequence = 0;
+  file(app, sessionId) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(app) || app.length > 48) throw new Error("\u5FAE\u5E94\u7528\u540D\u4E0D\u5408\u6CD5");
+    if (typeof sessionId !== "string" || !sessionId) throw new Error("\u4F1A\u8BDD id \u4E0D\u5408\u6CD5");
+    const session = safeName.test(sessionId) ? sessionId : createHash("sha256").update(sessionId).digest("hex").slice(0, 32);
+    return path5.join(this.dir, `${app}--${session}.json`);
+  }
+  read(app, sessionId) {
+    try {
+      const value = JSON.parse(fs4.readFileSync(this.file(app, sessionId), "utf8"));
+      if (value?.app !== app || value?.sessionId !== sessionId || !Array.isArray(value?.blocks)) return void 0;
+      return value;
+    } catch {
+      return void 0;
+    }
+  }
+  write(app, sessionId, blocks) {
+    const file = this.file(app, sessionId);
+    const board = { app, sessionId, updatedAt: (/* @__PURE__ */ new Date()).toISOString(), blocks };
+    fs4.mkdirSync(this.dir, { recursive: true, mode: 448 });
+    const temp = `${file}.${process.pid}.${++this.sequence}.tmp`;
+    try {
+      fs4.writeFileSync(temp, JSON.stringify(board) + "\n", { mode: 384 });
+      fs4.renameSync(temp, file);
+    } finally {
+      if (fs4.existsSync(temp)) fs4.unlinkSync(temp);
+    }
+    return board;
+  }
+};
+var workbenchToolName = "ee_workbench";
+async function runWorkbenchTool(deps, args, exec) {
+  if (args?.action !== "board") throw new Error("action \u53EA\u80FD\u662F board");
+  const app = String(args?.app ?? "");
+  const apps = await deps.readApps();
+  const target = apps.find((item) => item.name === app);
+  if (!target) throw new Error(`\u6CA1\u6709\u5FAE\u5E94\u7528 ${app}\uFF0C\u6216\u5B83\u4E0D\u5728\u4F60\u7684\u53EF\u7528\u8303\u56F4\u5185`);
+  if (!target.workbench?.panes.some((pane) => pane.widgets?.some((widget) => widget.type === "board"))) throw new Error(`\u5FAE\u5E94\u7528 ${app} \u7684\u5DE5\u4F5C\u53F0\u6CA1\u6709 AI \u770B\u677F`);
+  const checked = checkBoardBlocks(args?.blocks);
+  if (!checked.blocks) throw new Error(checked.error);
+  const sessionId = exec?.agent?.session?.id ?? deps.boundSession(app);
+  if (typeof sessionId !== "string" || !sessionId) throw new Error("\u627E\u4E0D\u5230\u8981\u66F4\u65B0\u770B\u677F\u7684\u4F1A\u8BDD");
+  deps.boards.write(app, sessionId, checked.blocks);
+  return "\u5DF2\u66F4\u65B0\u5DE5\u4F5C\u53F0\u770B\u677F";
+}
+function registerWorkbenchTool(ctx, deps) {
+  return ctx.tools.register({
+    name: workbenchToolName,
+    description: "\u66F4\u65B0\u5F53\u524D\u5FAE\u5E94\u7528\u5DE5\u4F5C\u53F0\u4E0A\u7684\u300CAI \u770B\u677F\u300D\u3002\u53EA\u7528\u6765\u628A\u672C\u8F6E\u5904\u7406\u7ED3\u679C\u5199\u5230\u770B\u677F\u4E0A\uFF0C\u4E0D\u4F1A\u6539\u4EFB\u4F55\u4E1A\u52A1\u6570\u636E\u3002\u6BCF\u6B21\u8C03\u7528\u6574\u4F53\u66FF\u6362\u770B\u677F\u5185\u5BB9\u3002",
+    parameters: {
+      type: "object",
+      required: ["action", "app", "blocks"],
+      properties: {
+        action: { type: "string", enum: ["board"] },
+        app: { type: "string", description: "\u5FAE\u5E94\u7528\u540D\uFF0C\u4E5F\u5C31\u662F /\u540D\u5B57 \u91CC\u7684\u540D\u5B57" },
+        blocks: {
+          type: "array",
+          maxItems: 20,
+          description: "\u770B\u677F\u5185\u5BB9\uFF0C\u4ECE\u4E0A\u5230\u4E0B\u663E\u793A\uFF1B\u53EA\u5F53\u6587\u5B57\u663E\u793A\uFF0C\u4E0D\u652F\u6301 HTML",
+          items: {
+            type: "object",
+            required: ["type"],
+            properties: {
+              type: { type: "string", enum: ["text", "list", "table"] },
+              text: { type: "string" },
+              items: { type: "array", items: { type: "string" } },
+              columns: { type: "array", items: { type: "string" } },
+              rows: { type: "array", items: { type: "array", items: { type: "string" } } }
+            }
+          }
+        }
+      }
+    },
+    output: { schema: {}, render: (_args, value) => [{ type: "text", text: renderResult(value) }] },
+    execute: async (args, exec) => ({ content: [{ type: "text", text: await runWorkbenchTool(deps, args, exec) }] })
+  });
+}
+
 // src/index.ts
 var name = "dsh-ee-connect";
 var inject = {
@@ -2965,6 +3135,7 @@ function apply(ctx, input) {
       await Promise.all([bridge.sync().catch(() => void 0), skills?.refreshNow()]);
     });
     const appBindings = new AppBindings();
+    const boards = new BoardStore();
     registerDoctor(ctx, config, tokens, http, bridge, appBindings);
     skills = await registerSkills(ctx, config, http);
     registerBrand(ctx, {
@@ -2976,12 +3147,22 @@ function apply(ctx, input) {
         return appBindings.bind(name2, sessionId);
       },
       unbindApp: async (name2) => appBindings.unbind(name2),
+      workbenchData: async (request) => readWidgetData(await skills.readApps(), bridge, request),
+      readBoard: async (request) => boards.read(String(request?.app ?? ""), String(request?.sessionId ?? "")) ?? null,
       readOverview: () => readEnterpriseOverview(config, http, bridge),
       login: () => commands.login(),
       doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge, appBindings)
     });
+    const disposeWorkbenchTool = registerWorkbenchTool(ctx, {
+      boards,
+      readApps: () => skills.readApps(),
+      boundSession: (app) => appBindings.list()[app]?.sessionId
+    });
     await bridge.start();
-    return () => bridge.stop();
+    return () => {
+      disposeWorkbenchTool();
+      bridge.stop();
+    };
   });
 }
 export {

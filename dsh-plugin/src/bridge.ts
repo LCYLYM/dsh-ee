@@ -42,6 +42,8 @@ export class McpBridge {
   private metas = new Map<string, Record<string, ActionMeta>>();
   private previews = new Map<string, string>();
   private local = new Map<string, LocalAction>();
+  /** 服务端在 tools/list 里标了 readOnlyHint 的工具（服务端工具名）；工作台取数只能用它们 */
+  private readOnly = new Set<string>();
   readonly status = { lastSyncAt: 0, tools: 0, error: "" };
 
   constructor(private ctx: DshContext, private config: PluginConfig, private http: HttpClient) {}
@@ -69,6 +71,16 @@ export class McpBridge {
   /** 直接调服务端工具（本机诊断用）。 */
   async callTool(name: string, args: unknown): Promise<any> {
     return this.rpc("tools/call", { name, arguments: args });
+  }
+
+  /** 当前员工能用、并且服务端标为只读的工具；没权限的工具不在 tools/list 里，也就不在这里。 */
+  isReadOnlyTool(serverName: string): boolean {
+    return this.readOnly.has(serverName);
+  }
+
+  /** 当前员工能不能用这个工具（服务端按权限列出的工具）。 */
+  hasTool(serverName: string): boolean {
+    return [...this.serverNames.values()].includes(serverName);
   }
 
   /** 这次调用该不该先让用户批准；只读的返回 undefined。 */
@@ -103,6 +115,7 @@ export class McpBridge {
     const actions = tool._meta?.dshee?.actions;
     if (actions && typeof actions === "object") this.metas.set(name, actions);
     this.serverNames.set(name, tool.name);
+    if (tool.annotations?.readOnlyHint === true) this.readOnly.add(tool.name);
     const dispose = this.ctx.tools.register({
       name,
       description: tool.description || tool.name,
@@ -120,6 +133,7 @@ export class McpBridge {
       dispose();
       this.metas.delete(name);
       this.serverNames.delete(name);
+      this.readOnly.delete(tool.name);
     });
   }
 

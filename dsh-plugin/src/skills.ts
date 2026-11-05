@@ -1,6 +1,7 @@
 import type { DshContext, PluginConfig } from "./dsh.js";
 import type { HttpClient } from "./http.js";
 import { installRequired } from "./plugins.js";
+import type { AppWorkbench } from "./workbench.js";
 
 export interface CatalogApp {
   name: string;
@@ -13,6 +14,8 @@ export interface CatalogApp {
   missing?: string[];
   asset_id?: number;
   web_url?: string;
+  /** 右侧栏业务工作台；旧服务端没有这个字段 */
+  workbench?: AppWorkbench;
 }
 
 export interface SkillsHandle {

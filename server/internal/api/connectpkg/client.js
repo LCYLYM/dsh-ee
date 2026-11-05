@@ -27,7 +27,7 @@ __export(client_exports, {
   inject: () => inject
 });
 module.exports = __toCommonJS(client_exports);
-var import_react2 = require("react");
+var import_react3 = require("react");
 
 // node_modules/@deepseek-ai/dsh-typert-protocol/lib/index.js
 var TYPERT_OWNED_VALUE = Symbol.for("dsh.typert.owned-value");
@@ -3312,10 +3312,10 @@ function isValidJWT(token, algorithm = null) {
     const tokensParts = token.split(".");
     if (tokensParts.length !== 3)
       return false;
-    const [header] = tokensParts;
-    if (!header)
+    const [header2] = tokensParts;
+    if (!header2)
       return false;
-    const parsedHeader = JSON.parse(atob(header));
+    const parsedHeader = JSON.parse(atob(header2));
     if ("typ" in parsedHeader && parsedHeader?.typ !== "JWT")
       return false;
     if (!parsedHeader.alg)
@@ -19895,10 +19895,10 @@ function date4(params) {
 }
 
 // src/brand-view.ts
-function brandMark(createElement3, brand, props = {}) {
+function brandMark(createElement4, brand, props = {}) {
   const size = props.size ?? 32;
   if (brand.logo_url) {
-    return createElement3("img", {
+    return createElement4("img", {
       src: brand.logo_url,
       alt: brand.name,
       width: size,
@@ -19907,7 +19907,7 @@ function brandMark(createElement3, brand, props = {}) {
     });
   }
   const letter = (brand.name.trim().charAt(0) || "\u4F01").toUpperCase();
-  return createElement3("span", {
+  return createElement4("span", {
     "aria-label": brand.name,
     style: {
       width: size,
@@ -19923,8 +19923,8 @@ function brandMark(createElement3, brand, props = {}) {
     }
   }, letter);
 }
-function brandName(createElement3, brand) {
-  return createElement3("span", { "data-dsh-ee-brand": brand.revision || "neutral" }, brand.name);
+function brandName(createElement4, brand) {
+  return createElement4("span", { "data-dsh-ee-brand": brand.revision || "neutral" }, brand.name);
 }
 
 // src/status-view.ts
@@ -19959,34 +19959,34 @@ function adminRemaining(me, now = Date.now()) {
   if (minutes >= 60) return `\u8FD8\u5269 ${Math.floor(minutes / 60)} \u5C0F\u65F6 ${minutes % 60} \u5206\u949F`;
   return `\u8FD8\u5269 ${minutes} \u5206\u949F`;
 }
-function button(createElement3, label, onClick, busy = false) {
-  return createElement3("button", {
+function button(createElement4, label, onClick, busy = false) {
+  return createElement4("button", {
     type: "button",
     onClick,
     disabled: busy,
     style: { padding: "6px 10px", border: "1px solid currentColor", borderRadius: 6, background: "transparent", color: "inherit", cursor: busy ? "wait" : "pointer", opacity: busy ? 0.55 : 1 }
   }, label);
 }
-function section(createElement3, title, ...children) {
-  return createElement3(
+function section(createElement4, title, ...children) {
+  return createElement4(
     "section",
     { style: { marginTop: 18, paddingTop: 14, borderTop: "1px solid color-mix(in srgb, currentColor 14%, transparent)" } },
-    createElement3("h3", { style: { margin: "0 0 10px", fontSize: 13 } }, title),
+    createElement4("h3", { style: { margin: "0 0 10px", fontSize: 13 } }, title),
     ...children
   );
 }
-function enterprisePanel(createElement3, org, state, actions, AppsPanel) {
+function enterprisePanel(createElement4, org, state, actions, AppsPanel) {
   const { data, failed, busy, notice, doctor } = state;
   const me = data?.me;
   const quota = effectiveQuota(data?.usage);
-  const children = [createElement3("h2", { key: "title", style: { margin: "0 0 16px", fontSize: 16 } }, org)];
+  const children = [createElement4("h2", { key: "title", style: { margin: "0 0 16px", fontSize: 16 } }, org)];
   if (!data || !me) {
-    children.push(createElement3("p", { key: "state", style: { lineHeight: 1.6 } }, failed ? "\u672A\u767B\u5F55\u6216\u8FDE\u63A5\u4E0D\u53EF\u7528\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55\u3002" : "\u6B63\u5728\u8BFB\u53D6\u4F01\u4E1A\u8D26\u53F7\u2026"));
-    if (failed) children.push(createElement3(
+    children.push(createElement4("p", { key: "state", style: { lineHeight: 1.6 } }, failed ? "\u672A\u767B\u5F55\u6216\u8FDE\u63A5\u4E0D\u53EF\u7528\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55\u3002" : "\u6B63\u5728\u8BFB\u53D6\u4F01\u4E1A\u8D26\u53F7\u2026"));
+    if (failed) children.push(createElement4(
       "div",
       { key: "actions", style: { display: "flex", gap: 8 } },
-      button(createElement3, busy ? "\u6B63\u5728\u53D1\u8D77\u767B\u5F55\u2026" : "\u767B\u5F55", actions.login, busy),
-      button(createElement3, "\u5237\u65B0", actions.refresh, busy)
+      button(createElement4, busy ? "\u6B63\u5728\u53D1\u8D77\u767B\u5F55\u2026" : "\u767B\u5F55", actions.login, busy),
+      button(createElement4, "\u5237\u65B0", actions.refresh, busy)
     ));
   } else {
     const rows = [
@@ -19995,73 +19995,73 @@ function enterprisePanel(createElement3, org, state, actions, AppsPanel) {
       ["\u4EE4\u724C\u6709\u6548\u671F", me.expires_at ? `${me.expires_at.slice(0, 10)} \u5230\u671F` : "\u957F\u671F\u6709\u6548"],
       ["\u7BA1\u7406\u6A21\u5F0F", adminRemaining(me)]
     ];
-    children.push(createElement3(
+    children.push(createElement4(
       "dl",
       { key: "account", style: { margin: 0, display: "grid", gridTemplateColumns: "80px 1fr", gap: "12px 8px" } },
       ...rows.flatMap(([label, value]) => [
-        createElement3("dt", { key: `${label}-label`, style: { opacity: 0.65 } }, label),
-        createElement3("dd", { key: `${label}-value`, style: { margin: 0 } }, value)
+        createElement4("dt", { key: `${label}-label`, style: { opacity: 0.65 } }, label),
+        createElement4("dd", { key: `${label}-value`, style: { margin: 0 } }, value)
       ])
     ));
-    if (AppsPanel) children.push(createElement3(AppsPanel, { key: "apps" }));
+    if (AppsPanel) children.push(createElement4(AppsPanel, { key: "apps" }));
     children.push(section(
-      createElement3,
+      createElement4,
       "\u672C\u6708\u989D\u5EA6",
-      quota === void 0 ? "\u989D\u5EA6\u4FE1\u606F\u4E0D\u53EF\u7528" : quota === null ? "\u4E0D\u9650\u989D" : createElement3(
+      quota === void 0 ? "\u989D\u5EA6\u4FE1\u606F\u4E0D\u53EF\u7528" : quota === null ? "\u4E0D\u9650\u989D" : createElement4(
         "div",
         {},
-        createElement3(
+        createElement4(
           "div",
           { style: { display: "flex", justifyContent: "space-between", marginBottom: 7 } },
-          createElement3("span", {}, `${formatTokens(quota.used)} / ${formatTokens(quota.limit)}`),
-          createElement3("span", { style: { color: quota.usedRatio >= 0.9 ? "#d97706" : "inherit" } }, `\u5269\u4F59 ${quota.remainingPercent}%`)
+          createElement4("span", {}, `${formatTokens(quota.used)} / ${formatTokens(quota.limit)}`),
+          createElement4("span", { style: { color: quota.usedRatio >= 0.9 ? "#d97706" : "inherit" } }, `\u5269\u4F59 ${quota.remainingPercent}%`)
         ),
-        createElement3(
+        createElement4(
           "div",
           { role: "progressbar", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(quota.usedRatio * 100), style: { height: 6, borderRadius: 3, overflow: "hidden", background: "color-mix(in srgb, currentColor 12%, transparent)" } },
-          createElement3("div", { style: { width: `${quota.usedRatio * 100}%`, height: "100%", background: quota.usedRatio >= 0.9 ? "#d97706" : "#2563eb" } })
+          createElement4("div", { style: { width: `${quota.usedRatio * 100}%`, height: "100%", background: quota.usedRatio >= 0.9 ? "#d97706" : "#2563eb" } })
         )
       )
     ));
     children.push(section(
-      createElement3,
+      createElement4,
       "\u4F01\u4E1A\u6A21\u578B",
-      createElement3("div", {}, `\u9ED8\u8BA4\uFF1A${data.default_model || "\u672A\u8BBE\u7F6E"}`),
-      createElement3("div", { style: { marginTop: 6, opacity: 0.75, lineHeight: 1.5 } }, data.models.length ? data.models.join("\u3001") : "\u6CA1\u6709\u53EF\u7528\u6A21\u578B\u6216\u6A21\u578B\u5217\u8868\u4E0D\u53EF\u7528")
+      createElement4("div", {}, `\u9ED8\u8BA4\uFF1A${data.default_model || "\u672A\u8BBE\u7F6E"}`),
+      createElement4("div", { style: { marginTop: 6, opacity: 0.75, lineHeight: 1.5 } }, data.models.length ? data.models.join("\u3001") : "\u6CA1\u6709\u53EF\u7528\u6A21\u578B\u6216\u6A21\u578B\u5217\u8868\u4E0D\u53EF\u7528")
     ));
     children.push(section(
-      createElement3,
+      createElement4,
       "\u63A5\u5165\u72B6\u6001",
-      createElement3("div", { style: { lineHeight: 1.6 } }, `\u63D2\u4EF6 ${data.version}${data.latest_version && data.latest_version !== data.version ? ` \xB7 \u65B0\u7248\u672C ${data.latest_version}` : " \xB7 \u5DF2\u662F\u6700\u65B0"}`),
-      createElement3(
+      createElement4("div", { style: { lineHeight: 1.6 } }, `\u63D2\u4EF6 ${data.version}${data.latest_version && data.latest_version !== data.version ? ` \xB7 \u65B0\u7248\u672C ${data.latest_version}` : " \xB7 \u5DF2\u662F\u6700\u65B0"}`),
+      createElement4(
         "div",
         { style: { display: "flex", gap: 8, marginTop: 10 } },
-        button(createElement3, busy ? "\u8BCA\u65AD\u4E2D\u2026" : "\u8BCA\u65AD", actions.doctor, busy),
-        button(createElement3, "\u5237\u65B0", actions.refresh, busy)
+        button(createElement4, busy ? "\u8BCA\u65AD\u4E2D\u2026" : "\u8BCA\u65AD", actions.doctor, busy),
+        button(createElement4, "\u5237\u65B0", actions.refresh, busy)
       )
     ));
   }
-  if (notice) children.push(createElement3("p", { key: "notice", role: "status", style: { lineHeight: 1.6, overflowWrap: "anywhere" } }, notice));
+  if (notice) children.push(createElement4("p", { key: "notice", role: "status", style: { lineHeight: 1.6, overflowWrap: "anywhere" } }, notice));
   if (doctor) children.push(section(
-    createElement3,
+    createElement4,
     `\u8BCA\u65AD\u7ED3\u679C\uFF1A${doctor.summary}`,
-    createElement3(
+    createElement4(
       "ul",
       { style: { margin: 0, paddingLeft: 18, lineHeight: 1.6 } },
-      ...doctor.checks.map((check2) => createElement3("li", { key: check2.id, style: { color: check2.status === "ok" ? "inherit" : check2.status === "warn" ? "#d97706" : "#d92d20" } }, `${check2.title}${check2.fix ? `\uFF1B${check2.fix}` : ""}`))
+      ...doctor.checks.map((check2) => createElement4("li", { key: check2.id, style: { color: check2.status === "ok" ? "inherit" : check2.status === "warn" ? "#d97706" : "#d92d20" } }, `${check2.title}${check2.fix ? `\uFF1B${check2.fix}` : ""}`))
     )
   ));
-  return createElement3("main", {
+  return createElement4("main", {
     "data-dsh-ee-ui": "panel",
     "data-dsh-ee-state": data ? "connected" : failed ? "disconnected" : "loading",
     style: { padding: 16, color: "inherit", fontSize: 13 }
   }, ...children);
 }
-function enterpriseHeader(createElement3, data, failed, onClick) {
+function enterpriseHeader(createElement4, data, failed, onClick) {
   const me = data?.me;
   const quota = effectiveQuota(data?.usage);
   const label = !me ? failed ? "\u4F01\u4E1A \xB7 \u672A\u767B\u5F55" : "\u4F01\u4E1A \xB7 \u68C0\u67E5\u4E2D" : me.admin_live ? `\u7BA1\u7406\u6A21\u5F0F \xB7 ${adminRemaining(me)}` : quota ? `\u4F01\u4E1A\u6A21\u578B \xB7 \u5269\u4F59 ${quota.remainingPercent}%` : `\u4F01\u4E1A\u6A21\u578B \xB7 ${me.username}`;
-  return createElement3("button", {
+  return createElement4("button", {
     type: "button",
     onClick,
     "data-dsh-ee-ui": "header",
@@ -20093,14 +20093,14 @@ var import_react = require("react");
 
 // src/apps-view.ts
 var buttonStyle = { border: 0, background: "transparent", color: "inherit", cursor: "pointer", padding: 0, textAlign: "left" };
-function appIcon(createElement3, app) {
-  return createElement3("span", {
+function appIcon(createElement4, app) {
+  return createElement4("span", {
     "aria-hidden": true,
     style: { width: 30, height: 30, flex: "0 0 30px", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "color-mix(in srgb, currentColor 10%, transparent)", fontSize: 16 }
   }, app.icon || Array.from(app.title)[0] || "?");
 }
-function appTile(createElement3, app, onOpen) {
-  return createElement3(
+function appTile(createElement4, app, onOpen) {
+  return createElement4(
     "button",
     {
       type: "button",
@@ -20108,73 +20108,74 @@ function appTile(createElement3, app, onOpen) {
       title: app.description,
       style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, minWidth: 0, flex: 1, padding: "5px 0" }
     },
-    appIcon(createElement3, app),
-    createElement3("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title)
+    appIcon(createElement4, app),
+    createElement4("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title)
   );
 }
-function appMenu(createElement3, app, actions) {
-  return createElement3(
+function appMenu(createElement4, app, actions) {
+  return createElement4(
     "details",
     { style: { position: "relative", flex: "0 0 auto" } },
-    createElement3("summary", { "aria-label": `${app.title}\u66F4\u591A\u64CD\u4F5C`, style: { cursor: "pointer", listStyle: "none", padding: "4px 6px" } }, "\u22EF"),
-    createElement3(
+    createElement4("summary", { "aria-label": `${app.title}\u66F4\u591A\u64CD\u4F5C`, style: { cursor: "pointer", listStyle: "none", padding: "4px 6px" } }, "\u22EF"),
+    createElement4(
       "div",
       { style: { position: "absolute", right: 0, zIndex: 20, minWidth: 130, padding: 6, borderRadius: 7, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", boxShadow: "0 5px 20px #0002" } },
-      createElement3("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.newSession(app) }, "\u65B0\u5F00\u4E00\u4E2A\u4F1A\u8BDD"),
-      createElement3("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.fill(app) }, "\u586B\u8FDB\u8F93\u5165\u6846"),
-      createElement3("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.web(app) }, "\u5728\u7F51\u9875\u67E5\u770B"),
-      createElement3("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.unbind(app) }, "\u89E3\u9664\u7ED1\u5B9A")
+      createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.newSession(app) }, "\u65B0\u5F00\u4E00\u4E2A\u4F1A\u8BDD"),
+      app.workbench?.panes?.length && actions.openWorkbench ? createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.openWorkbench(app) }, "\u6253\u5F00\u5DE5\u4F5C\u53F0") : null,
+      createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.fill(app) }, "\u586B\u8FDB\u8F93\u5165\u6846"),
+      createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.web(app) }, "\u5728\u7F51\u9875\u67E5\u770B"),
+      createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.unbind(app) }, "\u89E3\u9664\u7ED1\u5B9A")
     )
   );
 }
-function appRow(createElement3, app, actions, status) {
+function appRow(createElement4, app, actions, status) {
   const statusView = status === "need" ? { label: "\u5F85\u4F60\u51B3\u5B9A", color: "#d97706" } : status === "busy" ? { label: "\u5DE5\u4F5C\u4E2D", color: "#2563eb" } : status === "done" ? { label: "\u672C\u8F6E\u7ED3\u675F", color: "#737373" } : void 0;
-  return createElement3(
+  return createElement4(
     "div",
     { key: app.name, "data-dsh-ee-app": app.name, style: { display: "flex", alignItems: "center", gap: 4 } },
-    statusView ? createElement3("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
-    appTile(createElement3, app, () => actions.open(app)),
-    app.missing?.length ? createElement3("span", { title: `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528") : null,
-    appMenu(createElement3, app, actions)
+    statusView ? createElement4("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
+    appTile(createElement4, app, () => actions.open(app)),
+    app.missing?.length ? createElement4("span", { title: `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528") : null,
+    appMenu(createElement4, app, actions)
   );
 }
-function appsSection(createElement3, state, actions) {
+function appsSection(createElement4, state, actions) {
   if (!state.loggedIn) {
-    return createElement3(
+    return createElement4(
       "section",
       { "data-dsh-ee-ui": "apps", style: { padding: "10px 12px", fontSize: 13 } },
-      createElement3("div", { style: { marginBottom: 8 } }, "\u767B\u5F55\u540E\u67E5\u770B\u4F01\u4E1A\u5E94\u7528"),
-      createElement3("button", { type: "button", onClick: actions.login, style: { ...buttonStyle, border: "1px solid currentColor", borderRadius: 6, padding: "5px 10px" } }, "\u767B\u5F55")
+      createElement4("div", { style: { marginBottom: 8 } }, "\u767B\u5F55\u540E\u67E5\u770B\u4F01\u4E1A\u5E94\u7528"),
+      createElement4("button", { type: "button", onClick: actions.login, style: { ...buttonStyle, border: "1px solid currentColor", borderRadius: 6, padding: "5px 10px" } }, "\u767B\u5F55")
     );
   }
   if (!state.apps.length) return null;
   const query = state.query?.trim().toLowerCase() ?? "";
   const filtered = state.apps.filter((app) => !query || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(query));
   const shown = state.expanded ? filtered : filtered.slice(0, 6);
-  return createElement3(
+  return createElement4(
     "section",
     { "data-dsh-ee-ui": "apps", style: { padding: "10px 12px", fontSize: 13 } },
-    createElement3("h2", { style: { margin: "0 0 7px", fontSize: 13 } }, "\u4F01\u4E1A\u5E94\u7528"),
-    state.apps.length > 8 ? createElement3("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }) : null,
-    createElement3("div", { style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement3, app, actions, state.statuses?.[app.name]))),
-    !state.expanded && filtered.length > 6 ? createElement3("button", { type: "button", onClick: actions.toggle, style: { ...buttonStyle, marginTop: 7, opacity: 0.7 } }, `\u66F4\u591A\uFF08${filtered.length - 6}\uFF09`) : null,
-    state.notice ? createElement3("p", { role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null
+    createElement4("h2", { style: { margin: "0 0 7px", fontSize: 13 } }, "\u4F01\u4E1A\u5E94\u7528"),
+    state.apps.length > 8 ? createElement4("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }) : null,
+    createElement4("div", { style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement4, app, actions, state.statuses?.[app.name]))),
+    !state.expanded && filtered.length > 6 ? createElement4("button", { type: "button", onClick: actions.toggle, style: { ...buttonStyle, marginTop: 7, opacity: 0.7 } }, `\u66F4\u591A\uFF08${filtered.length - 6}\uFF09`) : null,
+    state.notice ? createElement4("p", { role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null
   );
 }
-function heroAppsMenu(createElement3, apps, onOpen, query = "", onSearch = () => {
+function heroAppsMenu(createElement4, apps, onOpen, query = "", onSearch = () => {
 }, notice = "") {
   if (!apps.length) return null;
   const normalized = query.trim().toLowerCase();
   const shown = apps.filter((app) => !normalized || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(normalized)).slice(0, 8);
-  return createElement3(
+  return createElement4(
     "details",
     { "data-dsh-ee-ui": "hero-apps", style: { position: "relative", display: "inline-block" } },
-    createElement3("summary", { style: { cursor: "pointer", listStyle: "none", fontSize: 12, padding: "4px 7px", whiteSpace: "nowrap" } }, "\u4F01\u4E1A\u5E94\u7528"),
-    createElement3(
+    createElement4("summary", { style: { cursor: "pointer", listStyle: "none", fontSize: 12, padding: "4px 7px", whiteSpace: "nowrap" } }, "\u4F01\u4E1A\u5E94\u7528"),
+    createElement4(
       "div",
       { style: { position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 30, width: 280, padding: 8, borderRadius: 8, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 8px 30px #0003" } },
-      apps.length > 8 ? createElement3("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: query, onChange: (event) => onSearch(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid #8886", background: "transparent", color: "inherit" } }) : null,
-      createElement3("div", { style: { display: "grid", gap: 4 } }, ...shown.map((app) => createElement3(
+      apps.length > 8 ? createElement4("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: query, onChange: (event) => onSearch(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid #8886", background: "transparent", color: "inherit" } }) : null,
+      createElement4("div", { style: { display: "grid", gap: 4 } }, ...shown.map((app) => createElement4(
         "button",
         {
           key: app.name,
@@ -20182,15 +20183,15 @@ function heroAppsMenu(createElement3, apps, onOpen, query = "", onSearch = () =>
           onClick: () => onOpen(app),
           style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, padding: 7, borderRadius: 6, width: "100%" }
         },
-        appIcon(createElement3, app),
-        createElement3(
+        appIcon(createElement4, app),
+        createElement4(
           "span",
           { style: { minWidth: 0 } },
-          createElement3("span", { style: { display: "block", fontSize: 13 } }, app.title),
-          createElement3("span", { style: { display: "block", fontSize: 11, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.starters[0] || app.description)
+          createElement4("span", { style: { display: "block", fontSize: 13 } }, app.title),
+          createElement4("span", { style: { display: "block", fontSize: 11, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.starters[0] || app.description)
         )
       ))),
-      notice ? createElement3("p", { role: "status", style: { margin: "7px 4px 0", fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" } }, notice) : null
+      notice ? createElement4("p", { role: "status", style: { margin: "7px 4px 0", fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" } }, notice) : null
     )
   );
 }
@@ -20507,7 +20508,10 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     if (id) seen.add(`${app.name}:${id}`);
     update({ sessionSnapshot: snapshot.sessionSnapshot });
   };
-  const launcher = createLauncher(ctx, { bind });
+  let workbenchOpener;
+  const launcher = createLauncher(ctx, { bind, afterLaunch: async (app, id) => {
+    await workbenchOpener?.(app, id);
+  } });
   const launchSidebar = async (app) => {
     const id = snapshot.bindings[app.name]?.sessionId;
     const archived = ctx.workspaces?.list?.getSnapshot?.()?.archivedSessionIds;
@@ -20533,6 +20537,17 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     },
     newSession: (app) => {
       void openWithFallback(app, (target) => launcher.launchNew(target)).then(setNotice);
+    },
+    openWorkbench: (app) => {
+      const id = snapshot.bindings[app.name]?.sessionId;
+      const current = ctx.sidebarRight?.mounted?.getSnapshot?.();
+      if (!id || id !== current) {
+        setNotice("\u5148\u70B9\u5E94\u7528\u56DE\u5230\u5B83\u7684\u4F1A\u8BDD\uFF0C\u518D\u6253\u5F00\u5DE5\u4F5C\u53F0");
+        return;
+      }
+      void workbenchOpener?.(app, id, true).then((opened) => {
+        if (!opened) setNotice("\u5DE5\u4F5C\u53F0\u6CA1\u6709\u6253\u5F00\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5");
+      });
     },
     unbind: (app) => {
       void remote.unbindApp({ name: app.name }).then((result) => {
@@ -20576,7 +20591,424 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
   const AppsPanel = () => (0, import_react.createElement)(AppsSection);
   ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({ name: "sidebar.footer.action", id: "dsh-ee-apps", order: 30, label: "\u4F01\u4E1A\u5E94\u7528" }, AppsSection));
   ctx.slots.inject("conversation.hero.options", () => ctx.slots.register({ name: "conversation.hero.options", id: "dsh-ee-apps", order: 100, label: "\u4F01\u4E1A\u5E94\u7528" }, HeroApps));
-  return { AppsPanel };
+  return {
+    AppsPanel,
+    appsNow: () => snapshot.apps,
+    subscribeApps: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setWorkbenchOpener: (opener) => {
+      workbenchOpener = opener;
+    }
+  };
+}
+
+// src/workbench-client.ts
+var import_react2 = require("react");
+
+// src/workbench.ts
+var workbenchScheme = "dsh-resource://dsh-ee-workbench/";
+function workbenchAddress(app, pane) {
+  return `${workbenchScheme}${encodeURIComponent(app)}/${encodeURIComponent(pane)}`;
+}
+function parseWorkbenchAddress(address) {
+  if (typeof address !== "string" || !address.startsWith(workbenchScheme)) return void 0;
+  const parts = address.slice(workbenchScheme.length).split("/");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return void 0;
+  try {
+    return { app: decodeURIComponent(parts[0]), pane: decodeURIComponent(parts[1]) };
+  } catch {
+    return void 0;
+  }
+}
+function getPath(value, path) {
+  if (!path) return value;
+  let current = value;
+  for (const key of path.split(".")) {
+    if (current === null || current === void 0 || typeof current !== "object") return void 0;
+    current = current[key];
+  }
+  return current;
+}
+function formatValue(value, format) {
+  if (value === null || value === void 0 || value === "") return "\u2014";
+  const number4 = typeof value === "number" ? value : Number(value);
+  switch (format) {
+    case "money":
+      return Number.isFinite(number4) ? number4.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(value);
+    case "number":
+      return Number.isFinite(number4) ? number4.toLocaleString("zh-CN") : String(value);
+    case "percent":
+      return Number.isFinite(number4) ? `${Number((number4 * 100).toFixed(2))}%` : String(value);
+    case "date": {
+      const date5 = new Date(value);
+      return Number.isNaN(date5.getTime()) ? String(value) : date5.toLocaleDateString("zh-CN");
+    }
+    default:
+      return typeof value === "object" ? JSON.stringify(value) : String(value);
+  }
+}
+var maxValueLength = 500;
+var placeholder = /\{\{\s*(row|form)\.([A-Za-z0-9_.]+)\s*\}\}/g;
+function placeholderValue(value) {
+  let text = value === null || value === void 0 ? "" : typeof value === "object" ? JSON.stringify(value) : String(value);
+  text = text.trim();
+  return text.length > maxValueLength ? `${text.slice(0, maxValueLength)}\u2026` : text;
+}
+function fillPrompt(prompt, data) {
+  return prompt.replace(placeholder, (_match, scope, path) => placeholderValue(getPath(scope === "row" ? data.row : data.form, path)));
+}
+function checkForm(fields, values) {
+  for (const field of fields) {
+    const raw = values[field.name];
+    const value = typeof raw === "string" ? raw.trim() : raw;
+    if (field.required && (value === void 0 || value === null || value === "")) return `\u8BF7\u586B\u5199\u300C${field.label}\u300D`;
+    if (field.kind === "number" && value !== void 0 && value !== "" && !Number.isFinite(Number(value))) return `\u300C${field.label}\u300D\u8981\u586B\u6570\u5B57`;
+    if (field.kind === "select" && value && !(field.options ?? []).includes(value)) return `\u300C${field.label}\u300D\u8BF7\u4ECE\u9009\u9879\u91CC\u9009`;
+  }
+  return "";
+}
+function tableRows(result, rows) {
+  const list = getPath(result, rows);
+  if (!Array.isArray(list)) return { rows: [], total: 0 };
+  return { rows: list.slice(0, 50), total: list.length };
+}
+var maxBoardBytes = 32 << 10;
+
+// src/workbench-open.ts
+function waitMounted(sidebarRight, sessionId, timeoutMs = 5e3) {
+  const mounted = sidebarRight?.mounted;
+  if (typeof mounted?.getSnapshot !== "function") return Promise.resolve(false);
+  if (mounted.getSnapshot() === sessionId) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let dispose;
+    const done = (ok) => {
+      clearTimeout(timer);
+      dispose?.();
+      resolve(ok);
+    };
+    const timer = setTimeout(() => done(false), timeoutMs);
+    dispose = mounted.subscribe?.(() => {
+      if (mounted.getSnapshot() === sessionId) done(true);
+    });
+    if (mounted.getSnapshot() === sessionId) done(true);
+  });
+}
+function workbenchOpenIn(sidebarRight, sessionId, app) {
+  const tabs = sidebarRight?.openTabs?.getSnapshot?.();
+  if (!Array.isArray(tabs)) return false;
+  const prefix = workbenchAddress(app, "");
+  return tabs.some((tab) => tab?.sessionId === sessionId && typeof tab?.contentId === "string" && tab.contentId.startsWith(prefix));
+}
+async function openWorkbench(ctx, app, sessionId, force = false) {
+  const panes = app.workbench?.panes ?? [];
+  const sidebarRight = ctx.sidebarRight;
+  if (!panes.length || typeof sidebarRight?.openResource !== "function") return false;
+  if (!await waitMounted(sidebarRight, sessionId)) return false;
+  if (!force && workbenchOpenIn(sidebarRight, sessionId, app.name)) return false;
+  panes.forEach((pane, index) => {
+    const placement = index === 1 ? { preferNewPane: true } : {};
+    if (pane.type === "web") {
+      sidebarRight.openTab("browser", { ...placement, params: { url: pane.url } });
+    } else {
+      sidebarRight.openResource(workbenchAddress(app.name, pane.id), placement);
+    }
+  });
+  return true;
+}
+
+// src/workbench-view.ts
+var muted = { opacity: 0.65, fontSize: 12 };
+var card = { border: "1px solid color-mix(in srgb, currentColor 14%, transparent)", borderRadius: 8, padding: "10px 12px" };
+var buttonStyle2 = { border: "1px solid color-mix(in srgb, currentColor 25%, transparent)", borderRadius: 6, background: "transparent", color: "inherit", cursor: "pointer", padding: "3px 9px", fontSize: 12 };
+var widgetNames = { metric: "\u6307\u6807", table: "\u8868\u683C", form: "\u8868\u5355", actions: "\u5FEB\u6377\u6309\u94AE", markdown: "\u8BF4\u660E", board: "AI \u770B\u677F" };
+function button2(h, label, onClick, disabled = false, key) {
+  return h("button", { key, type: "button", onClick, disabled, style: { ...buttonStyle2, opacity: disabled ? 0.5 : 1, cursor: disabled ? "default" : "pointer" } }, label);
+}
+function header(h, widget, refresh) {
+  return h(
+    "div",
+    { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 } },
+    h("strong", { style: { fontSize: 13 } }, widget.title || widgetNames[widget.type]),
+    refresh ? h("button", { type: "button", onClick: refresh, "aria-label": "\u5237\u65B0", title: "\u5237\u65B0", style: { ...buttonStyle2, border: 0, padding: "0 4px" } }, "\u21BB") : null
+  );
+}
+function stateNote(h, state) {
+  if (!state || state.status === "loading") return h("div", { style: muted }, "\u52A0\u8F7D\u4E2D\u2026");
+  if (state.status === "forbidden") return h("div", { style: muted }, "\u65E0\u6743\u9650\uFF1A\u4F60\u6CA1\u6709\u8FD9\u4E2A\u6570\u636E\u6E90\u7684\u4F7F\u7528\u6743\u9650");
+  if (state.status === "error") return h("div", { style: { ...muted, color: "#b45309", opacity: 1, overflowWrap: "anywhere" } }, `\u53D6\u6570\u5931\u8D25\uFF1A${state.error}`);
+  return null;
+}
+function metricView(h, widget, state, refresh) {
+  const note = stateNote(h, state);
+  return h(
+    "section",
+    { style: card },
+    header(h, widget, refresh),
+    note ?? h("div", { style: { fontSize: 24, fontWeight: 600 } }, formatValue(getPath(state.value, widget.field), widget.format))
+  );
+}
+function tableView(h, index, widget, state, handlers) {
+  const note = stateNote(h, state);
+  const columns = widget.columns ?? [];
+  const actions = widget.row_actions ?? [];
+  let body = note;
+  if (!note) {
+    const { rows, total } = tableRows(state.value, widget.rows);
+    body = rows.length === 0 ? h("div", { style: muted }, "\u6682\u65E0\u6570\u636E") : h(
+      "div",
+      { style: { overflowX: "auto" } },
+      h(
+        "table",
+        { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
+        h("thead", null, h(
+          "tr",
+          null,
+          ...columns.map((column, c) => h("th", { key: c, style: { textAlign: "left", padding: "4px 6px", borderBottom: "1px solid color-mix(in srgb, currentColor 15%, transparent)", whiteSpace: "nowrap" } }, column.title)),
+          actions.length ? h("th", { key: "actions" }) : null
+        )),
+        h("tbody", null, ...rows.map((row, r) => h(
+          "tr",
+          { key: r },
+          ...columns.map((column, c) => h("td", { key: c, style: { padding: "4px 6px", borderBottom: "1px solid color-mix(in srgb, currentColor 8%, transparent)" } }, formatValue(getPath(row, column.field), column.format))),
+          actions.length ? h(
+            "td",
+            { key: "actions", style: { padding: "4px 6px", whiteSpace: "nowrap" } },
+            ...actions.map((action, a) => {
+              const key = `${index}:row:${r}:${a}`;
+              return button2(h, action.label, () => handlers.send(key, action, { row }), handlers.sending.has(key), key);
+            })
+          ) : null
+        )))
+      ),
+      total > rows.length ? h("div", { style: { ...muted, marginTop: 6 } }, `\u5171 ${total} \u884C\uFF0C\u53EA\u663E\u793A\u524D ${rows.length} \u884C`) : null
+    );
+  }
+  return h("section", { style: card }, header(h, widget, () => handlers.refresh(index)), body);
+}
+function formView(h, index, widget, handlers) {
+  const values = handlers.formValues(index);
+  const fields = widget.fields ?? [];
+  const key = `${index}:form`;
+  const submit = () => {
+    const error62 = checkForm(fields, values);
+    handlers.setFormError(index, error62);
+    if (!error62 && widget.submit) handlers.send(key, widget.submit, { form: values });
+  };
+  const input2 = (field) => {
+    const common = {
+      "aria-label": field.label,
+      value: values[field.name] ?? "",
+      onChange: (event) => handlers.setFormValue(index, field.name, event.target.value),
+      style: { width: "100%", boxSizing: "border-box", padding: 5, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 20%, transparent)", background: "transparent", color: "inherit", fontSize: 12 }
+    };
+    if (field.kind === "select") {
+      return h("select", common, h("option", { value: "" }, "\u8BF7\u9009\u62E9"), ...(field.options ?? []).map((option) => h("option", { key: option, value: option }, option)));
+    }
+    return h("input", { ...common, type: field.kind === "number" ? "number" : field.kind === "date" ? "date" : "text" });
+  };
+  return h(
+    "section",
+    { style: card },
+    header(h, widget),
+    h(
+      "div",
+      { style: { display: "grid", gap: 8 } },
+      ...fields.map((field) => h(
+        "label",
+        { key: field.name, style: { display: "grid", gap: 3, fontSize: 12 } },
+        h("span", null, field.label, field.required ? h("span", { style: { color: "#b45309" } }, " *") : null),
+        input2(field)
+      ))
+    ),
+    handlers.formError(index) ? h("div", { role: "alert", style: { color: "#b45309", fontSize: 12, marginTop: 6 } }, handlers.formError(index)) : null,
+    h("div", { style: { marginTop: 8 } }, button2(h, widget.submit?.label || "\u63D0\u4EA4", submit, handlers.sending.has(key)))
+  );
+}
+function actionsView(h, index, widget, handlers) {
+  return h(
+    "section",
+    { style: card },
+    header(h, widget),
+    h(
+      "div",
+      { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+      ...(widget.actions ?? []).map((action, a) => {
+        const key = `${index}:action:${a}`;
+        return button2(h, action.label, () => handlers.send(key, action, {}), handlers.sending.has(key), key);
+      })
+    )
+  );
+}
+function markdownView(h, widget) {
+  return h("section", { style: card }, widget.title ? header(h, widget) : null, h("div", { style: { whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6 } }, widget.text ?? ""));
+}
+function boardView(h, widget, board) {
+  let body;
+  if (!board?.blocks?.length) {
+    body = h("div", { style: muted }, "AI \u5904\u7406\u5B8C\u4EE5\u540E\u4F1A\u628A\u7ED3\u679C\u5199\u5728\u8FD9\u91CC\u3002");
+  } else {
+    body = h(
+      "div",
+      { style: { display: "grid", gap: 8 } },
+      ...board.blocks.map((block, b) => {
+        if (block.type === "text") return h("div", { key: b, style: { whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6 } }, block.text);
+        if (block.type === "list") return h("ul", { key: b, style: { margin: 0, paddingLeft: 18, fontSize: 12 } }, ...block.items.map((item, i) => h("li", { key: i }, item)));
+        return h(
+          "table",
+          { key: b, style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
+          h("thead", null, h("tr", null, ...block.columns.map((column, c) => h("th", { key: c, style: { textAlign: "left", padding: "3px 6px" } }, column)))),
+          h("tbody", null, ...block.rows.map((row, r) => h("tr", { key: r }, ...row.map((cell, c) => h("td", { key: c, style: { padding: "3px 6px", borderTop: "1px solid color-mix(in srgb, currentColor 8%, transparent)" } }, cell)))))
+        );
+      }),
+      h("div", { style: muted }, `\u66F4\u65B0\u4E8E ${new Date(board.updatedAt).toLocaleString("zh-CN")}`)
+    );
+  }
+  return h("section", { style: card }, header(h, widget), body);
+}
+function panelView(h, pane, state, handlers) {
+  const widgets = pane.widgets ?? [];
+  return h(
+    "div",
+    { "data-dsh-ee-ui": "workbench", style: { display: "grid", gap: 10, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } },
+    state.notice ? h("p", { role: "status", style: { margin: 0, fontSize: 12, overflowWrap: "anywhere" } }, state.notice) : null,
+    ...widgets.map((widget, index) => {
+      const key = `w${index}`;
+      switch (widget.type) {
+        case "metric":
+          return h("div", { key }, metricView(h, widget, state.data[index], () => handlers.refresh(index)));
+        case "table":
+          return h("div", { key }, tableView(h, index, widget, state.data[index], handlers));
+        case "form":
+          return h("div", { key }, formView(h, index, widget, handlers));
+        case "actions":
+          return h("div", { key }, actionsView(h, index, widget, handlers));
+        case "markdown":
+          return h("div", { key }, markdownView(h, widget));
+        case "board":
+          return h("div", { key }, boardView(h, widget, state.board));
+        default:
+          return null;
+      }
+    })
+  );
+}
+function missingPaneView(h) {
+  return h("div", { style: { padding: 16, fontSize: 13, opacity: 0.7 } }, "\u8FD9\u4E2A\u5DE5\u4F5C\u53F0\u5DF2\u7ECF\u4E0D\u53EF\u7528\uFF1A\u5E94\u7528\u53EF\u80FD\u5DF2\u505C\u7528\uFF0C\u6216\u8005\u5DE5\u4F5C\u53F0\u914D\u7F6E\u6539\u4E86\u3002\u53EF\u4EE5\u5173\u6389\u8FD9\u4E2A\u6807\u7B7E\u9875\u3002");
+}
+
+// src/workbench-client.ts
+var workbenchTabId = "__DSH_EE_PACKAGE__/workbench";
+var workbenchKind = "dsh-ee-workbench";
+function onScreenSession(ctx) {
+  const mounted = ctx.sidebarRight?.mounted?.getSnapshot?.();
+  return typeof mounted === "string" && mounted ? mounted : currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
+}
+function registerWorkbench(ctx, deps) {
+  const { remote, unwrapRemote: unwrapRemote2 } = deps;
+  const titleOf = (address) => {
+    const parsed = parseWorkbenchAddress(address);
+    const pane = deps.appsNow().find((app) => app.name === parsed?.app)?.workbench?.panes.find((item) => item.id === parsed?.pane);
+    return pane?.title || "\u5DE5\u4F5C\u53F0";
+  };
+  const useAppsList = () => {
+    const [apps, setApps] = (0, import_react2.useState)(deps.appsNow());
+    (0, import_react2.useEffect)(() => deps.subscribeApps(() => setApps(deps.appsNow())), []);
+    return apps;
+  };
+  const WorkbenchTab = (props) => {
+    const info = props.useTabInfo?.();
+    const address = info?.tab?.navigation?.address || info?.tab?.contentId || "";
+    const visible = info?.tab?.visible !== false;
+    const parsed = parseWorkbenchAddress(address);
+    const apps = useAppsList();
+    const app = apps.find((item) => item.name === parsed?.app);
+    const pane = app?.workbench?.panes.find((item) => item.id === parsed?.pane && item.type === "panel");
+    const [data, setData] = (0, import_react2.useState)({});
+    const [board, setBoard] = (0, import_react2.useState)(void 0);
+    const [notice, setNotice] = (0, import_react2.useState)("");
+    const [sending, setSending] = (0, import_react2.useState)(/* @__PURE__ */ new Set());
+    const [forms, setForms] = (0, import_react2.useState)({});
+    const [formErrors, setFormErrors] = (0, import_react2.useState)({});
+    const sessionRef = (0, import_react2.useRef)("");
+    if (!sessionRef.current) sessionRef.current = onScreenSession(ctx);
+    const load = async (index) => {
+      if (!app || !pane) return;
+      setData((current) => ({ ...current, [index]: { status: "loading" } }));
+      try {
+        const result = unwrapRemote2(await remote.workbenchData({ app: app.name, pane: pane.id, widget: index }));
+        const state = result?.forbidden ? { status: "forbidden" } : result?.error ? { status: "error", error: String(result.error) } : { status: "ready", value: result?.value };
+        setData((current) => ({ ...current, [index]: state }));
+      } catch (error62) {
+        setData((current) => ({ ...current, [index]: { status: "error", error: error62 instanceof Error ? error62.message : "\u7F51\u7EDC\u9519\u8BEF" } }));
+      }
+    };
+    const loadAll = () => (pane?.widgets ?? []).forEach((widget, index) => {
+      if (widget.source) void load(index);
+    });
+    const loadBoard = async () => {
+      if (!app || !sessionRef.current) return;
+      try {
+        setBoard(unwrapRemote2(await remote.board({ app: app.name, sessionId: sessionRef.current })));
+      } catch {
+      }
+    };
+    const hasBoard = !!pane?.widgets?.some((widget) => widget.type === "board");
+    (0, import_react2.useEffect)(loadAll, [app?.name, app?.version, pane?.id]);
+    (0, import_react2.useEffect)(() => {
+      if (!hasBoard || !visible) return;
+      void loadBoard();
+      const timer = setInterval(() => void loadBoard(), 3e3);
+      return () => clearInterval(timer);
+    }, [hasBoard, visible, app?.name]);
+    (0, import_react2.useEffect)(() => info?.tab?.actions?.bindCommands?.({ refresh: () => {
+      loadAll();
+      void loadBoard();
+    } }), [info?.tab?.id, app?.version]);
+    if (!app || !pane) return missingPaneView(import_react2.createElement);
+    const send = (key, action, values) => {
+      if (sending.has(key)) return;
+      const sessionId = onScreenSession(ctx);
+      if (!sessionId) return setNotice("\u6CA1\u6709\u627E\u5230\u5F53\u524D\u4F1A\u8BDD\uFF0C\u8BF7\u5148\u6253\u5F00\u8FD9\u4E2A\u5E94\u7528\u7684\u4F1A\u8BDD");
+      setSending((current) => new Set(current).add(key));
+      setNotice("");
+      sendToSession(ctx, sessionId, fillPrompt(action.prompt, values)).then(() => {
+        setNotice(`\u5DF2\u53D1\u7ED9 AI\uFF1A${action.label}`);
+        if (values.form) {
+          const index = Number(key.split(":")[0]);
+          setForms((current) => ({ ...current, [index]: {} }));
+        }
+      }).catch(() => setNotice(sendUnknownNotice)).finally(() => setSending((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      }));
+    };
+    const handlers = {
+      sending,
+      send,
+      refresh: (index) => void load(index),
+      formValues: (index) => forms[index] ?? {},
+      setFormValue: (index, name, value) => setForms((current) => ({ ...current, [index]: { ...current[index] ?? {}, [name]: value } })),
+      formError: (index) => formErrors[index] ?? "",
+      setFormError: (index, error62) => setFormErrors((current) => ({ ...current, [index]: error62 }))
+    };
+    return panelView(import_react2.createElement, pane, { data, board, notice }, handlers);
+  };
+  ctx.effect(() => ctx.sidebarRightTabs.register({
+    id: workbenchTabId,
+    kind: workbenchKind,
+    patterns: [`${workbenchScheme}**`],
+    keepMounted: true,
+    title: titleOf
+  }));
+  ctx.slots.inject("sidebar.right.pane.tab", () => ctx.slots.register({ name: "sidebar.right.pane.tab", key: workbenchTabId }, WorkbenchTab));
+  return {
+    openWorkbench: (app, sessionId, force = false) => openWorkbench(ctx, app, sessionId, force)
+  };
 }
 
 // src/client.ts
@@ -20593,6 +21025,8 @@ var clientRemote = createTypertRemoteInfo({
     "dshEE/appBindings": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/bindApp": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/unbindApp": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/workbenchData": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/board": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/overview": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/login": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/doctor": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }
@@ -20626,8 +21060,8 @@ function createOverviewStore(remote) {
     }
   };
   const use = () => {
-    const [local, setLocal] = (0, import_react2.useState)(snapshot);
-    (0, import_react2.useEffect)(() => {
+    const [local, setLocal] = (0, import_react3.useState)(snapshot);
+    (0, import_react3.useEffect)(() => {
       const listener = () => setLocal(snapshot);
       listeners.add(listener);
       listener();
@@ -20649,7 +21083,10 @@ async function apply(ctx) {
     const remote = remoteCtx.remote.dshEE;
     const overview = createOverviewStore(remote);
     const useOverview = (_remote) => overview.use();
-    const { AppsPanel } = registerApps(ctx, remote, useOverview, unwrapRemote);
+    const apps = registerApps(ctx, remote, useOverview, unwrapRemote);
+    const { AppsPanel } = apps;
+    const workbench = registerWorkbench(ctx, { remote, unwrapRemote, appsNow: apps.appsNow, subscribeApps: apps.subscribeApps });
+    apps.setWorkbenchOpener(workbench.openWorkbench);
     let brand;
     try {
       brand = unwrapRemote(await remote.brand());
@@ -20659,8 +21096,8 @@ async function apply(ctx) {
     const org = brand?.name || "\u4F01\u4E1A";
     const EnterprisePanel = () => {
       const state = useOverview(remote);
-      const [notice, setNotice] = (0, import_react2.useState)("");
-      const [doctor, setDoctor] = (0, import_react2.useState)(void 0);
+      const [notice, setNotice] = (0, import_react3.useState)("");
+      const [doctor, setDoctor] = (0, import_react3.useState)(void 0);
       const login = async () => {
         state.setBusy(true);
         try {
@@ -20687,7 +21124,7 @@ async function apply(ctx) {
         setDoctor(void 0);
         void state.refresh();
       };
-      return enterprisePanel(import_react2.createElement, org, { ...state, notice, doctor }, { login: () => void login(), refresh, doctor: () => void diagnose() }, AppsPanel);
+      return enterprisePanel(import_react3.createElement, org, { ...state, notice, doctor }, { login: () => void login(), refresh, doctor: () => void diagnose() }, AppsPanel);
     };
     const EnterpriseHeader = () => {
       const state = useOverview(remote);
@@ -20695,14 +21132,14 @@ async function apply(ctx) {
         ctx.sidebarRight.openTab("dsh-ee-enterprise");
         if (state.failed) void remote.login().catch(() => void 0);
       };
-      return enterpriseHeader(import_react2.createElement, state.data, state.failed, onClick);
+      return enterpriseHeader(import_react3.createElement, state.data, state.failed, onClick);
     };
     registerEnterpriseStatus(ctx, org, EnterprisePanel, EnterpriseHeader);
     if (!TAKEOVER) return;
     if (!brand || brand.enabled === false) brand = { enabled: false, name: org, logo_url: "", revision: "" };
     brand = { ...brand, name: org };
-    const EnterpriseBrandMark = (props) => brandMark(import_react2.createElement, brand, props);
-    const EnterpriseBrandName = () => brandName(import_react2.createElement, brand);
+    const EnterpriseBrandMark = (props) => brandMark(import_react3.createElement, brand, props);
+    const EnterpriseBrandName = () => brandName(import_react3.createElement, brand);
     ctx.slots.inject("sidebar.brand.mark", () => ctx.slots.inject("sidebar.brand.name", () => ctx.slots.inject("conversation.hero.brand.mark", function* () {
       yield ctx.slots.register({ name: "sidebar.brand.mark" }, EnterpriseBrandMark);
       yield ctx.slots.register({ name: "sidebar.brand.name" }, EnterpriseBrandName);

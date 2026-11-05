@@ -5,6 +5,7 @@ import { brandMark, brandName, type BrandViewData } from "./brand-view.js";
 import type { EnterpriseOverview } from "./overview.js";
 import { enterpriseHeader, enterprisePanel, enterpriseTabId, registerEnterpriseStatus, type DoctorViewData } from "./status-view.js";
 import { registerApps } from "./apps-client.js";
+import { registerWorkbench } from "./workbench-client.js";
 
 export const inject = ["slots", "remote", "sidebarRightTabs", "sidebarRight", "sessions", "conversation", "workspaces"];
 
@@ -21,6 +22,8 @@ const clientRemote = createTypertRemoteInfo({
     "dshEE/appBindings": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/bindApp": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/unbindApp": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
+    "dshEE/workbenchData": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
+    "dshEE/board": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/overview": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/login": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/doctor": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
@@ -87,7 +90,10 @@ export async function apply(ctx: any): Promise<void> {
     const remote = remoteCtx.remote.dshEE;
     const overview = createOverviewStore(remote);
     const useOverview = (_remote?: any) => overview.use();
-    const { AppsPanel } = registerApps(ctx, remote, useOverview, unwrapRemote);
+    const apps = registerApps(ctx, remote, useOverview, unwrapRemote);
+    const { AppsPanel } = apps;
+    const workbench = registerWorkbench(ctx, { remote, unwrapRemote, appsNow: apps.appsNow, subscribeApps: apps.subscribeApps });
+    apps.setWorkbenchOpener(workbench.openWorkbench);
     let brand: BrandViewData;
     try {
       brand = unwrapRemote(await remote.brand());

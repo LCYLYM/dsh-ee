@@ -10,6 +10,7 @@ import { registerBrand } from "./brand.js";
 import { readEnterpriseOverview } from "./overview.js";
 import { uploadPackage } from "./upload.js";
 import { AppBindings } from "./app-bindings.js";
+import { BoardStore, readWidgetData, registerWorkbenchTool } from "./workbench-host.js";
 import type { DshContext, PluginConfig } from "./dsh.js";
 
 export const name = "dsh-ee-connect";
@@ -40,6 +41,7 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
       await Promise.all([bridge.sync().catch(() => undefined), skills?.refreshNow()]);
     });
     const appBindings = new AppBindings();
+    const boards = new BoardStore();
     registerDoctor(ctx, config, tokens, http, bridge, appBindings);
     skills = await registerSkills(ctx, config, http);
     registerBrand(ctx, {
@@ -51,11 +53,21 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
         return appBindings.bind(name, sessionId);
       },
       unbindApp: async (name) => appBindings.unbind(name),
+      workbenchData: async (request) => readWidgetData(await skills!.readApps(), bridge, request),
+      readBoard: async (request) => boards.read(String(request?.app ?? ""), String(request?.sessionId ?? "")) ?? null,
       readOverview: () => readEnterpriseOverview(config, http, bridge),
       login: () => commands.login(),
       doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge, appBindings),
     });
+    const disposeWorkbenchTool = registerWorkbenchTool(ctx, {
+      boards,
+      readApps: () => skills!.readApps(),
+      boundSession: (app) => appBindings.list()[app]?.sessionId,
+    });
     await bridge.start();
-    return () => bridge.stop();
+    return () => {
+      disposeWorkbenchTool();
+      bridge.stop();
+    };
   });
 }

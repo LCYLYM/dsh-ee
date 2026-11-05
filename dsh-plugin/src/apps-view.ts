@@ -17,6 +17,7 @@ export interface AppsViewActions {
   fill: (app: CatalogApp) => void;
   web: (app: CatalogApp) => void;
   newSession: (app: CatalogApp) => void;
+  openWorkbench?: (app: CatalogApp) => void;
   unbind: (app: CatalogApp) => void;
   toggle: () => void;
   search: (query: string) => void;
@@ -45,6 +46,7 @@ function appMenu(createElement: (...args: any[]) => any, app: CatalogApp, action
     createElement("summary", { "aria-label": `${app.title}更多操作`, style: { cursor: "pointer", listStyle: "none", padding: "4px 6px" } }, "⋯"),
     createElement("div", { style: { position: "absolute", right: 0, zIndex: 20, minWidth: 130, padding: 6, borderRadius: 7, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", boxShadow: "0 5px 20px #0002" } },
       createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.newSession(app) }, "新开一个会话"),
+      app.workbench?.panes?.length && actions.openWorkbench ? createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.openWorkbench!(app) }, "打开工作台") : null,
       createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.fill(app) }, "填进输入框"),
       createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.web(app) }, "在网页查看"),
       createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.unbind(app) }, "解除绑定")));

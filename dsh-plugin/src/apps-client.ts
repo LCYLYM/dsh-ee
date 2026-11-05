@@ -84,7 +84,9 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     if (id) seen.add(`${app.name}:${id}`);
     update({ sessionSnapshot: snapshot.sessionSnapshot });
   };
-  const launcher = createLauncher(ctx, { bind });
+  // 应用启动后打开它的工作台；由 client.ts 在注册工作台以后设置
+  let workbenchOpener: ((app: CatalogApp, sessionId: string, force?: boolean) => Promise<boolean>) | undefined;
+  const launcher = createLauncher(ctx, { bind, afterLaunch: async (app, id) => { await workbenchOpener?.(app, id); } });
   const launchSidebar = async (app: CatalogApp) => {
     const id = snapshot.bindings[app.name]?.sessionId;
     const archived = ctx.workspaces?.list?.getSnapshot?.()?.archivedSessionIds;
@@ -105,6 +107,15 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     login: () => { void remote.login().then((result: any) => setNotice(unwrapRemote(result)?.text || "请在浏览器完成企业登录。")).catch(() => setNotice("发起登录失败，请稍后重试。")); },
     open: (app) => { markSeen(app); void openWithFallback(app, launch).then(setNotice); },
     newSession: (app) => { void openWithFallback(app, (target) => launcher.launchNew(target)).then(setNotice); },
+    openWorkbench: (app) => {
+      const id = snapshot.bindings[app.name]?.sessionId;
+      const current = ctx.sidebarRight?.mounted?.getSnapshot?.();
+      if (!id || id !== current) {
+        setNotice("先点应用回到它的会话，再打开工作台");
+        return;
+      }
+      void workbenchOpener?.(app, id, true).then((opened) => { if (!opened) setNotice("工作台没有打开，请稍后再试"); });
+    },
     unbind: (app) => { void remote.unbindApp({ name: app.name }).then((result: any) => { const bindings = unwrapRemote(result); update({ bindings }); setNotice("已解除绑定"); }).catch(() => setNotice("解除绑定失败，请稍后重试。")); },
     fill: (app) => { void fill(app).then(setNotice); },
     web,
@@ -137,5 +148,13 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
 
   ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({ name: "sidebar.footer.action", id: "dsh-ee-apps", order: 30, label: "企业应用" }, AppsSection));
   ctx.slots.inject("conversation.hero.options", () => ctx.slots.register({ name: "conversation.hero.options", id: "dsh-ee-apps", order: 100, label: "企业应用" }, HeroApps));
-  return { AppsPanel };
+  return {
+    AppsPanel,
+    appsNow: () => snapshot.apps,
+    subscribeApps: (listener: () => void) => {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+    setWorkbenchOpener: (opener: typeof workbenchOpener) => { workbenchOpener = opener; },
+  };
 }
