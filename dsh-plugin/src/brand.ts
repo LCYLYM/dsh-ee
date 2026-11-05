@@ -4,6 +4,8 @@ import type { DshContext } from "./dsh.js";
 export interface ClientServiceActions {
   readBrand: () => Promise<any>;
   readApps: () => Promise<any>;
+  readAvailableApps: () => Promise<any>;
+  setAppSubscription: (name: string, enabled: boolean) => Promise<any>;
   readOverview: () => Promise<any>;
   readAppBindings: () => Promise<any>;
   bindApp: (name: string, sessionId: string) => Promise<any>;
@@ -27,6 +29,21 @@ export class DshEEClientService extends TypertRemoteService {
   @Remote
   async apps(): Promise<any> {
     return this.actions.readApps();
+  }
+
+  @Remote
+  async availableApps(): Promise<any> {
+    return this.actions.readAvailableApps();
+  }
+
+  @Remote
+  async enableApp(request: { name: string }): Promise<any> {
+    return this.actions.setAppSubscription(request?.name, true);
+  }
+
+  @Remote
+  async disableApp(request: { name: string }): Promise<any> {
+    return this.actions.setAppSubscription(request?.name, false);
   }
 
   @Remote

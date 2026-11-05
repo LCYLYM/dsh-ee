@@ -8,13 +8,14 @@ import { applicationStatus, createSessionSnapshotAdapter, visibleAppStatus } fro
 
 interface AppsSnapshot {
   apps: CatalogApp[];
+  available: CatalogApp[];
   bindings: AppBindingMap;
   sessionSnapshot?: any;
   busy: boolean;
 }
 
 export function registerApps(ctx: any, remote: any, useOverview: () => any, unwrapRemote: (result: any) => any) {
-  let snapshot: AppsSnapshot = { apps: [], bindings: {}, busy: false };
+  let snapshot: AppsSnapshot = { apps: [], available: [], bindings: {}, busy: false };
   const adaptSessions = createSessionSnapshotAdapter();
   const seen = new Set<string>();
   let started = false;
@@ -32,6 +33,13 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
       update({ apps: Array.isArray(apps) ? apps : [] });
     } catch {
       update({ apps: [] });
+    }
+    try {
+      // 旧版接入插件后端没有这个方法
+      const available = typeof remote.availableApps === "function" ? unwrapRemote(await remote.availableApps()) : [];
+      update({ available: Array.isArray(available) ? available : [] });
+    } catch {
+      update({ available: [] });
     }
     try {
       if (typeof remote.appBindings === "function") {
@@ -106,7 +114,7 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     if (app.web_url) window.open(app.web_url, "_blank", "noopener,noreferrer");
   };
 
-  const useActions = (setNotice: (notice: string) => void, launch: (app: CatalogApp) => Promise<void>): AppsViewActions => ({
+  const useActions = (setNotice: (notice: string) => void, launch: (app: CatalogApp) => Promise<void>, setConfirmDisable: (name: string) => void = () => {}): AppsViewActions => ({
     login: () => { void remote.login().then((result: any) => setNotice(unwrapRemote(result)?.text || "请在浏览器完成企业登录。")).catch(() => setNotice("发起登录失败，请稍后重试。")); },
     open: (app) => { markSeen(app); void openWithFallback(app, launch).then(setNotice); },
     newSession: (app) => { void openWithFallback(app, (target) => launcher.launchNew(target)).then(setNotice); },
@@ -119,6 +127,24 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
         return;
       }
       void workbenchOpener?.(app, id, true).then((opened) => { if (!opened) setNotice("工作台没有打开，请稍后再试"); });
+    },
+    enable: (app) => {
+      void remote.enableApp({ name: app.name }).then(async (result: any) => {
+        const value = unwrapRemote(result);
+        if (!value?.ok) return setNotice(`启用失败：${value?.error || "请稍后重试"}`);
+        await refresh();
+        setNotice(`已启用「${app.title}」，点一下开始使用`);
+      }).catch(() => setNotice("启用失败，请检查网络后重试。"));
+    },
+    disable: (app, confirmed) => {
+      if (!confirmed) return setConfirmDisable(app.name);
+      setConfirmDisable("");
+      void remote.disableApp({ name: app.name }).then(async (result: any) => {
+        const value = unwrapRemote(result);
+        if (!value?.ok) return setNotice(`停用失败：${value?.error || "请稍后重试"}`);
+        await refresh();
+        setNotice(`已停用「${app.title}」`);
+      }).catch(() => setNotice("停用失败，请检查网络后重试。"));
     },
     unbind: (app) => { void remote.unbindApp({ name: app.name }).then((result: any) => { const bindings = unwrapRemote(result); update({ bindings }); setNotice("已解除绑定"); }).catch(() => setNotice("解除绑定失败，请稍后重试。")); },
     fill: (app) => { void fill(app).then(setNotice); },
@@ -133,13 +159,15 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     const [expanded, setExpanded] = useState(false);
     const [query, setQuery] = useState("");
     const [notice, setNotice] = useState("");
+    const [availableOpen, setAvailableOpen] = useState(false);
+    const [confirmDisable, setConfirmDisable] = useState("");
     if (!overview.data && !overview.failed) return null;
-    const actions = { ...useActions(setNotice, launchSidebar), toggle: () => setExpanded(!expanded), search: setQuery };
+    const actions = { ...useActions(setNotice, launchSidebar, setConfirmDisable), toggle: () => setExpanded(!expanded), search: setQuery, toggleAvailable: () => setAvailableOpen(!availableOpen) };
     const statuses = Object.fromEntries(state.apps.map((app) => {
       const id = state.bindings[app.name]?.sessionId;
       return [app.name, id ? visibleAppStatus(applicationStatus(state.sessionSnapshot, id), `${app.name}:${id}`, seen) : undefined];
     }));
-    return appsSection(createElement, { apps: state.apps, loggedIn: !!overview.data?.me, expanded, query, notice, statuses }, actions);
+    return appsSection(createElement, { apps: state.apps, available: state.available, availableOpen, confirmDisable, loggedIn: !!overview.data?.me, expanded, query, notice, statuses }, actions);
   };
   const HeroApps = () => {
     const state = useApps();

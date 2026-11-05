@@ -10,6 +10,7 @@ import { registerBrand } from "./brand.js";
 import { readEnterpriseOverview } from "./overview.js";
 import { uploadPackage } from "./upload.js";
 import { AppBindings } from "./app-bindings.js";
+import { setAppSubscription } from "./app-subscription.js";
 import { BoardStore, readWidgetData, registerWorkbenchTool } from "./workbench-host.js";
 import type { DshContext, PluginConfig } from "./dsh.js";
 
@@ -47,6 +48,12 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
     registerBrand(ctx, {
       readBrand: skills.readBrand,
       readApps: skills.readApps,
+      readAvailableApps: skills.readAvailableApps,
+      setAppSubscription: async (name, enabled) => {
+        const result = await setAppSubscription(http, name, enabled);
+        if (result.ok) await skills!.refreshNow();
+        return result;
+      },
       readAppBindings: async () => appBindings.list(),
       bindApp: async (name, sessionId) => {
         if (!(await skills!.readApps()).some((app) => app.name === name)) throw new Error("目录里没有这个微应用");

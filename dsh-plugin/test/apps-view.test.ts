@@ -88,3 +88,44 @@ test("「进行中」只列待你决定和工作中，待你决定在前，点�
   assert.deepEqual(opened, ["s2"]);
   assert.equal(inProgressView(createElement, [], () => {}), null);
 });
+
+test("可启用分组：没有就不显示，默认收起，展开后点启用", () => {
+  const enabled: string[] = [];
+  const withEnable = { ...actions, enable: (target: CatalogApp) => enabled.push(target.name), toggleAvailable() {} };
+  assert.doesNotMatch(JSON.stringify(appsSection(createElement, { apps: [app(1)], available: [], loggedIn: true }, withEnable)), /可启用/);
+  const folded = appsSection(createElement, { apps: [], available: [app(7)], loggedIn: true }, withEnable);
+  assert.match(JSON.stringify(folded), /可启用（1）/);
+  assert.doesNotMatch(JSON.stringify(folded), /应用7/);
+  const open = appsSection(createElement, { apps: [], available: [app(7)], availableOpen: true, loggedIn: true }, withEnable);
+  const found: any[] = [];
+  const walk = (node: any) => {
+    if (!node || typeof node !== "object") return;
+    if (node.type === "button" && node.children.includes("启用")) found.push(node);
+    for (const child of (node.children ?? []).flat(Infinity)) walk(child);
+  };
+  walk(open);
+  found[0].props.onClick();
+  assert.deepEqual(enabled, ["app-7"]);
+});
+
+test("只有自选的应用能停用，要点两次", () => {
+  const calls: string[] = [];
+  const withDisable = { ...actions, disable: (target: CatalogApp, confirmed: boolean) => calls.push(`${target.name}:${confirmed}`) };
+  const optional = { ...app(1), delivery: "optional" as const };
+  const auto = { ...app(2), delivery: "auto" as const };
+  const first = JSON.stringify(appsSection(createElement, { apps: [optional, auto], loggedIn: true }, withDisable));
+  assert.equal(first.split('"停用"').length - 1, 1);
+  const buttons: any[] = [];
+  const walk = (node: any) => {
+    if (!node || typeof node !== "object") return;
+    if (node.type === "button" && (node.children.includes("停用") || node.children.includes("确认停用"))) buttons.push(node);
+    for (const child of (node.children ?? []).flat(Infinity)) walk(child);
+  };
+  walk(appsSection(createElement, { apps: [optional], loggedIn: true }, withDisable));
+  buttons[0].props.onClick();
+  buttons.length = 0;
+  walk(appsSection(createElement, { apps: [optional], loggedIn: true, confirmDisable: "app-1" }, withDisable));
+  assert.equal(buttons[0].children[0], "确认停用");
+  buttons[0].props.onClick();
+  assert.deepEqual(calls, ["app-1:false", "app-1:true"]);
+});

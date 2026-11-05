@@ -109,8 +109,10 @@ type dshApp struct {
 	Icon        string   `json:"icon,omitempty"`
 	Starters    []string `json:"starters"`
 	Launch      string   `json:"launch"`
-	Version     int      `json:"version"`
-	AssetID     int64    `json:"asset_id"`
+	// auto（默认生效，不能停用）或 optional（员工自己启用的）
+	Delivery string `json:"delivery"`
+	Version  int    `json:"version"`
+	AssetID  int64  `json:"asset_id"`
 	// 依赖的技能、连接里，当前员工没有权限的，前端提示「部分能力不可用」
 	Missing []string `json:"missing,omitempty"`
 	// 右侧栏业务工作台；没有配置就不带。员工没权限的数据源由插件显示「无权限」，这里不删
@@ -418,7 +420,7 @@ func appEntry(a *store.Asset, sp *assetSpec, version int) dshApp {
 	if starters == nil {
 		starters = []string{}
 	}
-	return dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Version: version, AssetID: a.ID, Workbench: sp.Workbench}
+	return dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Delivery: a.Delivery, Version: version, AssetID: a.ID, Workbench: sp.Workbench}
 }
 
 // POST / DELETE /api/dsh/apps/{name}/subscription：员工在 DSH 里启用或停用「自选」微应用。

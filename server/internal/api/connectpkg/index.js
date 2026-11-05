@@ -405,6 +405,10 @@ async function registerSkills(ctx, config, http) {
       await refresh();
       return (catalog.apps ?? []).map((app) => ({ ...app, web_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : void 0 }));
     },
+    readAvailableApps: async () => {
+      await refresh();
+      return (catalog.available_apps ?? []).map((app) => ({ ...app, web_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : void 0 }));
+    },
     refreshNow: async () => {
       if (await refresh()) {
         invalidate();
@@ -2781,8 +2785,8 @@ function validateName(subject, value) {
 }
 
 // src/brand.ts
-var _doctor_dec, _login_dec, _overview_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _apps_dec, _brand_dec, _a, _init;
-var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _a) {
+var _doctor_dec, _login_dec, _overview_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
+var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _a) {
   constructor(ctx, actions) {
     super(ctx, "dshEE");
     this.actions = actions;
@@ -2793,6 +2797,15 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
   }
   async apps() {
     return this.actions.readApps();
+  }
+  async availableApps() {
+    return this.actions.readAvailableApps();
+  }
+  async enableApp(request) {
+    return this.actions.setAppSubscription(request?.name, true);
+  }
+  async disableApp(request) {
+    return this.actions.setAppSubscription(request?.name, false);
   }
   async appBindings() {
     return this.actions.readAppBindings();
@@ -2822,6 +2835,9 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "brand", _brand_dec, DshEEClientService);
 __decorateElement(_init, 1, "apps", _apps_dec, DshEEClientService);
+__decorateElement(_init, 1, "availableApps", _availableApps_dec, DshEEClientService);
+__decorateElement(_init, 1, "enableApp", _enableApp_dec, DshEEClientService);
+__decorateElement(_init, 1, "disableApp", _disableApp_dec, DshEEClientService);
 __decorateElement(_init, 1, "appBindings", _appBindings_dec, DshEEClientService);
 __decorateElement(_init, 1, "bindApp", _bindApp_dec, DshEEClientService);
 __decorateElement(_init, 1, "unbindApp", _unbindApp_dec, DshEEClientService);
@@ -2958,6 +2974,21 @@ var AppBindings = class {
     }
   }
 };
+
+// src/app-subscription.ts
+var nameRe = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+async function setAppSubscription(http, name2, enabled) {
+  if (typeof name2 !== "string" || !nameRe.test(name2) || name2.length > 48) return { ok: false, error: "\u5FAE\u5E94\u7528\u540D\u4E0D\u5408\u6CD5" };
+  const response = await http.fetch(`/api/dsh/apps/${encodeURIComponent(name2)}/subscription`, { method: enabled ? "POST" : "DELETE" });
+  if (response.ok) return { ok: true };
+  let error = `HTTP ${response.status}`;
+  try {
+    const body = await response.json();
+    if (body?.error) error = body.error;
+  } catch {
+  }
+  return { ok: false, error };
+}
 
 // src/workbench-host.ts
 import fs4 from "node:fs";
@@ -3141,6 +3172,12 @@ function apply(ctx, input) {
     registerBrand(ctx, {
       readBrand: skills.readBrand,
       readApps: skills.readApps,
+      readAvailableApps: skills.readAvailableApps,
+      setAppSubscription: async (name2, enabled) => {
+        const result = await setAppSubscription(http, name2, enabled);
+        if (result.ok) await skills.refreshNow();
+        return result;
+      },
       readAppBindings: async () => appBindings.list(),
       bindApp: async (name2, sessionId) => {
         if (!(await skills.readApps()).some((app) => app.name === name2)) throw new Error("\u76EE\u5F55\u91CC\u6CA1\u6709\u8FD9\u4E2A\u5FAE\u5E94\u7528");

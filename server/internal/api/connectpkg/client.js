@@ -20126,7 +20126,15 @@ function starterItems(createElement4, app, actions) {
     }, starter))
   ];
 }
-function appMenu(createElement4, app, actions) {
+function disableItem(createElement4, app, actions, confirming) {
+  if (app.delivery !== "optional" || !actions.disable) return null;
+  return createElement4("button", {
+    type: "button",
+    style: { ...buttonStyle, display: "block", width: "100%", padding: 7, color: confirming ? "#b91c1c" : "inherit" },
+    onClick: () => actions.disable(app, confirming)
+  }, confirming ? "\u786E\u8BA4\u505C\u7528" : "\u505C\u7528");
+}
+function appMenu(createElement4, app, actions, confirming = false) {
   return createElement4(
     "details",
     { style: { position: "relative", flex: "0 0 auto" } },
@@ -20139,11 +20147,12 @@ function appMenu(createElement4, app, actions) {
       createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.fill(app) }, "\u586B\u8FDB\u8F93\u5165\u6846"),
       createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.web(app) }, "\u5728\u7F51\u9875\u67E5\u770B"),
       createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.unbind(app) }, "\u89E3\u9664\u7ED1\u5B9A"),
+      disableItem(createElement4, app, actions, confirming),
       ...starterItems(createElement4, app, actions)
     )
   );
 }
-function appRow(createElement4, app, actions, status) {
+function appRow(createElement4, app, actions, status, confirming = false) {
   const statusView = status === "need" ? { label: "\u5F85\u4F60\u51B3\u5B9A", color: "#d97706" } : status === "busy" ? { label: "\u5DE5\u4F5C\u4E2D", color: "#2563eb" } : status === "done" ? { label: "\u672C\u8F6E\u7ED3\u675F", color: "#737373" } : void 0;
   return createElement4(
     "div",
@@ -20151,7 +20160,36 @@ function appRow(createElement4, app, actions, status) {
     statusView ? createElement4("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
     appTile(createElement4, app, () => actions.open(app)),
     app.missing?.length ? createElement4("span", { title: `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528") : null,
-    appMenu(createElement4, app, actions)
+    appMenu(createElement4, app, actions, confirming)
+  );
+}
+function availableGroup(createElement4, state, actions) {
+  const available = state.available ?? [];
+  if (!available.length || !actions.enable) return null;
+  return createElement4(
+    "div",
+    { "data-dsh-ee-ui": "available-apps", style: { marginTop: 8, borderTop: "1px solid color-mix(in srgb, currentColor 10%, transparent)", paddingTop: 6 } },
+    createElement4(
+      "button",
+      { type: "button", onClick: () => actions.toggleAvailable?.(), "aria-expanded": !!state.availableOpen, style: { ...buttonStyle, opacity: 0.75, fontSize: 12 } },
+      `${state.availableOpen ? "\u25BE" : "\u25B8"} \u53EF\u542F\u7528\uFF08${available.length}\uFF09`
+    ),
+    state.availableOpen ? createElement4("div", { style: { display: "grid", gap: 4, marginTop: 5 } }, ...available.map((app) => createElement4(
+      "div",
+      {
+        key: app.name,
+        "data-dsh-ee-available": app.name,
+        style: { display: "flex", alignItems: "center", gap: 8 }
+      },
+      appIcon(createElement4, app),
+      createElement4(
+        "span",
+        { style: { flex: 1, minWidth: 0 } },
+        createElement4("span", { style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
+        app.description ? createElement4("span", { style: { display: "block", fontSize: 11, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: app.description }, app.description) : null
+      ),
+      createElement4("button", { type: "button", onClick: () => actions.enable(app), style: { ...buttonStyle, border: "1px solid currentColor", borderRadius: 6, padding: "2px 8px", fontSize: 12, flex: "0 0 auto" } }, "\u542F\u7528")
+    ))) : null
   );
 }
 function appsSection(createElement4, state, actions) {
@@ -20163,7 +20201,7 @@ function appsSection(createElement4, state, actions) {
       createElement4("button", { type: "button", onClick: actions.login, style: { ...buttonStyle, border: "1px solid currentColor", borderRadius: 6, padding: "5px 10px" } }, "\u767B\u5F55")
     );
   }
-  if (!state.apps.length) return null;
+  if (!state.apps.length && !(state.available ?? []).length) return null;
   const query = state.query?.trim().toLowerCase() ?? "";
   const filtered = state.apps.filter((app) => !query || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(query));
   const shown = state.expanded ? filtered : filtered.slice(0, 6);
@@ -20172,8 +20210,9 @@ function appsSection(createElement4, state, actions) {
     { "data-dsh-ee-ui": "apps", style: { padding: "10px 12px", fontSize: 13 } },
     createElement4("h2", { style: { margin: "0 0 7px", fontSize: 13 } }, "\u4F01\u4E1A\u5E94\u7528"),
     state.apps.length > 8 ? createElement4("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }) : null,
-    createElement4("div", { style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement4, app, actions, state.statuses?.[app.name]))),
+    createElement4("div", { style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement4, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name))),
     !state.expanded && filtered.length > 6 ? createElement4("button", { type: "button", onClick: actions.toggle, style: { ...buttonStyle, marginTop: 7, opacity: 0.7 } }, `\u66F4\u591A\uFF08${filtered.length - 6}\uFF09`) : null,
+    availableGroup(createElement4, state, actions),
     state.notice ? createElement4("p", { role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null
   );
 }
@@ -20485,7 +20524,7 @@ function visibleAppStatus(status, key, seen) {
 
 // src/apps-client.ts
 function registerApps(ctx, remote, useOverview, unwrapRemote2) {
-  let snapshot = { apps: [], bindings: {}, busy: false };
+  let snapshot = { apps: [], available: [], bindings: {}, busy: false };
   const adaptSessions = createSessionSnapshotAdapter();
   const seen = /* @__PURE__ */ new Set();
   let started = false;
@@ -20502,6 +20541,12 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
       update({ apps: Array.isArray(apps) ? apps : [] });
     } catch {
       update({ apps: [] });
+    }
+    try {
+      const available = typeof remote.availableApps === "function" ? unwrapRemote2(await remote.availableApps()) : [];
+      update({ available: Array.isArray(available) ? available : [] });
+    } catch {
+      update({ available: [] });
     }
     try {
       if (typeof remote.appBindings === "function") {
@@ -20580,7 +20625,8 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
   const web = (app) => {
     if (app.web_url) window.open(app.web_url, "_blank", "noopener,noreferrer");
   };
-  const useActions = (setNotice, launch) => ({
+  const useActions = (setNotice, launch, setConfirmDisable = () => {
+  }) => ({
     login: () => {
       void remote.login().then((result) => setNotice(unwrapRemote2(result)?.text || "\u8BF7\u5728\u6D4F\u89C8\u5668\u5B8C\u6210\u4F01\u4E1A\u767B\u5F55\u3002")).catch(() => setNotice("\u53D1\u8D77\u767B\u5F55\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002"));
     },
@@ -20605,6 +20651,24 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
         if (!opened) setNotice("\u5DE5\u4F5C\u53F0\u6CA1\u6709\u6253\u5F00\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5");
       });
     },
+    enable: (app) => {
+      void remote.enableApp({ name: app.name }).then(async (result) => {
+        const value = unwrapRemote2(result);
+        if (!value?.ok) return setNotice(`\u542F\u7528\u5931\u8D25\uFF1A${value?.error || "\u8BF7\u7A0D\u540E\u91CD\u8BD5"}`);
+        await refresh();
+        setNotice(`\u5DF2\u542F\u7528\u300C${app.title}\u300D\uFF0C\u70B9\u4E00\u4E0B\u5F00\u59CB\u4F7F\u7528`);
+      }).catch(() => setNotice("\u542F\u7528\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u540E\u91CD\u8BD5\u3002"));
+    },
+    disable: (app, confirmed) => {
+      if (!confirmed) return setConfirmDisable(app.name);
+      setConfirmDisable("");
+      void remote.disableApp({ name: app.name }).then(async (result) => {
+        const value = unwrapRemote2(result);
+        if (!value?.ok) return setNotice(`\u505C\u7528\u5931\u8D25\uFF1A${value?.error || "\u8BF7\u7A0D\u540E\u91CD\u8BD5"}`);
+        await refresh();
+        setNotice(`\u5DF2\u505C\u7528\u300C${app.title}\u300D`);
+      }).catch(() => setNotice("\u505C\u7528\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u540E\u91CD\u8BD5\u3002"));
+    },
     unbind: (app) => {
       void remote.unbindApp({ name: app.name }).then((result) => {
         const bindings = unwrapRemote2(result);
@@ -20627,13 +20691,15 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     const [expanded, setExpanded] = (0, import_react.useState)(false);
     const [query, setQuery] = (0, import_react.useState)("");
     const [notice, setNotice] = (0, import_react.useState)("");
+    const [availableOpen, setAvailableOpen] = (0, import_react.useState)(false);
+    const [confirmDisable, setConfirmDisable] = (0, import_react.useState)("");
     if (!overview.data && !overview.failed) return null;
-    const actions = { ...useActions(setNotice, launchSidebar), toggle: () => setExpanded(!expanded), search: setQuery };
+    const actions = { ...useActions(setNotice, launchSidebar, setConfirmDisable), toggle: () => setExpanded(!expanded), search: setQuery, toggleAvailable: () => setAvailableOpen(!availableOpen) };
     const statuses = Object.fromEntries(state.apps.map((app) => {
       const id = state.bindings[app.name]?.sessionId;
       return [app.name, id ? visibleAppStatus(applicationStatus(state.sessionSnapshot, id), `${app.name}:${id}`, seen) : void 0];
     }));
-    return appsSection(import_react.createElement, { apps: state.apps, loggedIn: !!overview.data?.me, expanded, query, notice, statuses }, actions);
+    return appsSection(import_react.createElement, { apps: state.apps, available: state.available, availableOpen, confirmDisable, loggedIn: !!overview.data?.me, expanded, query, notice, statuses }, actions);
   };
   const HeroApps = () => {
     const state = useApps();
@@ -21103,6 +21169,9 @@ var clientRemote = createTypertRemoteInfo({
   methods: {
     "dshEE/brand": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/apps": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/availableApps": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/enableApp": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/disableApp": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/appBindings": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/bindApp": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/unbindApp": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },

@@ -9,6 +9,11 @@ export interface AppsViewState {
   busy?: boolean;
   notice?: string;
   statuses?: Record<string, AppSessionStatus | undefined>;
+  /** 范围内、自选、还没启用的微应用 */
+  available?: CatalogApp[];
+  availableOpen?: boolean;
+  /** 已点过一次「停用」、等待确认的应用 */
+  confirmDisable?: string;
 }
 
 export interface AppsViewActions {
@@ -18,6 +23,11 @@ export interface AppsViewActions {
   web: (app: CatalogApp) => void;
   newSession: (app: CatalogApp) => void;
   openWorkbench?: (app: CatalogApp) => void;
+  /** 启用一个自选微应用 */
+  enable?: (app: CatalogApp) => void;
+  /** 第一次点「停用」只进入确认状态；confirmed 为真才真正停用 */
+  disable?: (app: CatalogApp, confirmed: boolean) => void;
+  toggleAvailable?: () => void;
   /** 新建会话并带着这条示例问题开始 */
   startWith?: (app: CatalogApp, starter: string) => void;
   unbind: (app: CatalogApp) => void;
@@ -57,7 +67,16 @@ function starterItems(createElement: (...args: any[]) => any, app: CatalogApp, a
   ];
 }
 
-function appMenu(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions) {
+function disableItem(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions, confirming: boolean) {
+  if (app.delivery !== "optional" || !actions.disable) return null;
+  return createElement("button", {
+    type: "button",
+    style: { ...buttonStyle, display: "block", width: "100%", padding: 7, color: confirming ? "#b91c1c" : "inherit" },
+    onClick: () => actions.disable!(app, confirming),
+  }, confirming ? "确认停用" : "停用");
+}
+
+function appMenu(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions, confirming = false) {
   return createElement("details", { style: { position: "relative", flex: "0 0 auto" } },
     createElement("summary", { "aria-label": `${app.title}更多操作`, style: { cursor: "pointer", listStyle: "none", padding: "4px 6px" } }, "⋯"),
     createElement("div", { style: { position: "absolute", right: 0, zIndex: 20, minWidth: 130, padding: 6, borderRadius: 7, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", boxShadow: "0 5px 20px #0002" } },
@@ -66,16 +85,33 @@ function appMenu(createElement: (...args: any[]) => any, app: CatalogApp, action
       createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.fill(app) }, "填进输入框"),
       createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.web(app) }, "在网页查看"),
       createElement("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.unbind(app) }, "解除绑定"),
+      disableItem(createElement, app, actions, confirming),
       ...starterItems(createElement, app, actions)));
 }
 
-function appRow(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions, status?: AppSessionStatus) {
+function appRow(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions, status?: AppSessionStatus, confirming = false) {
   const statusView = status === "need" ? { label: "待你决定", color: "#d97706" } : status === "busy" ? { label: "工作中", color: "#2563eb" } : status === "done" ? { label: "本轮结束", color: "#737373" } : undefined;
   return createElement("div", { key: app.name, "data-dsh-ee-app": app.name, style: { display: "flex", alignItems: "center", gap: 4 } },
     statusView ? createElement("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
     appTile(createElement, app, () => actions.open(app)),
     app.missing?.length ? createElement("span", { title: `不可用：${app.missing.join("、")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "部分能力不可用") : null,
-    appMenu(createElement, app, actions));
+    appMenu(createElement, app, actions, confirming));
+}
+
+/** 「可启用（N）」分组：默认收起；没有就不显示。 */
+function availableGroup(createElement: (...args: any[]) => any, state: AppsViewState, actions: AppsViewActions) {
+  const available = state.available ?? [];
+  if (!available.length || !actions.enable) return null;
+  return createElement("div", { "data-dsh-ee-ui": "available-apps", style: { marginTop: 8, borderTop: "1px solid color-mix(in srgb, currentColor 10%, transparent)", paddingTop: 6 } },
+    createElement("button", { type: "button", onClick: () => actions.toggleAvailable?.(), "aria-expanded": !!state.availableOpen, style: { ...buttonStyle, opacity: 0.75, fontSize: 12 } },
+      `${state.availableOpen ? "▾" : "▸"} 可启用（${available.length}）`),
+    state.availableOpen ? createElement("div", { style: { display: "grid", gap: 4, marginTop: 5 } }, ...available.map((app) => createElement("div", {
+      key: app.name, "data-dsh-ee-available": app.name, style: { display: "flex", alignItems: "center", gap: 8 } },
+      appIcon(createElement, app),
+      createElement("span", { style: { flex: 1, minWidth: 0 } },
+        createElement("span", { style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
+        app.description ? createElement("span", { style: { display: "block", fontSize: 11, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: app.description }, app.description) : null),
+      createElement("button", { type: "button", onClick: () => actions.enable!(app), style: { ...buttonStyle, border: "1px solid currentColor", borderRadius: 6, padding: "2px 8px", fontSize: 12, flex: "0 0 auto" } }, "启用")))) : null);
 }
 
 export function appsSection(createElement: (...args: any[]) => any, state: AppsViewState, actions: AppsViewActions) {
@@ -84,15 +120,16 @@ export function appsSection(createElement: (...args: any[]) => any, state: AppsV
       createElement("div", { style: { marginBottom: 8 } }, "登录后查看企业应用"),
       createElement("button", { type: "button", onClick: actions.login, style: { ...buttonStyle, border: "1px solid currentColor", borderRadius: 6, padding: "5px 10px" } }, "登录"));
   }
-  if (!state.apps.length) return null;
+  if (!state.apps.length && !(state.available ?? []).length) return null;
   const query = state.query?.trim().toLowerCase() ?? "";
   const filtered = state.apps.filter((app) => !query || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(query));
   const shown = state.expanded ? filtered : filtered.slice(0, 6);
   return createElement("section", { "data-dsh-ee-ui": "apps", style: { padding: "10px 12px", fontSize: 13 } },
     createElement("h2", { style: { margin: "0 0 7px", fontSize: 13 } }, "企业应用"),
     state.apps.length > 8 ? createElement("input", { "aria-label": "搜索企业应用", value: state.query ?? "", onChange: (event: any) => actions.search(event.target.value), placeholder: "搜索…", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }) : null,
-    createElement("div", { style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement, app, actions, state.statuses?.[app.name]))),
+    createElement("div", { style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name))),
     !state.expanded && filtered.length > 6 ? createElement("button", { type: "button", onClick: actions.toggle, style: { ...buttonStyle, marginTop: 7, opacity: 0.7 } }, `更多（${filtered.length - 6}）`) : null,
+    availableGroup(createElement, state, actions),
     state.notice ? createElement("p", { role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null);
 }
 

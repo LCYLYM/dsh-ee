@@ -56,8 +56,9 @@ func TestDshAppSubscription(t *testing.T) {
 	expect(t, "建技能", code, 201, body)
 
 	type entry struct {
-		Name string `json:"name"`
-		Icon string `json:"icon"`
+		Name     string `json:"name"`
+		Icon     string `json:"icon"`
+		Delivery string `json:"delivery"`
 	}
 	read := func() (apps, available, skills []string, etag string) {
 		t.Helper()
@@ -76,6 +77,9 @@ func TestDshAppSubscription(t *testing.T) {
 		}
 		for _, e := range c.Apps {
 			apps = append(apps, e.Name)
+			if want := map[string]string{"always-on": "auto", "expense-pick": "optional"}[e.Name]; e.Delivery != want {
+				t.Fatalf("%s 的 delivery 应是 %s：%s", e.Name, want, raw)
+			}
 		}
 		for _, e := range c.Available {
 			available = append(available, e.Name)

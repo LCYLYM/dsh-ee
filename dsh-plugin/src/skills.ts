@@ -10,6 +10,8 @@ export interface CatalogApp {
   icon?: string;
   starters: string[];
   launch: "new" | "resume";
+  /** auto：默认生效，不能停用；optional：员工自己启用的。旧服务端没有这个字段 */
+  delivery?: "auto" | "optional";
   version: number;
   missing?: string[];
   asset_id?: number;
@@ -21,6 +23,8 @@ export interface CatalogApp {
 export interface SkillsHandle {
   readBrand: () => Promise<any>;
   readApps: () => Promise<CatalogApp[]>;
+  /** 范围内、自选、还没启用的微应用；旧服务端没有这一项，返回空数组 */
+  readAvailableApps: () => Promise<CatalogApp[]>;
   /** 立刻重新拉目录（登录之后用），有变化就通知 DSH 刷新技能列表。 */
   refreshNow: () => Promise<void>;
 }
@@ -97,6 +101,10 @@ export async function registerSkills(ctx: DshContext, config: PluginConfig, http
     readApps: async () => {
       await refresh();
       return (catalog.apps ?? []).map((app: CatalogApp) => ({ ...app, web_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : undefined }));
+    },
+    readAvailableApps: async () => {
+      await refresh();
+      return (catalog.available_apps ?? []).map((app: CatalogApp) => ({ ...app, web_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : undefined }));
     },
     refreshNow: async () => {
       if (await refresh()) {
