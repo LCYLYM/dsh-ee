@@ -102,7 +102,7 @@ test("取数只调只读工具：没权限显示无权限，写工具拒绝", as
 test("看板参数校验", () => {
   assert.match(checkBoardBlocks([]).error!, /非空数组/);
   assert.match(checkBoardBlocks(Array.from({ length: 21 }, () => ({ type: "text", text: "x" }))).error!, /最多 20 块/);
-  assert.match(checkBoardBlocks([{ type: "html", text: "<b>" }]).error!, /只能是 text、list 或 table/);
+  assert.match(checkBoardBlocks([{ type: "html", text: "<b>" }]).error!, /只能是 text、list、table 或 citations/);
   assert.match(checkBoardBlocks([{ type: "text", text: "长".repeat(12000) }]).error!, /32 KB/);
   assert.deepEqual(checkBoardBlocks([{ type: "table", columns: ["单号"], rows: [[1]] }]).blocks, [{ type: "table", columns: ["单号"], rows: [["1"]] }]);
 });

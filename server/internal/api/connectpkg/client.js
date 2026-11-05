@@ -20786,14 +20786,19 @@ function formatValue(value, format) {
   }
 }
 var maxValueLength = 500;
-var placeholder = /\{\{\s*(row|form)\.([A-Za-z0-9_.]+)\s*\}\}/g;
+var placeholder = /\{\{\s*(row|form|scope)\.([A-Za-z0-9_.]+)\s*\}\}/g;
 function placeholderValue(value) {
   let text = value === null || value === void 0 ? "" : typeof value === "object" ? JSON.stringify(value) : String(value);
   text = text.trim();
   return text.length > maxValueLength ? `${text.slice(0, maxValueLength)}\u2026` : text;
 }
 function fillPrompt(prompt, data) {
-  return prompt.replace(placeholder, (_match, scope, path) => placeholderValue(getPath(scope === "row" ? data.row : data.form, path)));
+  return prompt.replace(placeholder, (_match, scope, path) => placeholderValue(getPath(scope === "row" ? data.row : scope === "form" ? data.form : data.scope ?? { kbs: "\u5168\u90E8\u77E5\u8BC6\u5E93" }, path)));
+}
+function scopeText(bases, selected) {
+  const picked = bases.filter((item) => selected.includes(item.kb));
+  if (!picked.length) return "\u5168\u90E8\u77E5\u8BC6\u5E93";
+  return `\u77E5\u8BC6\u5E93${picked.map((item) => `\u300C${item.title}\u300D`).join("")}\uFF08\u6807\u8BC6 ${picked.map((item) => item.kb).join("\u3001")}\uFF09`;
 }
 function checkForm(fields, values) {
   for (const field of fields) {
@@ -20811,6 +20816,18 @@ function tableRows(result, rows) {
   return { rows: list.slice(0, 50), total: list.length };
 }
 var maxBoardBytes = 32 << 10;
+function parseDocLines(text) {
+  const out = [];
+  for (const line of String(text ?? "").split("\n")) {
+    const match = /^(\d+)\| ?(.*)$/.exec(line);
+    if (match) out.push({ n: Number(match[1]), text: match[2] });
+  }
+  return out;
+}
+function docWindow(from) {
+  const start = Math.max(1, from - 20);
+  return { from: start, to: start + 199 };
+}
 
 // src/workbench-open.ts
 function waitMounted(sidebarRight, sessionId, timeoutMs = 5e3) {
@@ -20863,7 +20880,7 @@ async function openWorkbench(ctx, app, sessionId, force = false) {
 var muted = { opacity: 0.65, fontSize: 12 };
 var card = { border: "1px solid color-mix(in srgb, currentColor 14%, transparent)", borderRadius: 8, padding: "10px 12px" };
 var buttonStyle2 = { border: "1px solid color-mix(in srgb, currentColor 25%, transparent)", borderRadius: 6, background: "transparent", color: "inherit", cursor: "pointer", padding: "3px 9px", fontSize: 12 };
-var widgetNames = { metric: "\u6307\u6807", table: "\u8868\u683C", form: "\u8868\u5355", actions: "\u5FEB\u6377\u6309\u94AE", markdown: "\u8BF4\u660E", board: "AI \u770B\u677F" };
+var widgetNames = { metric: "\u6307\u6807", table: "\u8868\u683C", form: "\u8868\u5355", actions: "\u5FEB\u6377\u6309\u94AE", markdown: "\u8BF4\u660E", board: "AI \u770B\u677F", kb_scope: "\u67E5\u54EA\u4E9B\u5E93" };
 function button2(h, label, onClick, disabled = false, key) {
   return h("button", { key, type: "button", onClick, disabled, style: { ...buttonStyle2, opacity: disabled ? 0.5 : 1, cursor: disabled ? "default" : "pointer" } }, label);
 }
@@ -20985,7 +21002,58 @@ function actionsView(h, index, widget, handlers) {
 function markdownView(h, widget) {
   return h("section", { style: card }, widget.title ? header(h, widget) : null, h("div", { style: { whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6 } }, widget.text ?? ""));
 }
-function boardView(h, widget, board) {
+var citationBadges = {
+  ok: { text: "\u2714 \u5DF2\u6838\u5BF9\u539F\u6587", color: "#15803d" },
+  stale: { text: "\u539F\u6587\u5DF2\u66F4\u65B0", color: "#a16207" },
+  mismatch: { text: "\u2716 \u5BF9\u4E0D\u4E0A\u539F\u6587", color: "#b91c1c" },
+  missing: { text: "\u2716 \u627E\u4E0D\u5230\u8FD9\u7BC7\u6587\u6863", color: "#b91c1c" },
+  unchecked: { text: "\u672A\u6838\u5BF9", color: "inherit" }
+};
+function citationsView(h, items, key, open2) {
+  return h(
+    "ol",
+    { key, style: { margin: 0, paddingLeft: 22, fontSize: 12, display: "grid", gap: 6 } },
+    ...items.map((item, i) => {
+      const badge = citationBadges[item.status ?? "unchecked"];
+      const where = `${item.title || `\u6587\u6863 ${item.doc}`} \xB7 \u7B2C ${item.from === item.to ? item.from : `${item.from}\u2013${item.to}`} \u884C`;
+      return h(
+        "li",
+        { key: i, "data-citation": i + 1 },
+        h(
+          "div",
+          { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 } },
+          open2 ? h("button", { type: "button", onClick: () => open2(item), title: "\u67E5\u770B\u539F\u6587", style: { ...buttonStyle2, padding: "1px 6px" } }, where) : h("span", null, where),
+          h("span", { style: { color: badge.color, fontSize: 11, opacity: item.status === "unchecked" || !item.status ? 0.6 : 1 } }, badge.text)
+        ),
+        h("div", { style: { ...muted, marginTop: 2, whiteSpace: "pre-wrap" } }, `\u201C${item.quote}\u201D`)
+      );
+    })
+  );
+}
+function kbScopeView(h, widget, state, handlers) {
+  const note = stateNote(h, state);
+  const bases = note ? [] : getPath(state.value, "items") ?? [];
+  const selected = handlers.selectedKBs ?? [];
+  const body = note ?? (bases.length === 0 ? h("div", { style: muted }, "\u4F60\u8FD8\u6CA1\u6709\u53EF\u4EE5\u67E5\u7684\u77E5\u8BC6\u5E93") : h(
+    "div",
+    { style: { display: "flex", flexWrap: "wrap", gap: "4px 12px" } },
+    ...bases.map((item) => h(
+      "label",
+      { key: item.kb, style: { display: "flex", alignItems: "center", gap: 4, fontSize: 12, cursor: "pointer" } },
+      h("input", { type: "checkbox", checked: selected.includes(item.kb), onChange: () => handlers.toggleKB?.(item.kb) }),
+      item.title,
+      item.docs !== void 0 ? h("span", { style: muted }, `${item.docs} \u7BC7`) : null
+    ))
+  ));
+  return h(
+    "section",
+    { style: card },
+    header(h, widget),
+    body,
+    bases.length > 0 ? h("div", { style: { ...muted, marginTop: 6 } }, selected.length ? `\u53EA\u67E5\u52FE\u9009\u7684 ${selected.length} \u4E2A\u5E93` : "\u6CA1\u6709\u52FE\u9009\u65F6\u67E5\u5168\u90E8") : null
+  );
+}
+function boardView(h, widget, board, openCitation) {
   let body;
   if (!board?.blocks?.length) {
     body = h("div", { style: muted }, "AI \u5904\u7406\u5B8C\u4EE5\u540E\u4F1A\u628A\u7ED3\u679C\u5199\u5728\u8FD9\u91CC\u3002");
@@ -20996,6 +21064,7 @@ function boardView(h, widget, board) {
       ...board.blocks.map((block, b) => {
         if (block.type === "text") return h("div", { key: b, style: { whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6 } }, block.text);
         if (block.type === "list") return h("ul", { key: b, style: { margin: 0, paddingLeft: 18, fontSize: 12 } }, ...block.items.map((item, i) => h("li", { key: i }, item)));
+        if (block.type === "citations") return citationsView(h, block.items, b, openCitation);
         return h(
           "table",
           { key: b, style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
@@ -21028,7 +21097,9 @@ function panelView(h, pane, state, handlers) {
         case "markdown":
           return h("div", { key }, markdownView(h, widget));
         case "board":
-          return h("div", { key }, boardView(h, widget, state.board));
+          return h("div", { key }, boardView(h, widget, state.board, handlers.openCitation));
+        case "kb_scope":
+          return h("div", { key }, kbScopeView(h, widget, state.data[index], handlers));
         default:
           return null;
       }
@@ -21038,6 +21109,50 @@ function panelView(h, pane, state, handlers) {
 function missingPaneView(h) {
   return h("div", { style: { padding: 16, fontSize: 13, opacity: 0.7 } }, "\u8FD9\u4E2A\u5DE5\u4F5C\u53F0\u5DF2\u7ECF\u4E0D\u53EF\u7528\uFF1A\u5E94\u7528\u53EF\u80FD\u5DF2\u505C\u7528\uFF0C\u6216\u8005\u5DE5\u4F5C\u53F0\u914D\u7F6E\u6539\u4E86\u3002\u53EF\u4EE5\u5173\u6389\u8FD9\u4E2A\u6807\u7B7E\u9875\u3002");
 }
+function kbDocView(h, target, state, handlers) {
+  const wrap = (...children) => h("div", { "data-dsh-ee-ui": "kb-doc", style: { display: "grid", gap: 8, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } }, ...children);
+  if (!target) return wrap(h("div", { style: muted }, "\u70B9\u300C\u7B54\u6848\u4E0E\u51FA\u5904\u300D\u91CC\u7684\u5F15\u7528\uFF0C\u4F1A\u5728\u8FD9\u91CC\u6253\u5F00\u539F\u6587\u3002"));
+  const note = stateNote(h, state);
+  if (note) return wrap(h("strong", null, target.title || `\u6587\u6863 ${target.doc}`), note);
+  const value = state.value ?? {};
+  const lines = parseDocLines(value.text);
+  const total = Number(value.total_lines) || 0;
+  const from = Number(value.from) || 1;
+  const to = Number(value.to) || from;
+  let marked = false;
+  return wrap(
+    h(
+      "div",
+      { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 } },
+      h("strong", null, value.title || target.title || `\u6587\u6863 ${target.doc}`),
+      h("span", { style: muted }, `\u7B2C ${value.version ?? "?"} \u7248 \xB7 \u5171 ${total} \u884C`)
+    ),
+    value.stale ? h("div", { role: "status", style: { fontSize: 12, color: "#a16207" } }, `${value.stale}\uFF1B\u9AD8\u4EAE\u7684\u662F\u5F15\u7528\u65F6\u7684\u7248\u672C\u3002`) : null,
+    h(
+      "div",
+      { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
+      button2(h, "\u4E0A\u4E00\u9875", () => handlers.page(-1), from <= 1, "prev"),
+      button2(h, "\u4E0B\u4E00\u9875", () => handlers.page(1), total > 0 && to >= total, "next"),
+      button2(h, "\u5728\u8FD9\u7BC7\u91CC\u7EE7\u7EED\u95EE", handlers.ask, handlers.asking, "ask")
+    ),
+    h(
+      "div",
+      { style: { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, lineHeight: 1.6 } },
+      ...lines.map((line) => {
+        const hit = line.n >= target.from && line.n <= target.to;
+        const first = hit && !marked;
+        if (first) marked = true;
+        return h(
+          "div",
+          { key: line.n, "data-kb-hit": first ? "1" : void 0, style: { display: "grid", gridTemplateColumns: "3.5em 1fr", gap: 8, background: hit ? "color-mix(in srgb, #facc15 28%, transparent)" : "transparent", borderRadius: 3 } },
+          h("span", { style: { textAlign: "right", opacity: 0.45, userSelect: "none" } }, String(line.n)),
+          h("span", { style: { whiteSpace: "pre-wrap", overflowWrap: "anywhere" } }, line.text || " ")
+        );
+      })
+    ),
+    target.quote ? h("div", { style: muted }, `\u5F15\u7528\u7684\u539F\u6587\uFF1A\u201C${target.quote}\u201D`) : null
+  );
+}
 
 // src/workbench-client.ts
 var workbenchTabId = "__DSH_EE_PACKAGE__/workbench";
@@ -21045,6 +21160,23 @@ var workbenchKind = "dsh-ee-workbench";
 function onScreenSession(ctx) {
   const mounted = ctx.sidebarRight?.mounted?.getSnapshot?.();
   return typeof mounted === "string" && mounted ? mounted : currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
+}
+function createDocTargets() {
+  const targets = /* @__PURE__ */ new Map();
+  const listeners = /* @__PURE__ */ new Set();
+  return {
+    get: (app) => targets.get(app),
+    set: (app, target) => {
+      targets.set(app, target);
+      for (const listener of listeners) listener();
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    }
+  };
 }
 function registerWorkbench(ctx, deps) {
   const { remote, unwrapRemote: unwrapRemote2 } = deps;
@@ -21066,24 +21198,37 @@ function registerWorkbench(ctx, deps) {
     }, []);
     return { apps, loaded };
   };
-  const WorkbenchTab = (props) => {
-    const info = props.useTabInfo?.();
-    const address = info?.tab?.navigation?.address || info?.tab?.contentId || "";
-    const visible = info?.tab?.visible !== false;
-    const parsed = parseWorkbenchAddress(address);
-    const { apps, loaded } = useAppsList();
-    const app = apps.find((item) => item.name === parsed?.app);
-    const pane = app?.workbench?.panes.find((item) => item.id === parsed?.pane && item.type === "panel");
+  const docTargets = createDocTargets();
+  const useSending = () => {
+    const [sending, setSending] = (0, import_react2.useState)(/* @__PURE__ */ new Set());
+    const [notice, setNotice] = (0, import_react2.useState)("");
+    const send = (key, text, label, done) => {
+      if (sending.has(key)) return;
+      const sessionId = onScreenSession(ctx);
+      if (!sessionId) return setNotice("\u6CA1\u6709\u627E\u5230\u5F53\u524D\u4F1A\u8BDD\uFF0C\u8BF7\u5148\u6253\u5F00\u8FD9\u4E2A\u5E94\u7528\u7684\u4F1A\u8BDD");
+      setSending((current) => new Set(current).add(key));
+      setNotice("");
+      sendToSession(ctx, sessionId, text).then(() => {
+        setNotice(`\u5DF2\u53D1\u7ED9 AI\uFF1A${label}`);
+        done?.();
+      }).catch(() => setNotice(sendUnknownNotice)).finally(() => setSending((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      }));
+    };
+    return { sending, notice, setNotice, send };
+  };
+  const PanelPane = ({ app, pane, info, visible }) => {
     const [data, setData] = (0, import_react2.useState)({});
     const [board, setBoard] = (0, import_react2.useState)(void 0);
-    const [notice, setNotice] = (0, import_react2.useState)("");
-    const [sending, setSending] = (0, import_react2.useState)(/* @__PURE__ */ new Set());
     const [forms, setForms] = (0, import_react2.useState)({});
     const [formErrors, setFormErrors] = (0, import_react2.useState)({});
+    const [selectedKBs, setSelectedKBs] = (0, import_react2.useState)([]);
+    const { sending, notice, send: sendText } = useSending();
     const sessionRef = (0, import_react2.useRef)("");
     if (!sessionRef.current) sessionRef.current = onScreenSession(ctx);
     const load = async (index) => {
-      if (!app || !pane) return;
       setData((current) => ({ ...current, [index]: { status: "loading" } }));
       try {
         const result = unwrapRemote2(await remote.workbenchData({ app: app.name, pane: pane.id, widget: index }));
@@ -21093,47 +21238,40 @@ function registerWorkbench(ctx, deps) {
         setData((current) => ({ ...current, [index]: { status: "error", error: error62 instanceof Error ? error62.message : "\u7F51\u7EDC\u9519\u8BEF" } }));
       }
     };
-    const loadAll = () => (pane?.widgets ?? []).forEach((widget, index) => {
+    const loadAll = () => (pane.widgets ?? []).forEach((widget, index) => {
       if (widget.source) void load(index);
     });
     const loadBoard = async () => {
-      if (!app || !sessionRef.current) return;
+      if (!sessionRef.current) return;
       try {
         setBoard(unwrapRemote2(await remote.board({ app: app.name, sessionId: sessionRef.current })));
       } catch {
       }
     };
-    const hasBoard = !!pane?.widgets?.some((widget) => widget.type === "board");
-    (0, import_react2.useEffect)(loadAll, [app?.name, app?.version, pane?.id]);
+    const hasBoard = !!pane.widgets?.some((widget) => widget.type === "board");
+    (0, import_react2.useEffect)(loadAll, [app.name, app.version, pane.id]);
     (0, import_react2.useEffect)(() => {
       if (!hasBoard || !visible) return;
       void loadBoard();
       const timer = setInterval(() => void loadBoard(), 3e3);
       return () => clearInterval(timer);
-    }, [hasBoard, visible, app?.name]);
+    }, [hasBoard, visible, app.name]);
     (0, import_react2.useEffect)(() => info?.tab?.actions?.bindCommands?.({ refresh: () => {
       loadAll();
       void loadBoard();
-    } }), [info?.tab?.id, app?.version]);
-    if (!app || !pane) return loaded ? missingPaneView(import_react2.createElement) : (0, import_react2.createElement)("div", { style: { padding: 16, fontSize: 13, opacity: 0.65 } }, "\u52A0\u8F7D\u4E2D\u2026");
+    } }), [info?.tab?.id, app.version]);
+    const scopeIndex = (pane.widgets ?? []).findIndex((widget) => widget.type === "kb_scope");
+    const scopeState = scopeIndex >= 0 ? data[scopeIndex] : void 0;
+    const bases = scopeState?.status === "ready" && Array.isArray(scopeState.value?.items) ? scopeState.value.items : [];
     const send = (key, action, values) => {
-      if (sending.has(key)) return;
-      const sessionId = onScreenSession(ctx);
-      if (!sessionId) return setNotice("\u6CA1\u6709\u627E\u5230\u5F53\u524D\u4F1A\u8BDD\uFF0C\u8BF7\u5148\u6253\u5F00\u8FD9\u4E2A\u5E94\u7528\u7684\u4F1A\u8BDD");
-      setSending((current) => new Set(current).add(key));
-      setNotice("");
-      sendToSession(ctx, sessionId, fillPrompt(action.prompt, values)).then(() => {
-        setNotice(`\u5DF2\u53D1\u7ED9 AI\uFF1A${action.label}`);
+      sendText(key, fillPrompt(action.prompt, { ...values, scope: { kbs: scopeText(bases, selectedKBs) } }), action.label, () => {
         if (values.form) {
           const index = Number(key.split(":")[0]);
           setForms((current) => ({ ...current, [index]: {} }));
         }
-      }).catch(() => setNotice(sendUnknownNotice)).finally(() => setSending((current) => {
-        const next = new Set(current);
-        next.delete(key);
-        return next;
-      }));
+      });
     };
+    const docPane = app.workbench?.panes.find((item) => item.type === "kb_doc");
     const handlers = {
       sending,
       send,
@@ -21141,9 +21279,86 @@ function registerWorkbench(ctx, deps) {
       formValues: (index) => forms[index] ?? {},
       setFormValue: (index, name, value) => setForms((current) => ({ ...current, [index]: { ...current[index] ?? {}, [name]: value } })),
       formError: (index) => formErrors[index] ?? "",
-      setFormError: (index, error62) => setFormErrors((current) => ({ ...current, [index]: error62 }))
+      setFormError: (index, error62) => setFormErrors((current) => ({ ...current, [index]: error62 })),
+      selectedKBs,
+      toggleKB: (kb) => setSelectedKBs((current) => current.includes(kb) ? current.filter((item) => item !== kb) : [...current, kb]),
+      openCitation: docPane ? (citation) => {
+        docTargets.set(app.name, { doc: citation.doc, version: citation.version, from: citation.from, to: citation.to, quote: citation.quote, title: citation.title });
+        try {
+          ctx.sidebarRight.openResource(workbenchAddress(app.name, docPane.id), { preferNewPane: true });
+        } catch {
+        }
+      } : void 0
     };
     return panelView(import_react2.createElement, pane, { data, board, notice }, handlers);
+  };
+  const DocPane = ({ app }) => {
+    const [target, setTarget] = (0, import_react2.useState)(docTargets.get(app.name));
+    const [range, setRange] = (0, import_react2.useState)(target ? docWindow(target.from) : void 0);
+    const [state, setState] = (0, import_react2.useState)(void 0);
+    const { sending, notice, send } = useSending();
+    const scrolled = (0, import_react2.useRef)("");
+    (0, import_react2.useEffect)(() => docTargets.subscribe(() => {
+      const next = docTargets.get(app.name);
+      setTarget(next);
+      if (next) setRange(docWindow(next.from));
+    }), [app.name]);
+    (0, import_react2.useEffect)(() => {
+      if (!target || !range) return;
+      let live = true;
+      setState({ status: "loading" });
+      remote.kbDoc({ doc: target.doc, version: target.version, from: range.from, to: range.to }).then((raw) => {
+        if (!live) return;
+        const result = unwrapRemote2(raw);
+        setState(result?.forbidden ? { status: "forbidden" } : result?.error ? { status: "error", error: String(result.error) } : { status: "ready", value: result?.value });
+      }).catch((error62) => {
+        if (live) setState({ status: "error", error: error62 instanceof Error ? error62.message : "\u7F51\u7EDC\u9519\u8BEF" });
+      });
+      return () => {
+        live = false;
+      };
+    }, [target, range?.from, range?.to]);
+    (0, import_react2.useEffect)(() => {
+      if (state?.status !== "ready" || !target) return;
+      const key = `${target.doc}:${target.from}:${target.quote ?? ""}`;
+      if (scrolled.current === key) return;
+      scrolled.current = key;
+      const hit = typeof document !== "undefined" ? document.querySelector('[data-dsh-ee-ui="kb-doc"] [data-kb-hit="1"]') : null;
+      hit?.scrollIntoView?.({ block: "center" });
+    }, [state, target]);
+    const value = state?.status === "ready" ? state.value : void 0;
+    const view = kbDocView(import_react2.createElement, target, state, {
+      page: (delta) => setRange((current) => {
+        if (!current) return current;
+        const size = current.to - current.from + 1;
+        const from = Math.max(1, current.from + delta * size);
+        return { from, to: from + size - 1 };
+      }),
+      asking: sending.has("ask"),
+      ask: () => {
+        if (!target) return;
+        const title = value?.title || target.title || `\u6587\u6863 ${target.doc}`;
+        send("ask", `\u63A5\u7740\u770B\u77E5\u8BC6\u5E93\u6587\u6863\u300C${title}\u300D\uFF08\u6587\u6863\u7F16\u53F7 ${target.doc}\uFF09\u7B2C ${target.from}\uFF5E${target.to} \u884C\u524D\u540E\u7684\u5185\u5BB9\uFF1A\u8FD9\u4E00\u90E8\u5206\u8FD8\u6709\u54EA\u4E9B\u76F8\u5173\u89C4\u5B9A\u6216\u4F8B\u5916\u60C5\u51B5\uFF1F\u8BF7\u5E26\u51FA\u5904\u56DE\u7B54\u3002`, "\u5728\u8FD9\u7BC7\u91CC\u7EE7\u7EED\u95EE");
+      }
+    });
+    return notice ? (0, import_react2.createElement)(
+      "div",
+      { style: { height: "100%", display: "grid", gridTemplateRows: "auto 1fr" } },
+      (0, import_react2.createElement)("p", { role: "status", style: { margin: "8px 12px 0", fontSize: 12 } }, notice),
+      view
+    ) : view;
+  };
+  const WorkbenchTab = (props) => {
+    const info = props.useTabInfo?.();
+    const address = info?.tab?.navigation?.address || info?.tab?.contentId || "";
+    const visible = info?.tab?.visible !== false;
+    const parsed = parseWorkbenchAddress(address);
+    const { apps, loaded } = useAppsList();
+    const app = apps.find((item) => item.name === parsed?.app);
+    const pane = app?.workbench?.panes.find((item) => item.id === parsed?.pane && (item.type === "panel" || item.type === "kb_doc"));
+    if (!app || !pane) return loaded ? missingPaneView(import_react2.createElement) : (0, import_react2.createElement)("div", { style: { padding: 16, fontSize: 13, opacity: 0.65 } }, "\u52A0\u8F7D\u4E2D\u2026");
+    if (pane.type === "kb_doc") return (0, import_react2.createElement)(DocPane, { key: `${app.name}/${pane.id}`, app });
+    return (0, import_react2.createElement)(PanelPane, { key: `${app.name}/${pane.id}`, app, pane, info, visible });
   };
   ctx.effect(() => ctx.sidebarRightTabs.register({
     id: workbenchTabId,
@@ -21176,6 +21391,7 @@ var clientRemote = createTypertRemoteInfo({
     "dshEE/bindApp": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/unbindApp": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/workbenchData": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/kbDoc": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/board": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/overview": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/login": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },

@@ -2785,8 +2785,8 @@ function validateName(subject, value) {
 }
 
 // src/brand.ts
-var _doctor_dec, _login_dec, _overview_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
-var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _a) {
+var _doctor_dec, _login_dec, _overview_dec, _kbDoc_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
+var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _kbDoc_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _a) {
   constructor(ctx, actions) {
     super(ctx, "dshEE");
     this.actions = actions;
@@ -2822,6 +2822,9 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
   async board(request) {
     return this.actions.readBoard(request);
   }
+  async kbDoc(request) {
+    return this.actions.readKBDoc(request);
+  }
   async overview() {
     return this.actions.readOverview();
   }
@@ -2843,6 +2846,7 @@ __decorateElement(_init, 1, "bindApp", _bindApp_dec, DshEEClientService);
 __decorateElement(_init, 1, "unbindApp", _unbindApp_dec, DshEEClientService);
 __decorateElement(_init, 1, "workbenchData", _workbenchData_dec, DshEEClientService);
 __decorateElement(_init, 1, "board", _board_dec, DshEEClientService);
+__decorateElement(_init, 1, "kbDoc", _kbDoc_dec, DshEEClientService);
 __decorateElement(_init, 1, "overview", _overview_dec, DshEEClientService);
 __decorateElement(_init, 1, "login", _login_dec, DshEEClientService);
 __decorateElement(_init, 1, "doctor", _doctor_dec, DshEEClientService);
@@ -3032,8 +3036,22 @@ function checkBoardBlocks(blocks) {
         if (!Array.isArray(block.rows) || block.rows.length > 50 || !block.rows.every((row) => Array.isArray(row))) return { error: `${where}\uFF1Arows \u5FC5\u987B\u662F\u6700\u591A 50 \u884C\u7684\u4E8C\u7EF4\u6570\u7EC4` };
         out.push({ type: "table", columns: block.columns.map(text), rows: block.rows.map((row) => row.map(text)) });
         break;
+      case "citations": {
+        if (!Array.isArray(block.items) || block.items.length === 0 || block.items.length > 30) return { error: `${where}\uFF1Aitems \u8981\u6709 1\uFF5E30 \u6761\u5F15\u7528` };
+        const items = [];
+        for (const [i, item] of block.items.entries()) {
+          const at = `${where}\u7B2C ${i + 1} \u6761\u5F15\u7528`;
+          const int = (value) => Number.isInteger(value) && value > 0;
+          if (!int(item?.doc) || !int(item?.from) || !int(item?.to) || item.to < item.from) return { error: `${at}\uFF1Adoc\u3001from\u3001to \u8981\u662F\u6B63\u6574\u6570\uFF0C\u4E14 to \u4E0D\u5C0F\u4E8E from` };
+          if (item.version !== void 0 && item.version !== null && !int(item.version)) return { error: `${at}\uFF1Aversion \u8981\u662F\u6B63\u6574\u6570` };
+          if (typeof item.quote !== "string" || !item.quote.trim() || item.quote.length > 500) return { error: `${at}\uFF1Aquote \u8981\u5199 1\uFF5E500 \u5B57\u7684\u539F\u6587\u6458\u53E5` };
+          items.push({ doc: item.doc, version: item.version ?? void 0, from: item.from, to: item.to, quote: item.quote, title: item.title === void 0 ? void 0 : text(item.title).slice(0, 200) });
+        }
+        out.push({ type: "citations", items });
+        break;
+      }
       default:
-        return { error: `${where}\uFF1Atype \u53EA\u80FD\u662F text\u3001list \u6216 table` };
+        return { error: `${where}\uFF1Atype \u53EA\u80FD\u662F text\u3001list\u3001table \u6216 citations` };
     }
   }
   return { blocks: out };
@@ -3056,6 +3074,49 @@ async function readWidgetData(apps, tools, request) {
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   }
+}
+var kbTool = (name2) => `kb__${name2}`;
+async function readKBDoc(tools, request) {
+  const name2 = kbTool("read");
+  if (!tools.hasTool(name2)) return { forbidden: true };
+  const int = (value) => Number.isInteger(value) && value > 0 ? value : void 0;
+  if (!int(request?.doc)) return { error: "\u6587\u6863\u7F16\u53F7\u4E0D\u5BF9" };
+  try {
+    return { value: toolValue(await tools.callTool(name2, { doc: request.doc, version: int(request.version), from: int(request.from) ?? 1, to: int(request.to) })) };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+async function verifyCitations(tools, blocks) {
+  const all = [];
+  for (const block of blocks) if (block.type === "citations") all.push(...block.items);
+  if (!all.length) return { blocks, bad: [], stale: [] };
+  let results;
+  if (tools?.hasTool(kbTool("verify"))) {
+    try {
+      const value = toolValue(await tools.callTool(kbTool("verify"), { citations: all.map(({ doc, version, from, to, quote }) => ({ doc, version, from, to, quote })) }));
+      if (Array.isArray(value?.results)) results = value.results;
+    } catch {
+    }
+  }
+  const bad = [];
+  const stale = [];
+  let index = 0;
+  const out = blocks.map((block) => {
+    if (block.type !== "citations") return block;
+    return {
+      ...block,
+      items: block.items.map((item) => {
+        const result = results?.find((r) => r?.index === index);
+        index++;
+        const status = ["ok", "stale", "mismatch", "missing"].includes(result?.status) ? result.status : "unchecked";
+        if (status === "mismatch" || status === "missing") bad.push(index);
+        if (status === "stale") stale.push(index);
+        return { ...item, title: item.title || result?.title || void 0, status };
+      })
+    };
+  });
+  return { blocks: out, bad, stale };
 }
 var safeName = /^[A-Za-z0-9_-]{1,80}$/;
 var BoardStore = class {
@@ -3104,13 +3165,17 @@ async function runWorkbenchTool(deps, args, exec) {
   if (!checked.blocks) throw new Error(checked.error);
   const sessionId = exec?.agent?.session?.id ?? deps.boundSession(app);
   if (typeof sessionId !== "string" || !sessionId) throw new Error("\u627E\u4E0D\u5230\u8981\u66F4\u65B0\u770B\u677F\u7684\u4F1A\u8BDD");
-  deps.boards.write(app, sessionId, checked.blocks);
-  return "\u5DF2\u66F4\u65B0\u5DE5\u4F5C\u53F0\u770B\u677F";
+  const verified = await verifyCitations(deps.tools, checked.blocks);
+  deps.boards.write(app, sessionId, verified.blocks);
+  const notes = ["\u5DF2\u66F4\u65B0\u5DE5\u4F5C\u53F0\u770B\u677F"];
+  if (verified.bad.length) notes.push(`\u5F15\u7528 ${verified.bad.map((n) => `[${n}]`).join(" ")} \u5BF9\u4E0D\u4E0A\u539F\u6587\uFF1A\u8BF7\u7528 kb__read \u91CD\u65B0\u8BFB\u90A3\u51E0\u884C\uFF0C\u6539\u6B63\u540E\u518D\u5199\u4E00\u6B21\u770B\u677F\uFF0C\u5E76\u5728\u5BF9\u8BDD\u91CC\u5411\u7528\u6237\u66F4\u6B63\u3002`);
+  if (verified.stale.length) notes.push(`\u5F15\u7528 ${verified.stale.map((n) => `[${n}]`).join(" ")} \u7684\u6587\u6863\u5DF2\u7ECF\u66F4\u65B0\uFF0C\u8BF7\u8BFB\u6700\u65B0\u7248\u672C\u786E\u8BA4\u7ED3\u8BBA\u6CA1\u6709\u53D8\u3002`);
+  return notes.join("\n");
 }
 function registerWorkbenchTool(ctx, deps) {
   return ctx.tools.register({
     name: workbenchToolName,
-    description: "\u66F4\u65B0\u5F53\u524D\u5FAE\u5E94\u7528\u5DE5\u4F5C\u53F0\u4E0A\u7684\u300CAI \u770B\u677F\u300D\u3002\u53EA\u7528\u6765\u628A\u672C\u8F6E\u5904\u7406\u7ED3\u679C\u5199\u5230\u770B\u677F\u4E0A\uFF0C\u4E0D\u4F1A\u6539\u4EFB\u4F55\u4E1A\u52A1\u6570\u636E\u3002\u6BCF\u6B21\u8C03\u7528\u6574\u4F53\u66FF\u6362\u770B\u677F\u5185\u5BB9\u3002",
+    description: "\u66F4\u65B0\u5F53\u524D\u5FAE\u5E94\u7528\u5DE5\u4F5C\u53F0\u4E0A\u7684\u300CAI \u770B\u677F\u300D\u3002\u53EA\u7528\u6765\u628A\u672C\u8F6E\u5904\u7406\u7ED3\u679C\u5199\u5230\u770B\u677F\u4E0A\uFF0C\u4E0D\u4F1A\u6539\u4EFB\u4F55\u4E1A\u52A1\u6570\u636E\u3002\u6BCF\u6B21\u8C03\u7528\u6574\u4F53\u66FF\u6362\u770B\u677F\u5185\u5BB9\u3002citations \u5757\u91CC\u7684\u77E5\u8BC6\u5E93\u5F15\u7528\u4F1A\u81EA\u52A8\u6838\u5BF9\uFF0C\u8FD4\u56DE\u7ED3\u679C\u4F1A\u6307\u51FA\u5BF9\u4E0D\u4E0A\u539F\u6587\u7684\u5F15\u7528\u3002",
     parameters: {
       type: "object",
       required: ["action", "app", "blocks"],
@@ -3125,9 +3190,29 @@ function registerWorkbenchTool(ctx, deps) {
             type: "object",
             required: ["type"],
             properties: {
-              type: { type: "string", enum: ["text", "list", "table"] },
+              type: { type: "string", enum: ["text", "list", "table", "citations"] },
               text: { type: "string" },
-              items: { type: "array", items: { type: "string" } },
+              items: {
+                type: "array",
+                description: "list\uFF1A\u6BCF\u9879\u4E00\u6BB5\u6587\u5B57\uFF1Bcitations\uFF1A\u6BCF\u9879\u4E00\u6761\u77E5\u8BC6\u5E93\u5F15\u7528 {doc, version, from, to, quote, title}",
+                items: {
+                  anyOf: [
+                    { type: "string" },
+                    {
+                      type: "object",
+                      required: ["doc", "from", "to", "quote"],
+                      properties: {
+                        doc: { type: "integer" },
+                        version: { type: "integer" },
+                        from: { type: "integer" },
+                        to: { type: "integer" },
+                        quote: { type: "string" },
+                        title: { type: "string" }
+                      }
+                    }
+                  ]
+                }
+              },
               columns: { type: "array", items: { type: "string" } },
               rows: { type: "array", items: { type: "array", items: { type: "string" } } }
             }
@@ -3186,6 +3271,7 @@ function apply(ctx, input) {
       unbindApp: async (name2) => appBindings.unbind(name2),
       workbenchData: async (request) => readWidgetData(await skills.readApps(), bridge, request),
       readBoard: async (request) => boards.read(String(request?.app ?? ""), String(request?.sessionId ?? "")) ?? null,
+      readKBDoc: (request) => readKBDoc(bridge, request),
       readOverview: () => readEnterpriseOverview(config, http, bridge),
       login: () => commands.login(),
       doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge, appBindings)
@@ -3193,7 +3279,8 @@ function apply(ctx, input) {
     const disposeWorkbenchTool = registerWorkbenchTool(ctx, {
       boards,
       readApps: () => skills.readApps(),
-      boundSession: (app) => appBindings.list()[app]?.sessionId
+      boundSession: (app) => appBindings.list()[app]?.sessionId,
+      tools: bridge
     });
     await bridge.start();
     return () => {

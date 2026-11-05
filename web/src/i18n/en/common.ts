@@ -73,6 +73,7 @@ export default {
     revoke: { title: "Revoke?", action: "Revoke" },
     disable: { title: "Disable?", action: "Disable" },
     reset: { title: "Restore defaults?", action: "Restore defaults" },
+    restore: { title: "Restore?", action: "Restore" },
   },
   api: {
     unreachable: "Can't reach the server. Make sure dsh-ee server is running",
@@ -103,6 +104,7 @@ export default {
     "admin-upstream": "Upstream preload",
     "admin-distribution": "DSH distribution",
     "admin-settings": "Settings",
+    knowledge: "Knowledge base",
   },
   pageDesc: {
     workbench: "Personal stats, installed capabilities, team picks, my contributions",
@@ -128,6 +130,7 @@ export default {
     "admin-upstream": "Online sync and offline import",
     "admin-distribution": "Distributing DSH itself",
     "admin-settings": "Global settings",
+    knowledge: "Policies, handbooks and documents; ask in Knowledge Q&A in DSH",
   },
   menuGroups: {
     工作台: "Workbench",

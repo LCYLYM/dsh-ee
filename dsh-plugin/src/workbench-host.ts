@@ -6,7 +6,7 @@ import { dshHome } from "./config.js";
 import { renderResult } from "./bridge.js";
 import type { CatalogApp } from "./skills.js";
 import type { DshContext } from "./dsh.js";
-import { checkBoardBlocks, toolValue, type Board, type WorkbenchWidget } from "./workbench.js";
+import { checkBoardBlocks, toolValue, type Board, type BoardBlock, type Citation, type WorkbenchWidget } from "./workbench.js";
 
 export interface ToolCaller {
   hasTool(serverName: string): boolean;
@@ -44,6 +44,66 @@ export async function readWidgetData(apps: CatalogApp[], tools: ToolCaller, requ
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+/** 知识库工具在网关上的名字（kb__<工具>） */
+export const kbTool = (name: string) => `kb__${name}`;
+
+export interface KBDocRequest {
+  doc: number;
+  version?: number;
+  from: number;
+  to: number;
+}
+
+/** 文档窗格读原文：经 kb__read，服务端按员工权限过滤，读的记录也会留下。 */
+export async function readKBDoc(tools: ToolCaller, request: KBDocRequest): Promise<WidgetData> {
+  const name = kbTool("read");
+  if (!tools.hasTool(name)) return { forbidden: true };
+  const int = (value: any) => (Number.isInteger(value) && value > 0 ? value : undefined);
+  if (!int(request?.doc)) return { error: "文档编号不对" };
+  try {
+    return { value: toolValue(await tools.callTool(name, { doc: request.doc, version: int(request.version), from: int(request.from) ?? 1, to: int(request.to) })) };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * 把看板里的引用逐条拿到服务端核对，结果写进每条引用的 status。核对不了（没有 kb__verify、网络错误）时标 unchecked。
+ * 返回对不上的引用编号（从 1 开始，按看板里出现的顺序）。
+ */
+export async function verifyCitations(tools: ToolCaller | undefined, blocks: BoardBlock[]): Promise<{ blocks: BoardBlock[]; bad: number[]; stale: number[] }> {
+  const all: Citation[] = [];
+  for (const block of blocks) if (block.type === "citations") all.push(...block.items);
+  if (!all.length) return { blocks, bad: [], stale: [] };
+  let results: any[] | undefined;
+  if (tools?.hasTool(kbTool("verify"))) {
+    try {
+      const value = toolValue(await tools.callTool(kbTool("verify"), { citations: all.map(({ doc, version, from, to, quote }) => ({ doc, version, from, to, quote })) }));
+      if (Array.isArray(value?.results)) results = value.results;
+    } catch {
+      // 核对失败不影响写看板，标成没核对
+    }
+  }
+  const bad: number[] = [];
+  const stale: number[] = [];
+  let index = 0;
+  const out = blocks.map((block) => {
+    if (block.type !== "citations") return block;
+    return {
+      ...block,
+      items: block.items.map((item) => {
+        const result = results?.find((r) => r?.index === index);
+        index++;
+        const status = ["ok", "stale", "mismatch", "missing"].includes(result?.status) ? result.status : "unchecked";
+        if (status === "mismatch" || status === "missing") bad.push(index);
+        if (status === "stale") stale.push(index);
+        return { ...item, title: item.title || result?.title || undefined, status } as Citation;
+      }),
+    };
+  });
+  return { blocks: out, bad, stale };
 }
 
 const safeName = /^[A-Za-z0-9_-]{1,80}$/;
@@ -94,6 +154,8 @@ export interface WorkbenchToolDeps {
   readApps: () => Promise<CatalogApp[]>;
   /** 拿不到调用方会话时，退回这个应用当前绑定的会话 */
   boundSession: (app: string) => string | undefined;
+  /** 核对看板引用用的企业工具（kb__verify）；没有时引用标成没核对 */
+  tools?: ToolCaller;
 }
 
 /** 执行一次 ee_workbench 调用；exec 是 DSH 传给工具的执行上下文，exec.agent.session 是调用它的会话。 */
@@ -108,15 +170,19 @@ export async function runWorkbenchTool(deps: WorkbenchToolDeps, args: any, exec?
   if (!checked.blocks) throw new Error(checked.error);
   const sessionId = exec?.agent?.session?.id ?? deps.boundSession(app);
   if (typeof sessionId !== "string" || !sessionId) throw new Error("找不到要更新看板的会话");
-  deps.boards.write(app, sessionId, checked.blocks);
-  return "已更新工作台看板";
+  const verified = await verifyCitations(deps.tools, checked.blocks);
+  deps.boards.write(app, sessionId, verified.blocks);
+  const notes = ["已更新工作台看板"];
+  if (verified.bad.length) notes.push(`引用 ${verified.bad.map((n) => `[${n}]`).join(" ")} 对不上原文：请用 kb__read 重新读那几行，改正后再写一次看板，并在对话里向用户更正。`);
+  if (verified.stale.length) notes.push(`引用 ${verified.stale.map((n) => `[${n}]`).join(" ")} 的文档已经更新，请读最新版本确认结论没有变。`);
+  return notes.join("\n");
 }
 
 /** 注册 ee_workbench 工具，返回撤销函数。 */
 export function registerWorkbenchTool(ctx: DshContext, deps: WorkbenchToolDeps): () => void {
   return ctx.tools.register({
     name: workbenchToolName,
-    description: "更新当前微应用工作台上的「AI 看板」。只用来把本轮处理结果写到看板上，不会改任何业务数据。每次调用整体替换看板内容。",
+    description: "更新当前微应用工作台上的「AI 看板」。只用来把本轮处理结果写到看板上，不会改任何业务数据。每次调用整体替换看板内容。citations 块里的知识库引用会自动核对，返回结果会指出对不上原文的引用。",
     parameters: {
       type: "object",
       required: ["action", "app", "blocks"],
@@ -131,9 +197,29 @@ export function registerWorkbenchTool(ctx: DshContext, deps: WorkbenchToolDeps):
             type: "object",
             required: ["type"],
             properties: {
-              type: { type: "string", enum: ["text", "list", "table"] },
+              type: { type: "string", enum: ["text", "list", "table", "citations"] },
               text: { type: "string" },
-              items: { type: "array", items: { type: "string" } },
+              items: {
+                type: "array",
+                description: "list：每项一段文字；citations：每项一条知识库引用 {doc, version, from, to, quote, title}",
+                items: {
+                  anyOf: [
+                    { type: "string" },
+                    {
+                      type: "object",
+                      required: ["doc", "from", "to", "quote"],
+                      properties: {
+                        doc: { type: "integer" },
+                        version: { type: "integer" },
+                        from: { type: "integer" },
+                        to: { type: "integer" },
+                        quote: { type: "string" },
+                        title: { type: "string" },
+                      },
+                    },
+                  ],
+                },
+              },
               columns: { type: "array", items: { type: "string" } },
               rows: { type: "array", items: { type: "array", items: { type: "string" } } },
             },

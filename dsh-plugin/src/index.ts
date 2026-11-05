@@ -11,7 +11,7 @@ import { readEnterpriseOverview } from "./overview.js";
 import { uploadPackage } from "./upload.js";
 import { AppBindings } from "./app-bindings.js";
 import { setAppSubscription } from "./app-subscription.js";
-import { BoardStore, readWidgetData, registerWorkbenchTool } from "./workbench-host.js";
+import { BoardStore, readKBDoc, readWidgetData, registerWorkbenchTool } from "./workbench-host.js";
 import type { DshContext, PluginConfig } from "./dsh.js";
 
 export const name = "dsh-ee-connect";
@@ -62,6 +62,7 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
       unbindApp: async (name) => appBindings.unbind(name),
       workbenchData: async (request) => readWidgetData(await skills!.readApps(), bridge, request),
       readBoard: async (request) => boards.read(String(request?.app ?? ""), String(request?.sessionId ?? "")) ?? null,
+      readKBDoc: (request) => readKBDoc(bridge, request),
       readOverview: () => readEnterpriseOverview(config, http, bridge),
       login: () => commands.login(),
       doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge, appBindings),
@@ -70,6 +71,7 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
       boards,
       readApps: () => skills!.readApps(),
       boundSession: (app) => appBindings.list()[app]?.sessionId,
+      tools: bridge,
     });
     await bridge.start();
     return () => {

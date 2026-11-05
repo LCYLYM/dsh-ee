@@ -16,6 +16,7 @@ const META = {
   workbench: { title: "我的工作台", defaultPath: "/workbench", description: "个人指标、装过的能力、部门在用、我分享的" },
   apps: { title: "微应用", defaultPath: "/apps", description: "基于 DSH 运行的企业微应用" },
   market: { title: "能力中心", defaultPath: "/hub", description: "插件、技能、提示词、企业连接与微应用" },
+  knowledge: { title: "知识库", defaultPath: "/knowledge", description: "制度、手册与资料；在 DSH 的「知识问答」里提问" },
   "dsh-download": { title: "下载 DSH", defaultPath: "/dsh", description: "DSH 核心与桌面版下载" },
   setup: { title: "接入指南", defaultPath: "/setup", description: "一条命令接入企业源" },
   publish: { title: "分享能力", defaultPath: "/publish", description: "上传或申请引入能力" },

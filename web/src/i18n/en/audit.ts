@@ -29,6 +29,7 @@ export default {
       connect: "DSH connect plugin",
       dsh_release: "DSH Desktop distribution",
       brand: "Company branding",
+      kb: "Knowledge base",
     },
     colTime: "Time",
     colActor: "Actor",
@@ -66,6 +67,7 @@ export default {
       connect: { publish: "Published connect plugin" },
       dsh_release: { check: "Checked official releases", mirror: "Downloaded installer", mirror_failed: "Installer verification failed", recommend: "Set recommended release", delete: "Deleted local installer" },
       brand: { update: "Updated company branding" },
+      kb: { create: "Create knowledge base", edit: "Edit knowledge base", delete: "Delete knowledge base", doc_create: "Add document", doc_edit: "Edit document", doc_delete: "Delete document" },
     },
   },
 } satisfies Messages<typeof zh>;

@@ -71,6 +71,7 @@ export default {
     revoke: { title: "确认吊销？", action: "吊销" },
     disable: { title: "确认禁用？", action: "禁用" },
     reset: { title: "恢复默认？", action: "恢复默认" },
+    restore: { title: "确认恢复？", action: "恢复" },
   },
   api: {
     unreachable: "连不上服务端，请确认 dsh-ee server 已启动",
@@ -102,6 +103,7 @@ export default {
     "admin-upstream": "上游预载",
     "admin-distribution": "DSH 分发",
     "admin-settings": "系统设置",
+    knowledge: "知识库",
   },
   pageDesc: {
     workbench: "个人指标、装过的能力、部门在用、我分享的",
@@ -127,6 +129,7 @@ export default {
     "admin-upstream": "在线同步与离线导入",
     "admin-distribution": "DSH 本体分发",
     "admin-settings": "全局设置",
+    knowledge: "制度、手册与资料；在 DSH 的「知识问答」里提问",
   },
   /** 默认菜单分组名。 */
   menuGroups: {

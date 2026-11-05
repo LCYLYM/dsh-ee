@@ -20,6 +20,8 @@ import Account from "./pages/account";
 import PluginDetail from "./pages/plugin-detail";
 import AssetDetail from "./pages/asset-detail";
 import AssetEditor from "./pages/asset-editor";
+import KnowledgeBase from "./pages/knowledge-base";
+import KnowledgeDoc from "./pages/knowledge-doc";
 import DevicePage from "./pages/device";
 import Onboarding from "./pages/onboarding";
 import GetStarted from "./pages/get-started";
@@ -109,6 +111,8 @@ function AppRoutes() {
         <Route path="assets/new" element={<AssetEditor />} />
         <Route path="assets/:id" element={<AssetDetail />} />
         <Route path="assets/:id/edit" element={<AssetEditor />} />
+        <Route path="knowledge/docs/:id" element={<KnowledgeDoc />} />
+        <Route path="knowledge/:id" element={<KnowledgeBase />} />
         {!pages.some((m) => m.path === "/market") && <Route path="market" element={<LegacyMarket />} />}
         {!pages.some((m) => m.path === "/keys") && <Route path="keys" element={<LegacyPage pageKey="my-keys" />} />}
         {!pages.some((m) => m.path === "/admin/keys") && <Route path="admin/keys" element={<LegacyPage pageKey="admin-keys" />} />}

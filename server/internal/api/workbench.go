@@ -21,7 +21,7 @@ type appWorkbench struct {
 
 type wbPane struct {
 	ID    string `json:"id"`
-	Type  string `json:"type"` // panel | web
+	Type  string `json:"type"` // panel | web | kb_doc（知识库原文，点看板上的引用时打开）
 	Title string `json:"title"`
 	// web：用官方浏览器标签页打开的地址
 	URL string `json:"url,omitempty"`
@@ -30,7 +30,7 @@ type wbPane struct {
 }
 
 type wbWidget struct {
-	Type  string `json:"type"` // metric | table | form | actions | markdown | board
+	Type  string `json:"type"` // metric | table | form | actions | markdown | board | kb_scope
 	Title string `json:"title,omitempty"`
 	// markdown：说明文字
 	Text string `json:"text,omitempty"`
@@ -79,6 +79,7 @@ type wbField struct {
 var (
 	wbFieldNameRe   = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	wbPathRe        = regexp.MustCompile(`^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$`)
+	// {{scope.kbs}} 是同一个面板上「查哪些库」勾选的知识库，没勾就是全部
 	wbPlaceholderRe = regexp.MustCompile(`\{\{\s*([a-z]+)\.([A-Za-z0-9_.]+)\s*\}\}`)
 	wbFormats       = []string{"", "money", "number", "percent", "date"}
 )
@@ -115,6 +116,8 @@ func validateWorkbench(wb *appWorkbench, connections []string) string {
 				return where + "：网址必须以 http:// 或 https:// 开头，最多 2048 个字符"
 			}
 			p.Widgets = nil
+		case "kb_doc":
+			p.URL, p.Widgets = "", nil
 		case "panel":
 			p.URL = ""
 			if len(p.Widgets) == 0 {
@@ -129,7 +132,7 @@ func validateWorkbench(wb *appWorkbench, connections []string) string {
 				}
 			}
 		default:
-			return where + "：类型只能是 panel 或 web"
+			return where + "：类型只能是 panel、web 或 kb_doc"
 		}
 	}
 	return ""
@@ -244,8 +247,12 @@ func validateWidget(w *wbWidget, connections []string) string {
 			return "说明文字必填，最多 4000 个字"
 		}
 	case "board":
+	case "kb_scope":
+		// 固定读知识库列表
+		keepSource = true
+		w.Source = &wbSource{Connection: kbConn, Tool: "list"}
 	default:
-		return "类型只能是 metric / table / form / actions / markdown / board"
+		return "类型只能是 metric / table / form / actions / markdown / board / kb_scope"
 	}
 	// 其它类型用不到的字段清掉，避免存进版本里误导审核
 	if !keepSource {
@@ -274,7 +281,11 @@ func validateSource(src *wbSource, connections []string) string {
 		return "要指定数据源（source）"
 	}
 	src.Connection, src.Tool = strings.TrimSpace(src.Connection), strings.TrimSpace(src.Tool)
-	if !slices.Contains(connections, src.Connection) {
+	if src.Connection == kbConn {
+		if !slices.Contains(kbWorkbenchTools, src.Tool) {
+			return "知识库数据源的工具只能是 " + strings.Join(kbWorkbenchTools, " / ")
+		}
+	} else if !slices.Contains(connections, src.Connection) {
 		return "数据源的连接 " + src.Connection + " 不在这个微应用的依赖连接里"
 	}
 	if src.Tool == "" {
@@ -305,10 +316,11 @@ func validateAction(a *wbAction, scope string, formFields map[string]bool) strin
 	}
 	rest := wbPlaceholderRe.ReplaceAllStringFunc(a.Prompt, func(m string) string { return "" })
 	if strings.Contains(rest, "{{") || strings.Contains(rest, "}}") {
-		return "占位符只能写成 {{row.字段}} 或 {{form.字段}}"
+		return "占位符只能写成 {{row.字段}}、{{form.字段}} 或 {{scope.kbs}}"
 	}
 	for _, m := range wbPlaceholderRe.FindAllStringSubmatch(a.Prompt, -1) {
 		switch {
+		case m[1] == "scope" && m[2] == "kbs":
 		case m[1] == "row" && scope == "row":
 		case m[1] == "form" && scope == "form":
 			if !formFields[m[2]] {
@@ -331,7 +343,7 @@ func (s *Server) checkWorkbenchSources(ctx context.Context, wb *appWorkbench) (s
 	tools := map[string]map[string]*store.ConnectionTool{}
 	for pi, p := range wb.Panes {
 		for wi, w := range p.Widgets {
-			if w.Source == nil {
+			if w.Source == nil || w.Source.Connection == kbConn {
 				continue
 			}
 			where := fmt.Sprintf("工作台第 %d 个窗格第 %d 个组件：", pi+1, wi+1)
@@ -384,11 +396,15 @@ func workbenchContent(wb *appWorkbench) string {
 			fmt.Fprintf(&b, "- 「%s」：内部系统网页 %s（你看不到页面内容）\n", p.Title, p.URL)
 			continue
 		}
+		if p.Type == "kb_doc" {
+			fmt.Fprintf(&b, "- 「%s」：用户点看板上的引用时，在这里看那篇文档的原文并高亮引用的几行\n", p.Title)
+			continue
+		}
 		var parts []string
 		for _, w := range p.Widgets {
 			title := w.Title
 			if title == "" {
-				title = map[string]string{"metric": "指标", "table": "表格", "form": "表单", "actions": "快捷按钮", "markdown": "说明", "board": "AI 看板"}[w.Type]
+				title = map[string]string{"metric": "指标", "table": "表格", "form": "表单", "actions": "快捷按钮", "markdown": "说明", "board": "AI 看板", "kb_scope": "知识库选择"}[w.Type]
 			}
 			parts = append(parts, title)
 			if w.Type == "board" {

@@ -41,6 +41,8 @@ type assetSpec struct {
 	Skills      []string `json:"skills,omitempty"`
 	Connections []string `json:"connections,omitempty"`
 	Plugins     []string `json:"plugins,omitempty"`
+	// 微应用：绑定的知识库（标识），指令里会带上查知识库的规则
+	Knowledge []string `json:"knowledge,omitempty"`
 	// 微应用：在 DSH 里显示的图标（一个 emoji，留空用名字首字）
 	Icon string `json:"icon,omitempty"`
 	// 微应用：点开时怎么开始 —— "new"（每次新会话，默认）或 "resume"（回到上次的会话）
@@ -94,7 +96,7 @@ func validateSpec(kind string, sp *assetSpec) string {
 		if kind == store.KindPrompt {
 			sp.ModelInvocable, sp.WhenToUse = nil, ""
 		}
-		sp.Persona, sp.Starters, sp.Skills, sp.Connections, sp.Plugins = "", nil, nil, nil, nil
+		sp.Persona, sp.Starters, sp.Skills, sp.Connections, sp.Plugins, sp.Knowledge = "", nil, nil, nil, nil, nil
 		sp.Icon, sp.Launch, sp.Workbench = "", "", nil
 		sp.Type, sp.URL, sp.Auth, sp.OpenAPI, sp.Instructions = "", "", nil, "", ""
 	case store.KindApp:
@@ -146,6 +148,9 @@ func validateSpec(kind string, sp *assetSpec) string {
 		if sp.Plugins, msg = clean(sp.Plugins, 20, registry.ValidName, "插件"); msg != "" {
 			return msg
 		}
+		if sp.Knowledge, msg = clean(sp.Knowledge, 20, slugRe.MatchString, "知识库"); msg != "" {
+			return msg
+		}
 		if sp.Workbench != nil {
 			if msg := validateWorkbench(sp.Workbench, sp.Connections); msg != "" {
 				return msg
@@ -193,7 +198,7 @@ func validateSpec(kind string, sp *assetSpec) string {
 			return "超时应在 1–120 秒之间"
 		}
 		sp.Body, sp.WhenToUse, sp.ModelInvocable = "", "", nil
-		sp.Persona, sp.Starters, sp.Skills, sp.Connections, sp.Plugins = "", nil, nil, nil, nil
+		sp.Persona, sp.Starters, sp.Skills, sp.Connections, sp.Plugins, sp.Knowledge = "", nil, nil, nil, nil, nil
 		sp.Icon, sp.Launch, sp.Workbench = "", "", nil
 	default:
 		return "未知的能力类型"
@@ -589,6 +594,10 @@ func (s *Server) handleHubCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if !slugRe.MatchString(req.Slug) || len(req.Slug) > maxSlug {
 		writeErr(w, http.StatusBadRequest, "标识只能用小写字母、数字和连字符，例如 expense-policy，最多 48 个字符")
+		return
+	}
+	if req.Slug == kbConn || req.Slug == kbQAName {
+		writeErr(w, http.StatusBadRequest, "标识 "+req.Slug+" 留给知识库使用")
 		return
 	}
 	sp, raw, ok := s.decodeSpec(w, r, req.Kind, req.Spec)

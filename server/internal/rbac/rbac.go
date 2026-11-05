@@ -32,6 +32,7 @@ const (
 	AuditView          = "audit.view"
 	PluginsManage      = "plugins.manage"
 	ConnectionsManage  = "connections.manage"
+	KnowledgeManage    = "knowledge.manage"
 	RegistryManage     = "registry.manage"
 	UpstreamManage     = "upstream.manage"
 	DistributionManage = "distribution.manage"
@@ -69,6 +70,7 @@ var Catalog = []Permission{
 	{AuditView, "查看审计日志", "能力与分发", "登录、账号、权限、设置、发布与审核等操作记录", nil},
 	{PluginsManage, "管理能力与审核", "能力与分发", "插件、技能、提示词与微应用的审核、上下架、可用范围与下发方式", nil},
 	{ConnectionsManage, "管理企业连接", "能力与分发", "接入企业 MCP 服务与 API，托管凭据，配置工具与授权", nil},
+	{KnowledgeManage, "管理知识库", "能力与分发", "新建和删除知识库，设置谁能查、谁来维护，管理全部文档，查看全部检索记录，配置「知识问答」", nil},
 	{RegistryManage, "管理 npm 源", "能力与分发", "路由规则、上游与访问令牌", nil},
 	{UpstreamManage, "管理上游预载", "能力与分发", "在线同步与离线导入", nil},
 	{DistributionManage, "管理 DSH 分发", "能力与分发", "DSH 本体与桌面版的分发", nil},
@@ -92,6 +94,7 @@ var DefaultMenus = []Menu{
 		{Kind: "page", Title: "我的工作台", Path: "/workbench", PageKey: "workbench", Icon: "House", Permission: PortalView},
 		{Kind: "page", Title: "微应用", Path: "/apps", PageKey: "apps", Icon: "AppWindow", Permission: PortalView},
 		{Kind: "page", Title: "能力中心", Path: "/hub", PageKey: "market", Icon: "Puzzle", Permission: PortalView},
+		{Kind: "page", Title: "知识库", Path: "/knowledge", PageKey: "knowledge", Icon: "BookOpen", Permission: PortalView},
 		{Kind: "page", Title: "下载 DSH", Path: "/dsh", PageKey: "dsh-download", Icon: "Download", Permission: PortalView},
 		{Kind: "page", Title: "接入指南", Path: "/setup", PageKey: "setup", Icon: "Terminal", Permission: PortalView},
 		{Kind: "page", Title: "分享能力", Path: "/publish", PageKey: "publish", Icon: "Upload", Permission: PortalView},

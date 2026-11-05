@@ -167,6 +167,22 @@ func (s *Server) routes() []route {
 		prm("POST /api/admin/connections/{id}/sync", s.handleConnSync, rbac.ConnectionsManage),
 		prm("PATCH /api/admin/connections/{id}/tools/{name}", s.handleConnTool, rbac.ConnectionsManage),
 
+		// 知识库：建库、权限、文档、试搜与检索记录（员工在 DSH 里用 /mcp 的 kb__ 工具检索）
+		prm("GET /api/kb", s.handleKBList, rbac.PortalView),
+		prm("POST /api/kb", s.handleKBCreate, rbac.KnowledgeManage),
+		prm("PUT /api/kb/settings", s.handleKBSettings, rbac.KnowledgeManage),
+		prm("POST /api/kb/search", s.handleKBSearch, rbac.PortalView),
+		prm("GET /api/kb/queries", s.handleKBQueries, rbac.PortalView),
+		prm("GET /api/kb/{id}", s.handleKBDetail, rbac.PortalView),
+		prm("PATCH /api/kb/{id}", s.handleKBPatch, rbac.PortalView),
+		prm("DELETE /api/kb/{id}", s.handleKBDelete, rbac.KnowledgeManage),
+		prm("POST /api/kb/{id}/docs", s.handleKBUpload, rbac.PortalView),
+		prm("GET /api/kb-docs/{id}", s.handleKDocDetail, rbac.PortalView),
+		prm("PATCH /api/kb-docs/{id}", s.handleKDocPatch, rbac.PortalView),
+		prm("DELETE /api/kb-docs/{id}", s.handleKDocDelete, rbac.PortalView),
+		prm("POST /api/kb-docs/{id}/file", s.handleKDocReplace, rbac.PortalView),
+		prm("GET /api/kb-docs/{id}/original", s.handleKDocOriginal, rbac.PortalView),
+
 		// DSH 接入：接入插件的发布，以及员工本机 DSH 调用的目录与 MCP 网关（令牌认证）
 		prm("GET /api/connect", s.handleConnectInfo, rbac.PortalView),
 		prm("GET /api/admin/connect", s.handleAdminConnect, rbac.SettingsManage),

@@ -19,6 +19,7 @@ import hub from "./hub";
 import tokens from "./tokens";
 import onboarding from "./onboarding";
 import getStarted from "./get-started";
+import knowledge from "./knowledge";
 
 export default {
   ...common,
@@ -39,5 +40,6 @@ export default {
   ...hub,
   ...tokens,
   ...onboarding,
+  ...knowledge,
   ...getStarted,
 } satisfies Messages<typeof zh>;

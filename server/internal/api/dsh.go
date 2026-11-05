@@ -150,6 +150,8 @@ type dshCatalog struct {
 	conns  []*dshConn
 	// 系统技能的正文，按名字
 	system map[string]string
+	// 员工能查的知识库（kb__ 工具与「知识问答」）
+	kbases []*store.KBase
 }
 
 // userCatalog 算出某个员工的 DSH 此刻应有的技能、连接与必装插件：
@@ -182,6 +184,9 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	}
 	c := &dshCatalog{Skills: []dshSkill{}, Apps: []dshApp{}, AvailableApps: []dshApp{}, Required: []dshPlugin{}, ServerName: s.mcpServerNameCtx(ctx),
 		assets: map[string]*store.Asset{}, specs: map[string]*assetSpec{}}
+	if c.kbases, err = s.readableKBases(ctx, v); err != nil {
+		return nil, err
+	}
 	var connIDs []int64
 	for _, a := range on {
 		lv := live[a.ID]
@@ -284,6 +289,20 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 			c.system[ss.skill.Name] = ss.body
 		}
 	}
+	// 预置的「知识问答」：名字归系统，同名的员工能力让位
+	set, err := s.appSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if app, skill, body := kbQAApp(set, c.ServerName, c.kbases); app != nil {
+		c.Skills = slices.DeleteFunc(c.Skills, func(k dshSkill) bool { return k.Name == kbQAName })
+		c.Apps = slices.DeleteFunc(c.Apps, func(a dshApp) bool { return a.Name == kbQAName })
+		c.AvailableApps = slices.DeleteFunc(c.AvailableApps, func(a dshApp) bool { return a.Name == kbQAName })
+		delete(c.assets, kbQAName)
+		c.Skills = append(c.Skills, *skill)
+		c.Apps = append(c.Apps, *app)
+		c.system[kbQAName] = body
+	}
 	sort.Slice(c.Skills, func(i, j int) bool { return c.Skills[i].Name < c.Skills[j].Name })
 	sort.Slice(c.Apps, func(i, j int) bool {
 		if c.Apps[i].Title == c.Apps[j].Title {
@@ -315,6 +334,8 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	for _, name := range slices.Sorted(maps.Keys(c.system)) {
 		fmt.Fprintf(h, "sys:%s:%s;", name, c.system[name])
 	}
+	// 能查的知识库变了，kb__ 工具会出现或消失
+	fmt.Fprintf(h, "kb:%d;", len(c.kbases))
 	for _, cn := range c.conns {
 		fmt.Fprintf(h, "%s@%d:", cn.asset.Slug, cn.version)
 		for _, t := range cn.tools {
@@ -472,7 +493,23 @@ func missingAppCapabilities(sp *assetSpec, c *dshCatalog) []string {
 			missing = append(missing, slug)
 		}
 	}
+	for _, slug := range sp.Knowledge {
+		if !slices.ContainsFunc(c.kbases, func(b *store.KBase) bool { return b.Slug == slug }) {
+			missing = append(missing, slug)
+		}
+	}
 	return missing
+}
+
+// appKBases 是微应用绑定的、这个员工能查的知识库。
+func appKBases(sp *assetSpec, c *dshCatalog) []*store.KBase {
+	var out []*store.KBase
+	for _, b := range c.kbases {
+		if slices.Contains(sp.Knowledge, b.Slug) {
+			out = append(out, b)
+		}
+	}
+	return out
 }
 
 // appContent 把微应用写成一段 /命令 指令：人设与工作方式，加上它能用的企业能力。
@@ -497,6 +534,17 @@ func appContent(sp *assetSpec, c *dshCatalog) string {
 		b.WriteString("\n## 可用的企业能力\n\n")
 		b.WriteString(strings.Join(lines, "\n"))
 		b.WriteString("\n")
+	}
+	if bases := appKBases(sp, c); len(bases) > 0 {
+		board := false
+		if sp.Workbench != nil {
+			for _, p := range sp.Workbench.Panes {
+				for _, w := range p.Widgets {
+					board = board || w.Type == "board"
+				}
+			}
+		}
+		b.WriteString(kbRules(c.ServerName, bases, board))
 	}
 	if missing := missingAppCapabilities(sp, c); len(missing) > 0 {
 		fmt.Fprintf(&b, "\n注意：这些能力不在当前用户的可用范围内，不要尝试调用：%s\n", strings.Join(missing, "、"))
@@ -603,6 +651,9 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
+		if len(c.kbases) > 0 {
+			tools = append(tools, kbToolDefs()...)
+		}
 		for _, def := range s.agentToolList(r.Context(), pr) {
 			tools = append(tools, def)
 		}
@@ -618,6 +669,15 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		}
 		if strings.HasPrefix(p.Name, "ee_") {
 			writeRPC(w, msg.ID, s.agentCall(r, pr, p.Name, p.Arguments), nil)
+			return
+		}
+		if strings.HasPrefix(p.Name, kbConn+"__") {
+			bases, err := s.readableKBases(r.Context(), v)
+			if err != nil {
+				s.internalErr(w, r, err)
+				return
+			}
+			writeRPC(w, msg.ID, s.kbCall(r.Context(), v, bases, p.Name, p.Arguments), nil)
 			return
 		}
 		c, err := s.userCatalog(r.Context(), v)
@@ -654,6 +714,9 @@ func mcpInstructions(c *dshCatalog, agent bool) string {
 	var b strings.Builder
 	if agent {
 		b.WriteString("ee_* 工具用来操作企业工作台 dsh-ee 本身（额度、能力中心、插件、使用记录），用法见技能 dsh-ee-guide。\n")
+	}
+	if len(c.kbases) > 0 {
+		b.WriteString(kbMCPInstructions())
 	}
 	if len(c.conns) == 0 {
 		b.WriteString("当前账号没有可用的企业连接。")

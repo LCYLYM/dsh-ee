@@ -3,9 +3,9 @@ import { createElement, useEffect, useRef, useState } from "react";
 import { sendUnknownNotice } from "./app-launcher.js";
 import { currentSessionOf, sendToSession } from "./host-session.js";
 import type { CatalogApp } from "./skills.js";
-import { fillPrompt, parseWorkbenchAddress, workbenchScheme, type Board, type WorkbenchAction } from "./workbench.js";
+import { docWindow, fillPrompt, parseWorkbenchAddress, scopeText, workbenchAddress, workbenchScheme, type Board, type Citation, type KBaseItem, type WorkbenchAction, type WorkbenchPane } from "./workbench.js";
 import { openWorkbench } from "./workbench-open.js";
-import { missingPaneView, panelView, type PanelHandlers, type WidgetState } from "./workbench-view.js";
+import { kbDocView, missingPaneView, panelView, type DocTarget, type PanelHandlers, type WidgetState } from "./workbench-view.js";
 
 export const workbenchTabId = "__DSH_EE_PACKAGE__/workbench";
 export const workbenchKind = "dsh-ee-workbench";
@@ -13,6 +13,23 @@ export const workbenchKind = "dsh-ee-workbench";
 function onScreenSession(ctx: any): string {
   const mounted = ctx.sidebarRight?.mounted?.getSnapshot?.();
   return typeof mounted === "string" && mounted ? mounted : currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
+}
+
+/** 每个应用的「原文」窗格此刻要看的引用；面板上点引用时设置，原文窗格订阅它。 */
+function createDocTargets() {
+  const targets = new Map<string, DocTarget>();
+  const listeners = new Set<() => void>();
+  return {
+    get: (app: string) => targets.get(app),
+    set: (app: string, target: DocTarget) => {
+      targets.set(app, target);
+      for (const listener of listeners) listener();
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+  };
 }
 
 export interface WorkbenchDeps {
@@ -49,73 +66,22 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
     return { apps, loaded };
   };
 
-  const WorkbenchTab = (props: any) => {
-    const info = props.useTabInfo?.();
-    const address = info?.tab?.navigation?.address || info?.tab?.contentId || "";
-    const visible = info?.tab?.visible !== false;
-    const parsed = parseWorkbenchAddress(address);
-    const { apps, loaded } = useAppsList();
-    const app = apps.find((item) => item.name === parsed?.app);
-    const pane = app?.workbench?.panes.find((item) => item.id === parsed?.pane && item.type === "panel");
+  const docTargets = createDocTargets();
 
-    const [data, setData] = useState<Record<number, WidgetState>>({});
-    const [board, setBoard] = useState<Board | null | undefined>(undefined);
-    const [notice, setNotice] = useState("");
+  const useSending = () => {
     const [sending, setSending] = useState<Set<string>>(new Set());
-    const [forms, setForms] = useState<Record<number, Record<string, any>>>({});
-    const [formErrors, setFormErrors] = useState<Record<number, string>>({});
-    const sessionRef = useRef("");
-    if (!sessionRef.current) sessionRef.current = onScreenSession(ctx);
-
-    const load = async (index: number) => {
-      if (!app || !pane) return;
-      setData((current) => ({ ...current, [index]: { status: "loading" } }));
-      try {
-        const result = unwrapRemote(await remote.workbenchData({ app: app.name, pane: pane.id, widget: index }));
-        const state: WidgetState = result?.forbidden ? { status: "forbidden" } : result?.error ? { status: "error", error: String(result.error) } : { status: "ready", value: result?.value };
-        setData((current) => ({ ...current, [index]: state }));
-      } catch (error) {
-        setData((current) => ({ ...current, [index]: { status: "error", error: error instanceof Error ? error.message : "网络错误" } }));
-      }
-    };
-    const loadAll = () => (pane?.widgets ?? []).forEach((widget, index) => { if (widget.source) void load(index); });
-    const loadBoard = async () => {
-      if (!app || !sessionRef.current) return;
-      try {
-        setBoard(unwrapRemote(await remote.board({ app: app.name, sessionId: sessionRef.current })));
-      } catch {
-        // 看板读不到时保留上一次的内容
-      }
-    };
-    const hasBoard = !!pane?.widgets?.some((widget) => widget.type === "board");
-
-    // 打开标签页或配置变化时取一次数；不做定时刷新，组件上有刷新按钮
-    useEffect(loadAll, [app?.name, app?.version, pane?.id]);
-    // 看板：标签页可见时每 3 秒读一次本机文件，不可见时停止
-    useEffect(() => {
-      if (!hasBoard || !visible) return;
-      void loadBoard();
-      const timer = setInterval(() => void loadBoard(), 3000);
-      return () => clearInterval(timer);
-    }, [hasBoard, visible, app?.name]);
-    // 右侧栏的「刷新」命令：重新取数
-    useEffect(() => info?.tab?.actions?.bindCommands?.({ refresh: () => { loadAll(); void loadBoard(); } }), [info?.tab?.id, app?.version]);
-
-    if (!app || !pane) return loaded ? missingPaneView(createElement) : createElement("div", { style: { padding: 16, fontSize: 13, opacity: 0.65 } }, "加载中…");
-
-    const send = (key: string, action: WorkbenchAction, values: { row?: any; form?: Record<string, any> }) => {
+    const [notice, setNotice] = useState("");
+    /** 把一段话发到屏幕上的会话；返回是否发出 */
+    const send = (key: string, text: string, label: string, done?: () => void) => {
       if (sending.has(key)) return;
       const sessionId = onScreenSession(ctx);
       if (!sessionId) return setNotice("没有找到当前会话，请先打开这个应用的会话");
       setSending((current) => new Set(current).add(key));
       setNotice("");
-      sendToSession(ctx, sessionId, fillPrompt(action.prompt, values))
+      sendToSession(ctx, sessionId, text)
         .then(() => {
-          setNotice(`已发给 AI：${action.label}`);
-          if (values.form) {
-            const index = Number(key.split(":")[0]);
-            setForms((current) => ({ ...current, [index]: {} }));
-          }
+          setNotice(`已发给 AI：${label}`);
+          done?.();
         })
         // 发送失败时消息可能已经到了宿主：只提示，不自动重试
         .catch(() => setNotice(sendUnknownNotice))
@@ -125,6 +91,65 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
           return next;
         }));
     };
+    return { sending, notice, setNotice, send };
+  };
+
+  const PanelPane = ({ app, pane, info, visible }: { app: CatalogApp; pane: WorkbenchPane; info: any; visible: boolean }) => {
+    const [data, setData] = useState<Record<number, WidgetState>>({});
+    const [board, setBoard] = useState<Board | null | undefined>(undefined);
+    const [forms, setForms] = useState<Record<number, Record<string, any>>>({});
+    const [formErrors, setFormErrors] = useState<Record<number, string>>({});
+    const [selectedKBs, setSelectedKBs] = useState<string[]>([]);
+    const { sending, notice, send: sendText } = useSending();
+    const sessionRef = useRef("");
+    if (!sessionRef.current) sessionRef.current = onScreenSession(ctx);
+
+    const load = async (index: number) => {
+      setData((current) => ({ ...current, [index]: { status: "loading" } }));
+      try {
+        const result = unwrapRemote(await remote.workbenchData({ app: app.name, pane: pane.id, widget: index }));
+        const state: WidgetState = result?.forbidden ? { status: "forbidden" } : result?.error ? { status: "error", error: String(result.error) } : { status: "ready", value: result?.value };
+        setData((current) => ({ ...current, [index]: state }));
+      } catch (error) {
+        setData((current) => ({ ...current, [index]: { status: "error", error: error instanceof Error ? error.message : "网络错误" } }));
+      }
+    };
+    const loadAll = () => (pane.widgets ?? []).forEach((widget, index) => { if (widget.source) void load(index); });
+    const loadBoard = async () => {
+      if (!sessionRef.current) return;
+      try {
+        setBoard(unwrapRemote(await remote.board({ app: app.name, sessionId: sessionRef.current })));
+      } catch {
+        // 看板读不到时保留上一次的内容
+      }
+    };
+    const hasBoard = !!pane.widgets?.some((widget) => widget.type === "board");
+
+    // 打开标签页或配置变化时取一次数；不做定时刷新，组件上有刷新按钮
+    useEffect(loadAll, [app.name, app.version, pane.id]);
+    // 看板：标签页可见时每 3 秒读一次本机文件，不可见时停止
+    useEffect(() => {
+      if (!hasBoard || !visible) return;
+      void loadBoard();
+      const timer = setInterval(() => void loadBoard(), 3000);
+      return () => clearInterval(timer);
+    }, [hasBoard, visible, app.name]);
+    // 右侧栏的「刷新」命令：重新取数
+    useEffect(() => info?.tab?.actions?.bindCommands?.({ refresh: () => { loadAll(); void loadBoard(); } }), [info?.tab?.id, app.version]);
+
+    // {{scope.kbs}}：「查哪些库」组件取到的库里勾选了哪些
+    const scopeIndex = (pane.widgets ?? []).findIndex((widget) => widget.type === "kb_scope");
+    const scopeState = scopeIndex >= 0 ? data[scopeIndex] : undefined;
+    const bases: KBaseItem[] = scopeState?.status === "ready" && Array.isArray(scopeState.value?.items) ? scopeState.value.items : [];
+    const send = (key: string, action: WorkbenchAction, values: { row?: any; form?: Record<string, any> }) => {
+      sendText(key, fillPrompt(action.prompt, { ...values, scope: { kbs: scopeText(bases, selectedKBs) } }), action.label, () => {
+        if (values.form) {
+          const index = Number(key.split(":")[0]);
+          setForms((current) => ({ ...current, [index]: {} }));
+        }
+      });
+    };
+    const docPane = app.workbench?.panes.find((item) => item.type === "kb_doc");
     const handlers: PanelHandlers = {
       sending,
       send,
@@ -133,8 +158,83 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
       setFormValue: (index, name, value) => setForms((current) => ({ ...current, [index]: { ...(current[index] ?? {}), [name]: value } })),
       formError: (index) => formErrors[index] ?? "",
       setFormError: (index, error) => setFormErrors((current) => ({ ...current, [index]: error })),
+      selectedKBs,
+      toggleKB: (kb) => setSelectedKBs((current) => (current.includes(kb) ? current.filter((item) => item !== kb) : [...current, kb])),
+      openCitation: docPane ? (citation: Citation) => {
+        docTargets.set(app.name, { doc: citation.doc, version: citation.version, from: citation.from, to: citation.to, quote: citation.quote, title: citation.title });
+        try {
+          ctx.sidebarRight.openResource(workbenchAddress(app.name, docPane.id), { preferNewPane: true });
+        } catch {
+          // 打不开新窗格时，原文窗格如果已经开着，也会跟着切过去
+        }
+      } : undefined,
     };
     return panelView(createElement, pane, { data, board, notice }, handlers);
+  };
+
+  const DocPane = ({ app }: { app: CatalogApp }) => {
+    const [target, setTarget] = useState<DocTarget | undefined>(docTargets.get(app.name));
+    const [range, setRange] = useState<{ from: number; to: number } | undefined>(target ? docWindow(target.from) : undefined);
+    const [state, setState] = useState<WidgetState | undefined>(undefined);
+    const { sending, notice, send } = useSending();
+    const scrolled = useRef("");
+    useEffect(() => docTargets.subscribe(() => {
+      const next = docTargets.get(app.name);
+      setTarget(next);
+      if (next) setRange(docWindow(next.from));
+    }), [app.name]);
+    useEffect(() => {
+      if (!target || !range) return;
+      let live = true;
+      setState({ status: "loading" });
+      remote.kbDoc({ doc: target.doc, version: target.version, from: range.from, to: range.to })
+        .then((raw: any) => {
+          if (!live) return;
+          const result = unwrapRemote(raw);
+          setState(result?.forbidden ? { status: "forbidden" } : result?.error ? { status: "error", error: String(result.error) } : { status: "ready", value: result?.value });
+        })
+        .catch((error: unknown) => { if (live) setState({ status: "error", error: error instanceof Error ? error.message : "网络错误" }); });
+      return () => { live = false; };
+    }, [target, range?.from, range?.to]);
+    // 每条引用第一次显示出来时，滚到高亮的那一行
+    useEffect(() => {
+      if (state?.status !== "ready" || !target) return;
+      const key = `${target.doc}:${target.from}:${target.quote ?? ""}`;
+      if (scrolled.current === key) return;
+      scrolled.current = key;
+      const hit = typeof document !== "undefined" ? document.querySelector('[data-dsh-ee-ui="kb-doc"] [data-kb-hit="1"]') : null;
+      (hit as any)?.scrollIntoView?.({ block: "center" });
+    }, [state, target]);
+    const value: any = state?.status === "ready" ? state.value : undefined;
+    const view = kbDocView(createElement, target, state, {
+      page: (delta) => setRange((current) => {
+        if (!current) return current;
+        const size = current.to - current.from + 1;
+        const from = Math.max(1, current.from + delta * size);
+        return { from, to: from + size - 1 };
+      }),
+      asking: sending.has("ask"),
+      ask: () => {
+        if (!target) return;
+        const title = value?.title || target.title || `文档 ${target.doc}`;
+        send("ask", `接着看知识库文档「${title}」（文档编号 ${target.doc}）第 ${target.from}～${target.to} 行前后的内容：这一部分还有哪些相关规定或例外情况？请带出处回答。`, "在这篇里继续问");
+      },
+    });
+    return notice ? createElement("div", { style: { height: "100%", display: "grid", gridTemplateRows: "auto 1fr" } },
+      createElement("p", { role: "status", style: { margin: "8px 12px 0", fontSize: 12 } }, notice), view) : view;
+  };
+
+  const WorkbenchTab = (props: any) => {
+    const info = props.useTabInfo?.();
+    const address = info?.tab?.navigation?.address || info?.tab?.contentId || "";
+    const visible = info?.tab?.visible !== false;
+    const parsed = parseWorkbenchAddress(address);
+    const { apps, loaded } = useAppsList();
+    const app = apps.find((item) => item.name === parsed?.app);
+    const pane = app?.workbench?.panes.find((item) => item.id === parsed?.pane && (item.type === "panel" || item.type === "kb_doc"));
+    if (!app || !pane) return loaded ? missingPaneView(createElement) : createElement("div", { style: { padding: 16, fontSize: 13, opacity: 0.65 } }, "加载中…");
+    if (pane.type === "kb_doc") return createElement(DocPane, { key: `${app.name}/${pane.id}`, app });
+    return createElement(PanelPane, { key: `${app.name}/${pane.id}`, app, pane, info, visible });
   };
 
   ctx.effect(() => ctx.sidebarRightTabs.register({

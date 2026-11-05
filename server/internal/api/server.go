@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hikariming/dsh-ee/server/internal/kb"
 	"github.com/hikariming/dsh-ee/server/internal/rbac"
 	"github.com/hikariming/dsh-ee/server/internal/registry"
 	"github.com/hikariming/dsh-ee/server/internal/secret"
@@ -75,6 +76,8 @@ type Server struct {
 	routeTable []route
 	// 由路由表生成的 Agent 工具
 	agentTools []*agentTool
+	// 知识库的内存关键词索引
+	kb kbIndex
 }
 
 func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Server {
@@ -91,6 +94,7 @@ func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Serv
 		}}
 	}
 	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), deviceCodeRate: newIPRate(deviceCodePerMinute), deviceTokenRate: newIPRate(deviceTokenPerMinute), upstream: up, connectKick: make(chan struct{}, 1), elevationKick: make(chan struct{}, 1)}
+	s.kb.ix = kb.NewIndex()
 	s.initDshReleases()
 	s.registry = s.newRegistry()
 	s.routeTable = s.routes()

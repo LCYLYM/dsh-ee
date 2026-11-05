@@ -55,23 +55,26 @@ func sectionPerms(field string) []string {
 		return []string{rbac.SettingsManage, rbac.RegistryManage}
 	case "Upstream":
 		return []string{rbac.SettingsManage, rbac.RegistryManage, rbac.UpstreamManage}
+	case "Knowledge":
+		return []string{rbac.SettingsManage, rbac.KnowledgeManage}
 	default:
 		return []string{rbac.SettingsManage}
 	}
 }
 
 func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
-	var next store.AppSettings
+	cur, err := s.store.GetSettings(r.Context())
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	// 请求里没带的段落保持原样（旧版网页不认识的新段落，例如 knowledge，不会被清空）
+	next := *cur.Clone()
 	if !readJSON(w, r, &next) {
 		return
 	}
 	if msg := validateSettings(&next); msg != "" {
 		writeErr(w, http.StatusBadRequest, msg)
-		return
-	}
-	cur, err := s.store.GetSettings(r.Context())
-	if err != nil {
-		s.internalErr(w, r, err)
 		return
 	}
 	// 认证方式由 LDAP 配置的开关决定；LogoRev 只能由 logo 上传接口更新。

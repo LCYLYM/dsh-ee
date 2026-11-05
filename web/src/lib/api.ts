@@ -796,6 +796,112 @@ async function request<T>(
   return data as T;
 }
 
+/** 知识库：谁能查（可用范围）与谁来维护。 */
+export interface KBMaintainers {
+  users: number[];
+  roles: number[];
+}
+
+export interface KBase {
+  id: number;
+  slug: string;
+  title: string;
+  description: string;
+  scope: Scope;
+  maintainers: KBMaintainers;
+  revision: string;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  docs: number;
+  can_edit: boolean;
+  can_manage: boolean;
+  readable: boolean;
+}
+
+export interface KBQASettings {
+  qaEnabled: boolean;
+  qaTitle: string;
+  qaIcon: string;
+  qaStarters: string[];
+  qaExtra: string;
+}
+
+export interface KDoc {
+  id: number;
+  kb_id: number;
+  title: string;
+  folder: string;
+  source_name: string;
+  mime: string;
+  size: number;
+  version: number;
+  lines: number;
+  updated_by: number | null;
+  updated_by_name?: string;
+  created_at: string;
+  updated_at: string;
+  has_original: boolean;
+}
+
+export interface KDocVersion {
+  doc_id: number;
+  version: number;
+  note: string;
+  created_by: number | null;
+  created_by_name: string;
+  created_at: string;
+}
+
+export interface KDocDetail {
+  doc: KDoc;
+  kb: KBase;
+  version: number;
+  markdown: string;
+  outline: { level: number; title: string; line: number }[] | null;
+  versions: KDocVersion[];
+}
+
+export interface KBHit {
+  kb_id: number;
+  doc: number;
+  title: string;
+  folder?: string;
+  version: number;
+  heading: string;
+  from: number;
+  to: number;
+  line: number;
+  snippet: string;
+  matched: string[];
+  score: number;
+}
+
+export interface KBSearchResult {
+  hits: KBHit[];
+  term_hits: Record<string, number>;
+  total: number;
+  truncated?: boolean;
+}
+
+export interface KBQuery {
+  id: number;
+  user_id: number;
+  user: string;
+  tool: "search" | "read" | "browse";
+  query: string;
+  kb_ids: number[];
+  docs: number[];
+  hits: number;
+  created_at: string;
+}
+
+export interface KBUploadResult {
+  file: string;
+  doc?: KDoc;
+  error?: string;
+}
+
 export const api = {
   login: (username: string, password: string) =>
     request<User>("POST", "/api/auth/login", { username, password }, { silent401: true }),
@@ -901,6 +1007,43 @@ export const api = {
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(q)) if (v !== undefined && v !== "") params.set(k, String(v));
     return request<{ logs: AuditLog[] }>("GET", `/api/admin/audit?${params}`).then((r) => r.logs);
+  },
+
+  knowledge: () => request<{ items: KBase[]; can_manage: boolean; formats: string[]; qa: KBQASettings }>("GET", "/api/kb"),
+  createKB: (b: { slug: string; title: string; description: string; scope?: Scope; maintainers?: KBMaintainers }) => request<KBase>("POST", "/api/kb", b),
+  kb: (id: number) => request<{ kb: KBase; docs: KDoc[] }>("GET", `/api/kb/${id}`),
+  patchKB: (id: number, p: Partial<{ title: string; description: string; scope: Scope; maintainers: KBMaintainers }>) => request<KBase>("PATCH", `/api/kb/${id}`, p),
+  deleteKB: (id: number) => request<void>("DELETE", `/api/kb/${id}`),
+  saveKBSettings: (s: KBQASettings) => request<KBQASettings>("PUT", "/api/kb/settings", s),
+  uploadKBDocs: (id: number, files: File[], folder: string) => {
+    const form = new FormData();
+    form.set("folder", folder);
+    for (const f of files) form.append("file", f, f.name);
+    return request<{ results: KBUploadResult[] }>("POST", `/api/kb/${id}/docs`, undefined, { raw: { body: form } });
+  },
+  createKBDoc: (id: number, title: string, markdown: string, folder: string) => {
+    const form = new FormData();
+    form.set("folder", folder);
+    form.set("title", title);
+    form.set("markdown", markdown);
+    return request<{ results: KBUploadResult[] }>("POST", `/api/kb/${id}/docs`, undefined, { raw: { body: form } });
+  },
+  kbDoc: (id: number, version?: number) => request<KDocDetail>("GET", `/api/kb-docs/${id}${version ? `?version=${version}` : ""}`),
+  patchKBDoc: (id: number, p: Partial<{ title: string; folder: string; markdown: string; note: string }>) => request<KDoc>("PATCH", `/api/kb-docs/${id}`, p),
+  replaceKBDoc: (id: number, file: File) => {
+    const form = new FormData();
+    form.set("file", file, file.name);
+    return request<KDoc>("POST", `/api/kb-docs/${id}/file`, undefined, { raw: { body: form } });
+  },
+  deleteKBDoc: (id: number) => request<void>("DELETE", `/api/kb-docs/${id}`),
+  kbOriginalURL: (id: number) => `/api/kb-docs/${id}/original`,
+  searchKB: (q: { query: string; mode?: string; kb_ids?: number[]; folder?: string }) => request<KBSearchResult>("POST", "/api/kb/search", q),
+  kbQueries: (q: { kb?: number; all?: boolean; tool?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (q.kb) params.set("kb", String(q.kb));
+    if (q.all) params.set("all", "1");
+    if (q.tool) params.set("tool", q.tool);
+    return request<{ items: KBQuery[] }>("GET", `/api/kb/queries?${params}`).then((r) => r.items);
   },
 
   hub: () => request<{ assets: HubAsset[]; plugin_policies: Record<string, PluginPolicy> }>("GET", "/api/hub"),

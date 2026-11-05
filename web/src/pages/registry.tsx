@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 import Workbench from "./workbench";
 import Apps from "./apps";
 import Market from "./market";
+import Knowledge from "./knowledge";
 import DshDownload from "./dsh-download";
 import Setup from "./setup";
 import Publish from "./publish";
@@ -29,6 +30,7 @@ export const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
   workbench: Workbench,
   apps: Apps,
   market: Market,
+  knowledge: Knowledge,
   "dsh-download": DshDownload,
   setup: Setup,
   publish: Publish,

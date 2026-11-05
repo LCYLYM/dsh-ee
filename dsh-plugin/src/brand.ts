@@ -12,6 +12,7 @@ export interface ClientServiceActions {
   unbindApp: (name: string) => Promise<any>;
   workbenchData: (request: { app: string; pane: string; widget: number }) => Promise<any>;
   readBoard: (request: { app: string; sessionId: string }) => Promise<any>;
+  readKBDoc: (request: { doc: number; version?: number; from: number; to: number }) => Promise<any>;
   login: () => Promise<any>;
   doctor: () => Promise<any>;
 }
@@ -69,6 +70,11 @@ export class DshEEClientService extends TypertRemoteService {
   @Remote
   async board(request: { app: string; sessionId: string }): Promise<any> {
     return this.actions.readBoard(request);
+  }
+
+  @Remote
+  async kbDoc(request: { doc: number; version?: number; from: number; to: number }): Promise<any> {
+    return this.actions.readKBDoc(request);
   }
 
   @Remote

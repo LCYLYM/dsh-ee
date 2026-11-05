@@ -5,6 +5,7 @@
 - 设计稿：[docs/design.md](./docs/design.md)
 - 前端：[web/](./web)（Vite + React + Tailwind；DSH 分发仍是模拟数据，其余已接服务端）
 - 能力中心设计：[docs/capability-hub.md](./docs/capability-hub.md)（插件、技能、提示词、企业连接、微应用，以及 DSH 接入插件）
+- 知识库设计：[docs/knowledge.md](./docs/knowledge.md)（不用向量模型，Agent 多轮关键词检索、读原文、带出处作答；DSH 里预置「知识问答」工作台）
 - 服务端：[server/](./server)（Go；用户与 RBAC、LDAP / AD 登录、账号月度额度、企业 API key 与 OpenAI 兼容网关、内置 npm 源与审核、上游预载、DSH 插件索引、运营统计与审计日志；OceanBase / TiDB）
 - 部署：[deploy/](./deploy)（单文件二进制、docker compose、离线安装包）
 - 端到端测试：[e2e/](./e2e)（Playwright，跑在嵌好前端的单文件服务端上）
@@ -106,6 +107,7 @@ DSH_EE_SEED_ADMIN_PASSWORD='你的管理员密码' go run ./cmd/seed
 | `/account` | 账号与修改密码（接真实后端） |
 | `/workbench` | 我的工作台（本月 Token、我的密钥、装过的能力与可更新、部门在用、我分享的；接真实后端，其中「我的微应用」仍是模拟数据） |
 | `/apps` | 微应用：人设 + 技能 + 企业系统 + 插件，在 DSH 里用 /名字 打开（接真实后端） |
+| `/knowledge` | 知识库：建库、谁能查与谁来维护、上传 PDF / Word / Markdown、试搜、检索记录、「知识问答」设置；`/knowledge/:id` 库详情，`/knowledge/docs/:id` 文档（带行号、版本、回滚；接真实后端） |
 | `/hub` | 能力中心：插件、技能、提示词、企业连接、微应用分 Tab；启用 / 停用，启用的自动同步到员工 DSH（接真实后端；旧的 `/market` 会跳转过来） |
 | `/assets/:id`、`/assets/new` | 能力详情与编辑：版本、可用范围与下发方式、连接的工具与调用记录（接真实后端） |
 | `/plugins/:name` | 插件详情（安装命令、自动检查结果、版本、依赖、README；接真实后端） |

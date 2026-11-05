@@ -64,6 +64,16 @@ type AppSettings struct {
 		// 总开关：关闭后 /mcp 不再提供 ee_* 工具，系统技能也不下发
 		AgentEnabled bool `json:"agentEnabled"`
 	} `json:"connect"`
+	// 知识库与预置的「知识问答」微应用（kb-qa）
+	Knowledge struct {
+		// 员工至少能查一个知识库时，DSH 里出现「知识问答」
+		QAEnabled  bool     `json:"qaEnabled"`
+		QATitle    string   `json:"qaTitle"`
+		QAIcon     string   `json:"qaIcon"`
+		QAStarters []string `json:"qaStarters"`
+		// 管理员补充的回答要求，追加在系统规则后面
+		QAExtra string `json:"qaExtra"`
+	} `json:"knowledge"`
 	Registry struct {
 		// cache：企业作用域之外的包按需回源并缓存 / preloaded：只提供已预载的包
 		ProxyMode   string   `json:"proxyMode"`
@@ -101,6 +111,10 @@ func DefaultSettings() *AppSettings {
 	s.Connect.DeviceTokenDays = 90
 	s.Connect.AllowManualTokens = true
 	s.Connect.AgentEnabled = true
+	s.Knowledge.QAEnabled = true
+	s.Knowledge.QATitle = "知识问答"
+	s.Knowledge.QAIcon = "📚"
+	s.Knowledge.QAStarters = []string{"出差住宿标准是多少？", "新员工入职要准备哪些材料？"}
 	s.Registry.ProxyMode = "cache"
 	s.Registry.ExtraScopes = []string{}
 	s.Registry.RequireToken = true
@@ -122,6 +136,7 @@ func (s *AppSettings) CompanyScopes() []string {
 func (s *AppSettings) Clone() *AppSettings {
 	c := *s
 	c.Registry.ExtraScopes = append([]string{}, s.Registry.ExtraScopes...)
+	c.Knowledge.QAStarters = append([]string{}, s.Knowledge.QAStarters...)
 	return &c
 }
 

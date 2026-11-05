@@ -15,7 +15,7 @@ export interface WorkbenchField {
 }
 
 export interface WorkbenchWidget {
-  type: "metric" | "table" | "form" | "actions" | "markdown" | "board";
+  type: "metric" | "table" | "form" | "actions" | "markdown" | "board" | "kb_scope";
   title?: string;
   text?: string;
   source?: { connection: string; tool: string; args?: Record<string, unknown> };
@@ -31,7 +31,8 @@ export interface WorkbenchWidget {
 
 export interface WorkbenchPane {
   id: string;
-  type: "panel" | "web";
+  /** kb_doc：知识库原文，点看板上的引用时在这里打开 */
+  type: "panel" | "web" | "kb_doc";
   title: string;
   url?: string;
   widgets?: WorkbenchWidget[];
@@ -90,7 +91,7 @@ export function formatValue(value: any, format?: string): string {
 }
 
 const maxValueLength = 500;
-const placeholder = /\{\{\s*(row|form)\.([A-Za-z0-9_.]+)\s*\}\}/g;
+const placeholder = /\{\{\s*(row|form|scope)\.([A-Za-z0-9_.]+)\s*\}\}/g;
 
 function placeholderValue(value: any): string {
   let text = value === null || value === undefined ? "" : typeof value === "object" ? JSON.stringify(value) : String(value);
@@ -98,9 +99,23 @@ function placeholderValue(value: any): string {
   return text.length > maxValueLength ? `${text.slice(0, maxValueLength)}…` : text;
 }
 
-/** 把 {{row.x}} / {{form.x}} 换成这一行或这张表单里的值，得到发给 AI 的一段普通文字。 */
-export function fillPrompt(prompt: string, data: { row?: any; form?: Record<string, any> }): string {
-  return prompt.replace(placeholder, (_match, scope: "row" | "form", path: string) => placeholderValue(getPath(scope === "row" ? data.row : data.form, path)));
+/** 把 {{row.x}} / {{form.x}} 换成这一行或这张表单里的值，{{scope.kbs}} 换成勾选的知识库，得到发给 AI 的一段普通文字。 */
+export function fillPrompt(prompt: string, data: { row?: any; form?: Record<string, any>; scope?: { kbs: string } }): string {
+  return prompt.replace(placeholder, (_match, scope: "row" | "form" | "scope", path: string) =>
+    placeholderValue(getPath(scope === "row" ? data.row : scope === "form" ? data.form : data.scope ?? { kbs: "全部知识库" }, path)));
+}
+
+export interface KBaseItem {
+  kb: string;
+  title: string;
+  docs?: number;
+}
+
+/** {{scope.kbs}} 的文字：勾选了就是「知识库「A」「B」（标识 a、b）」，没勾就是全部。 */
+export function scopeText(bases: KBaseItem[], selected: string[]): string {
+  const picked = bases.filter((item) => selected.includes(item.kb));
+  if (!picked.length) return "全部知识库";
+  return `知识库${picked.map((item) => `「${item.title}」`).join("")}（标识 ${picked.map((item) => item.kb).join("、")}）`;
 }
 
 /** 表单提交前的检查；返回第一条错误，没有错误返回空字符串。 */
@@ -137,10 +152,23 @@ export function toolValue(result: any): any {
   }
 }
 
+/** 看板上的一条引用；status 是写看板时到服务端核对的结果。 */
+export interface Citation {
+  doc: number;
+  version?: number;
+  from: number;
+  to: number;
+  quote: string;
+  title?: string;
+  /** ok 对得上；stale 对得上但文档已更新；mismatch 对不上；missing 文档不存在或没权限；unchecked 没能核对 */
+  status?: "ok" | "stale" | "mismatch" | "missing" | "unchecked";
+}
+
 export type BoardBlock =
   | { type: "text"; text: string }
   | { type: "list"; items: string[] }
-  | { type: "table"; columns: string[]; rows: string[][] };
+  | { type: "table"; columns: string[]; rows: string[][] }
+  | { type: "citations"; items: Citation[] };
 
 export interface Board {
   app: string;
@@ -174,9 +202,44 @@ export function checkBoardBlocks(blocks: any): { blocks?: BoardBlock[]; error?: 
         if (!Array.isArray(block.rows) || block.rows.length > 50 || !block.rows.every((row: any) => Array.isArray(row))) return { error: `${where}：rows 必须是最多 50 行的二维数组` };
         out.push({ type: "table", columns: block.columns.map(text), rows: block.rows.map((row: any[]) => row.map(text)) });
         break;
+      case "citations": {
+        if (!Array.isArray(block.items) || block.items.length === 0 || block.items.length > 30) return { error: `${where}：items 要有 1～30 条引用` };
+        const items: Citation[] = [];
+        for (const [i, item] of block.items.entries()) {
+          const at = `${where}第 ${i + 1} 条引用`;
+          const int = (value: any) => Number.isInteger(value) && value > 0;
+          if (!int(item?.doc) || !int(item?.from) || !int(item?.to) || item.to < item.from) return { error: `${at}：doc、from、to 要是正整数，且 to 不小于 from` };
+          if (item.version !== undefined && item.version !== null && !int(item.version)) return { error: `${at}：version 要是正整数` };
+          if (typeof item.quote !== "string" || !item.quote.trim() || item.quote.length > 500) return { error: `${at}：quote 要写 1～500 字的原文摘句` };
+          items.push({ doc: item.doc, version: item.version ?? undefined, from: item.from, to: item.to, quote: item.quote, title: item.title === undefined ? undefined : text(item.title).slice(0, 200) });
+        }
+        out.push({ type: "citations", items });
+        break;
+      }
       default:
-        return { error: `${where}：type 只能是 text、list 或 table` };
+        return { error: `${where}：type 只能是 text、list、table 或 citations` };
     }
   }
   return { blocks: out };
+}
+
+export interface DocLine {
+  n: number;
+  text: string;
+}
+
+/** 解析 kb__read 返回的正文（每行「12| 内容」）。 */
+export function parseDocLines(text: string): DocLine[] {
+  const out: DocLine[] = [];
+  for (const line of String(text ?? "").split("\n")) {
+    const match = /^(\d+)\| ?(.*)$/.exec(line);
+    if (match) out.push({ n: Number(match[1]), text: match[2] });
+  }
+  return out;
+}
+
+/** 文档窗格要读的行：引用前面留 20 行上下文，一共读 200 行。 */
+export function docWindow(from: number): { from: number; to: number } {
+  const start = Math.max(1, from - 20);
+  return { from: start, to: start + 199 };
 }
