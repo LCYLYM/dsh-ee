@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { ArrowLeft, ArrowRight, Puzzle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Puzzle, X } from "lucide-react";
 import { auditLog, clientPlatforms, microApps } from "../mock/data";
 import { PageLink } from "../lib/menus";
 import { LangSwitch } from "../components/lang-switch";
@@ -236,6 +236,41 @@ const controls = ["xinchuang", "control", "audit"] as const;
 
 const steps = ["deploy", "capture", "review", "use"] as const;
 
+const whyPoints = ["knowledge", "trust", "trace", "reuse"] as const;
+
+/** 对比：员工各自用 AI 工具 vs 经 dsh-ee 统一下发。 */
+function Compare() {
+  const { t } = useTranslation();
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <div data-reveal className="rounded-3xl border border-neutral-200 bg-neutral-50 p-6 sm:p-8">
+        <div className="font-mono text-sm text-neutral-600">{t("landing.why.before.tag")}</div>
+        <h3 className="mt-1 text-2xl font-semibold text-neutral-900">{t("landing.why.before.title")}</h3>
+        <ul className="mt-6 space-y-4">
+          {whyPoints.map((k) => (
+            <li key={k} className="flex gap-3 text-neutral-700">
+              <X size={18} className="mt-0.5 shrink-0 text-neutral-400" />
+              {t(`landing.why.before.${k}`)}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div data-reveal style={delay(100)} className="rounded-3xl bg-brand-600 p-6 text-white sm:p-8">
+        <div className="font-mono text-sm text-white/75">{t("landing.why.after.tag")}</div>
+        <h3 className="mt-1 text-2xl font-semibold">{t("landing.why.after.title")}</h3>
+        <ul className="mt-6 space-y-4">
+          {whyPoints.map((k) => (
+            <li key={k} className="flex gap-3">
+              <Check size={18} className="mt-0.5 shrink-0 text-white" />
+              {t(`landing.why.after.${k}`)}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 const h2 = "text-4xl leading-tight font-bold tracking-[-0.025em] md:text-5xl";
 
 export default function Landing() {
@@ -253,6 +288,7 @@ export default function Landing() {
           </Link>
           <nav className="hidden gap-6 text-sm text-neutral-700 md:flex">
             <a href="#how" className="hover:text-neutral-900">{t("landing.nav.how")}</a>
+            <a href="#why" className="hover:text-neutral-900">{t("landing.nav.why")}</a>
             <a href="#workbench" className="hover:text-neutral-900">{t("landing.nav.workbench")}</a>
             <a href="#control" className="hover:text-neutral-900">{t("landing.nav.control")}</a>
             <a href="#deploy" className="hover:text-neutral-900">{t("landing.nav.deploy")}</a>
@@ -314,11 +350,25 @@ export default function Landing() {
           </div>
         </section>
 
+        <section id="why" aria-labelledby="why-title" className="relative mx-auto max-w-[1360px] scroll-mt-6 border-t border-neutral-100 px-5 py-28 sm:px-8">
+          <CornerMarks />
+          <Eyebrow n="02" label={t("landing.why.eyebrow")} />
+          <div className="mb-12 grid gap-6 lg:grid-cols-[1.35fr_1fr] lg:items-end">
+            <h2 id="why-title" data-reveal className={cx(h2, "text-brand-950")}>
+              {t("landing.why.title")}
+            </h2>
+            <p data-reveal style={delay(80)} className="text-lg leading-relaxed text-neutral-800">
+              {t("landing.why.desc")}
+            </p>
+          </div>
+          <Compare />
+        </section>
+
         <section id="workbench" className="relative scroll-mt-6 border-t border-neutral-100 bg-brand-50/40 py-28">
           <CornerMarks />
           <div className="mx-auto grid max-w-[1360px] gap-12 px-5 sm:px-8 lg:grid-cols-[1fr_1.1fr] lg:items-center">
             <div>
-              <Eyebrow n="02" label={t("landing.nav.workbench")} />
+              <Eyebrow n="03" label={t("landing.nav.workbench")} />
               <h2 data-reveal className={cx(h2, "text-brand-950")}>
                 {t("landing.wbLine1")}
                 <br />
@@ -348,7 +398,7 @@ export default function Landing() {
           <div className="mx-auto grid max-w-[1360px] gap-12 px-5 sm:px-8 lg:grid-cols-2">
             <div>
               <div data-reveal className="mb-8 flex items-center gap-3 font-mono text-sm tracking-wide text-brand-300">
-                <span>03 /</span>
+                <span>04 /</span>
                 <span className="text-neutral-400">{t("landing.nav.control")}</span>
                 <span aria-hidden className="h-px flex-1 bg-white/15" />
               </div>
@@ -375,7 +425,7 @@ export default function Landing() {
         <section id="deploy" className="relative mx-auto grid max-w-[1360px] scroll-mt-6 gap-12 border-t border-neutral-100 px-5 py-28 sm:px-8 lg:grid-cols-[1fr_1.1fr]">
           <CornerMarks />
           <div>
-            <Eyebrow n="04" label={t("landing.nav.deploy")} />
+            <Eyebrow n="05" label={t("landing.nav.deploy")} />
             <h2 data-reveal className={cx(h2, "text-brand-950")}>
               {t("landing.deployLine1")}
               <br />
