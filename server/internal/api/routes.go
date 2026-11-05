@@ -176,6 +176,8 @@ func (s *Server) routes() []route {
 		pub("GET /api/dsh/brand/logo", s.handleBrandLogo),
 		prm("PUT /api/admin/brand/logo", s.handleUploadBrandLogo, rbac.SettingsManage),
 		pub("GET /api/dsh/skills/{name}", s.handleDshSkill),
+		pub("POST /api/dsh/apps/{name}/subscription", s.handleDshAppSubscription),
+		pub("DELETE /api/dsh/apps/{name}/subscription", s.handleDshAppSubscription),
 		prm("GET /api/dsh/releases", s.handleDshReleases, rbac.PortalView),
 		prm("GET /dl/{target}/{file}", s.handleDownloadDshRelease, rbac.PortalView),
 		pub("GET /dl/connect/{file}", s.handleConnectTarball),

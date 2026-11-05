@@ -134,9 +134,11 @@ type dshConn struct {
 type dshCatalog struct {
 	Skills []dshSkill `json:"skills"`
 	// 员工可用的微应用，给接入插件画「企业应用」入口；旧插件忽略这个字段
-	Apps     []dshApp    `json:"apps"`
-	Required []dshPlugin `json:"required_plugins"`
-	Revision string      `json:"revision"`
+	Apps []dshApp `json:"apps"`
+	// 在可用范围内、需要员工自己启用、但还没启用的微应用；只有展示信息，/名字 加载不到
+	AvailableApps []dshApp    `json:"available_apps"`
+	Required      []dshPlugin `json:"required_plugins"`
+	Revision      string      `json:"revision"`
 	// 企业连接在 DSH 里的工具前缀（mcp__<server_name>__）
 	ServerName string   `json:"server_name"`
 	Brand      dshBrand `json:"brand"`
@@ -159,11 +161,16 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	if err != nil {
 		return nil, err
 	}
-	var on []*store.Asset
+	var on, offered []*store.Asset
 	var ids []int64
 	for _, a := range assets {
-		if available(v, a) && (a.Delivery == store.DeliveryAuto || subs[a.ID]) {
+		switch {
+		case !available(v, a):
+		case a.Delivery == store.DeliveryAuto || subs[a.ID]:
 			on = append(on, a)
+			ids = append(ids, a.ID)
+		case a.Kind == store.KindApp && a.Delivery == store.DeliveryOptional:
+			offered = append(offered, a)
 			ids = append(ids, a.ID)
 		}
 	}
@@ -171,7 +178,7 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	if err != nil {
 		return nil, err
 	}
-	c := &dshCatalog{Skills: []dshSkill{}, Apps: []dshApp{}, Required: []dshPlugin{}, ServerName: s.mcpServerNameCtx(ctx),
+	c := &dshCatalog{Skills: []dshSkill{}, Apps: []dshApp{}, AvailableApps: []dshApp{}, Required: []dshPlugin{}, ServerName: s.mcpServerNameCtx(ctx),
 		assets: map[string]*store.Asset{}, specs: map[string]*assetSpec{}}
 	var connIDs []int64
 	for _, a := range on {
@@ -188,15 +195,7 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 		case store.KindPrompt, store.KindApp:
 			c.Skills = append(c.Skills, dshSkill{Name: a.Slug, Title: sp.Title, Kind: a.Kind, Description: sp.Description, ModelInvocable: false, UserInvocable: true, Version: lv.Version})
 			if a.Kind == store.KindApp {
-				launch := sp.Launch
-				if launch == "" {
-					launch = "new"
-				}
-				starters := sp.Starters
-				if starters == nil {
-					starters = []string{}
-				}
-				c.Apps = append(c.Apps, dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Version: lv.Version, AssetID: a.ID, Workbench: sp.Workbench})
+				c.Apps = append(c.Apps, appEntry(a, sp, lv.Version))
 			}
 		case store.KindConnection:
 			c.conns = append(c.conns, &dshConn{asset: a, version: lv.Version, spec: sp})
@@ -205,6 +204,15 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	}
 	for i := range c.Apps {
 		c.Apps[i].Missing = missingAppCapabilities(c.specs[c.Apps[i].Name], c)
+	}
+	// 可启用的微应用不进 assets / specs：没启用前 /名字 加载不到，也不算进必装插件
+	for _, a := range offered {
+		if lv := live[a.ID]; lv != nil {
+			sp := parseSpec(lv.Spec)
+			app := appEntry(a, sp, lv.Version)
+			app.Missing = missingAppCapabilities(sp, c)
+			c.AvailableApps = append(c.AvailableApps, app)
+		}
 	}
 	if len(connIDs) > 0 {
 		tools, err := s.store.ConnectionTools(ctx, connIDs...)
@@ -281,6 +289,12 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 		}
 		return c.Apps[i].Title < c.Apps[j].Title
 	})
+	sort.Slice(c.AvailableApps, func(i, j int) bool {
+		if c.AvailableApps[i].Title == c.AvailableApps[j].Title {
+			return c.AvailableApps[i].Name < c.AvailableApps[j].Name
+		}
+		return c.AvailableApps[i].Title < c.AvailableApps[j].Title
+	})
 	sort.Slice(c.Required, func(i, j int) bool { return c.Required[i].Name < c.Required[j].Name })
 	sort.Slice(c.conns, func(i, j int) bool { return c.conns[i].asset.Slug < c.conns[j].asset.Slug })
 
@@ -293,6 +307,7 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	h := sha256.New()
 	_ = json.NewEncoder(h).Encode(c.Skills)
 	_ = json.NewEncoder(h).Encode(c.Apps)
+	_ = json.NewEncoder(h).Encode(c.AvailableApps)
 	_ = json.NewEncoder(h).Encode(c.Required)
 	_ = json.NewEncoder(h).Encode(c.Brand)
 	for _, name := range slices.Sorted(maps.Keys(c.system)) {
@@ -391,6 +406,61 @@ func (s *Server) handleDshSkill(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"skill": skill, "content": content})
+}
+
+// appEntry 是目录里一个微应用的展示信息。
+func appEntry(a *store.Asset, sp *assetSpec, version int) dshApp {
+	launch := sp.Launch
+	if launch == "" {
+		launch = "new"
+	}
+	starters := sp.Starters
+	if starters == nil {
+		starters = []string{}
+	}
+	return dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Version: version, AssetID: a.ID, Workbench: sp.Workbench}
+}
+
+// POST / DELETE /api/dsh/apps/{name}/subscription：员工在 DSH 里启用或停用「自选」微应用。
+// 与网页上的启用是同一件事（同一张订阅表、同样的范围检查）；只给接入插件的界面用，不做成 AI 工具，
+// 免得模型被提示注入诱导去改员工的配置。令牌需要 hub 范围（dshPrincipal 统一检查）。
+func (s *Server) handleDshAppSubscription(w http.ResponseWriter, r *http.Request) {
+	v, ok := s.dshAuth(w, r)
+	if !ok {
+		return
+	}
+	a, err := s.store.GetAssetBySlug(r.Context(), r.PathValue("name"))
+	if errors.Is(err, store.ErrNotFound) {
+		a, err = nil, nil
+	}
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	if a == nil || a.Kind != store.KindApp || !available(v, a) {
+		writeErr(w, http.StatusNotFound, "没有这个微应用，或它不在你的可用范围内")
+		return
+	}
+	if a.Delivery == store.DeliveryAuto {
+		writeErr(w, http.StatusBadRequest, "这个微应用对你默认生效，不需要启用，也不能停用")
+		return
+	}
+	if r.Method == http.MethodPost {
+		err = s.store.Subscribe(r.Context(), v.user.ID, a.ID)
+	} else {
+		err = s.store.Unsubscribe(r.Context(), v.user.ID, a.ID)
+	}
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	s.hub.notify()
+	c, err := s.userCatalog(r.Context(), v)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"revision": c.Revision, "enabled": r.Method == http.MethodPost})
 }
 
 func missingAppCapabilities(sp *assetSpec, c *dshCatalog) []string {
