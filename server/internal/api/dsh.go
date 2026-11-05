@@ -113,6 +113,8 @@ type dshApp struct {
 	AssetID     int64    `json:"asset_id"`
 	// 依赖的技能、连接里，当前员工没有权限的，前端提示「部分能力不可用」
 	Missing []string `json:"missing,omitempty"`
+	// 右侧栏业务工作台；没有配置就不带。员工没权限的数据源由插件显示「无权限」，这里不删
+	Workbench *appWorkbench `json:"workbench,omitempty"`
 }
 
 type dshPlugin struct {
@@ -194,7 +196,7 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 				if starters == nil {
 					starters = []string{}
 				}
-				c.Apps = append(c.Apps, dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Version: lv.Version, AssetID: a.ID})
+				c.Apps = append(c.Apps, dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Version: lv.Version, AssetID: a.ID, Workbench: sp.Workbench})
 			}
 		case store.KindConnection:
 			c.conns = append(c.conns, &dshConn{asset: a, version: lv.Version, spec: sp})
@@ -433,6 +435,7 @@ func appContent(sp *assetSpec, c *dshCatalog) string {
 			fmt.Fprintf(&b, "- %s\n", q)
 		}
 	}
+	b.WriteString(workbenchContent(sp.Workbench))
 	return b.String()
 }
 

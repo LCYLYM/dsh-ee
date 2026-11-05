@@ -354,7 +354,7 @@ func (s *Server) handleConnTest(w http.ResponseWriter, r *http.Request) {
 	if !readJSONLimit(w, r, &req, 6<<20) {
 		return
 	}
-	sp, _, ok := s.decodeSpec(w, store.KindConnection, req.Spec)
+	sp, _, ok := s.decodeSpec(w, r, store.KindConnection, req.Spec)
 	if !ok {
 		return
 	}

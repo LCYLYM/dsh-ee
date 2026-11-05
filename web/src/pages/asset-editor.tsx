@@ -13,6 +13,7 @@ import { useScopeOptions } from "../components/scope-dialog";
 import { Combobox } from "../components/pickers";
 import { Badge, Button, Card, cx, Field, inputBase, inputCls, PageHeader, PasswordInput, Segmented, ToggleRow } from "../components/ui";
 import { PageLink } from "../lib/menus";
+import { parseWorkbench, WorkbenchField, workbenchText } from "../components/workbench-editor";
 
 const KINDS: AssetKind[] = ["skill", "prompt", "app", "connection"];
 const textareaCls = "w-full rounded-md border border-neutral-300 bg-card px-3 py-2 text-sm outline-none placeholder:text-neutral-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
@@ -174,6 +175,8 @@ function AssetEditor() {
   const queryKind = params.get("kind") as AssetKind;
   const kind: AssetKind = existing.data?.asset.kind ?? (KINDS.includes(queryKind) ? queryKind : "skill");
   const [spec, setSpec] = useState<AssetSpec>(() => emptySpec(kind));
+  // 工作台在编辑框里是 JSON 文字，提交时再解析
+  const [wbText, setWbText] = useState("");
   const [slug, setSlug] = useState("");
   const [scope, setScope] = useState<Scope>(allScope());
   const [delivery, setDelivery] = useState<Delivery>("optional");
@@ -189,9 +192,11 @@ function AssetEditor() {
     if (existing.data) {
       const a = existing.data.asset;
       setSpec({ ...emptySpec(a.kind), ...a.spec });
+      setWbText(workbenchText(a.spec.workbench));
       setSlug(a.slug);
     } else if (!editing) {
       setSpec(emptySpec(kind));
+      setWbText("");
     }
   }, [existing.data, editing, kind]);
 
@@ -220,7 +225,7 @@ function AssetEditor() {
       case "prompt":
         return { ...base, body: spec.body };
       case "app":
-        return { ...base, persona: spec.persona, starters: (spec.starters ?? []).filter(Boolean), icon: spec.icon, launch: spec.launch, skills: spec.skills, connections: spec.connections, plugins: spec.plugins };
+        return { ...base, persona: spec.persona, starters: (spec.starters ?? []).filter(Boolean), icon: spec.icon, launch: spec.launch, workbench: parseWorkbench(wbText).value, skills: spec.skills, connections: spec.connections, plugins: spec.plugins };
       case "connection":
         return { ...base, type: spec.type, url: spec.url, auth: spec.auth, instructions: spec.instructions, timeout_seconds: spec.timeout_seconds, ...(spec.type === "openapi" ? { openapi: spec.openapi } : {}) };
     }
@@ -228,6 +233,7 @@ function AssetEditor() {
 
   const submit = async () => {
     setError(null);
+    if (kind === "app" && parseWorkbench(wbText).error) return setError(t("appWorkbench.badJson", { error: parseWorkbench(wbText).error }));
     const s = cleanSpec();
     const r = await run(async () => {
       if (editing) {
@@ -335,6 +341,7 @@ function AssetEditor() {
             <MultiPick label={t("editor.skills")} values={spec.skills ?? []} options={skillOptions} onChange={(v) => set({ skills: v })} />
             <MultiPick label={t("editor.connections")} values={spec.connections ?? []} options={connOptions} onChange={(v) => set({ connections: v })} />
             <MultiPick label={t("editor.plugins")} values={spec.plugins ?? []} options={pluginOptions} onChange={(v) => set({ plugins: v })} />
+            <WorkbenchField text={wbText} onText={setWbText} connections={spec.connections ?? []} />
           </Section>
         )}
         {kind === "connection" && (

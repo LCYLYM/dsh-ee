@@ -109,6 +109,18 @@ export default {
     editConnection: "Edit connection",
     secretHint: "Credential: {{hint}}",
   },
+  appWorkbench: {
+    label: "Workbench (optional)",
+    hint: "The business panel shown in the DSH right sidebar when this app is opened. Written as JSON; see Insert sample. Data sources must be read-only tools of this app's connections. Leave empty for no workbench.",
+    insertSample: "Insert sample",
+    preview: "Preview",
+    hidePreview: "Hide preview",
+    placeholder: "{ \"panes\": [ … ] }",
+    badJson: "Invalid JSON: {{error}}",
+    needPanes: "The top level needs a panes array",
+    webPane: "Web page",
+    widget: { metric: "Metric", table: "Table", form: "Form", actions: "Quick actions", markdown: "Notes", board: "AI board" },
+  },
   editor: {
     newSkill: "Write a skill",
     newPrompt: "Write a prompt",

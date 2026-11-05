@@ -107,6 +107,18 @@ export default {
     editConnection: "修改连接",
     secretHint: "凭据：{{hint}}",
   },
+  appWorkbench: {
+    label: "工作台（可选）",
+    hint: "员工打开这个微应用时，DSH 右侧栏显示的业务面板。用 JSON 填写，格式见「插入示例」；数据源只能用这个微应用依赖连接里的只读工具。留空表示没有工作台。",
+    insertSample: "插入示例",
+    preview: "预览",
+    hidePreview: "收起预览",
+    placeholder: "{ \"panes\": [ … ] }",
+    badJson: "JSON 格式不对：{{error}}",
+    needPanes: "最外层要有 panes 数组",
+    webPane: "网页",
+    widget: { metric: "指标", table: "表格", form: "表单", actions: "快捷按钮", markdown: "说明", board: "AI 看板" },
+  },
   editor: {
     newSkill: "写一个技能",
     newPrompt: "写一个提示词",

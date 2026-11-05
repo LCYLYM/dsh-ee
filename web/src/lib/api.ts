@@ -501,6 +501,39 @@ export interface Scope {
 }
 
 /** 资产版本的内容，按 kind 取用其中的字段（与 server/internal/api/hub.go 的 assetSpec 对应）。 */
+// 微应用在 DSH 右侧栏里的业务工作台，结构见 docs/workbench-panels.md；服务端负责完整校验
+export interface WorkbenchAction {
+  label: string;
+  prompt: string;
+}
+
+export interface WorkbenchWidget {
+  type: "metric" | "table" | "form" | "actions" | "markdown" | "board";
+  title?: string;
+  text?: string;
+  source?: { connection: string; tool: string; args?: Record<string, unknown> };
+  field?: string;
+  format?: string;
+  rows?: string;
+  columns?: { field: string; title: string; format?: string }[];
+  row_actions?: WorkbenchAction[];
+  fields?: { name: string; label: string; kind: string; required?: boolean; options?: string[] }[];
+  submit?: WorkbenchAction;
+  actions?: WorkbenchAction[];
+}
+
+export interface WorkbenchPane {
+  id: string;
+  type: "panel" | "web";
+  title: string;
+  url?: string;
+  widgets?: WorkbenchWidget[];
+}
+
+export interface AppWorkbench {
+  panes: WorkbenchPane[];
+}
+
 export interface AssetSpec {
   title: string;
   description: string;
@@ -511,6 +544,7 @@ export interface AssetSpec {
   starters?: string[];
   icon?: string;
   launch?: "new" | "resume";
+  workbench?: AppWorkbench;
   skills?: string[];
   connections?: string[];
   plugins?: string[];

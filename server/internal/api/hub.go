@@ -45,6 +45,8 @@ type assetSpec struct {
 	Icon string `json:"icon,omitempty"`
 	// 微应用：点开时怎么开始 —— "new"（每次新会话，默认）或 "resume"（回到上次的会话）
 	Launch string `json:"launch,omitempty"`
+	// 微应用：DSH 右侧栏里的业务工作台（可选）
+	Workbench *appWorkbench `json:"workbench,omitempty"`
 
 	// 连接：mcp（上游 MCP 服务地址）或 openapi（接口根地址 + 文档）
 	Type         string    `json:"type,omitempty"`
@@ -93,7 +95,7 @@ func validateSpec(kind string, sp *assetSpec) string {
 			sp.ModelInvocable, sp.WhenToUse = nil, ""
 		}
 		sp.Persona, sp.Starters, sp.Skills, sp.Connections, sp.Plugins = "", nil, nil, nil, nil
-		sp.Icon, sp.Launch = "", ""
+		sp.Icon, sp.Launch, sp.Workbench = "", "", nil
 		sp.Type, sp.URL, sp.Auth, sp.OpenAPI, sp.Instructions = "", "", nil, "", ""
 	case store.KindApp:
 		sp.Persona = strings.TrimSpace(sp.Persona)
@@ -144,6 +146,11 @@ func validateSpec(kind string, sp *assetSpec) string {
 		if sp.Plugins, msg = clean(sp.Plugins, 20, registry.ValidName, "插件"); msg != "" {
 			return msg
 		}
+		if sp.Workbench != nil {
+			if msg := validateWorkbench(sp.Workbench, sp.Connections); msg != "" {
+				return msg
+			}
+		}
 		sp.Body, sp.WhenToUse, sp.ModelInvocable = "", "", nil
 		sp.Type, sp.URL, sp.Auth, sp.OpenAPI, sp.Instructions = "", "", nil, "", ""
 	case store.KindConnection:
@@ -187,7 +194,7 @@ func validateSpec(kind string, sp *assetSpec) string {
 		}
 		sp.Body, sp.WhenToUse, sp.ModelInvocable = "", "", nil
 		sp.Persona, sp.Starters, sp.Skills, sp.Connections, sp.Plugins = "", nil, nil, nil, nil
-		sp.Icon, sp.Launch = "", ""
+		sp.Icon, sp.Launch, sp.Workbench = "", "", nil
 	default:
 		return "未知的能力类型"
 	}
@@ -533,7 +540,7 @@ func (s *Server) initialStatus(r *http.Request, kind string) (string, error) {
 	return store.StatusPending, nil
 }
 
-func (s *Server) decodeSpec(w http.ResponseWriter, kind string, raw json.RawMessage) (*assetSpec, json.RawMessage, bool) {
+func (s *Server) decodeSpec(w http.ResponseWriter, r *http.Request, kind string, raw json.RawMessage) (*assetSpec, json.RawMessage, bool) {
 	var sp assetSpec
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
 	dec.DisallowUnknownFields()
@@ -542,6 +549,13 @@ func (s *Server) decodeSpec(w http.ResponseWriter, kind string, raw json.RawMess
 		return nil, nil, false
 	}
 	if msg := validateSpec(kind, &sp); msg != "" {
+		writeErr(w, http.StatusBadRequest, msg)
+		return nil, nil, false
+	}
+	if msg, err := s.checkWorkbenchSources(r.Context(), sp.Workbench); err != nil {
+		s.internalErr(w, r, err)
+		return nil, nil, false
+	} else if msg != "" {
 		writeErr(w, http.StatusBadRequest, msg)
 		return nil, nil, false
 	}
@@ -577,7 +591,7 @@ func (s *Server) handleHubCreate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "标识只能用小写字母、数字和连字符，例如 expense-policy，最多 48 个字符")
 		return
 	}
-	sp, raw, ok := s.decodeSpec(w, req.Kind, req.Spec)
+	sp, raw, ok := s.decodeSpec(w, r, req.Kind, req.Spec)
 	if !ok {
 		return
 	}
@@ -691,7 +705,7 @@ func (s *Server) handleHubNewVersion(w http.ResponseWriter, r *http.Request) {
 	if !readJSONLimit(w, r, &req, 6<<20) {
 		return
 	}
-	sp, raw, ok := s.decodeSpec(w, a.Kind, req.Spec)
+	sp, raw, ok := s.decodeSpec(w, r, a.Kind, req.Spec)
 	if !ok {
 		return
 	}
