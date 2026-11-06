@@ -780,7 +780,7 @@ async function runLocalDoctor(ctx, config, tokens, http, bridge, bindings) {
       add({ id: "default_model", status: "warn", title: `\u4F01\u4E1A\u9ED8\u8BA4\u6A21\u578B ${server.default_model} \u4E0D\u5728\u4F60\u7684\u53EF\u7528\u5217\u8868\u91CC`, fix: "\u5728 DSH \u91CC\u6539\u9009\u53EF\u7528\u7684\u6A21\u578B" });
     }
     if (server.connect_version && config.version !== "dev") {
-      add(compareVersions(server.connect_version, config.version) > 0 ? { id: "plugin_version", status: "warn", title: `\u63A5\u5165\u63D2\u4EF6\u6709\u65B0\u7248\u672C ${server.connect_version}\uFF08\u5F53\u524D ${config.version}\uFF09`, fix: `\u5728 DSH \u63D2\u4EF6\u9875\u66F4\u65B0\u63A5\u5165\u63D2\u4EF6\uFF08\u5F53\u521D\u662F\u7C98\u8D34\u5730\u5740\u5B89\u88C5\u7684\uFF0C\u63D2\u4EF6\u9875\u6CA1\u6709\u66F4\u65B0\u6309\u94AE\uFF1A\u5148\u5378\u8F7D\u5B83\uFF0C\u518D\u5728\u300C\u6DFB\u52A0\u63D2\u4EF6\u300D\u91CC\u8F93\u5165 ${config.scopes[0] ?? "@\u4F01\u4E1A\u4F5C\u7528\u57DF"}/dsh-connect \u5B89\u88C5\uFF1B\u767B\u5F55\u4E0E\u4F01\u4E1A\u6E90\u914D\u7F6E\u4F1A\u4FDD\u7559\uFF09\uFF0C\u7136\u540E\u91CD\u542F DSH` } : { id: "plugin_version", status: "ok", title: `\u63A5\u5165\u63D2\u4EF6 ${config.version} \u5DF2\u662F\u6700\u65B0` });
+      add(compareVersions(server.connect_version, config.version) > 0 ? { id: "plugin_version", status: "warn", title: `\u63A5\u5165\u63D2\u4EF6\u6709\u65B0\u7248\u672C ${server.connect_version}\uFF08\u5F53\u524D ${config.version}\uFF09`, fix: "\u5728 DSH \u7684\u300C\u8BBE\u7F6E \u2192 dsh-ee\u300D\u70B9\u300C\u66F4\u65B0\u5230\u6700\u65B0\u7248\u300D\uFF0C\u88C5\u597D\u540E\u91CD\u542F DSH" } : { id: "plugin_version", status: "ok", title: `\u63A5\u5165\u63D2\u4EF6 ${config.version} \u5DF2\u662F\u6700\u65B0` });
     }
     const manager = ctx.get("pluginManager");
     if (manager && (server.required_plugins ?? []).length) {
@@ -1136,26 +1136,26 @@ function createCallable(name2, proto, tracker) {
   defineProperty(self, "name", name2);
   return Object.setPrototypeOf(self, proto);
 }
-function handleError(info, reason2, getOuterStack) {
+function handleError(info, reason3, getOuterStack) {
   const innerLines = info.error.stack.split("\n");
-  if (typeof reason2?.stack !== "string") {
-    const outerError = new Error(reason2);
+  if (typeof reason3?.stack !== "string") {
+    const outerError = new Error(reason3);
     const lines2 = outerError.stack.split("\n");
     lines2.splice(1, Infinity, ...getOuterStack());
     outerError.stack = lines2.join("\n");
     throw outerError;
   }
-  const lines = reason2.stack.split("\n");
+  const lines = reason3.stack.split("\n");
   let index = lines.indexOf(innerLines[2]);
-  if (index === -1) throw reason2;
+  if (index === -1) throw reason3;
   index -= info.offset;
   while (index > 0) {
     if (!lines[index - 1].endsWith(" (<anonymous>)")) break;
     index -= 1;
   }
   lines.splice(index, Infinity, ...getOuterStack());
-  reason2.stack = lines.join("\n");
-  throw reason2;
+  reason3.stack = lines.join("\n");
+  throw reason3;
 }
 function composeError(callback, getOuterStack = buildOuterStack()) {
   const info = {
@@ -1164,10 +1164,10 @@ function composeError(callback, getOuterStack = buildOuterStack()) {
   };
   try {
     const result = callback(info);
-    if (isObject(result) && "then" in result) return result.then(void 0, (reason2) => handleError(info, reason2, getOuterStack));
+    if (isObject(result) && "then" in result) return result.then(void 0, (reason3) => handleError(info, reason3, getOuterStack));
     else return result;
-  } catch (reason2) {
-    handleError(info, reason2, getOuterStack);
+  } catch (reason3) {
+    handleError(info, reason3, getOuterStack);
   }
 }
 function buildOuterStack(offset = 0) {
@@ -2005,7 +2005,7 @@ var Fiber = class {
       try {
         this.context.emit("internal/plugin", this);
       } catch (error) {
-        Promise.resolve(this.dispose()).catch((reason2) => this.ctx.logger.error(reason2));
+        Promise.resolve(this.dispose()).catch((reason3) => this.ctx.logger.error(reason3));
         throw error;
       }
       if (this.uid !== null && parent.fiber.state !== 5) {
@@ -2128,9 +2128,9 @@ var Fiber = class {
       return setupBarrier;
     };
     const disposeAfter = (setup) => {
-      return Promise.resolve(setup).then(() => dispose(), async (reason2) => {
+      return Promise.resolve(setup).then(() => dispose(), async (reason3) => {
         await dispose();
-        throw reason2;
+        throw reason3;
       });
     };
     const finalizeDisposal = (callback) => {
@@ -2163,7 +2163,7 @@ var Fiber = class {
     removeWrapper = this._disposables.push(wrapper);
     try {
       task = this._execute(runner);
-    } catch (reason2) {
+    } catch (reason3) {
       executing = false;
       setupFailed = true;
       runner.epoch = false;
@@ -2171,10 +2171,10 @@ var Fiber = class {
       try {
         cleanup = finalizeDisposal(dispose);
       } finally {
-        rejectSetup?.(reason2);
+        rejectSetup?.(reason3);
       }
       if (isObject(cleanup) && "then" in cleanup) cleanup.catch((error) => this.ctx.logger.error(error));
-      throw reason2;
+      throw reason3;
     }
     executing = false;
     if (setupBarrier) Promise.resolve(task).then(resolveSetup, rejectSetup);
@@ -2295,9 +2295,9 @@ var Fiber = class {
         await this._execute(this._runner);
         this._error = void 0;
       }
-    } catch (reason2) {
-      this.ctx.logger.error(reason2);
-      this._error = reason2;
+    } catch (reason3) {
+      this.ctx.logger.error(reason3);
+      this._error = reason3;
       this._runner.epoch = INACTIVE;
     }
     this._updateState(() => {
@@ -2316,8 +2316,8 @@ var Fiber = class {
           info.error = /* @__PURE__ */ new Error();
           await runDisposable(dispose);
         }, this._runner.getOuterStack);
-      } catch (reason2) {
-        this.ctx.logger.error(reason2);
+      } catch (reason3) {
+        this.ctx.logger.error(reason3);
       }
     }));
     this.store = void 0;
@@ -2852,8 +2852,8 @@ function validateName(subject, value) {
 }
 
 // src/brand.ts
-var _saveServer_dec, _testServer_dec, _serverSettings_dec, _doctor_dec, _login_dec, _overview_dec, _kbDoc_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
-var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _kbDoc_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _serverSettings_dec = [Remote], _testServer_dec = [Remote], _saveServer_dec = [Remote], _a) {
+var _updatePlugin_dec, _saveServer_dec, _testServer_dec, _serverSettings_dec, _doctor_dec, _login_dec, _overview_dec, _kbDoc_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
+var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _kbDoc_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _serverSettings_dec = [Remote], _testServer_dec = [Remote], _saveServer_dec = [Remote], _updatePlugin_dec = [Remote], _a) {
   constructor(ctx, actions) {
     super(ctx, "dshEE");
     this.actions = actions;
@@ -2910,6 +2910,9 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
   async saveServer(request) {
     return this.actions.saveServer(request ?? {});
   }
+  async updatePlugin() {
+    return this.actions.updatePlugin();
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "brand", _brand_dec, DshEEClientService);
@@ -2929,6 +2932,7 @@ __decorateElement(_init, 1, "doctor", _doctor_dec, DshEEClientService);
 __decorateElement(_init, 1, "serverSettings", _serverSettings_dec, DshEEClientService);
 __decorateElement(_init, 1, "testServer", _testServer_dec, DshEEClientService);
 __decorateElement(_init, 1, "saveServer", _saveServer_dec, DshEEClientService);
+__decorateElement(_init, 1, "updatePlugin", _updatePlugin_dec, DshEEClientService);
 __decoratorMetadata(_init, DshEEClientService);
 function registerBrand(ctx, actions) {
   return new DshEEClientService(ctx, actions);
@@ -3079,6 +3083,42 @@ var ServerSettingsService = class {
     return this.read();
   }
 };
+
+// src/connect-update.ts
+var reason2 = (error) => error instanceof Error ? error.message : String(error);
+async function updateConnect(ctx, config, http) {
+  const manager = ctx.get("pluginManager");
+  if (!manager || typeof manager.installBundle !== "function") {
+    return { ok: false, version: config.version, message: "\u8FD9\u53F0 DSH \u6CA1\u6709\u63D2\u4EF6\u7BA1\u7406\u63A5\u53E3\uFF0C\u8BF7\u5728\u63D2\u4EF6\u9875\u624B\u52A8\u66F4\u65B0\u63A5\u5165\u63D2\u4EF6" };
+  }
+  let info;
+  try {
+    info = await http.json("/api/connect");
+  } catch (error) {
+    const why = reason2(error);
+    return { ok: false, version: config.version, message: `\u67E5\u4E0D\u5230\u4F01\u4E1A\u7AEF\u7684\u63A5\u5165\u63D2\u4EF6\u7248\u672C\uFF1A${why}${why === "HTTP 401" ? "\uFF1B\u5148\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7\u518D\u8BD5" : ""}` };
+  }
+  const latest = String(info?.version ?? "");
+  const pkg = String(info?.package ?? "");
+  if (!info?.ready || !latest || !pkg) {
+    return { ok: false, version: config.version, message: info?.error || "\u4F01\u4E1A\u7AEF\u8FD8\u6CA1\u6709\u53D1\u5E03\u63A5\u5165\u63D2\u4EF6\uFF0C\u8BF7\u7BA1\u7406\u5458\u5148\u5728\u7CFB\u7EDF\u8BBE\u7F6E\u91CC\u53D1\u5E03" };
+  }
+  if (config.version !== "dev" && compareVersions(latest, config.version) <= 0) {
+    return { ok: true, version: config.version, latest, package: pkg, message: `\u5DF2\u662F\u6700\u65B0\uFF08${config.version}\uFF09` };
+  }
+  const done = { ok: true, updated: true, version: config.version, latest, package: pkg, message: `\u5DF2\u5B89\u88C5 ${pkg}@${latest}\uFF0C\u91CD\u542F DSH \u540E\u751F\u6548` };
+  try {
+    await manager.installBundle(info.tarball_url || `${config.base}/dl/connect/dsh-connect-${latest}.tgz`);
+    return done;
+  } catch (tarballError) {
+    try {
+      await manager.installBundle(`${pkg}@${latest}`, { registry: `${config.base}/npm/` });
+      return done;
+    } catch (registryError) {
+      return { ok: false, version: config.version, latest, package: pkg, message: `\u5B89\u88C5\u5931\u8D25\uFF1A${reason2(registryError) || reason2(tarballError)}` };
+    }
+  }
+}
 
 // src/upload.ts
 import fs3 from "node:fs";
@@ -3486,7 +3526,8 @@ function apply(ctx, input) {
       doctor: () => runLocalDoctor(ctx, config, tokens, http, bridge, appBindings),
       serverSettings: async () => server.read(),
       testServer: (request) => server.test(request?.base),
-      saveServer: (request) => server.save(request?.base)
+      saveServer: (request) => server.save(request?.base),
+      updatePlugin: () => updateConnect(ctx, config, http)
     });
     const disposeWorkbenchTool = registerWorkbenchTool(ctx, {
       boards,

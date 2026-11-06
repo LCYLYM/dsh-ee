@@ -9,6 +9,7 @@ import { registerDoctor, runLocalDoctor } from "./doctor.js";
 import { registerBrand } from "./brand.js";
 import { overviewFailure, readEnterpriseOverview } from "./overview.js";
 import { ServerSettingsService } from "./server-settings.js";
+import { updateConnect } from "./connect-update.js";
 import { uploadPackage } from "./upload.js";
 import { AppBindings } from "./app-bindings.js";
 import { setAppSubscription } from "./app-subscription.js";
@@ -81,6 +82,7 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
       serverSettings: async () => server.read(),
       testServer: (request) => server.test(request?.base),
       saveServer: (request) => server.save(request?.base),
+      updatePlugin: () => updateConnect(ctx, config, http),
     });
     const disposeWorkbenchTool = registerWorkbenchTool(ctx, {
       boards,

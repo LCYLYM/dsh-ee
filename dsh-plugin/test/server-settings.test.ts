@@ -105,10 +105,14 @@ test("设置页：显示当前地址、插件包地址，没改时不能保存",
   const createElement = (type: any, props: any, ...children: any[]) => ({ type, props: props ?? {}, children });
   const noop = () => {};
   const settings = { base: "https://ee.example.com", packaged: "http://localhost:8080", overridden: true, org: "企业", version: "1.0.9" };
-  const view = serverSettingsView(createElement, { settings, draft: "https://ee.example.com" }, { setDraft: noop, test: noop, save: noop, reset: noop });
+  const view = serverSettingsView(createElement, { settings, draft: "https://ee.example.com" }, { setDraft: noop, test: noop, save: noop, reset: noop, update: noop });
   const text = JSON.stringify(view);
   assert.match(text, /插件包里的地址是 http:\/\/localhost:8080/);
   assert.match(text, /恢复插件包里的地址/);
+  assert.match(text, /更新到最新版/);
+  assert.match(text, /当前版本 1\.0\.9/);
+  const result = serverSettingsView(createElement, { settings, draft: settings.base, update: { ok: true, updated: true, version: "1.0.9", latest: "1.1.0", message: "已安装 @company/dsh-connect@1.1.0，重启 DSH 后生效" } }, { setDraft: noop, test: noop, save: noop, reset: noop, update: noop });
+  assert.match(JSON.stringify(result), /已安装 @company\/dsh-connect@1\.1\.0/);
   const find = (node: any, label: string): any => {
     if (!node || typeof node !== "object") return undefined;
     if (node.type === "button" && node.children.includes(label)) return node;
@@ -118,8 +122,8 @@ test("设置页：显示当前地址、插件包地址，没改时不能保存",
     }
   };
   assert.equal(find(view, "保存").props.disabled, true);
-  const edited = serverSettingsView(createElement, { settings, draft: "https://other.example.com" }, { setDraft: noop, test: noop, save: noop, reset: noop });
+  const edited = serverSettingsView(createElement, { settings, draft: "https://other.example.com" }, { setDraft: noop, test: noop, save: noop, reset: noop, update: noop });
   assert.equal(find(edited, "保存").props.disabled, false);
-  const tested = serverSettingsView(createElement, { settings, draft: settings.base, test: { base: settings.base, ok: false, checks: [{ id: "reach", ok: false, title: "连不上", detail: "连接超时" }] } }, { setDraft: noop, test: noop, save: noop, reset: noop });
+  const tested = serverSettingsView(createElement, { settings, draft: settings.base, test: { base: settings.base, ok: false, checks: [{ id: "reach", ok: false, title: "连不上", detail: "连接超时" }] } }, { setDraft: noop, test: noop, save: noop, reset: noop, update: noop });
   assert.match(JSON.stringify(tested), /"data-dsh-ee-test":"fail"/);
 });

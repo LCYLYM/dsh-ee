@@ -104,7 +104,7 @@ export async function runLocalDoctor(ctx: DshContext, config: PluginConfig, toke
     }
     if (server.connect_version && config.version !== "dev") {
       add(compareVersions(server.connect_version, config.version) > 0
-        ? { id: "plugin_version", status: "warn", title: `接入插件有新版本 ${server.connect_version}（当前 ${config.version}）`, fix: `在 DSH 插件页更新接入插件（当初是粘贴地址安装的，插件页没有更新按钮：先卸载它，再在「添加插件」里输入 ${config.scopes[0] ?? "@企业作用域"}/dsh-connect 安装；登录与企业源配置会保留），然后重启 DSH` }
+        ? { id: "plugin_version", status: "warn", title: `接入插件有新版本 ${server.connect_version}（当前 ${config.version}）`, fix: "在 DSH 的「设置 → dsh-ee」点「更新到最新版」，装好后重启 DSH" }
         : { id: "plugin_version", status: "ok", title: `接入插件 ${config.version} 已是最新` });
     }
     const manager = ctx.get("pluginManager");

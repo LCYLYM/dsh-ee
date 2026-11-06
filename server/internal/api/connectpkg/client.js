@@ -21684,9 +21684,22 @@ function serverSettingsView(createElement4, state, actions) {
   if (notice) children.push(createElement4("p", { key: "notice", style: { marginTop: 14, lineHeight: 1.6 } }, notice));
   if (error62) children.push(createElement4("p", { key: "error", style: { marginTop: 14, color: "#d92d20", lineHeight: 1.6 } }, error62));
   children.push(createElement4(
+    "div",
+    { key: "plugin", "data-dsh-ee-settings": "plugin-update", style: { marginTop: 20, paddingTop: 16, borderTop: "1px solid color-mix(in srgb, currentColor 14%, transparent)" } },
+    createElement4(
+      "div",
+      { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } },
+      createElement4("span", { style: { fontWeight: 500 } }, "\u63A5\u5165\u63D2\u4EF6"),
+      createElement4("span", { style: { fontSize: 12, ...muted2 } }, `\u5F53\u524D\u7248\u672C ${settings.version}`),
+      button3(createElement4, busy === "update" ? "\u6B63\u5728\u66F4\u65B0\u2026" : "\u66F4\u65B0\u5230\u6700\u65B0\u7248", actions.update, !!busy)
+    ),
+    state.update ? createElement4("p", { "data-dsh-ee-update": state.update.ok ? "ok" : "fail", style: { margin: "8px 0 0", fontSize: 12, lineHeight: 1.6, color: state.update.ok ? "inherit" : "#d92d20" } }, state.update.message) : null,
+    createElement4("p", { style: { margin: "6px 0 0", fontSize: 12, lineHeight: 1.6, ...muted2 } }, "\u66F4\u65B0\u5230\u4F01\u4E1A\u7AEF\u5DF2\u53D1\u5E03\u7684\u6700\u65B0\u7248\uFF1B\u88C5\u597D\u540E\u9700\u8981\u91CD\u542F DSH \u624D\u751F\u6548\u3002")
+  ));
+  children.push(createElement4(
     "p",
     { key: "hint", style: { marginTop: 22, fontSize: 12, lineHeight: 1.6, ...muted2 } },
-    `\u6539\u5730\u5740\u53EA\u5F71\u54CD\u8FD9\u53F0\u7535\u8111\u3002\u5982\u679C\u5927\u5BB6\u90FD\u8FDE\u4E0D\u4E0A\uFF0C\u8BF7\u7BA1\u7406\u5458\u5728 dsh-ee \u7F51\u9875\u7684\u7CFB\u7EDF\u8BBE\u7F6E\u91CC\u586B\u5199\u300C\u8BBF\u95EE\u5730\u5740\u300D\uFF0C\u518D\u91CD\u65B0\u53D1\u5E03\u63A5\u5165\u63D2\u4EF6\u3002\u63A5\u5165\u63D2\u4EF6\u7248\u672C ${settings.version}\u3002`
+    `\u6539\u5730\u5740\u53EA\u5F71\u54CD\u8FD9\u53F0\u7535\u8111\u3002\u5982\u679C\u5927\u5BB6\u90FD\u8FDE\u4E0D\u4E0A\uFF0C\u8BF7\u7BA1\u7406\u5458\u5728 dsh-ee \u7F51\u9875\u7684\u7CFB\u7EDF\u8BBE\u7F6E\u91CC\u586B\u5199\u300C\u8BBF\u95EE\u5730\u5740\u300D\uFF0C\u518D\u91CD\u65B0\u53D1\u5E03\u63A5\u5165\u63D2\u4EF6\u3002`
   ));
   return createElement4("div", { "data-dsh-ee-settings": "ready", style: { maxWidth: 640 } }, ...children);
 }
@@ -21728,11 +21741,22 @@ function registerServerSettings(ctx, deps) {
         patch({ busy: void 0 });
       }
     };
+    const update = async () => {
+      patch({ busy: "update", update: void 0, error: void 0 });
+      try {
+        patch({ update: unwrapRemote2(await remote.updatePlugin()) });
+      } catch (error62) {
+        patch({ update: { ok: false, version: state.settings?.version ?? "", message: `\u66F4\u65B0\u5931\u8D25\uFF1A${message(error62)}` } });
+      } finally {
+        patch({ busy: void 0 });
+      }
+    };
     return serverSettingsView(createElement4, state, {
       setDraft: (draft) => patch({ draft, test: void 0 }),
       test: () => void test(),
       save: () => void save(state.draft),
-      reset: () => void save(null)
+      reset: () => void save(null),
+      update: () => void update()
     });
   };
   ctx.slots.inject("settings.section", () => ctx.slots.register(
@@ -21766,7 +21790,8 @@ var clientRemote = createTypertRemoteInfo({
     "dshEE/doctor": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/serverSettings": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/testServer": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
-    "dshEE/saveServer": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }
+    "dshEE/saveServer": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/updatePlugin": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }
   }
 }, external_exports);
 var TAKEOVER = String("__DSH_EE_BRAND_TAKEOVER__") === "true";

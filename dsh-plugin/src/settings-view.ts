@@ -1,14 +1,16 @@
+import type { ConnectUpdate } from "./connect-update.js";
 import type { ServerSettings, ServerTest } from "./server-settings.js";
 
-// DSH 设置面板里的「dsh-ee」页：看、改、测试接入插件连的 dsh-ee 地址。
+// DSH 设置面板里的「dsh-ee」页：看、改、测试接入插件连的 dsh-ee 地址，以及一键更新接入插件。
 
 export const settingsSectionId = "dsh-ee";
 
 export interface ServerSettingsState {
   settings?: ServerSettings;
   draft: string;
-  busy?: "test" | "save";
+  busy?: "test" | "save" | "update";
   test?: ServerTest;
+  update?: ConnectUpdate;
   notice?: string;
   error?: string;
 }
@@ -18,6 +20,7 @@ export interface ServerSettingsActions {
   test: () => void;
   save: () => void;
   reset: () => void;
+  update: () => void;
 }
 
 const muted = { opacity: 0.65 };
@@ -76,8 +79,15 @@ export function serverSettingsView(createElement: (...args: any[]) => any, state
   }
   if (notice) children.push(createElement("p", { key: "notice", style: { marginTop: 14, lineHeight: 1.6 } }, notice));
   if (error) children.push(createElement("p", { key: "error", style: { marginTop: 14, color: "#d92d20", lineHeight: 1.6 } }, error));
+  children.push(createElement("div", { key: "plugin", "data-dsh-ee-settings": "plugin-update", style: { marginTop: 20, paddingTop: 16, borderTop: "1px solid color-mix(in srgb, currentColor 14%, transparent)" } },
+    createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } },
+      createElement("span", { style: { fontWeight: 500 } }, "接入插件"),
+      createElement("span", { style: { fontSize: 12, ...muted } }, `当前版本 ${settings.version}`),
+      button(createElement, busy === "update" ? "正在更新…" : "更新到最新版", actions.update, !!busy)),
+    state.update ? createElement("p", { "data-dsh-ee-update": state.update.ok ? "ok" : "fail", style: { margin: "8px 0 0", fontSize: 12, lineHeight: 1.6, color: state.update.ok ? "inherit" : "#d92d20" } }, state.update.message) : null,
+    createElement("p", { style: { margin: "6px 0 0", fontSize: 12, lineHeight: 1.6, ...muted } }, "更新到企业端已发布的最新版；装好后需要重启 DSH 才生效。")));
   children.push(createElement("p", { key: "hint", style: { marginTop: 22, fontSize: 12, lineHeight: 1.6, ...muted } },
-    `改地址只影响这台电脑。如果大家都连不上，请管理员在 dsh-ee 网页的系统设置里填写「访问地址」，再重新发布接入插件。接入插件版本 ${settings.version}。`));
+    `改地址只影响这台电脑。如果大家都连不上，请管理员在 dsh-ee 网页的系统设置里填写「访问地址」，再重新发布接入插件。`));
   return createElement("div", { "data-dsh-ee-settings": "ready", style: { maxWidth: 640 } }, ...children);
 }
 
@@ -128,11 +138,22 @@ export function registerServerSettings(ctx: any, deps: {
         patch({ busy: undefined });
       }
     };
+    const update = async () => {
+      patch({ busy: "update", update: undefined, error: undefined });
+      try {
+        patch({ update: unwrapRemote(await remote.updatePlugin()) });
+      } catch (error) {
+        patch({ update: { ok: false, version: state.settings?.version ?? "", message: `更新失败：${message(error)}` } });
+      } finally {
+        patch({ busy: undefined });
+      }
+    };
     return serverSettingsView(createElement, state, {
       setDraft: (draft) => patch({ draft, test: undefined }),
       test: () => void test(),
       save: () => void save(state.draft),
       reset: () => void save(null),
+      update: () => void update(),
     });
   };
   ctx.slots.inject("settings.section", () => ctx.slots.register(
