@@ -108,6 +108,7 @@ export default {
     heroDesc: "dsh-ee packages your company's skills, systems, data and business context into capabilities and micro-apps, then delivers them to every employee's DSH once reviewed and approved, with every step on record.",
     seeHow: "See how it works",
     howTitle: "How it works",
+    howLine: "From company assets to every employee, with every step under control",
     wbLine1: "Assets become micro-apps",
     wbLine2: "that run in DSH",
     wbDesc: "Expense assistant, business-data Q&A, contract review… dsh-ee hosts the interface, the employee's local DSH does the reasoning and tool calls, and required capabilities install the first time an app opens.",

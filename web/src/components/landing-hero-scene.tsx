@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, BookOpen, Boxes, Check, CheckCircle2, Database, Monitor, Puzzle } from "lucide-react";
+import { BookOpen, Boxes, Check, CheckCircle2, Database, Monitor, Puzzle } from "lucide-react";
 import { cx } from "./ui";
 
 /**
@@ -12,12 +12,12 @@ import { cx } from "./ui";
 
 type Source = { key: "skill" | "system" | "data" | "context"; pkg: string };
 
-/** 四类资产各占一组 M3 容器色，选中时换成实心主色。 */
+/** 四类资产各一种图标底色，白色图标。 */
 const icons = {
-  skill: { icon: Puzzle, bg: "bg-m3-primary-container text-m3-on-primary-container" },
-  system: { icon: Database, bg: "bg-m3-secondary-container text-m3-on-secondary-container" },
-  data: { icon: Boxes, bg: "bg-m3-tertiary-container text-m3-on-tertiary-container" },
-  context: { icon: BookOpen, bg: "bg-m3-surface-highest text-m3-on-surface-variant" },
+  skill: { icon: Puzzle, bg: "bg-[#4d6bfe]" },
+  system: { icon: Database, bg: "bg-[#0ea5e9]" },
+  data: { icon: Boxes, bg: "bg-[#8b5cf6]" },
+  context: { icon: BookOpen, bg: "bg-[#0a2540] dark:bg-[#33507a]" },
 } as const;
 
 type Box = { l: number; t: number; r: number; h: number };
@@ -47,7 +47,7 @@ const TYPE_STEP = 45;
 
 function Dot({ path, reverse, dur = "1.8s" }: { path: string; reverse?: boolean; dur?: string }) {
   return (
-    <circle r="4" fill="var(--md-sys-color-primary)">
+    <circle r="3.5" fill="var(--lp-accent)">
       <animateMotion
         dur={dur}
         repeatCount="indefinite"
@@ -134,10 +134,10 @@ export function LandingHeroScene({ sources }: { sources: readonly Source[] }) {
   const resultDelay = reduce ? 0 : TYPE_START + ask.length * TYPE_STEP;
 
   return (
-    <div className="mx-auto max-w-[1360px] px-4 pb-12 sm:px-6">
+    <div className="mx-auto max-w-[1160px] px-5 sm:px-8">
       <div
         ref={wrap}
-        className="relative grid grid-cols-1 items-center gap-4 xl:grid-cols-[250px_minmax(0,1fr)_minmax(0,1.1fr)_280px] xl:gap-10"
+        className="relative grid grid-cols-1 items-center gap-4 xl:grid-cols-[230px_minmax(0,1fr)_minmax(0,1.1fr)_260px] xl:gap-9"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
@@ -152,15 +152,15 @@ export function LandingHeroScene({ sources }: { sources: readonly Source[] }) {
           >
             <g className="scene-fade" style={delay(500)}>
               {geo.inPaths.map((d, i) => (
-                <path key={i} d={d} stroke="var(--md-sys-color-outline-variant)" strokeWidth="1.5" className="dash-flow" />
+                <path key={i} d={d} stroke="var(--lp-line)" strokeWidth="1.5" className="dash-flow" />
               ))}
-              <path d={geo.down} stroke="var(--md-sys-color-primary)" strokeOpacity="0.6" strokeWidth="2" />
-              <path d={geo.up} stroke="var(--md-sys-color-outline)" strokeWidth="1.5" className="dash-flow" />
-              <path d={geo.out} stroke="var(--md-sys-color-primary)" strokeOpacity="0.6" strokeWidth="2" />
+              <path d={geo.down} stroke="var(--lp-accent)" strokeOpacity="0.55" strokeWidth="1.5" />
+              <path d={geo.up} stroke="var(--lp-muted)" strokeOpacity="0.6" strokeWidth="1.5" className="dash-flow" />
+              <path d={geo.out} stroke="var(--lp-accent)" strokeOpacity="0.55" strokeWidth="1.5" />
             </g>
             {geo.inPaths[active] && (
               <g key={active}>
-                <path d={geo.inPaths[active]} stroke="var(--md-sys-color-primary)" strokeWidth="2.5" strokeLinecap="round" pathLength={1} className="draw-once" />
+                <path d={geo.inPaths[active]} stroke="var(--lp-accent)" strokeWidth="2" strokeLinecap="round" pathLength={1} className="draw-once" />
                 {!reduce && <Dot path={geo.inPaths[active]} dur="1.6s" />}
               </g>
             )}
@@ -174,8 +174,8 @@ export function LandingHeroScene({ sources }: { sources: readonly Source[] }) {
           </svg>
         )}
 
-        {/* 1. 企业资产：M3 列表项，选中态用 secondary container */}
-        <div className="relative grid grid-cols-2 gap-2 xl:flex xl:flex-col" role="radiogroup" aria-label={t("landing.diagram.pickAsset")}>
+        {/* 1. 企业资产 */}
+        <div className="relative grid grid-cols-2 gap-2.5 xl:flex xl:flex-col" role="radiogroup" aria-label={t("landing.diagram.pickAsset")}>
           {sources.map((x, j) => {
             const { icon: Icon, bg } = icons[x.key];
             const on = active === j;
@@ -190,123 +190,106 @@ export function LandingHeroScene({ sources }: { sources: readonly Source[] }) {
                 aria-checked={on}
                 onClick={() => setActive(j)}
                 className={cx(
-                  "scene-card relative flex items-center gap-3 rounded-[20px] px-3 py-3 text-left outline-none transition-colors duration-200",
-                  on ? "bg-m3-secondary-container text-m3-on-secondary-container" : "bg-m3-surface-low text-m3-on-surface",
+                  "scene-card flex items-center gap-3 rounded-lg bg-lp-card px-3 py-2.5 text-left transition-[box-shadow,transform] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lp-accent",
+                  on ? "shadow-lp-sm ring-2 ring-lp-accent xl:translate-x-1" : "shadow-lp-sm hover:-translate-y-px",
                 )}
                 style={delay(150 + j * 90)}
               >
-                <md-ripple />
-                <md-focus-ring style={{ "--md-focus-ring-shape": "20px" } as React.CSSProperties} />
-                <span
-                  className={cx(
-                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors",
-                    on ? "bg-m3-primary text-m3-on-primary" : bg,
-                  )}
-                >
-                  <Icon size={18} />
+                <span className={cx("flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white", bg)}>
+                  <Icon size={16} />
                 </span>
                 <span className="min-w-0">
-                  <span className="md-typescale-title-small block">{t(`landing.sources.${x.key}.title`)}</span>
-                  <span className={cx("md-typescale-body-small block truncate", on ? "opacity-80" : "text-m3-on-surface-variant")}>
-                    {t(`landing.sources.${x.key}.desc`)}
-                  </span>
+                  <span className="block text-sm font-semibold text-lp-ink">{t(`landing.sources.${x.key}.title`)}</span>
+                  <span className="block truncate text-xs text-lp-muted">{t(`landing.sources.${x.key}.desc`)}</span>
                 </span>
               </button>
             );
           })}
         </div>
 
-        {/* 2. dsh-ee：封装、审核、授权。M3 filled card，主色底 */}
+        {/* 2. dsh-ee：封装、审核、授权 */}
         <div
           ref={ee}
-          className="scene-card relative overflow-hidden rounded-[28px] bg-m3-primary p-5 text-m3-on-primary"
+          className="scene-card relative overflow-hidden rounded-xl bg-[linear-gradient(150deg,#6f88ff_0%,#4d6bfe_45%,#3549b8_100%)] p-5 text-white shadow-lp"
           style={delay(300)}
           aria-live="polite"
         >
-          <md-elevation style={{ "--md-elevation-level": 2 } as React.CSSProperties} />
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-m3-on-primary text-m3-primary">
-              <Puzzle size={18} />
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white text-[#3b5bdb]">
+              <Puzzle size={14} />
             </span>
-            <span className="md-typescale-title-large">dsh-ee</span>
-            <span className="md-typescale-label-small ml-auto rounded-full bg-m3-on-primary/15 px-2.5 py-1">{t("landing.scene.eeTag")}</span>
+            <span className="font-semibold">dsh-ee</span>
+            <span className="ml-auto rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-medium">{t("landing.scene.eeTag")}</span>
           </div>
-          <p className="md-typescale-body-medium mt-4 truncate opacity-90">{t(`landing.sources.${s.key}.asset`)}</p>
-          <ul key={active} className="mt-3 space-y-2">
+          <p className="mt-4 truncate text-sm text-white/85">{t(`landing.sources.${s.key}.asset`)}</p>
+          <ul key={active} className="mt-3 divide-y divide-white/15 rounded-lg bg-white/10">
             {eeSteps.map((st, i) => (
-              <li
-                key={st.name}
-                className="scene-card flex items-center gap-3 rounded-2xl bg-m3-on-primary/12 px-3 py-2.5"
-                style={delay(reduce ? 0 : i * 180)}
-              >
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-m3-primary-container text-m3-on-primary-container">
-                  <Check size={14} strokeWidth={3} />
-                </span>
-                <span className="md-typescale-label-large shrink-0">{st.name}</span>
-                <span className="md-typescale-body-small min-w-0 flex-1 truncate text-right opacity-80">{st.value}</span>
+              <li key={st.name} className="scene-card flex items-center gap-2.5 px-3 py-2.5" style={delay(reduce ? 0 : i * 180)}>
+                <Check size={15} strokeWidth={3} className="shrink-0 text-[#a7f3d0]" />
+                <span className="shrink-0 text-xs font-semibold">{st.name}</span>
+                <span className="min-w-0 flex-1 truncate text-right text-xs text-white/75">{st.value}</span>
               </li>
             ))}
           </ul>
         </div>
 
-        {/* 3. DSH 客户端：inverse surface，像一块深色的应用窗口 */}
+        {/* 3. DSH 客户端：深色应用窗口 */}
         <div
           ref={client}
-          className="scene-card relative overflow-hidden rounded-[28px] bg-m3-inverse-surface text-m3-inverse-on-surface"
+          className="scene-card relative overflow-hidden rounded-xl bg-[#0a2540] text-white shadow-lp dark:bg-[#132c4d]"
           style={delay(450)}
         >
-          <md-elevation style={{ "--md-elevation-level": 3 } as React.CSSProperties} />
-          <div className="flex items-center gap-3 px-5 pt-5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-m3-inverse-primary text-m3-inverse-surface">
-              <Monitor size={18} />
+          <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-3">
+            <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+            <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+            <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+            <span className="ml-3 flex items-center gap-1.5 text-xs font-medium text-white/80">
+              <Monitor size={13} />
+              {t("landing.scene.windowTag")}
             </span>
-            <span className="md-typescale-title-medium">{t("landing.scene.windowTag")}</span>
-            <span className="md-typescale-label-small ml-auto truncate opacity-70">{t("landing.scene.clientTag")}</span>
+            <span className="ml-auto truncate text-[11px] text-white/50">{t("landing.scene.clientTag")}</span>
           </div>
-          <div className="m-4 mt-5 rounded-[20px] bg-m3-inverse-on-surface/10 p-4">
-            <p className="md-typescale-body-large min-h-[3rem]" aria-label={ask}>
-              {ask.slice(0, typed)}
-              <span aria-hidden className="caret ml-0.5 inline-block h-5 w-0.5 translate-y-1 rounded-full bg-m3-inverse-primary" />
-            </p>
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="md-typescale-body-small min-w-0 truncate opacity-70">{t("landing.scene.calling", { pkg: s.pkg })}</span>
-              <span className="md-typescale-label-large flex h-10 shrink-0 items-center gap-2 rounded-full bg-m3-inverse-primary px-4 text-m3-inverse-surface">
-                <ArrowRight size={16} />
-                {t("landing.scene.send")}
-              </span>
+          <div className="p-4">
+            <div className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
+              <p className="min-h-[2.75rem] text-[15px] leading-snug" aria-label={ask}>
+                {ask.slice(0, typed)}
+                <span aria-hidden className="caret ml-0.5 inline-block h-4 w-px translate-y-0.5 bg-[#73c8ff]" />
+              </p>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate font-mono text-[11px] text-[#73c8ff]/80">{t("landing.scene.calling", { pkg: s.pkg })}</span>
+                <span className="flex shrink-0 items-center rounded-full bg-[#4d6bfe] px-3 py-1 text-xs font-medium">
+                  {t("landing.scene.send")}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* 4. 交付结果：elevated card */}
+        {/* 4. 交付结果 */}
         <div
           ref={result}
-          className="scene-card relative rounded-[28px] bg-m3-surface-lowest p-5"
+          className="scene-card rounded-xl bg-lp-card p-5 shadow-lp"
           style={delay(600)}
           aria-live="polite"
         >
-          <md-elevation style={{ "--md-elevation-level": 1 } as React.CSSProperties} />
           <div className="flex items-center justify-between">
-            <span className="md-typescale-label-medium text-m3-on-surface-variant">{t("landing.scene.result")}</span>
-            <span className="status-dot h-2.5 w-2.5 rounded-full bg-m3-primary" />
+            <span className="text-xs font-semibold tracking-wide text-lp-accent uppercase">{t("landing.scene.result")}</span>
+            <span className="status-dot h-2 w-2 rounded-full bg-[#10b981]" />
           </div>
           <div key={active} className="scene-card" style={delay(resultDelay)}>
-            <h3 className="md-typescale-title-medium mt-2">{t(`landing.sources.${s.key}.asset`)}</h3>
-            <p className="md-typescale-body-medium mt-3 rounded-2xl bg-m3-surface-container px-4 py-3 text-m3-on-surface">
+            <h3 className="mt-2 text-[15px] leading-snug font-semibold text-lp-ink">{t(`landing.sources.${s.key}.asset`)}</h3>
+            <p className="mt-3 rounded-md bg-lp-bg-alt px-3.5 py-3 text-sm leading-relaxed text-lp-body">
               {t(`landing.sources.${s.key}.answer`)}
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {checks.slice(0, 3).map((c) => (
-                <span
-                  key={c}
-                  className="md-typescale-label-medium inline-flex h-8 items-center rounded-lg border border-m3-outline-variant px-3 text-m3-on-surface-variant"
-                >
+                <span key={c} className="rounded-full bg-lp-accent-soft px-2.5 py-1 text-xs font-medium text-lp-accent">
                   {c}
                 </span>
               ))}
             </div>
-            <div className="md-typescale-label-large mt-4 flex items-center gap-2 rounded-2xl bg-m3-primary-container px-4 py-3 text-m3-on-primary-container">
-              <CheckCircle2 size={18} className="shrink-0" />
+            <div className="mt-4 flex items-center gap-2 border-t border-lp-line pt-3 text-sm font-medium text-lp-ink">
+              <CheckCircle2 size={16} className="shrink-0 text-[#10b981]" />
               <span className="min-w-0 flex-1">{t("landing.scene.audited")}</span>
             </div>
           </div>

@@ -99,137 +99,107 @@ svg .scene-fade { animation-name: scene-fade-in; }
 @keyframes caret { 50% { opacity: 0; } }
 .status-dot { animation: onboarding-pulse 2.4s ease-in-out infinite; }
 
-/* 落地页的 Material 3 主题：以品牌蓝 #4d6bfe 为种子色的 tonal spot 配色，
-   @material/web 组件和页面里的 m3-* 工具类都读这组 token。只作用在 .m3 里，不影响后台页面。 */
-.m3 {
-  --md-sys-color-primary: #4355b9;
-  --md-sys-color-on-primary: #ffffff;
-  --md-sys-color-primary-container: #dee0ff;
-  --md-sys-color-on-primary-container: #00105c;
-  --md-sys-color-secondary: #5b5d72;
-  --md-sys-color-on-secondary: #ffffff;
-  --md-sys-color-secondary-container: #e0e1f9;
-  --md-sys-color-on-secondary-container: #181a2c;
-  --md-sys-color-tertiary: #77536d;
-  --md-sys-color-on-tertiary: #ffffff;
-  --md-sys-color-tertiary-container: #ffd7f1;
-  --md-sys-color-on-tertiary-container: #2d1228;
-  --md-sys-color-error: #ba1a1a;
-  --md-sys-color-surface: #fbf8ff;
-  --md-sys-color-on-surface: #1b1b21;
-  --md-sys-color-on-surface-variant: #46464f;
-  --md-sys-color-surface-container-lowest: #ffffff;
-  --md-sys-color-surface-container-low: #f5f2fa;
-  --md-sys-color-surface-container: #efedf4;
-  --md-sys-color-surface-container-high: #eae7ef;
-  --md-sys-color-surface-container-highest: #e4e1e9;
-  --md-sys-color-outline: #767680;
-  --md-sys-color-outline-variant: #c7c5d0;
-  --md-sys-color-inverse-surface: #303036;
-  --md-sys-color-inverse-on-surface: #f3f0f7;
-  --md-sys-color-inverse-primary: #bac3ff;
-  --md-sys-color-shadow: #000000;
-  /* 内网部署不拉 Google Fonts：有 Roboto 用 Roboto，中文落到系统字体 */
-  --md-ref-typeface-brand: Roboto, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
-  --md-ref-typeface-plain: Roboto, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
-  background: var(--md-sys-color-surface);
-  color: var(--md-sys-color-on-surface);
-  font-family: var(--md-ref-typeface-plain);
+/* 落地页的 Stripe 式主题：白底与浅灰交替、深海军蓝标题、品牌蓝点缀、斜切色带与多层柔和阴影。
+   只作用在 .lp 里，不影响后台页面；页面里用 lp-* 工具类读这组变量。 */
+.lp {
+  --lp-bg: #ffffff;
+  --lp-bg-alt: #f6f9fc;
+  --lp-ink: #0a2540;
+  --lp-body: #425466;
+  --lp-muted: #6b7c93;
+  --lp-line: #e3e8ee;
+  --lp-accent: #4d6bfe;
+  --lp-accent-hover: #3b5bdb;
+  --lp-accent-soft: #eef3ff;
+  --lp-card: #ffffff;
+  --lp-navy: #0a2540;
+  --lp-shadow: 0 50px 100px -20px rgba(50, 50, 93, 0.25), 0 30px 60px -30px rgba(0, 0, 0, 0.3);
+  --lp-shadow-sm: 0 13px 27px -5px rgba(50, 50, 93, 0.25), 0 8px 16px -8px rgba(0, 0, 0, 0.3);
+  background: var(--lp-bg);
+  color: var(--lp-body);
 }
-.dark .m3 {
-  --md-sys-color-primary: #bac3ff;
-  --md-sys-color-on-primary: #08218a;
-  --md-sys-color-primary-container: #293ca0;
-  --md-sys-color-on-primary-container: #dee0ff;
-  --md-sys-color-secondary: #c4c5dd;
-  --md-sys-color-on-secondary: #2d2f42;
-  --md-sys-color-secondary-container: #434659;
-  --md-sys-color-on-secondary-container: #e0e1f9;
-  --md-sys-color-tertiary: #e6bad7;
-  --md-sys-color-on-tertiary: #44263d;
-  --md-sys-color-tertiary-container: #5d3c55;
-  --md-sys-color-on-tertiary-container: #ffd7f1;
-  --md-sys-color-error: #ffb4ab;
-  --md-sys-color-surface: #121318;
-  --md-sys-color-on-surface: #e4e1e9;
-  --md-sys-color-on-surface-variant: #c7c5d0;
-  --md-sys-color-surface-container-lowest: #0d0e13;
-  --md-sys-color-surface-container-low: #1b1b21;
-  --md-sys-color-surface-container: #1f1f25;
-  --md-sys-color-surface-container-high: #2a292f;
-  --md-sys-color-surface-container-highest: #35343a;
-  --md-sys-color-outline: #90909a;
-  --md-sys-color-outline-variant: #46464f;
-  --md-sys-color-inverse-surface: #e4e1e9;
-  --md-sys-color-inverse-on-surface: #303036;
-  --md-sys-color-inverse-primary: #4355b9;
+.dark .lp {
+  --lp-bg: #0b1424;
+  --lp-bg-alt: #0f1b2f;
+  --lp-ink: #f6f9fc;
+  --lp-body: #adbdcc;
+  --lp-muted: #8193a8;
+  --lp-line: #1f2d45;
+  --lp-accent: #7e94fa;
+  --lp-accent-hover: #a5b8fc;
+  --lp-accent-soft: #18224a;
+  --lp-card: #111d33;
+  --lp-navy: #050b16;
+  --lp-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --lp-shadow-sm: 0 13px 27px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
-/* Tailwind preflight 的 `* { padding: 0 }` 从外部压过了按钮 :host 上的内边距，这里按组件自己的规则补回 */
-.m3 :is(md-filled-button, md-filled-tonal-button, md-outlined-button, md-text-button) {
-  padding-block: calc((var(--_container-height) - max(var(--_label-text-line-height), var(--_icon-size))) / 2);
-  padding-inline: var(--_leading-space) var(--_trailing-space);
-}
-.m3 :is(md-filled-button, md-filled-tonal-button, md-outlined-button, md-text-button)[has-icon]:not([trailing-icon]) {
-  padding-inline: var(--_with-leading-icon-leading-space) var(--_with-leading-icon-trailing-space);
-}
-.m3 :is(md-filled-button, md-filled-tonal-button, md-outlined-button, md-text-button)[has-icon][trailing-icon] {
-  padding-inline: var(--_with-trailing-icon-leading-space) var(--_with-trailing-icon-trailing-space);
-}
-.m3 .flow-line {
-  background-image: linear-gradient(to bottom, var(--md-sys-color-primary) 50%, transparent 50%);
+.lp .flow-line {
+  background-image: linear-gradient(to bottom, var(--lp-accent) 50%, transparent 50%);
 }
 @media (min-width: 64rem) {
-  .m3 .flow-line {
-    background-image: linear-gradient(to right, var(--md-sys-color-primary) 50%, transparent 50%);
+  .lp .flow-line {
+    background-image: linear-gradient(to right, var(--lp-accent) 50%, transparent 50%);
   }
 }
-/* M3 的大号展示字：typescale 的 display 档是定值，这里按视口缩放 */
-.m3 .m3-display {
-  font-family: var(--md-ref-typeface-brand);
-  font-weight: 400;
-  font-size: clamp(2.5rem, 6vw, 4.75rem);
-  line-height: 1.08;
-  letter-spacing: -0.02em;
+
+/* 首屏流动渐变：几团品牌蓝、青、紫、暖橙缓慢漂移 */
+.lp-mesh {
+  background-color: #4d6bfe;
+  background-image:
+    radial-gradient(at 80% 14%, #73c8ff 0, transparent 42%),
+    radial-gradient(at 8% 12%, #6d5dfc 0, transparent 48%),
+    radial-gradient(at 72% 78%, #ffb088 0, transparent 40%),
+    radial-gradient(at 30% 92%, #3549b8 0, transparent 50%),
+    radial-gradient(at 55% 40%, #6f88ff 0, transparent 60%);
+  background-size: 160% 160%;
+  animation: lp-mesh 22s ease-in-out infinite alternate;
 }
-.m3 .m3-headline {
-  font-family: var(--md-ref-typeface-brand);
-  font-weight: 400;
-  font-size: clamp(2rem, 3.6vw, 2.875rem);
-  line-height: 1.15;
-  letter-spacing: -0.01em;
+@keyframes lp-mesh {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 30%; }
+  100% { background-position: 30% 100%; }
+}
+/* 斜切：下沿从左下到右上 */
+.lp-slant-bottom { clip-path: polygon(0 0, 100% 0, 100% 52%, 0 100%); }
+/* 斜切色带：上下两条边都向右上倾斜 */
+.lp-slant { clip-path: polygon(0 var(--lp-cut, 6vw), 100% 0, 100% calc(100% - var(--lp-cut, 6vw)), 0 100%); }
+
+/* Stripe 式悬停箭头：平时是 ›，悬停时伸出箭杆 */
+.lp-arrow { margin-left: 0.4em; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; }
+.lp-arrow .lp-arrow-line { opacity: 0; transition: opacity 0.15s ease; }
+.lp-arrow .lp-arrow-tip { transition: transform 0.15s ease; }
+:is(a, button):hover > .lp-arrow .lp-arrow-line { opacity: 1; }
+:is(a, button):hover > .lp-arrow .lp-arrow-tip { transform: translateX(3px); }
+
+/* 背景里的竖向参考线 */
+.lp-guides {
+  background-image: linear-gradient(to right, var(--lp-line) 1px, transparent 1px);
+  background-size: 25% 100%;
+  mask-image: repeating-linear-gradient(to bottom, black 0 4px, transparent 4px 8px);
+  -webkit-mask-image: repeating-linear-gradient(to bottom, black 0 4px, transparent 4px 8px);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dash-flow, .caret, .status-dot { animation: none; }
+  .dash-flow, .caret, .status-dot, .lp-mesh { animation: none; }
   .draw-once { stroke-dashoffset: 0; animation: none; }
   .scene-fade, .scene-card { opacity: 1; animation: none; }
 }
 
-/* 落地页的 m3-* 颜色工具类，值来自上面 .m3 里的 --md-sys-color-* */
+/* 落地页的 lp-* 颜色工具类，值来自上面 .lp 里的 --lp-* */
 @theme inline {
-  --color-m3-primary: var(--md-sys-color-primary);
-  --color-m3-on-primary: var(--md-sys-color-on-primary);
-  --color-m3-primary-container: var(--md-sys-color-primary-container);
-  --color-m3-on-primary-container: var(--md-sys-color-on-primary-container);
-  --color-m3-secondary: var(--md-sys-color-secondary);
-  --color-m3-secondary-container: var(--md-sys-color-secondary-container);
-  --color-m3-on-secondary-container: var(--md-sys-color-on-secondary-container);
-  --color-m3-tertiary: var(--md-sys-color-tertiary);
-  --color-m3-tertiary-container: var(--md-sys-color-tertiary-container);
-  --color-m3-on-tertiary-container: var(--md-sys-color-on-tertiary-container);
-  --color-m3-surface: var(--md-sys-color-surface);
-  --color-m3-on-surface: var(--md-sys-color-on-surface);
-  --color-m3-on-surface-variant: var(--md-sys-color-on-surface-variant);
-  --color-m3-surface-lowest: var(--md-sys-color-surface-container-lowest);
-  --color-m3-surface-low: var(--md-sys-color-surface-container-low);
-  --color-m3-surface-container: var(--md-sys-color-surface-container);
-  --color-m3-surface-high: var(--md-sys-color-surface-container-high);
-  --color-m3-surface-highest: var(--md-sys-color-surface-container-highest);
-  --color-m3-outline: var(--md-sys-color-outline);
-  --color-m3-outline-variant: var(--md-sys-color-outline-variant);
-  --color-m3-inverse-surface: var(--md-sys-color-inverse-surface);
-  --color-m3-inverse-on-surface: var(--md-sys-color-inverse-on-surface);
-  --color-m3-inverse-primary: var(--md-sys-color-inverse-primary);
+  --color-lp-bg: var(--lp-bg);
+  --color-lp-bg-alt: var(--lp-bg-alt);
+  --color-lp-ink: var(--lp-ink);
+  --color-lp-body: var(--lp-body);
+  --color-lp-muted: var(--lp-muted);
+  --color-lp-line: var(--lp-line);
+  --color-lp-accent: var(--lp-accent);
+  --color-lp-accent-hover: var(--lp-accent-hover);
+  --color-lp-accent-soft: var(--lp-accent-soft);
+  --color-lp-card: var(--lp-card);
+  --color-lp-navy: var(--lp-navy);
+  --shadow-lp: var(--lp-shadow);
+  --shadow-lp-sm: var(--lp-shadow-sm);
 }
 
 @theme inline {
