@@ -287,8 +287,8 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := currentUser(r)
-	if u.AuthSource == store.AuthLDAP {
-		writeErr(w, http.StatusBadRequest, "LDAP 账号的密码由企业目录管理，请在公司的账号系统里修改")
+	if u.AuthSource == store.AuthLDAP || u.AuthSource == store.AuthOIDC {
+		writeErr(w, http.StatusBadRequest, "这个账号的密码由企业目录或统一登录管理，请在公司的账号系统里修改")
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.OldPassword)) != nil {

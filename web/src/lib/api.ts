@@ -24,7 +24,7 @@ export interface User {
   /** 本月（UTC）已用 token，管理端列表查询时填充。 */
   month_tokens: number;
   /** local：本地密码 / ldap：由企业目录认证，资料在每次登录时同步。 */
-  auth_source: "local" | "ldap";
+  auth_source: "local" | "ldap" | "oidc";
   account_type: "human" | "bot";
   owner_id: number | null;
   email: string;
@@ -477,6 +477,81 @@ export interface LdapView extends LdapConfig {
 
 /** 提交时 bindPassword 不传表示沿用已存的，传空串表示清除。 */
 export type LdapInput = LdapConfig & { bindPassword?: string };
+
+export interface OidcConfig {
+  enabled: boolean;
+  preset: "keycloak" | "authing" | "azure" | "custom";
+  name: string;
+  issuer: string;
+  clientId: string;
+  scopes: string;
+  usernameClaim: string;
+  nameClaim: string;
+  emailClaim: string;
+  departmentClaim: string;
+  groupsClaim: string;
+  roleMappings: { group: string; roleId: number }[];
+  autoCreate: boolean;
+}
+
+export interface OidcView extends OidcConfig {
+  clientSecretSet: boolean;
+  redirectUri: string;
+}
+
+export type OidcInput = OidcConfig & { clientSecret?: string };
+
+export interface OidcTestResult {
+  ok: boolean;
+  error?: string;
+  provider?: { issuer: string; authorization_endpoint: string; token_endpoint: string; jwks_uri: string; userinfo_endpoint: string };
+  redirectUri?: string;
+}
+
+export interface ReportUsage {
+  id: number;
+  kind: string;
+  slug: string;
+  title: string;
+  department: string;
+  runs: number;
+  users: number;
+}
+
+export interface MonthlyReport {
+  month: string;
+  org_name: string;
+  report: {
+    users: number;
+    active_users: number;
+    app_runs: number;
+    app_users: number;
+    skill_runs: number;
+    tool_calls: number;
+    tool_errors: number;
+    kb_searches: number;
+    kb_hits: number;
+    model_calls: number;
+    tokens: number;
+    apps: ReportUsage[];
+    capabilities: ReportUsage[];
+    questions: { query: string; count: number; users: number; misses: number }[];
+    departments: { department: string; users: number; active_users: number; app_runs: number; tokens: number }[];
+    days: { date: string; active_users: number; app_runs: number }[];
+  };
+  previous: { users: number; active_users: number; app_runs: number; tool_calls: number; kb_searches: number; tokens: number };
+  params: ReportParams;
+  estimate: { app_hours: number; tool_hours: number; kb_hours: number; hours: number; cost: number };
+  satisfaction: number | null;
+  generated_at: string;
+}
+
+export interface ReportParams {
+  minutesPerAppRun: number;
+  minutesPerToolCall: number;
+  minutesPerKbHit: number;
+  hourlyCost: number;
+}
 
 export interface LdapTestResult {
   ok: boolean;
@@ -972,7 +1047,7 @@ export const api = {
     display_name: string;
     department: string;
     role_ids?: number[];
-    auth_source?: "local" | "ldap";
+    auth_source?: "local" | "ldap" | "oidc";
     account_type?: "human" | "bot";
     owner_id?: number;
   }) => request<User>("POST", "/api/admin/users", u),
@@ -1031,7 +1106,13 @@ export const api = {
   revokeTokens: (input: { ids?: string[]; user_id?: number; client_name?: string; department?: string }) =>
     request<{ revoked: number }>("POST", "/api/admin/tokens/revoke", input),
 
-  authMethods: () => request<{ ldap: boolean }>("GET", "/api/auth/methods", undefined, { silent401: true }),
+  authMethods: () => request<{ ldap: boolean; oidc: { name: string } | null }>("GET", "/api/auth/methods", undefined, { silent401: true }),
+  oidc: () => request<OidcView>("GET", "/api/admin/auth/oidc"),
+  saveOidc: (c: OidcInput) => request<OidcView>("PUT", "/api/admin/auth/oidc", c),
+  testOidc: (c: OidcInput) => request<OidcTestResult>("POST", "/api/admin/auth/oidc/test", c),
+  monthlyReport: (month: string) =>
+    request<MonthlyReport>("GET", `/api/admin/report/monthly?month=${encodeURIComponent(month)}&tz=${-new Date().getTimezoneOffset()}`),
+  saveReportParams: (p: ReportParams) => request<ReportParams>("PUT", "/api/admin/report/params", p),
   ldap: () => request<LdapView>("GET", "/api/admin/auth/ldap"),
   saveLdap: (c: LdapInput) => request<LdapView>("PUT", "/api/admin/auth/ldap", c),
   testLdap: (c: LdapInput & { testUsername?: string; testPassword?: string }) =>

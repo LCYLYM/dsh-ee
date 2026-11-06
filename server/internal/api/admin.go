@@ -105,13 +105,13 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			hash = h
-		case store.AuthLDAP:
+		case store.AuthLDAP, store.AuthOIDC:
 			if req.Password != "" {
-				writeErr(w, http.StatusBadRequest, "LDAP 账号不设本地密码")
+				writeErr(w, http.StatusBadRequest, "LDAP / OIDC 账号不设本地密码")
 				return
 			}
 		default:
-			writeErr(w, http.StatusBadRequest, "auth_source 只能是 local 或 ldap")
+			writeErr(w, http.StatusBadRequest, "auth_source 只能是 local、ldap 或 oidc")
 			return
 		}
 	}
@@ -202,8 +202,8 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	p := store.UserPatch{DisplayName: req.DisplayName, Department: req.Department, Disabled: req.Disabled}
 	if req.Password != nil {
-		if u, err := s.store.GetUser(r.Context(), id); err == nil && u.AuthSource == store.AuthLDAP {
-			writeErr(w, http.StatusBadRequest, "LDAP 账号的密码由企业目录管理，不能在这里重置")
+		if u, err := s.store.GetUser(r.Context(), id); err == nil && (u.AuthSource == store.AuthLDAP || u.AuthSource == store.AuthOIDC) {
+			writeErr(w, http.StatusBadRequest, "LDAP / OIDC 账号的密码由企业目录或统一登录管理，不能在这里重置")
 			return
 		}
 		hash, err := HashPassword(*req.Password)

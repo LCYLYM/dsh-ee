@@ -25,6 +25,7 @@ import KnowledgeDoc from "./pages/knowledge-doc";
 import DevicePage from "./pages/device";
 import Onboarding from "./pages/onboarding";
 import GetStarted from "./pages/get-started";
+import Report from "./pages/report";
 import { useApi } from "./lib/use-api";
 import { useTranslation } from "react-i18next";
 
@@ -100,6 +101,14 @@ function AppRoutes() {
     <Routes>
       <Route index element={<Landing />} />
       <Route path="login" element={<Login />} />
+      <Route
+        path="report/monthly"
+        element={
+          <RequireAuth>
+            <Report />
+          </RequireAuth>
+        }
+      />
       <Route
         path="get-started"
         element={

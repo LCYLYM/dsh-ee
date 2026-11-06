@@ -21,6 +21,7 @@ import onboarding from "./onboarding";
 import getStarted from "./get-started";
 import knowledge from "./knowledge";
 import build from "./build";
+import sso from "./sso";
 
 export default {
   ...common,
@@ -44,4 +45,5 @@ export default {
   ...knowledge,
   ...getStarted,
   ...build,
+  ...sso,
 } satisfies Messages<typeof zh>;

@@ -4,6 +4,7 @@ import { useStore } from "../../lib/store";
 import type { Settings } from "../../lib/types";
 import { Button, Card, cx, Field, inputBase, inputCls, PageHeader, Segmented, ToggleRow } from "../../components/ui";
 import LdapSettings from "./ldap-settings";
+import OidcSettings from "./oidc-settings";
 import ConnectSettings from "./connect-settings";
 import BrandSettings from "./brand-settings";
 import { PageLink } from "../../lib/menus";
@@ -174,6 +175,10 @@ export default function AdminSettings() {
 
         <Section title={t("settingsAdmin.auth")} desc={t("settingsAdmin.authNote")}>
           <LdapSettings />
+        </Section>
+
+        <Section title={t("oidcAdmin.title")}>
+          <OidcSettings />
         </Section>
       </div>
     </div>

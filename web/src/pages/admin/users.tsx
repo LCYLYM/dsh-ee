@@ -184,6 +184,7 @@ export default function AdminUsers() {
                 <Badge tone="brand">{t("users.ldapBadge")}</Badge>
               </span>
             )}
+            {u.auth_source === "oidc" && <Badge tone="brand">{t("ssoLogin.badge")}</Badge>}
           </div>
         </>
       ),
@@ -258,7 +259,7 @@ export default function AdminUsers() {
                     <ShieldCheck /> {t("users.rolesAction")}
                   </DropdownMenuItem>
                 )}
-                {canManage && u.auth_source !== "ldap" && (
+                {canManage && u.auth_source === "local" && (
                   <DropdownMenuItem
                     onSelect={() => {
                       setRolesFor(null);

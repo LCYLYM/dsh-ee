@@ -40,6 +40,7 @@ const (
 	auditBrandUpdate    = "brand.update"
 	auditLDAPUpdate     = "ldap.update"
 	auditLDAPSync       = "ldap.sync"
+	auditOIDCUpdate     = "oidc.update"
 
 	auditPackagePublish         = "package.publish"
 	auditPackageStatus          = "package.status"

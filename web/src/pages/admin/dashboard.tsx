@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, FileText } from "lucide-react";
 import { kindOf } from "../../lib/catalog";
 import { useStore } from "../../lib/store";
 import { useAuth } from "../../lib/auth";
@@ -82,7 +82,19 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <PageHeader title={t("dashboard.title")} desc={[settings.orgName, t("dashboard.desc")].filter(Boolean).join(" · ")} />
+      <PageHeader
+        title={t("dashboard.title")}
+        desc={[settings.orgName, t("dashboard.desc")].filter(Boolean).join(" · ")}
+        actions={
+          <Link
+            to="/report/monthly"
+            target="_blank"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-300 bg-card px-3 text-sm font-medium text-neutral-800 shadow-card hover:bg-neutral-50"
+          >
+            <FileText size={15} /> {t("report.export")}
+          </Link>
+        }
+      />
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3">
         <ChainPanel

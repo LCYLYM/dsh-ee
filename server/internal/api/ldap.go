@@ -307,9 +307,13 @@ func (s *Server) handleSyncLDAP(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
-// GET /api/auth/methods：登录页用，不需要登录。
+// GET /api/auth/methods：登录页用，不需要登录。oidc 为 null 表示没开企业统一登录。
 func (s *Server) handleAuthMethods(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]bool{"ldap": s.ldapEnabled(r.Context())})
+	var sso any
+	if cfg, ok := s.oidcEnabled(r.Context()); ok {
+		sso = map[string]string{"name": cfg.Name}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ldap": s.ldapEnabled(r.Context()), "oidc": sso})
 }
 
 // ---- 登录 ----

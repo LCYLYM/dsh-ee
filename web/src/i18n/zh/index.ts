@@ -19,6 +19,7 @@ import onboarding from "./onboarding";
 import getStarted from "./get-started";
 import knowledge from "./knowledge";
 import build from "./build";
+import sso from "./sso";
 
 /** 中文文案（源语言）。按页面分模块，这里合并成一棵树。 */
 export default {
@@ -43,4 +44,5 @@ export default {
   ...knowledge,
   ...getStarted,
   ...build,
+  ...sso,
 };

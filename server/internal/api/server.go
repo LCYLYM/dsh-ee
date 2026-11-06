@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/hikariming/dsh-ee/server/internal/kb"
+	"github.com/hikariming/dsh-ee/server/internal/oidc"
 	"github.com/hikariming/dsh-ee/server/internal/rbac"
 	"github.com/hikariming/dsh-ee/server/internal/registry"
 	"github.com/hikariming/dsh-ee/server/internal/secret"
@@ -44,6 +45,8 @@ type Options struct {
 	UpstreamTTL time.Duration
 	// dshfind 插件目录地址；为空时用默认的 api.dshfind.com。
 	FeedURL string
+	// 访问 OIDC 身份提供方的客户端；测试里可替换。
+	OIDCClient *http.Client
 }
 
 type Server struct {
@@ -82,6 +85,10 @@ type Server struct {
 	agentTools []*agentTool
 	// 知识库的内存关键词索引
 	kb kbIndex
+	// OIDC 登录：发现配置与公钥缓存、进行中的登录请求
+	oidcOnce   sync.Once
+	oidcClient *oidc.Client
+	oidcStates oidcStates
 }
 
 func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Server {

@@ -72,6 +72,8 @@ func (s *Server) routes() []route {
 		pub("POST /demo/travel/claims", s.handleDemoCreateClaim),
 
 		pub("GET /api/auth/methods", s.handleAuthMethods),
+		pub("GET /api/auth/oidc/start", s.handleOIDCStart),
+		pub("GET /api/auth/oidc/callback", s.handleOIDCCallback),
 		pub("POST /api/auth/login", s.handleLogin),
 		pub("POST /api/auth/logout", s.handleLogout),
 		usr("GET /api/auth/me", s.handleMe),
@@ -157,6 +159,11 @@ func (s *Server) routes() []route {
 		prm("PUT /api/admin/auth/ldap", s.handlePutLDAP, rbac.SettingsManage),
 		prm("POST /api/admin/auth/ldap/test", s.handleTestLDAP, rbac.SettingsManage),
 		prm("POST /api/admin/auth/ldap/sync", s.handleSyncLDAP, rbac.SettingsManage),
+		prm("GET /api/admin/report/monthly", s.handleMonthlyReport, rbac.DashboardView),
+		prm("PUT /api/admin/report/params", s.handlePutReportParams, rbac.DashboardView),
+		prm("GET /api/admin/auth/oidc", s.handleGetOIDC, rbac.SettingsManage),
+		prm("PUT /api/admin/auth/oidc", s.handlePutOIDC, rbac.SettingsManage),
+		prm("POST /api/admin/auth/oidc/test", s.handleTestOIDC, rbac.SettingsManage),
 
 		// 能力中心：技能、提示词、微应用、企业连接，插件的可用范围与下发方式
 		prm("GET /api/hub", s.handleHub, rbac.PortalView),

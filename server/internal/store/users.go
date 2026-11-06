@@ -42,6 +42,7 @@ type User struct {
 const (
 	AuthLocal = "local"
 	AuthLDAP  = "ldap"
+	AuthOIDC  = "oidc"
 
 	AccountHuman = "human"
 	AccountBot   = "bot"

@@ -61,16 +61,18 @@ export default function Account() {
             </>
           )}
           <dt className="text-neutral-600">{t("account.source")}</dt>
-          <dd className="text-neutral-900">{user.auth_source === "ldap" ? t("account.sourceLdap") : t("account.sourceLocal")}</dd>
+          <dd className="text-neutral-900">
+            {user.auth_source === "ldap" ? t("account.sourceLdap") : user.auth_source === "oidc" ? t("ssoLogin.sourceOidc") : t("account.sourceLocal")}
+          </dd>
           <dt className="text-neutral-600">{t("account.roles")}</dt>
           <dd className="text-neutral-900">{(user.roles ?? []).map((r) => L.role(r)).join(", ") || t("shell.noRoles")}</dd>
         </dl>
       </Card>
 
-      {user.auth_source === "ldap" ? (
+      {user.auth_source !== "local" ? (
         <Card className="mt-4 p-5">
           <h2 className="text-base font-medium text-neutral-900">{t("account.changePassword")}</h2>
-          <p className="mt-2 text-sm text-neutral-600">{t("account.ldapManaged")}</p>
+          <p className="mt-2 text-sm text-neutral-600">{user.auth_source === "oidc" ? t("ssoLogin.oidcManaged") : t("account.ldapManaged")}</p>
         </Card>
       ) : (
         <Card className="mt-4 p-5">
