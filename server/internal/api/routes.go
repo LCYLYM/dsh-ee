@@ -169,6 +169,7 @@ func (s *Server) routes() []route {
 		prm("DELETE /api/hub/{id}/subscription", s.handleHubSubscribe, rbac.PortalView),
 		prm("GET /api/admin/hub/review", s.handleHubReviewQueue, rbac.PluginsManage),
 		prm("POST /api/admin/hub/review", s.handleHubReview, rbac.PluginsManage),
+		prm("POST /api/admin/hub/scope-review", s.handleHubScopeReview, rbac.PluginsManage),
 		prm("PUT /api/admin/plugin-policies/{name...}", s.handlePutPluginPolicy, rbac.PluginsManage),
 		prm("POST /api/admin/connections/test", s.handleConnTest, rbac.ConnectionsManage),
 		prm("POST /api/admin/connections/{id}/sync", s.handleConnSync, rbac.ConnectionsManage),

@@ -4,6 +4,10 @@ import Workbench from "./workbench";
 import Apps from "./apps";
 import Market from "./market";
 import Knowledge from "./knowledge";
+import Build from "./build";
+import Templates from "./templates";
+import Materials from "./materials";
+import { AppNew } from "./asset-editor";
 import DshDownload from "./dsh-download";
 import Setup from "./setup";
 import Publish from "./publish";
@@ -31,6 +35,10 @@ export const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
   apps: Apps,
   market: Market,
   knowledge: Knowledge,
+  "app-new": AppNew,
+  build: Build,
+  templates: Templates,
+  materials: Materials,
   "dsh-download": DshDownload,
   setup: Setup,
   publish: Publish,

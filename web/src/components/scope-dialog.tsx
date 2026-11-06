@@ -34,6 +34,7 @@ export function ScopeDialog({
   canDelivery,
   labels,
   onSave,
+  selfId,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -44,6 +45,8 @@ export function ScopeDialog({
   canDelivery: boolean;
   labels: { auto: string; optional: string; autoHint: string; optionalHint: string };
   onSave: (scope: Scope, delivery: Delivery) => Promise<void>;
+  /** 负责人自己：多一个「只有我自己」，并说明扩大范围要审核。 */
+  selfId?: number;
 }) {
   const { t } = useTranslation();
   const opts = useScopeOptions();
@@ -68,7 +71,7 @@ export function ScopeDialog({
         </DialogHeader>
         <div className="space-y-5">
           <Field label={t("editor.scope")}>
-            <ScopeEditor value={s} onChange={setS} roles={opts.roles} users={opts.users} departments={opts.departments} />
+            <ScopeEditor value={s} onChange={setS} roles={opts.roles} users={opts.users} departments={opts.departments} selfId={selfId} />
           </Field>
           <Field label={t("editor.delivery")} hint={canDelivery ? (d === "auto" ? labels.autoHint : labels.optionalHint) : t("editor.deliveryAutoNeedsAdmin")}>
             <div className={canDelivery ? "" : "pointer-events-none opacity-50"}>

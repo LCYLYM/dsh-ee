@@ -111,7 +111,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setPendingCount(0);
       return;
     }
-    Promise.all([api.reviewQueue(), api.hubReviewQueue().catch(() => [])]).then(([q, h]) => setPendingCount(q.length + h.length), () => {});
+    Promise.all([api.reviewQueue(), api.hubReview().catch(() => ({ items: [], scopes: [] }))]).then(
+      ([q, h]) => setPendingCount(q.length + h.items.length + h.scopes.length),
+      () => {},
+    );
   }, [userId, canReview]);
 
   useEffect(reloadPlugins, [reloadPlugins]);

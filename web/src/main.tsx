@@ -1,6 +1,6 @@
 import { StrictMode, useCallback } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from "react-router";
 import "./index.css";
 import "./i18n";
 import { initTheme } from "./lib/theme";
@@ -77,8 +77,19 @@ function LegacyPage({ pageKey }: { pageKey: PageKey }) {
   return <Navigate to={pathOf(pageKey)} replace />;
 }
 
-function LegacyMarket() {
-  return <LegacyPage pageKey="market" />;
+/**
+ * 旧的能力中心（/hub、/market）：员工这边只剩应用，其余类型在「造 → 原料」里。
+ * 按原来的 tab 跳到对应位置，书签和 DSH 里的旧链接都还能用。
+ */
+function LegacyHub() {
+  const { pathOf, loading } = useMenus();
+  const [params] = useSearchParams();
+  const { t } = useTranslation();
+  if (loading) return <Status title={t("common.loading")} />;
+  const tab = params.get("tab");
+  if (tab === "plugin") return <Navigate to={`${pathOf("materials")}?advanced=1`} replace />;
+  if (tab === "skill" || tab === "prompt" || tab === "connection") return <Navigate to={`${pathOf("materials")}?tab=${tab}`} replace />;
+  return <Navigate to={pathOf("apps")} replace />;
 }
 
 /** 路由来自后端菜单：页面的路由、名称、访问权限都可在「菜单与页面」里在线修改。 */
@@ -115,7 +126,8 @@ function AppRoutes() {
         <Route path="assets/:id/edit" element={<AssetEditor />} />
         <Route path="knowledge/docs/:id" element={<KnowledgeDoc />} />
         <Route path="knowledge/:id" element={<KnowledgeBase />} />
-        {!pages.some((m) => m.path === "/market") && <Route path="market" element={<LegacyMarket />} />}
+        {!pages.some((m) => m.path === "/market") && <Route path="market" element={<LegacyHub />} />}
+        {!pages.some((m) => m.path === "/hub") && <Route path="hub" element={<LegacyHub />} />}
         {!pages.some((m) => m.path === "/keys") && <Route path="keys" element={<LegacyPage pageKey="my-keys" />} />}
         {!pages.some((m) => m.path === "/admin/keys") && <Route path="admin/keys" element={<LegacyPage pageKey="admin-keys" />} />}
         {pages.map((m) => {

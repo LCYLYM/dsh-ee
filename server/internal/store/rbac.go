@@ -631,7 +631,7 @@ func (s *Store) ResetMenus(ctx context.Context, defaults []rbac.Menu) error {
 	var add func(items []rbac.Menu, parent *int64) error
 	add = func(items []rbac.Menu, parent *int64) error {
 		for i, d := range items {
-			m := &Menu{ParentID: parent, Kind: d.Kind, Title: d.Title, Path: d.Path, PageKey: d.PageKey, Icon: d.Icon, Permission: d.Permission, Sort: (i + 1) * 10, Visible: true}
+			m := &Menu{ParentID: parent, Kind: d.Kind, Title: d.Title, Path: d.Path, PageKey: d.PageKey, Icon: d.Icon, Permission: d.Permission, Sort: (i + 1) * 10, Visible: !d.Hidden}
 			if err := insertMenu(ctx, tx, m); err != nil {
 				return err
 			}

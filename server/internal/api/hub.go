@@ -49,6 +49,8 @@ type assetSpec struct {
 	Launch string `json:"launch,omitempty"`
 	// 微应用：DSH 右侧栏里的业务工作台（可选）
 	Workbench *appWorkbench `json:"workbench,omitempty"`
+	// 微应用：样板，出现在「造 → 从样板复制」里（只有管理员能设）
+	Template bool `json:"template,omitempty"`
 
 	// 连接：mcp（上游 MCP 服务地址）或 openapi（接口根地址 + 文档）
 	Type         string    `json:"type,omitempty"`
@@ -97,7 +99,7 @@ func validateSpec(kind string, sp *assetSpec) string {
 			sp.ModelInvocable, sp.WhenToUse = nil, ""
 		}
 		sp.Persona, sp.Starters, sp.Skills, sp.Connections, sp.Plugins, sp.Knowledge = "", nil, nil, nil, nil, nil
-		sp.Icon, sp.Launch, sp.Workbench = "", "", nil
+		sp.Icon, sp.Launch, sp.Workbench, sp.Template = "", "", nil, false
 		sp.Type, sp.URL, sp.Auth, sp.OpenAPI, sp.Instructions = "", "", nil, "", ""
 	case store.KindApp:
 		sp.Persona = strings.TrimSpace(sp.Persona)
@@ -199,7 +201,7 @@ func validateSpec(kind string, sp *assetSpec) string {
 		}
 		sp.Body, sp.WhenToUse, sp.ModelInvocable = "", "", nil
 		sp.Persona, sp.Starters, sp.Skills, sp.Connections, sp.Plugins, sp.Knowledge = "", nil, nil, nil, nil, nil
-		sp.Icon, sp.Launch, sp.Workbench = "", "", nil
+		sp.Icon, sp.Launch, sp.Workbench, sp.Template = "", "", nil, false
 	default:
 		return "未知的能力类型"
 	}
@@ -529,10 +531,13 @@ type hubCreateReq struct {
 	Secret *string `json:"secret"`
 }
 
-// initialStatus 决定新版本的状态：连接由管理员维护，直接生效；其余在白名单模式下要审核，
-// 有审核权限的人提交的直接上架。
-func (s *Server) initialStatus(r *http.Request, kind string) (string, error) {
-	if kind == store.KindConnection || currentAccess(r).Has(rbac.PluginsManage) {
+// initialStatus 决定新版本的状态：连接由管理员维护，直接生效；可用范围只有提交人自己的
+// （「自己用」）不用审核；其余在白名单模式下要审核，有审核权限的人提交的直接上架。
+//
+// 「自己用」免审核是安全的：应用本身不带权限，运行时以员工本人的身份调用工具，
+// 能选的知识库、连接也只是他本来就能用的那些。
+func (s *Server) initialStatus(r *http.Request, kind string, sc store.Scope) (string, error) {
+	if kind == store.KindConnection || currentAccess(r).Has(rbac.PluginsManage) || sc.OnlyUser(currentUser(r).ID) {
 		return store.StatusPublished, nil
 	}
 	set, err := s.appSettings(r.Context())
@@ -556,6 +561,9 @@ func (s *Server) decodeSpec(w http.ResponseWriter, r *http.Request, kind string,
 	if msg := validateSpec(kind, &sp); msg != "" {
 		writeErr(w, http.StatusBadRequest, msg)
 		return nil, nil, false
+	}
+	if !currentAccess(r).Has(rbac.PluginsManage) {
+		sp.Template = false
 	}
 	if msg, err := s.checkWorkbenchSources(r.Context(), sp.Workbench); err != nil {
 		s.internalErr(w, r, err)
@@ -616,7 +624,11 @@ func (s *Server) handleHubCreate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, msg)
 		return
 	}
-	status, err := s.initialStatus(r, req.Kind)
+	// 「自己用」的下发方式固定为「自选」：只有自己，自动生效没有意义
+	if req.Kind != store.KindConnection && scope.OnlyUser(v.user.ID) {
+		delivery = store.DeliveryOptional
+	}
+	status, err := s.initialStatus(r, req.Kind, scope)
 	if err != nil {
 		s.internalErr(w, r, err)
 		return
@@ -718,7 +730,7 @@ func (s *Server) handleHubNewVersion(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	status, err := s.initialStatus(r, a.Kind)
+	status, err := s.initialStatus(r, a.Kind, a.Scope)
 	if err != nil {
 		s.internalErr(w, r, err)
 		return
@@ -789,9 +801,20 @@ func (s *Server) handleHubPatch(w http.ResponseWriter, r *http.Request) {
 		c := truncateStr(strings.TrimSpace(*req.Category), 32)
 		p.Category = &c
 	}
+	// 负责人（没有管理权限）把范围改大：新范围进入审核，通过前照旧
+	var requested *store.Scope
 	if req.Scope != nil {
 		sc := req.Scope.Normalize()
-		p.Scope = &sc
+		needReview, err := s.scopeNeedsReview(r, a, sc)
+		if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		if needReview {
+			requested = &sc
+		} else {
+			p.Scope = &sc
+		}
 	}
 	if req.Delivery != nil {
 		if msg := s.checkDelivery(v, a.Kind, *req.Delivery); msg != "" {
@@ -813,6 +836,19 @@ func (s *Server) handleHubPatch(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
+	if requested != nil {
+		if err := s.store.RequestAssetScope(r.Context(), a.ID, *requested); err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		s.audit(r, auditScopeRequest, a.Kind+":"+a.Slug, map[string]any{"id": a.ID, "scope": requested})
+	} else if p.Scope != nil && a.PendingScope != nil {
+		// 改成了不用审核的范围，原来的申请作废
+		if err := s.store.ClearAssetScopeRequest(r.Context(), a.ID); err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+	}
 	detail := map[string]any{"id": a.ID}
 	if p.Scope != nil {
 		detail["scope"] = p.Scope
@@ -832,6 +868,34 @@ func (s *Server) handleHubPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, updated)
+}
+
+// scopeNeedsReview：管理员、连接、自由收录模式，以及收窄范围都直接生效；
+// 负责人把范围改大（超出现在的范围）要审核。
+func (s *Server) scopeNeedsReview(r *http.Request, a *store.Asset, sc store.Scope) (bool, error) {
+	v := viewerOf(r)
+	if a.Kind == store.KindConnection || v.manages(a.Kind) {
+		return false, nil
+	}
+	userIn := func(id int64) bool {
+		u, err := s.store.GetUser(r.Context(), id)
+		if err != nil {
+			return false
+		}
+		acc, err := s.store.UserAccess(r.Context(), id)
+		if err != nil {
+			return false
+		}
+		return a.Scope.Allows(u.ID, u.Department, acc.RoleIDs)
+	}
+	if sc.Within(a.Scope, userIn) {
+		return false, nil
+	}
+	set, err := s.appSettings(r.Context())
+	if err != nil {
+		return false, err
+	}
+	return set.AdmissionMode != "open", nil
 }
 
 // DELETE /api/hub/{id}：彻底删除（管理员）。
@@ -920,7 +984,95 @@ func (s *Server) handleHubReviewQueue(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, it)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": out})
+	scopes, err := s.scopeRequests(r, users)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": out, "scopes": scopes})
+}
+
+// scopeReviewItem 是一条「扩大可用范围」的申请。
+type scopeReviewItem struct {
+	Asset         *store.Asset `json:"asset"`
+	Spec          *assetSpec   `json:"spec"`
+	Scope         store.Scope  `json:"scope"`
+	Requested     store.Scope  `json:"requested"`
+	Publisher     string       `json:"publisher"`
+	PublisherName string       `json:"publisher_name"`
+	Department    string       `json:"department"`
+	CreatedAt     *time.Time   `json:"created_at"`
+}
+
+func (s *Server) scopeRequests(r *http.Request, users userIndex) ([]scopeReviewItem, error) {
+	assets, err := s.store.ListAssets(r.Context())
+	if err != nil {
+		return nil, err
+	}
+	out := []scopeReviewItem{}
+	for _, a := range assets {
+		if a.PendingScope == nil {
+			continue
+		}
+		it := scopeReviewItem{Asset: a, Scope: a.Scope, Requested: *a.PendingScope, CreatedAt: a.ScopeRequestedAt}
+		if lv, err := s.store.LiveAssetVersion(r.Context(), a.ID); err == nil {
+			it.Spec = parseSpec(lv.Spec)
+		} else {
+			it.Spec = &assetSpec{Title: a.Title, Description: a.Description}
+		}
+		if u := users[derefID(a.OwnerID)]; u != nil {
+			it.Publisher, it.PublisherName, it.Department = u.Username, u.DisplayName, u.Department
+		}
+		out = append(out, it)
+	}
+	return out, nil
+}
+
+type scopeReviewReq struct {
+	AssetID int64  `json:"asset_id"`
+	Action  string `json:"action"`
+	Note    string `json:"note"`
+}
+
+// POST /api/admin/hub/scope-review：通过或驳回扩大范围的申请。
+func (s *Server) handleHubScopeReview(w http.ResponseWriter, r *http.Request) {
+	var req scopeReviewReq
+	if !readJSON(w, r, &req) {
+		return
+	}
+	a, err := s.store.GetAsset(r.Context(), req.AssetID)
+	if notFound(err) {
+		writeErr(w, http.StatusNotFound, "能力不存在")
+		return
+	}
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	if req.Action != "approve" && req.Action != "reject" {
+		writeErr(w, http.StatusBadRequest, "action 只能是 approve 或 reject")
+		return
+	}
+	if req.Action == "reject" && strings.TrimSpace(req.Note) == "" {
+		writeErr(w, http.StatusBadRequest, "驳回需要填写原因")
+		return
+	}
+	ok, err := s.store.ResolveAssetScope(r.Context(), a.ID, req.Action == "approve", truncate(req.Note, 1000))
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	if !ok {
+		writeErr(w, http.StatusConflict, "这项能力没有待审核的范围申请")
+		return
+	}
+	action := auditReviewApprove
+	if req.Action == "reject" {
+		action = auditReviewReject
+	}
+	s.audit(r, action, a.Kind+":"+a.Slug+"#scope", map[string]any{"requested": a.PendingScope, "note": truncate(req.Note, 500)})
+	s.hub.notify()
+	w.WriteHeader(http.StatusNoContent)
 }
 
 type assetReviewReq struct {

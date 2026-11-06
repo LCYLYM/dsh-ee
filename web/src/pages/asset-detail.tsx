@@ -193,7 +193,7 @@ function AssetDetail() {
 
   return (
     <div className="max-w-5xl">
-      <PageLink page="market" className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
+      <PageLink page={a.kind === "app" ? (owns ? "build" : "apps") : "materials"} className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
         <ArrowLeft size={14} /> {t("asset.back")}
       </PageLink>
 
@@ -212,6 +212,7 @@ function AssetDetail() {
             {state === "unpublished" && <Badge tone="red">{t("hub.unpublishedBadge")}</Badge>}
             {state === "outOfScope" && <Badge>{t("hub.outOfScopeBadge")}</Badge>}
             {a.pending > 0 && <Badge tone="amber">{t("hub.pendingBadge")}</Badge>}
+            {a.pending_scope && <Badge tone="amber">{t("build.stateSharing")}</Badge>}
           </div>
           <p className="mt-3 text-sm text-neutral-700">{a.spec.description}</p>
         </div>
@@ -275,6 +276,10 @@ function AssetDetail() {
             <p className="text-sm text-neutral-700">{dshHow(t, a, server)}</p>
             {a.available && !a.enabled && <p className="mt-2 text-sm text-amber-700">{t("asset.notEnabledHint")}</p>}
             {a.pending > 0 && (a.can_manage || owns) && <p className="mt-2 text-sm text-amber-700">{t("asset.pendingHint", { count: a.pending })}</p>}
+            {a.pending_scope && (a.can_manage || owns) && (
+              <p className="mt-2 text-sm text-amber-700">{t("build.sharingHint", { scope: scopeSummary(t, a.pending_scope, opts.roleName) })}</p>
+            )}
+            {!a.pending_scope && a.scope_note && owns && <p className="mt-2 text-sm text-red-700">{t("build.shareRejected", { note: a.scope_note })}</p>}
           </Card>
 
           {(a.kind === "skill" || a.kind === "prompt") && (
@@ -455,13 +460,15 @@ function AssetDetail() {
         open={scopeOpen}
         onOpenChange={setScopeOpen}
         title={t("asset.editScope")}
-        scope={a.scope}
+        description={a.can_manage ? undefined : t("build.shareDesc")}
+        scope={a.pending_scope ?? a.scope}
         delivery={a.delivery}
         canDelivery={a.can_manage}
+        selfId={owns && a.kind !== "connection" ? user?.id : undefined}
         labels={{ auto: t("asset.deliveryAuto"), optional: t("asset.deliveryOptional"), autoHint: t("editor.deliveryAutoHint"), optionalHint: t("editor.deliveryOptionalHint") }}
         onSave={async (scope, delivery) => {
-          await api.patchAsset(a.id, a.can_manage ? { scope, delivery } : { scope });
-          notify(t("asset.scopeSaved"));
+          const res = await api.patchAsset(a.id, a.can_manage ? { scope, delivery } : { scope });
+          notify(res.pending_scope ? t("build.shareSubmitted") : t("asset.scopeSaved"));
           detail.reload();
           hub.reload();
         }}

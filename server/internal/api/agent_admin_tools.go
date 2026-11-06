@@ -663,7 +663,28 @@ func adminSpecs() map[string]*agentSpec {
 					}
 					out = append(out, o)
 				}
-				return map[string]any{"items": out}
+				scopes := []map[string]any{}
+				for _, it := range items(dec(body), "scopes") {
+					o := map[string]any{"asset": pick(asMap(it["asset"]), "id", "kind", "slug", "title")}
+					for _, k := range []string{"scope", "requested", "publisher", "department", "created_at"} {
+						o[k] = it[k]
+					}
+					scopes = append(scopes, o)
+				}
+				return map[string]any{"items": out, "scopes": scopes}
+			},
+		},
+		"POST /api/admin/hub/scope-review": {
+			Tool: "ee_review", Action: "decide_scope", Summary: "通过或驳回负责人扩大可用范围的申请（「自己用」的应用要分享给同事时）", En: "Review a scope change", Effect: dg,
+			Params: []agentParam{{Name: "asset_id", Type: "integer", Required: true}, {Name: "decision", Type: "string", Required: true, Enum: []string{"approve", "reject"}, As: "action"}, {Name: "note", Type: "string", Desc: "驳回时写原因"}},
+			Preview: func(ctx context.Context, s *Server, _ *Principal, args map[string]any) (string, error) {
+				f, _ := args["asset_id"].(float64)
+				l, err := assetLabel(ctx, s, int64(f))
+				if err != nil {
+					return "", err
+				}
+				verb := map[string]string{"approve": "通过", "reject": "驳回"}[fmt.Sprint(args["decision"])]
+				return fmt.Sprintf("将%s %s 扩大可用范围的申请。%s", verb, l, map[string]string{"approve": "通过后新范围内的人立即可见。", "reject": ""}[fmt.Sprint(args["decision"])]), nil
 			},
 		},
 		"GET /api/admin/review": {

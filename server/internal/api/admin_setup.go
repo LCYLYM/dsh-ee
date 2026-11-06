@@ -285,6 +285,18 @@ func (s *Server) handleAttention(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		add(attentionItem{ID: "review_packages", Title: "待审核的插件版本", Count: len(pv), Detail: names, How: "ee_review.queue_packages，再用 inspect_package 看内容"})
+		all, err := s.store.ListAssets(ctx)
+		if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		var scoped []string
+		for _, as := range all {
+			if as.PendingScope != nil {
+				scoped = append(scoped, fmt.Sprintf("%s「%s」", as.Kind, as.Title))
+			}
+		}
+		add(attentionItem{ID: "review_scopes", Title: "申请扩大可用范围的能力", Count: len(scoped), Detail: firstN(scoped, 5), How: "ee_review.queue_assets 的 scopes，再用 decide_scope 通过或驳回"})
 	}
 	if a.Has(rbac.ConnectionsManage) {
 		n, err := s.store.CountPendingConnectionRequests(ctx)
@@ -592,4 +604,11 @@ func (s *Server) handleResolveConnectionRequest(w http.ResponseWriter, r *http.R
 func mustJSON(v any) []byte {
 	b, _ := json.Marshal(v)
 	return b
+}
+
+func firstN(xs []string, n int) []string {
+	if len(xs) > n {
+		return xs[:n]
+	}
+	return xs
 }

@@ -163,7 +163,7 @@ func init() {
 		"PUT /api/admin/settings",
 		"GET /api/admin/auth/ldap", "PUT /api/admin/auth/ldap", "POST /api/admin/auth/ldap/test", "POST /api/admin/auth/ldap/sync",
 		"PATCH /api/hub/{id}", "DELETE /api/hub/{id}",
-		"GET /api/admin/hub/review", "POST /api/admin/hub/review", "PUT /api/admin/plugin-policies/{name...}",
+		"GET /api/admin/hub/review", "POST /api/admin/hub/review", "POST /api/admin/hub/scope-review", "PUT /api/admin/plugin-policies/{name...}",
 		"POST /api/admin/connections/test", "POST /api/admin/connections/{id}/sync", "PATCH /api/admin/connections/{id}/tools/{name}",
 		"GET /api/admin/connect", "POST /api/admin/connect/publish", "PUT /api/admin/brand/logo",
 		"GET /api/admin/dsh-releases", "POST /api/admin/dsh-releases/check", "POST /api/admin/dsh-releases/{id}/mirror", "POST /api/admin/dsh-releases/{id}/recommend", "DELETE /api/admin/dsh-releases/{id}",

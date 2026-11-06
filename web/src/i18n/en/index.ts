@@ -20,6 +20,7 @@ import tokens from "./tokens";
 import onboarding from "./onboarding";
 import getStarted from "./get-started";
 import knowledge from "./knowledge";
+import build from "./build";
 
 export default {
   ...common,
@@ -42,4 +43,5 @@ export default {
   ...onboarding,
   ...knowledge,
   ...getStarted,
+  ...build,
 } satisfies Messages<typeof zh>;

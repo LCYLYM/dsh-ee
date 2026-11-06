@@ -5,6 +5,7 @@ import type { RoleRef, Scope, User } from "../lib/api";
 import { useLabels } from "../lib/labels";
 import { Combobox } from "./pickers";
 import { cx, inputBase, Segmented } from "./ui";
+import { isSelfOnly, selfScope } from "../lib/hub";
 
 function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   const { t } = useTranslation();
@@ -21,6 +22,7 @@ function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
 /**
  * 可用范围：全公司，或部门 / 角色 / 指定人的并集。
  * 拿不到角色或用户列表（没有相应权限）时只显示部门，部门可以直接输入。
+ * 给了 selfId 时多一个「只有我自己」：只有本人的范围不用审核（「自己用」）。
  */
 export function ScopeEditor({
   value,
@@ -28,12 +30,14 @@ export function ScopeEditor({
   roles,
   users,
   departments = [],
+  selfId,
 }: {
   value: Scope;
   onChange: (s: Scope) => void;
   roles?: RoleRef[] | null;
   users?: User[] | null;
   departments?: string[];
+  selfId?: number;
 }) {
   const { t } = useTranslation();
   const L = useLabels();
@@ -52,21 +56,31 @@ export function ScopeEditor({
   };
   const nobody = !value.all && value.departments.length + value.roles.length + value.users.length === 0;
   const userName = (id: number) => {
+    if (id === selfId) return t("selfScope.self");
     const u = users?.find((x) => x.id === id);
     return u ? u.display_name || u.username : `#${id}`;
   };
+  // 「指定范围」里一开始可能只有自己，要记住用户点的是哪一项
+  const [custom, setCustom] = useState(false);
+  const mode = value.all ? "all" : selfId && isSelfOnly(value, selfId) && !custom ? "self" : "custom";
 
   return (
     <div className="space-y-3">
       <Segmented
-        value={value.all ? "all" : "custom"}
-        onChange={(v) => set({ all: v === "all" })}
+        value={mode}
+        onChange={(v) => {
+          setCustom(v === "custom");
+          if (v === "self" && selfId) onChange(selfScope(selfId));
+          else set({ all: v === "all" });
+        }}
         options={[
-          { value: "all", label: t("scopeEditor.all") },
-          { value: "custom", label: t("scopeEditor.custom") },
+          ...(selfId ? [{ value: "self" as const, label: t("selfScope.self") }] : []),
+          { value: "all" as const, label: t("scopeEditor.all") },
+          { value: "custom" as const, label: t("scopeEditor.custom") },
         ]}
       />
-      {!value.all && (
+      {selfId && <p className="text-xs text-neutral-600">{mode === "self" ? t("selfScope.selfHint") : t("selfScope.reviewHint")}</p>}
+      {mode === "custom" && (
         <div className="space-y-3 border-l-2 border-neutral-100 pl-4">
           <div>
             <div className="mb-1.5 text-sm font-medium text-neutral-700">{t("scopeEditor.departments")}</div>

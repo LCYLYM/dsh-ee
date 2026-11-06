@@ -100,7 +100,7 @@ export function useMenuTitle() {
   };
 }
 
-const DEFAULT_GROUPS = { 工作台: 1, 账号与模型: 1, 管理: 1 };
+const DEFAULT_GROUPS = { 用: 1, 造: 1, 接入: 1, 工作台: 1, 账号与模型: 1, 管理: 1 };
 
 /** 按 page_key 链接站内页面；suffix 用于带查询参数等，例如 "?tab=x"。 */
 export function PageLink({ page, suffix = "", ...rest }: Omit<LinkProps, "to"> & { page: string; suffix?: string }) {

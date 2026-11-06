@@ -18,6 +18,7 @@ import tokens from "./tokens";
 import onboarding from "./onboarding";
 import getStarted from "./get-started";
 import knowledge from "./knowledge";
+import build from "./build";
 
 /** 中文文案（源语言）。按页面分模块，这里合并成一棵树。 */
 export default {
@@ -41,4 +42,5 @@ export default {
   ...onboarding,
   ...knowledge,
   ...getStarted,
+  ...build,
 };

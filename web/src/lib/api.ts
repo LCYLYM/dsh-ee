@@ -545,6 +545,9 @@ export interface AssetSpec {
   icon?: string;
   launch?: "new" | "resume";
   workbench?: AppWorkbench;
+  /** 微应用：样板，出现在「造 → 从样板复制」里（管理员设）。 */
+  template?: boolean;
+  knowledge?: string[];
   skills?: string[];
   connections?: string[];
   plugins?: string[];
@@ -584,6 +587,11 @@ export interface HubAsset {
   tools: number;
   tools_total: number;
   can_manage: boolean;
+  /** 申请扩大到的范围，审核通过前不生效。 */
+  pending_scope: Scope | null;
+  scope_requested_at: string | null;
+  /** 上一次范围申请被驳回的原因。 */
+  scope_note: string;
 }
 
 export interface AssetVersion {
@@ -644,6 +652,17 @@ export interface AssetReviewItem {
   publisher_name: string;
   department: string;
   created_at: string;
+}
+
+export interface ScopeReviewItem {
+  asset: HubAsset;
+  spec: AssetSpec;
+  scope: Scope;
+  requested: Scope;
+  publisher: string;
+  publisher_name: string;
+  department: string;
+  created_at: string | null;
 }
 
 export interface AssetCreate {
@@ -1080,6 +1099,8 @@ export const api = {
   subscribe: (id: number) => request<void>("POST", `/api/hub/${id}/subscription`),
   unsubscribe: (id: number) => request<void>("DELETE", `/api/hub/${id}/subscription`),
   hubReviewQueue: () => request<{ items: AssetReviewItem[] }>("GET", "/api/admin/hub/review").then((r) => r.items),
+  hubReview: () => request<{ items: AssetReviewItem[]; scopes: ScopeReviewItem[] }>("GET", "/api/admin/hub/review"),
+  reviewScope: (r: { asset_id: number; action: "approve" | "reject"; note?: string }) => request<void>("POST", "/api/admin/hub/scope-review", { note: "", ...r }),
   reviewAsset: (r: { asset_id: number; version: number; action: "approve" | "reject"; note?: string }) =>
     request<void>("POST", "/api/admin/hub/review", { note: "", ...r }),
   setPluginPolicy: (name: string, p: { scope: Scope; delivery: Delivery }) =>

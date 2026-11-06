@@ -126,7 +126,7 @@ export default {
   editor: {
     newSkill: "Write a skill",
     newPrompt: "Write a prompt",
-    newApp: "Build a micro-app",
+    newApp: "New app",
     newConnection: "Connect a system",
     newVersion: "New version of \"{{title}}\"",
     editConnection: "Edit connection \"{{title}}\"",
@@ -153,6 +153,7 @@ export default {
     launchNew: "Start a new session",
     launchResume: "Resume the last session",
     skills: "Skills it uses",
+    knowledge: "Knowledge bases (searched first; answers cite sources)",
     connections: "Systems it uses",
     plugins: "Plugins it needs (installed automatically for people who enable it)",
     pick: "Choose…",

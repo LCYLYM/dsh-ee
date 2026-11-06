@@ -77,7 +77,7 @@ var Catalog = []Permission{
 	{SettingsManage, "管理系统设置", "能力与分发", "评分、收录策略、上游、LDAP 登录等全局设置", nil},
 }
 
-// Menu 是默认菜单树的一项。Kind: group / page / link。
+// Menu 是默认菜单树的一项。Kind: group / page / link。Hidden 的页面有路由、不在侧边栏显示。
 type Menu struct {
 	Kind       string
 	Title      string
@@ -85,19 +85,30 @@ type Menu struct {
 	PageKey    string
 	Icon       string
 	Permission string
+	Hidden     bool
 	Children   []Menu
 }
 
 // DefaultMenus 是首次启动与「恢复默认」时写入的菜单。PageKey 对应前端页面注册表。
+// 按「用 / 造 / 管」组织：员工先看到应用；做应用的入口和原料在「造」；管理页面只有管理员看得到。
+// 已有部署的菜单由迁移 0013 升级（只改还是默认值的项）。
 var DefaultMenus = []Menu{
-	{Kind: "group", Title: "工作台", Children: []Menu{
+	{Kind: "group", Title: "用", Children: []Menu{
+		{Kind: "page", Title: "企业应用", Path: "/apps", PageKey: "apps", Icon: "AppWindow", Permission: PortalView},
+		{Kind: "page", Title: "知识问答", Path: "/knowledge", PageKey: "knowledge", Icon: "BookOpen", Permission: PortalView},
 		{Kind: "page", Title: "我的工作台", Path: "/workbench", PageKey: "workbench", Icon: "House", Permission: PortalView},
-		{Kind: "page", Title: "微应用", Path: "/apps", PageKey: "apps", Icon: "AppWindow", Permission: PortalView},
-		{Kind: "page", Title: "能力中心", Path: "/hub", PageKey: "market", Icon: "Puzzle", Permission: PortalView},
-		{Kind: "page", Title: "知识库", Path: "/knowledge", PageKey: "knowledge", Icon: "BookOpen", Permission: PortalView},
+	}},
+	{Kind: "group", Title: "造", Children: []Menu{
+		{Kind: "page", Title: "新建应用", Path: "/build/new", PageKey: "app-new", Icon: "SquarePlus", Permission: RegistryPublish},
+		{Kind: "page", Title: "我的应用", Path: "/build", PageKey: "build", Icon: "LayoutGrid", Permission: PortalView},
+		{Kind: "page", Title: "从样板复制", Path: "/build/templates", PageKey: "templates", Icon: "Copy", Permission: RegistryPublish},
+		{Kind: "page", Title: "原料", Path: "/build/materials", PageKey: "materials", Icon: "Layers", Permission: PortalView},
+		// 插件只在「原料 → 高级选项」里出现，这一页不进侧边栏
+		{Kind: "page", Title: "分享插件", Path: "/publish", PageKey: "publish", Icon: "Upload", Permission: PortalView, Hidden: true},
+	}},
+	{Kind: "group", Title: "接入", Children: []Menu{
 		{Kind: "page", Title: "下载 DSH", Path: "/dsh", PageKey: "dsh-download", Icon: "Download", Permission: PortalView},
 		{Kind: "page", Title: "接入指南", Path: "/setup", PageKey: "setup", Icon: "Terminal", Permission: PortalView},
-		{Kind: "page", Title: "分享能力", Path: "/publish", PageKey: "publish", Icon: "Upload", Permission: PortalView},
 		{Kind: "page", Title: "我的令牌", Path: "/tokens", PageKey: "my-keys", Icon: "KeyRound", Permission: KeysSelf},
 	}},
 	{Kind: "group", Title: "账号与模型", Children: []Menu{

@@ -10,7 +10,7 @@ import { useApi } from "../lib/use-api";
 import { pluginPath } from "../components/plugin-card";
 import { Badge, Button, Card, CardHeader, PluginIcon, Stat, StatStrip } from "../components/ui";
 import { HoverArrow, Ribbon } from "../components/landing-graphics";
-import { statusBadge } from "../components/status";
+import { BuildStateBadge } from "./build";
 import { PageLink } from "../lib/menus";
 import { useTranslation } from "react-i18next";
 
@@ -43,8 +43,10 @@ export default function Workbench() {
   const { data: myKeys, error: keysError } = useApi(api.myKeys);
   const overview = useApi(api.myOverview);
   const hub = useApi(api.hub);
-  const allApps = (hub.data?.assets ?? []).filter((a) => a.kind === "app");
+  const allApps = (hub.data?.assets ?? []).filter((a) => a.kind === "app" && (a.available || a.owner_id === user?.id));
   const myApps = allApps.filter((a) => a.enabled);
+  // 我做的应用（真实数据）：自己用的、分享出去的、在审核的
+  const built = allApps.filter((a) => a.owner_id === user?.id);
   const o = overview.data;
   const quota = myKeys?.quota;
   const byName = (n: string) => plugins.find((p) => p.name === n);
@@ -69,7 +71,7 @@ export default function Workbench() {
               {t("workbench.browseAll", { count: allApps.length })}
               <HoverArrow />
             </PageLink>
-            <PageLink page="publish" className="inline-flex h-9 items-center text-sm font-semibold text-brand-600 hover:text-neutral-900 dark:text-brand-300 dark:hover:text-white">
+            <PageLink page="app-new" className="inline-flex h-9 items-center text-sm font-semibold text-brand-600 hover:text-neutral-900 dark:text-brand-300 dark:hover:text-white">
               {t("workbench.shareNew")}
               <HoverArrow />
             </PageLink>
@@ -91,8 +93,8 @@ export default function Workbench() {
         <Stat label={t("workbench.myInstalls")} value={o ? o.installed.length : noValue} hint={installsHint(t, o, overview.error)} />
         <Stat
           label={t("workbench.myContributions")}
-          value={o ? o.contributions.length : noValue}
-          hint={o ? t("workbench.contributionsReach", { count: o.reach }) : overview.error ? t("workbench.unavailable") : t("workbench.reading")}
+          value={hub.data ? built.length : noValue}
+          hint={hub.data ? t("workbench.contributionsReach", { count: built.reduce((n, a) => n + a.users, 0) }) : hub.error ? t("workbench.unavailable") : t("workbench.reading")}
         />
       </StatStrip>
 
@@ -140,33 +142,52 @@ export default function Workbench() {
         </Card>
 
         <Card className="flex flex-col">
-          <CardHeader title={t("workbench.shared")} aside={o ? t("workbench.sharedCount", { count: o.contributions.length }) : undefined} />
-          <LoadState loading={overview.loading && !o} error={o ? null : overview.error} onRetry={overview.reload}>
+          <CardHeader
+            title={t("workbench.built")}
+            aside={
+              <PageLink page="build" className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
+                {t("workbench.builtCount", { count: built.length })}
+              </PageLink>
+            }
+          />
+          <LoadState loading={hub.loading && !hub.data} error={hub.data ? null : hub.error} onRetry={hub.reload}>
             <ul className="flex-1 px-5 pb-3">
-              {o?.contributions.length === 0 && <li className="py-2 text-sm text-neutral-600">{t("workbench.nothingShared")}</li>}
-              {o?.contributions.map((p) => (
-                <li key={p.name} className="border-t border-neutral-100 py-2.5 first:border-t-0 first:pt-1">
+              {hub.data && built.length === 0 && <li className="py-2 text-sm text-neutral-600">{t("workbench.nothingBuilt")}</li>}
+              {built.slice(0, 6).map((a) => (
+                <li key={a.id} className="border-t border-neutral-100 py-2.5 first:border-t-0 first:pt-1">
                   <div className="flex items-center gap-2">
-                    <Link to={pluginPath(p.name)} className="truncate text-neutral-900 hover:underline">
-                      {p.title}
+                    <Link to={`/assets/${a.id}`} className="truncate text-neutral-900 hover:underline">
+                      {a.spec.title}
                     </Link>
-                    <span className="ml-auto">{statusBadge[p.status]}</span>
+                    <span className="ml-auto shrink-0">
+                      <BuildStateBadge a={a} />
+                    </span>
                   </div>
-                  <div className="text-sm text-neutral-600">
-                    v{p.version} ·{" "}
-                    {p.status === "published" ? (
-                      <span className="tabular-nums">{t("workbench.colleaguesUsing", { count: p.users })}</span>
-                    ) : (
-                      t("workbench.awaitingReview")
-                    )}
-                  </div>
+                  <div className="text-sm text-neutral-600 tabular-nums">{t("build.uses", { uses: a.uses, users: a.users })}</div>
                 </li>
               ))}
             </ul>
+            {(o?.contributions.length ?? 0) > 0 && (
+              <div className="border-t border-neutral-100 px-5 pt-3 pb-3">
+                <div className="mb-1 text-xs font-medium text-neutral-500">{t("workbench.myPlugins")}</div>
+                <ul>
+                  {o!.contributions.map((p) => (
+                    <li key={p.name} className="flex items-center gap-2 py-1 text-sm">
+                      <Link to={pluginPath(p.name)} className="truncate text-neutral-900 hover:underline">
+                        {p.title}
+                      </Link>
+                      <span className="ml-auto text-xs text-neutral-600 tabular-nums">
+                        {p.status === "published" ? t("workbench.colleaguesUsing", { count: p.users }) : t("workbench.awaitingReview")}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </LoadState>
           <div className="mt-auto px-5 pb-5">
             <PageLink
-              page="publish"
+              page="app-new"
               className="flex h-9 items-center justify-center rounded-md border border-neutral-200 text-sm font-semibold text-neutral-800 shadow-card hover:bg-neutral-50"
             >
               {t("workbench.shareNew")}

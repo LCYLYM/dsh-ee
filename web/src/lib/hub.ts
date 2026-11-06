@@ -51,3 +51,20 @@ export function dshHow(t: TFunction, a: HubAsset, server: string) {
       return t("asset.howConnection", { slug: a.slug, server });
   }
 }
+
+/** 「自己用」：可用范围只有这一个人。 */
+export const selfScope = (userId: number): Scope => ({ all: false, departments: [], roles: [], users: [userId] });
+
+export function isSelfOnly(s: Scope, userId: number | undefined) {
+  return !!userId && !s.all && s.departments.length === 0 && s.roles.length === 0 && s.users.length === 1 && s.users[0] === userId;
+}
+
+export type BuildState = "unpublished" | "pending" | "rejected" | "sharing" | "self" | "shared";
+
+/** 作者视角的状态：自己用 / 分享审核中 / 已分享，以及首个版本待审核、未通过、已下架。 */
+export function buildState(a: HubAsset, userId: number | undefined): BuildState {
+  if (a.status === "unpublished") return "unpublished";
+  if (a.live_version === 0) return a.pending > 0 ? "pending" : "rejected";
+  if (a.pending_scope) return "sharing";
+  return isSelfOnly(a.scope, userId) ? "self" : "shared";
+}

@@ -11,6 +11,7 @@ import {
   Circle,
   ClipboardCheck,
   CloudDownload,
+  Copy,
   Database,
   Download,
   ExternalLink,
@@ -20,7 +21,9 @@ import {
   Globe,
   House,
   KeyRound,
+  Layers,
   LayoutDashboard,
+  LayoutGrid,
   ListChecks,
   MessageSquare,
   PanelsTopLeft,
@@ -30,6 +33,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  SquarePlus,
   Terminal,
   Upload,
   Users,
@@ -75,6 +79,10 @@ export const ICONS: Record<string, LucideIcon> = {
   ExternalLink,
   ScrollText,
   Cable,
+  SquarePlus,
+  LayoutGrid,
+  Copy,
+  Layers,
 };
 
 export function MenuIcon({ name, size = 16, className }: { name: string; size?: number; className?: string }) {

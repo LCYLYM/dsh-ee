@@ -54,6 +54,7 @@ const (
 	auditAssetVersion           = "asset.version"
 	auditAssetEdit              = "asset.edit"
 	auditAssetDelete            = "asset.delete"
+	auditScopeRequest           = "asset.scope_request"
 	auditConnTool               = "connection.tool"
 	auditConnRequest            = "connection.request"
 	auditConnectPublish         = "connect.publish"

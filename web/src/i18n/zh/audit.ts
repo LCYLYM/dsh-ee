@@ -60,7 +60,7 @@ export default {
       npm_token: { create: "创建 npm 令牌", revoke: "吊销 npm 令牌" },
       token: { create: "生成令牌", issue: "下发令牌", revoke: "吊销令牌", revoke_bulk: "批量吊销令牌" },
       device: { approve: "授权设备", deny: "拒绝设备" },
-      asset: { create: "新建能力", version: "提交新版本", edit: "修改范围或上下架", delete: "删除能力" },
+      asset: { create: "新建能力", version: "提交新版本", edit: "修改范围或上下架", delete: "删除能力", scope_request: "申请扩大可用范围" },
       connection: { tool: "设置连接工具", request: "申请使用企业连接" },
       connect: { publish: "发布接入插件" },
       dsh_release: { check: "检查官方版本", mirror: "下载安装包", mirror_failed: "安装包校验失败", recommend: "设置推荐版本", delete: "删除本地安装包" },

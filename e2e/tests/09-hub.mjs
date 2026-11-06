@@ -64,6 +64,8 @@ export default async function (t) {
   await page.getByLabel("标题").fill(`E2E 周报 ${tag}`);
   await page.getByLabel("说明").fill("把本周工作整理成周报");
   await page.locator("textarea").last().fill("按项目整理本周进展。");
+  // 员工新建默认「只有我自己」（不用审核）；改成全公司才进审核
+  await page.getByRole("button", { name: "全公司", exact: true }).click();
   await page.getByRole("button", { name: "提交", exact: true }).click();
   await page.waitForURL(/\/assets\/\d+$/);
   await page.getByText("等待审核，通过后才会生效").waitFor();
@@ -99,7 +101,7 @@ export default async function (t) {
   assert(legacyApp?.title === catalogApp.title && legacyApp.kind === "app" && legacyApp.user_invocable && !legacyApp.model_invocable, "旧 skills 条目保持兼容");
   step("微应用能保存图标与打开方式，详情页显示图标，DSH 目录单独列出且保留旧 skills 条目");
   await admin.goto(`${BASE}/apps`);
-  const appRow = admin.locator("li", { hasText: `E2E 报销助手 ${tag}` });
+  const appRow = admin.locator("div.rounded-lg", { hasText: `E2E 报销助手 ${tag}` }).last();
   await appRow.getByText("🧾", { exact: true }).waitFor();
   await shot(admin, "hub-app-icon");
 

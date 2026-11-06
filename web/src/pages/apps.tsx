@@ -9,6 +9,7 @@ import { useAction, useApi } from "../lib/use-api";
 import { assetPath } from "../lib/hub";
 import { pluginPath } from "../components/plugin-card";
 import { LoadState } from "../components/api-ui";
+import { useMenus } from "../lib/menus";
 import { Badge, Button, Card, cx, PageHeader, Segmented } from "../components/ui";
 
 type Filter = "all" | "enabled";
@@ -26,10 +27,12 @@ function AppIcon({ icon, title }: { icon?: string; title: string }) {
 function AppCard({ a, bySlug, busy, onToggle }: { a: HubAsset; bySlug: Map<string, HubAsset>; busy: boolean; onToggle: (a: HubAsset) => void }) {
   const { t } = useTranslation();
   const { plugins, notify } = useStore();
+  const { can } = useAuth();
   const deps = [
     ...(a.spec.skills ?? []).map((s) => ({ key: "s:" + s, label: bySlug.get(s)?.spec.title ?? s, to: bySlug.get(s) ? assetPath(bySlug.get(s)!.id) : null, kind: t("assetKinds.skill") })),
     ...(a.spec.connections ?? []).map((s) => ({ key: "c:" + s, label: bySlug.get(s)?.spec.title ?? s, to: bySlug.get(s) ? assetPath(bySlug.get(s)!.id) : null, kind: t("assetKinds.connection") })),
-    ...(a.spec.plugins ?? []).map((p) => ({ key: "p:" + p, label: plugins.find((x) => x.name === p)?.title ?? p, to: pluginPath(p), kind: t("hub.tabs.plugin") })),
+    // 插件只在管理和「造」的高级选项里出现
+    ...(can("plugins.manage") ? (a.spec.plugins ?? []) : []).map((p) => ({ key: "p:" + p, label: plugins.find((x) => x.name === p)?.title ?? p, to: pluginPath(p), kind: t("hub.tabs.plugin") })),
   ];
   return (
     <Card className="flex h-full flex-col p-4 transition hover:border-neutral-300">
@@ -100,14 +103,16 @@ function AppCard({ a, bySlug, busy, onToggle }: { a: HubAsset; bySlug: Map<strin
 export default function Apps() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const { notify } = useStore();
+  const { pathOf } = useMenus();
   const hub = useApi(api.hub);
   const { busy, run } = useAction();
   const [filter, setFilter] = useState<Filter>("all");
   const all = hub.data?.assets ?? [];
   const bySlug = new Map(all.map((a) => [a.slug, a]));
-  const apps = all.filter((a) => a.kind === "app");
+  // 「企业应用」只列我能用的和我自己做的；管理员看全部在「能力管理」
+  const apps = all.filter((a) => a.kind === "app" && (a.available || a.owner_id === user?.id));
   const list = apps.filter((a) => filter === "all" || a.enabled);
 
   const toggle = async (a: HubAsset) => {
@@ -132,7 +137,7 @@ export default function Apps() {
               ]}
             />
             {can("registry.publish") && (
-              <Button onClick={() => navigate("/assets/new?kind=app")}>
+              <Button onClick={() => navigate(pathOf("app-new"))}>
                 <Plus size={15} /> {t("apps.create")}
               </Button>
             )}

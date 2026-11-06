@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Download } from "lucide-react";
 import { categoryLabel } from "../../lib/catalog";
 import i18n from "../../i18n";
-import { api, formatBytes, type AssetReviewItem, type AssetSpec, type ReviewItem } from "../../lib/api";
-import { KIND_ICONS } from "../../lib/hub";
+import { api, formatBytes, type AssetReviewItem, type AssetSpec, type ReviewItem, type ScopeReviewItem } from "../../lib/api";
+import { KIND_ICONS, scopeSummary } from "../../lib/hub";
+import { useScopeOptions } from "../../components/scope-dialog";
 import { useApi, useAction } from "../../lib/use-api";
 import { useScoring, useStore } from "../../lib/store";
 import { LoadState } from "../../components/api-ui";
@@ -21,10 +22,19 @@ const key = (v: ReviewItem) => `${v.name}@${v.version}`;
 export default function AdminReview() {
   const { t } = useTranslation();
   const plugins = useApi(api.reviewQueue);
-  const assets = useApi(api.hubReviewQueue);
-  const [tab, setTab] = useState<"plugins" | "assets">("plugins");
-  // 插件队列空、能力队列不空时，默认看能力
-  const effective = tab === "plugins" && plugins.data?.length === 0 && (assets.data?.length ?? 0) > 0 ? "assets" : tab;
+  const hub = useApi(api.hubReview);
+  const assets = { ...hub, data: hub.data?.items ?? null } as ReturnType<typeof useApi<AssetReviewItem[]>>;
+  const scopes = { ...hub, data: hub.data?.scopes ?? null } as ReturnType<typeof useApi<ScopeReviewItem[]>>;
+  const [tab, setTab] = useState<"plugins" | "assets" | "scopes">("plugins");
+  // 插件队列空时，默认看有内容的那一队
+  const effective =
+    tab === "plugins" && plugins.data?.length === 0
+      ? (assets.data?.length ?? 0) > 0
+        ? "assets"
+        : (scopes.data?.length ?? 0) > 0
+          ? "scopes"
+          : tab
+      : tab;
   return (
     <div>
       <PageHeader
@@ -37,11 +47,12 @@ export default function AdminReview() {
             options={[
               { value: "plugins", label: `${t("reviewAssets.plugins")} ${plugins.data?.length ?? ""}` },
               { value: "assets", label: `${t("reviewAssets.assets")} ${assets.data?.length ?? ""}` },
+              { value: "scopes", label: `${t("scopeReview.tab")} ${scopes.data?.length ?? ""}` },
             ]}
           />
         }
       />
-      {effective === "plugins" ? <PluginReview q={plugins} /> : <AssetReview q={assets} />}
+      {effective === "plugins" ? <PluginReview q={plugins} /> : effective === "assets" ? <AssetReview q={assets} /> : <ScopeReview q={scopes} />}
     </div>
   );
 }
@@ -150,6 +161,96 @@ function AssetReview({ q }: { q: ReturnType<typeof useApi<AssetReviewItem[]>> })
                 </>
               )}
               <div className="mt-6">
+                <textarea className={cx(inputCls, "h-20 py-2")} placeholder={t("review.commentPlaceholder")} value={reason} onChange={(e) => setReason(e.target.value)} />
+                <div className="mt-3 flex gap-2">
+                  <Button disabled={busy} onClick={() => decide(true)}>
+                    {t("review.approve")}
+                  </Button>
+                  <Button variant="danger" disabled={busy || !reason.trim()} onClick={() => decide(false)}>
+                    {t("review.reject")}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+    </LoadState>
+  );
+}
+
+/** 负责人把「自己用」的能力分享出去（扩大可用范围）的申请。 */
+function ScopeReview({ q }: { q: ReturnType<typeof useApi<ScopeReviewItem[]>> }) {
+  const { t } = useTranslation();
+  const { notify, reloadPending } = useStore();
+  const opts = useScopeOptions();
+  const { busy, run } = useAction();
+  const [selected, setSelected] = useState<number | null>(null);
+  const [reason, setReason] = useState("");
+  const queue = q.data ?? [];
+  const current = queue.find((v) => v.asset.id === selected) ?? queue[0];
+
+  const decide = async (approve: boolean) => {
+    if (!current) return;
+    const r = await run(() => api.reviewScope({ asset_id: current.asset.id, action: approve ? "approve" : "reject", note: reason.trim() }));
+    if (!r.ok) return notify(r.error);
+    notify(t(approve ? "scopeReview.approved" : "scopeReview.rejected", { title: current.spec.title }));
+    setSelected(null);
+    setReason("");
+    q.reload();
+    reloadPending();
+  };
+
+  return (
+    <LoadState loading={q.loading && !q.data} error={q.error} onRetry={q.reload}>
+      {queue.length === 0 ? (
+        <Card className="p-12 text-center text-sm text-neutral-500">{t("scopeReview.empty")}</Card>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+          <Card className="h-fit divide-y divide-neutral-100">
+            {queue.map((v) => {
+              const Icon = KIND_ICONS[v.asset.kind];
+              return (
+                <button
+                  key={v.asset.id}
+                  onClick={() => setSelected(v.asset.id)}
+                  className={cx("flex w-full gap-3 px-4 py-3 text-left", current?.asset.id === v.asset.id ? "bg-neutral-100" : "hover:bg-neutral-50")}
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-700">
+                    <Icon size={16} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-neutral-800">{v.spec.title}</div>
+                    <div className="truncate text-xs text-neutral-500">{scopeSummary(t, v.requested, opts.roleName)}</div>
+                  </div>
+                  {v.created_at && <span className="text-xs whitespace-nowrap text-neutral-500">{ago(v.created_at)}</span>}
+                </button>
+              );
+            })}
+          </Card>
+          {current && (
+            <Card className="p-6">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <h2 className="text-xl font-semibold text-neutral-900">{current.spec.title}</h2>
+                <Badge>{t(`assetKinds.${current.asset.kind}`)}</Badge>
+                <span className="text-sm text-neutral-600">
+                  {t("reviewAssets.submittedBy", { name: current.publisher_name || current.publisher || "—", department: current.department || "—" })}
+                </span>
+              </div>
+              <dl className="mb-5 grid gap-3 text-sm sm:grid-cols-2">
+                <div className="rounded-lg border border-neutral-100 px-3 py-2">
+                  <dt className="text-xs text-neutral-500">{t("scopeReview.from")}</dt>
+                  <dd className="text-neutral-900">{scopeSummary(t, current.scope, opts.roleName)}</dd>
+                </div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 dark:border-amber-400/30 dark:bg-amber-400/10">
+                  <dt className="text-xs text-neutral-500">{t("scopeReview.to")}</dt>
+                  <dd className="font-medium text-neutral-900">{scopeSummary(t, current.requested, opts.roleName)}</dd>
+                </div>
+              </dl>
+              <h3 className="mb-2 text-sm font-semibold text-neutral-800">{t("reviewAssets.previous")}</h3>
+              <SpecView spec={current.spec} />
+              <p className="mt-4 text-xs text-neutral-500">{t("scopeReview.hint")}</p>
+              <div className="mt-4">
                 <textarea className={cx(inputCls, "h-20 py-2")} placeholder={t("review.commentPlaceholder")} value={reason} onChange={(e) => setReason(e.target.value)} />
                 <div className="mt-3 flex gap-2">
                   <Button disabled={busy} onClick={() => decide(true)}>

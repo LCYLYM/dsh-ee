@@ -124,7 +124,7 @@ export default {
   editor: {
     newSkill: "写一个技能",
     newPrompt: "写一个提示词",
-    newApp: "做一个微应用",
+    newApp: "新建应用",
     newConnection: "接入企业系统",
     newVersion: "提交「{{title}}」的新版本",
     editConnection: "修改连接「{{title}}」",
@@ -151,6 +151,7 @@ export default {
     launchNew: "每次新会话",
     launchResume: "回到上次会话",
     skills: "用到的技能",
+    knowledge: "绑定的知识库（应用会先查这些库再回答，并带上出处）",
     connections: "用到的企业系统",
     plugins: "依赖的插件（启用这个微应用的人会自动安装）",
     pick: "选择…",

@@ -6,7 +6,7 @@ import { api, type AssetKind, type AssetSpec, type ConnTestResult, type Delivery
 import { useAuth } from "../lib/auth";
 import { useStore } from "../lib/store";
 import { useAction, useApi } from "../lib/use-api";
-import { allScope, assetPath, KIND_ICONS } from "../lib/hub";
+import { allScope, assetPath, KIND_ICONS, selfScope } from "../lib/hub";
 import { ErrorNote, LoadState } from "../components/api-ui";
 import { ScopeEditor } from "../components/scope-editor";
 import { useScopeOptions } from "../components/scope-dialog";
@@ -155,59 +155,78 @@ function ConnectionFields({ spec, set, secret, setSecret, secretHint }: { spec: 
   );
 }
 
-export default function AssetEditorRoute() {
+export default function AssetEditorRoute({ forceKind }: { forceKind?: AssetKind }) {
   const { id } = useParams();
   const [params] = useSearchParams();
-  return <AssetEditor key={`${id ?? "new"}:${params.get("kind") ?? ""}`} />;
+  return <AssetEditor key={`${id ?? "new"}:${forceKind ?? params.get("kind") ?? ""}:${params.get("from") ?? ""}`} forceKind={forceKind} />;
 }
 
-function AssetEditor() {
+/** 「造 → 新建应用」：固定为应用的编辑器；?from=<id> 从样板复制，?knowledge=<库> 带上知识库。 */
+export function AppNew() {
+  return <AssetEditorRoute forceKind="app" />;
+}
+
+function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
   const { t } = useTranslation();
   const { id } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const { plugins, notify } = useStore();
   const editing = id !== undefined;
+  const fromId = !editing ? Number(params.get("from")) || 0 : 0;
+  const kbSlug = params.get("knowledge");
   const existing = useApi(() => (editing ? api.hubAsset(Number(id)) : Promise.resolve(null)));
+  const source = useApi(() => (fromId ? api.hubAsset(fromId) : Promise.resolve(null)));
   const hub = useApi(api.hub);
+  const kb = useApi(api.knowledge);
   const opts = useScopeOptions();
-  const queryKind = params.get("kind") as AssetKind;
+  const queryKind = (forceKind ?? (fromId ? "app" : params.get("kind"))) as AssetKind;
   const kind: AssetKind = existing.data?.asset.kind ?? (KINDS.includes(queryKind) ? queryKind : "skill");
+  const canManage = kind === "connection" ? can("connections.manage") : can("plugins.manage");
   const [spec, setSpec] = useState<AssetSpec>(() => emptySpec(kind));
   // 工作台在编辑框里是 JSON 文字，提交时再解析
   const [wbText, setWbText] = useState("");
   const [slug, setSlug] = useState("");
-  const [scope, setScope] = useState<Scope>(allScope());
+  // 员工新建默认「自己用」：保存就能在自己的 DSH 里打开，想分享再改范围
+  const [scope, setScope] = useState<Scope>(() => (!canManage && user && kind !== "connection" ? selfScope(user.id) : allScope()));
   const [delivery, setDelivery] = useState<Delivery>("optional");
   const [secret, setSecret] = useState("");
   const [preview, setPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [test, setTest] = useState<ConnTestResult | null>(null);
   const { busy, run } = useAction();
-  const canManage = kind === "connection" ? can("connections.manage") : can("plugins.manage");
 
-  // 新建时按类型给空白内容；编辑时用线上（或最新提交的）版本填好
+  // 新建时按类型给空白内容；编辑时用线上（或最新提交的）版本填好；从样板复制时用样板的内容
   useEffect(() => {
     if (existing.data) {
       const a = existing.data.asset;
       setSpec({ ...emptySpec(a.kind), ...a.spec });
       setWbText(workbenchText(a.spec.workbench));
       setSlug(a.slug);
-    } else if (!editing) {
-      setSpec(emptySpec(kind));
+    } else if (source.data) {
+      const a = source.data.asset;
+      setSpec({ ...emptySpec("app"), ...a.spec, title: t("selfScope.copyOf", { title: a.spec.title }).slice(0, 64), template: false });
+      setWbText(workbenchText(a.spec.workbench));
+      setSlug(`${a.slug}-copy`.slice(0, 48));
+    } else if (!editing && !fromId) {
+      setSpec({ ...emptySpec(kind), ...(kind === "app" && kbSlug ? { knowledge: [kbSlug] } : {}) });
       setWbText("");
     }
-  }, [existing.data, editing, kind]);
+  }, [existing.data, source.data, editing, fromId, kind, kbSlug, t]);
 
   const set = (p: Partial<AssetSpec>) => setSpec((s) => ({ ...s, ...p }));
   const assets = hub.data?.assets ?? [];
   const skillOptions = useMemo(() => assets.filter((a) => a.kind === "skill").map((a) => ({ value: a.slug, label: a.spec.title, hint: a.slug })), [assets]);
   const connOptions = useMemo(() => assets.filter((a) => a.kind === "connection").map((a) => ({ value: a.slug, label: a.spec.title, hint: a.slug })), [assets]);
   const pluginOptions = useMemo(() => plugins.map((p) => ({ value: p.name, label: p.title, hint: p.name })), [plugins]);
+  const kbOptions = useMemo(() => (kb.data?.items ?? []).filter((b) => b.readable).map((b) => ({ value: b.slug, label: b.title, hint: b.slug })), [kb.data]);
 
   if (editing && !existing.data) {
     return <LoadState loading={existing.loading} error={existing.error} onRetry={existing.reload}>{null}</LoadState>;
+  }
+  if (fromId && !source.data) {
+    return <LoadState loading={source.loading} error={source.error} onRetry={source.reload}>{null}</LoadState>;
   }
   const Icon = KIND_ICONS[kind];
   const title = editing
@@ -225,7 +244,19 @@ function AssetEditor() {
       case "prompt":
         return { ...base, body: spec.body };
       case "app":
-        return { ...base, persona: spec.persona, starters: (spec.starters ?? []).filter(Boolean), icon: spec.icon, launch: spec.launch, workbench: parseWorkbench(wbText).value, skills: spec.skills, connections: spec.connections, plugins: spec.plugins };
+        return {
+          ...base,
+          persona: spec.persona,
+          starters: (spec.starters ?? []).filter(Boolean),
+          icon: spec.icon,
+          launch: spec.launch,
+          workbench: parseWorkbench(wbText).value,
+          skills: spec.skills,
+          connections: spec.connections,
+          plugins: spec.plugins,
+          knowledge: spec.knowledge,
+          ...(can("plugins.manage") ? { template: !!spec.template } : {}),
+        };
       case "connection":
         return { ...base, type: spec.type, url: spec.url, auth: spec.auth, instructions: spec.instructions, timeout_seconds: spec.timeout_seconds, ...(spec.type === "openapi" ? { openapi: spec.openapi } : {}) };
     }
@@ -281,7 +312,7 @@ function AssetEditor() {
 
   return (
     <div className="max-w-3xl">
-      <PageLink page="market" className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
+      <PageLink page={kind === "app" ? "build" : "materials"} className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
         <ArrowLeft size={14} /> {t("asset.back")}
       </PageLink>
       <PageHeader title={title} desc={t(`hub.tabHints.${kind}`)} actions={<Icon size={28} strokeWidth={1.4} className="text-neutral-400" />} />
@@ -339,8 +370,15 @@ function AssetEditor() {
               <textarea className={cx(textareaCls, "h-24")} value={(spec.starters ?? []).join("\n")} onChange={(e) => set({ starters: e.target.value.split("\n") })} />
             </Field>
             <MultiPick label={t("editor.skills")} values={spec.skills ?? []} options={skillOptions} onChange={(v) => set({ skills: v })} />
+            <MultiPick label={t("editor.knowledge")} values={spec.knowledge ?? []} options={kbOptions} onChange={(v) => set({ knowledge: v })} />
             <MultiPick label={t("editor.connections")} values={spec.connections ?? []} options={connOptions} onChange={(v) => set({ connections: v })} />
-            <MultiPick label={t("editor.plugins")} values={spec.plugins ?? []} options={pluginOptions} onChange={(v) => set({ plugins: v })} />
+            {/* 插件需要写代码，只有已经用到插件的应用或管理员才看到这一项 */}
+            {(can("plugins.manage") || (spec.plugins?.length ?? 0) > 0) && (
+              <MultiPick label={t("editor.plugins")} values={spec.plugins ?? []} options={pluginOptions} onChange={(v) => set({ plugins: v })} />
+            )}
+            {can("plugins.manage") && (
+              <ToggleRow label={t("selfScope.template")} desc={t("selfScope.templateDesc")} checked={!!spec.template} onChange={(v) => set({ template: v })} />
+            )}
             <WorkbenchField
               text={wbText}
               onText={setWbText}
@@ -379,7 +417,14 @@ function AssetEditor() {
         {!editing && (
           <Section>
             <Field label={t("editor.scope")}>
-              <ScopeEditor value={scope} onChange={setScope} roles={opts.roles} users={opts.users} departments={opts.departments} />
+              <ScopeEditor
+                value={scope}
+                onChange={setScope}
+                roles={opts.roles}
+                users={opts.users}
+                departments={opts.departments}
+                selfId={kind !== "connection" ? user?.id : undefined}
+              />
             </Field>
             <Field
               label={t("editor.delivery")}

@@ -73,6 +73,39 @@ func (s Scope) Allows(userID int64, department string, roleIDs []int64) bool {
 	return false
 }
 
+// OnlyUser 判断范围是不是只有这一个人（「自己用」）。
+func (s Scope) OnlyUser(userID int64) bool {
+	n := s.Normalize()
+	return !n.All && len(n.Departments) == 0 && len(n.Roles) == 0 && len(n.Users) == 1 && n.Users[0] == userID
+}
+
+// Within 判断 s 是否没有超出 outer：收窄范围不用审核，扩大才要。
+// 单独列出的人如果本来就在 outer 的部门或角色里，也算没超出（userIn 判断）。
+func (s Scope) Within(outer Scope, userIn func(userID int64) bool) bool {
+	if outer.All {
+		return true
+	}
+	if s.All {
+		return false
+	}
+	for _, d := range s.Departments {
+		if !slices.Contains(outer.Departments, strings.TrimSpace(d)) {
+			return false
+		}
+	}
+	for _, r := range s.Roles {
+		if !slices.Contains(outer.Roles, r) {
+			return false
+		}
+	}
+	for _, u := range s.Users {
+		if !slices.Contains(outer.Users, u) && (userIn == nil || !userIn(u)) {
+			return false
+		}
+	}
+	return true
+}
+
 func scopeText(s Scope) (string, error) {
 	b, err := json.Marshal(s.Normalize())
 	return string(b), err
@@ -104,9 +137,14 @@ type Asset struct {
 	LiveVersion int `json:"live_version"`
 	// 待审核的版本数；列表查询时填充。
 	Pending int `json:"pending"`
+	// 负责人申请扩大到的范围，审核通过前不生效；nil 表示没有在审的范围变更
+	PendingScope     *Scope     `json:"pending_scope"`
+	ScopeRequestedAt *time.Time `json:"scope_requested_at"`
+	// 上一次范围申请被驳回的原因（再次申请或通过时清空）
+	ScopeNote string `json:"scope_note"`
 }
 
-const assetCols = "a.id, a.kind, a.slug, a.title, a.description, a.category, a.owner_id, a.scope, a.delivery, a.status, a.secret_hint, a.created_at, a.updated_at"
+const assetCols = "a.id, a.kind, a.slug, a.title, a.description, a.category, a.owner_id, a.scope, a.delivery, a.status, a.secret_hint, a.created_at, a.updated_at, a.pending_scope, a.scope_requested_at, a.scope_note"
 
 // 列表查询附带线上版本号与待审核数。
 const assetListCols = assetCols + `,
@@ -117,7 +155,9 @@ func scanAsset(row interface{ Scan(...any) error }, extra ...any) (*Asset, error
 	var a Asset
 	var owner sql.NullInt64
 	var scope string
-	dest := []any{&a.ID, &a.Kind, &a.Slug, &a.Title, &a.Description, &a.Category, &owner, &scope, &a.Delivery, &a.Status, &a.SecretHint, &a.CreatedAt, &a.UpdatedAt}
+	var pendingScope sql.NullString
+	var requestedAt sql.NullTime
+	dest := []any{&a.ID, &a.Kind, &a.Slug, &a.Title, &a.Description, &a.Category, &owner, &scope, &a.Delivery, &a.Status, &a.SecretHint, &a.CreatedAt, &a.UpdatedAt, &pendingScope, &requestedAt, &a.ScopeNote}
 	err := row.Scan(append(dest, extra...)...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -130,6 +170,14 @@ func scanAsset(row interface{ Scan(...any) error }, extra ...any) (*Asset, error
 		a.OwnerID = &v
 	}
 	a.Scope = parseScope(scope)
+	if pendingScope.Valid && pendingScope.String != "" {
+		ps := parseScope(pendingScope.String)
+		a.PendingScope = &ps
+	}
+	if requestedAt.Valid {
+		t := requestedAt.Time
+		a.ScopeRequestedAt = &t
+	}
 	return &a, nil
 }
 
@@ -359,6 +407,39 @@ func (s *Store) UpdateAsset(ctx context.Context, id int64, p AssetPatch) error {
 		return err
 	}
 	return nil
+}
+
+// RequestAssetScope 记下负责人申请的新范围，等审核；已有的申请被替换。
+func (s *Store) RequestAssetScope(ctx context.Context, id int64, sc Scope) error {
+	text, err := scopeText(sc)
+	if err != nil {
+		return err
+	}
+	t := now()
+	_, err = s.db.ExecContext(ctx, "UPDATE assets SET pending_scope = ?, scope_requested_at = ?, scope_note = '', updated_at = ? WHERE id = ?", text, t, t, id)
+	return err
+}
+
+// ClearAssetScopeRequest 撤销在审的范围申请（负责人把范围改回不需要审核的样子时）。
+func (s *Store) ClearAssetScopeRequest(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE assets SET pending_scope = NULL, scope_requested_at = NULL WHERE id = ?", id)
+	return err
+}
+
+// ResolveAssetScope 审核范围申请：通过时新范围生效，驳回时记下原因。返回是否有在审的申请。
+func (s *Store) ResolveAssetScope(ctx context.Context, id int64, approve bool, note string) (bool, error) {
+	q := "UPDATE assets SET scope = pending_scope, pending_scope = NULL, scope_requested_at = NULL, scope_note = '', updated_at = ? WHERE id = ? AND pending_scope IS NOT NULL"
+	args := []any{now(), id}
+	if !approve {
+		q = "UPDATE assets SET pending_scope = NULL, scope_requested_at = NULL, scope_note = ?, updated_at = ? WHERE id = ? AND pending_scope IS NOT NULL"
+		args = []any{note, now(), id}
+	}
+	res, err := s.db.ExecContext(ctx, q, args...)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
 }
 
 func (s *Store) DeleteAsset(ctx context.Context, id int64) error {

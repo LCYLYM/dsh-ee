@@ -27,7 +27,7 @@ type AssetFilter = "all" | "enabled" | "mine";
 const BANNER_KEY = "dsh-ee:hub-connect-banner";
 
 /** 插件列表：沿用原能力市场的筛选与排序。 */
-function PluginsTab({ limit }: { limit?: number }) {
+export function PluginsTab({ limit }: { limit?: number }) {
   const { t } = useTranslation();
   const { plugins, pluginsLoading } = useStore();
   const scoring = useScoring();
