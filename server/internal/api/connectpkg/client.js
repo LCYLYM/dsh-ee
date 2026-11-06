@@ -20124,7 +20124,7 @@ function appTile(createElement4, app, onOpen) {
     createElement4("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title)
   );
 }
-function starterItems(createElement4, app, actions) {
+function starterItems(createElement4, app, actions, close) {
   const starters = (app.starters ?? []).filter(Boolean).slice(0, 6);
   if (!starters.length || !actions.startWith) return [];
   return [
@@ -20134,45 +20134,92 @@ function starterItems(createElement4, app, actions) {
       type: "button",
       title: starter,
       style: { ...buttonStyle, display: "block", width: "100%", padding: 7, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-      onClick: () => actions.startWith(app, starter)
+      onClick: () => {
+        close();
+        actions.startWith(app, starter);
+      }
     }, starter))
   ];
 }
-function disableItem(createElement4, app, actions, confirming) {
+function disableItem(createElement4, app, actions, confirming, close) {
   if (app.delivery !== "optional" || !actions.disable) return null;
   return createElement4("button", {
     type: "button",
     style: { ...buttonStyle, display: "block", width: "100%", padding: 7, color: confirming ? "#b91c1c" : "inherit" },
-    onClick: () => actions.disable(app, confirming)
+    onClick: () => {
+      close();
+      actions.disable(app, confirming);
+    }
   }, confirming ? "\u786E\u8BA4\u505C\u7528" : "\u505C\u7528");
 }
-function appMenu(createElement4, app, actions, confirming = false) {
-  return createElement4(
-    "details",
-    { style: { position: "relative", flex: "0 0 auto" } },
-    createElement4("summary", { "aria-label": `${app.title}\u66F4\u591A\u64CD\u4F5C`, style: { cursor: "pointer", listStyle: "none", padding: "4px 6px" } }, "\u22EF"),
+function appMenu(createElement4, app, actions, confirming = false, open2 = false, anchor2) {
+  const close = () => actions.closeLayers?.() ?? actions.toggleMenu?.(app.name);
+  const item = (key, label, run) => createElement4("button", { key, type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => {
+    close();
+    run();
+  } }, label);
+  const layer = open2 ? [
+    createElement4("div", { key: "backdrop", "data-dsh-ee-ui": "app-menu-backdrop", onClick: close, style: { position: "fixed", inset: 0, zIndex: 80 } }),
     createElement4(
       "div",
-      { style: { position: "absolute", right: 0, zIndex: 20, minWidth: 130, padding: 6, borderRadius: 7, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", boxShadow: "0 5px 20px #0002" } },
-      createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.newSession(app) }, "\u65B0\u5F00\u4E00\u4E2A\u4F1A\u8BDD"),
-      app.workbench?.panes?.length && actions.openWorkbench ? createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.openWorkbench(app) }, "\u6253\u5F00\u5DE5\u4F5C\u53F0") : null,
-      createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.fill(app) }, "\u586B\u8FDB\u8F93\u5165\u6846"),
-      createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.web(app) }, "\u5728\u7F51\u9875\u67E5\u770B"),
-      createElement4("button", { type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => actions.unbind(app) }, "\u89E3\u9664\u7ED1\u5B9A"),
-      disableItem(createElement4, app, actions, confirming),
-      ...starterItems(createElement4, app, actions)
+      {
+        key: "menu",
+        role: "menu",
+        "data-dsh-ee-ui": "app-menu",
+        style: {
+          position: "fixed",
+          zIndex: 90,
+          right: anchor2?.right ?? 8,
+          top: anchor2?.up === false ? anchor2.top ?? 0 : void 0,
+          bottom: anchor2?.up === false ? void 0 : anchor2?.bottom ?? 64,
+          minWidth: 150,
+          maxWidth: "min(280px, calc(100vw - 16px))",
+          maxHeight: "min(340px, calc(100vh - 16px))",
+          overflowY: "auto",
+          padding: 6,
+          borderRadius: 7,
+          border: "1px solid color-mix(in srgb, currentColor 15%, transparent)",
+          background: "Canvas",
+          color: "CanvasText",
+          boxShadow: "0 5px 20px #0002"
+        }
+      },
+      item("new-session", "\u65B0\u5F00\u4E00\u4E2A\u4F1A\u8BDD", () => actions.newSession(app)),
+      app.workbench?.panes?.length && actions.openWorkbench ? item("workbench", "\u6253\u5F00\u5DE5\u4F5C\u53F0", () => actions.openWorkbench(app)) : null,
+      item("fill", "\u586B\u8FDB\u8F93\u5165\u6846", () => actions.fill(app)),
+      item("web", "\u5728\u7F51\u9875\u67E5\u770B", () => actions.web(app)),
+      item("unbind", "\u89E3\u9664\u7ED1\u5B9A", () => actions.unbind(app)),
+      disableItem(createElement4, app, actions, confirming, close),
+      ...starterItems(createElement4, app, actions, close)
     )
+  ] : null;
+  return createElement4(
+    "div",
+    { style: { position: "relative", flex: "0 0 auto" } },
+    createElement4("button", {
+      type: "button",
+      "aria-label": `${app.title}\u66F4\u591A\u64CD\u4F5C`,
+      "aria-expanded": open2,
+      "aria-haspopup": "menu",
+      onClick: (event) => {
+        event?.stopPropagation?.();
+        actions.toggleMenu?.(app.name, event);
+      },
+      style: { ...buttonStyle, padding: "4px 6px" }
+    }, "\u22EF"),
+    layer
   );
 }
-function appRow(createElement4, app, actions, status, confirming = false) {
-  const statusView = status === "need" ? { label: "\u5F85\u4F60\u51B3\u5B9A", color: "#d97706" } : status === "busy" ? { label: "\u5DE5\u4F5C\u4E2D", color: "#2563eb" } : status === "done" ? { label: "\u672C\u8F6E\u7ED3\u675F", color: "#737373" } : void 0;
+var statusViewOf = (status) => status === "need" ? { label: "\u5F85\u4F60\u51B3\u5B9A", color: "#d97706" } : status === "busy" ? { label: "\u5DE5\u4F5C\u4E2D", color: "#2563eb" } : status === "done" ? { label: "\u672C\u8F6E\u7ED3\u675F", color: "#737373" } : void 0;
+function appRow(createElement4, app, actions, status, confirming = false, menuOpen = false, anchor2) {
+  const statusView = statusViewOf(status);
   return createElement4(
     "div",
     { key: app.name, "data-dsh-ee-app": app.name, style: { display: "flex", alignItems: "center", gap: 4 } },
     statusView ? createElement4("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
     appTile(createElement4, app, () => actions.open(app)),
     app.missing?.length ? createElement4("span", { title: `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528") : null,
-    appMenu(createElement4, app, actions, confirming)
+    appMenu(createElement4, app, actions, confirming, menuOpen, anchor2)
   );
 }
 function availableGroup(createElement4, state, actions) {
@@ -20204,6 +20251,67 @@ function availableGroup(createElement4, state, actions) {
     ))) : null
   );
 }
+var matchesQuery = (app, query) => !query || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(query);
+function galleryRow(createElement4, app, actions, status, confirming = false, menuOpen = false, anchor2) {
+  const statusView = statusViewOf(status);
+  return createElement4(
+    "div",
+    { key: app.name, "data-dsh-ee-app": app.name, style: { display: "flex", alignItems: "center", gap: 6 } },
+    statusView ? createElement4("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
+    createElement4(
+      "button",
+      {
+        type: "button",
+        onClick: () => {
+          actions.closeLayers?.();
+          actions.open(app);
+        },
+        title: app.description,
+        style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, minWidth: 0, flex: 1, padding: "5px 0" }
+      },
+      appIcon(createElement4, app),
+      createElement4(
+        "span",
+        { style: { minWidth: 0, flex: 1 } },
+        createElement4("span", { style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
+        app.description ? createElement4("span", { style: { display: "block", fontSize: 11, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.description) : null
+      )
+    ),
+    app.missing?.length ? createElement4("span", { title: `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528") : null,
+    appMenu(createElement4, app, actions, confirming, menuOpen, anchor2)
+  );
+}
+function appsGallery(createElement4, state, actions, filtered) {
+  if (!state.galleryOpen) return null;
+  const close = () => actions.closeLayers?.() ?? actions.toggleGallery?.();
+  return createElement4(
+    "div",
+    { "data-dsh-ee-ui": "apps-gallery", onClick: close, style: { position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } },
+    createElement4(
+      "div",
+      {
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-label": "\u4F01\u4E1A\u5E94\u7528",
+        onClick: (event) => event?.stopPropagation?.(),
+        style: { width: "min(460px, calc(100vw - 32px))", maxHeight: "min(600px, calc(100vh - 48px))", display: "flex", flexDirection: "column", borderRadius: 10, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 12px 40px #0005", padding: "12px 14px", fontSize: 13 }
+      },
+      createElement4(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } },
+        createElement4("strong", { style: { fontSize: 14, flex: 1 } }, `\u4F01\u4E1A\u5E94\u7528\uFF08${state.apps.length}\uFF09`),
+        createElement4("button", { type: "button", "aria-label": "\u5173\u95ED", onClick: close, style: { ...buttonStyle, fontSize: 15, padding: "2px 6px", opacity: 0.7 } }, "\u2715")
+      ),
+      createElement4("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 4, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }),
+      createElement4(
+        "div",
+        { style: { overflowY: "auto", display: "grid", gap: 2, marginTop: 6, flex: 1, minHeight: 0 } },
+        filtered.length ? filtered.map((app) => galleryRow(createElement4, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name, state.menuFor === app.name, state.menuAnchor)) : createElement4("div", { style: { padding: "14px 4px", opacity: 0.6 } }, "\u6CA1\u6709\u5339\u914D\u7684\u5E94\u7528")
+      ),
+      availableGroup(createElement4, state, actions)
+    )
+  );
+}
 function appsSection(createElement4, state, actions) {
   if (!state.loggedIn) {
     return createElement4(
@@ -20215,50 +20323,74 @@ function appsSection(createElement4, state, actions) {
   }
   if (!state.apps.length && !(state.available ?? []).length) return null;
   const query = state.query?.trim().toLowerCase() ?? "";
-  const filtered = state.apps.filter((app) => !query || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(query));
-  const shown = state.expanded ? filtered : filtered.slice(0, 6);
+  const filtered = state.apps.filter((app) => matchesQuery(app, query));
+  const shown = filtered.slice(0, 6);
+  const header2 = createElement4(
+    "button",
+    {
+      type: "button",
+      onClick: () => actions.toggleCollapsed?.(),
+      "aria-expanded": !state.collapsed,
+      title: state.collapsed ? "\u5C55\u5F00\u4F01\u4E1A\u5E94\u7528" : "\u6536\u8D77\u4F01\u4E1A\u5E94\u7528",
+      style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "2px 0", margin: "0 0 5px", fontSize: 13, fontWeight: 600 }
+    },
+    createElement4("span", { "aria-hidden": true, style: { fontSize: 10, opacity: 0.7 } }, state.collapsed ? "\u25B8" : "\u25BE"),
+    "\u4F01\u4E1A\u5E94\u7528",
+    state.collapsed ? createElement4("span", { style: { fontSize: 12, fontWeight: 400, opacity: 0.6 } }, `\uFF08${state.apps.length}\uFF09`) : null
+  );
   return createElement4(
     "section",
     { "data-dsh-ee-ui": "apps", style: { padding: "10px 12px", fontSize: 13 } },
-    createElement4("h2", { style: { margin: "0 0 7px", fontSize: 13 } }, "\u4F01\u4E1A\u5E94\u7528"),
-    state.apps.length > 8 ? createElement4("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }) : null,
-    createElement4("div", { style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement4, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name))),
-    !state.expanded && filtered.length > 6 ? createElement4("button", { type: "button", onClick: actions.toggle, style: { ...buttonStyle, marginTop: 7, opacity: 0.7 } }, `\u66F4\u591A\uFF08${filtered.length - 6}\uFF09`) : null,
-    availableGroup(createElement4, state, actions),
-    state.notice ? createElement4("p", { role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null
+    header2,
+    state.collapsed ? null : [
+      state.apps.length > 8 ? createElement4("input", { key: "search", "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }) : null,
+      createElement4("div", { key: "list", style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement4, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name, state.menuFor === app.name, state.menuAnchor))),
+      createElement4("button", { key: "all", type: "button", onClick: () => actions.toggleGallery?.(), style: { ...buttonStyle, marginTop: 7, opacity: 0.7 } }, `\u67E5\u770B\u5168\u90E8\uFF08${state.apps.length}\uFF09`),
+      availableGroup(createElement4, state, actions),
+      state.notice ? createElement4("p", { key: "notice", role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null
+    ],
+    appsGallery(createElement4, state, actions, filtered)
   );
 }
 function heroAppsMenu(createElement4, apps, onOpen, query = "", onSearch = () => {
-}, notice = "") {
+}, notice = "", open2 = false, onToggle = () => {
+}) {
   if (!apps.length) return null;
   const normalized = query.trim().toLowerCase();
-  const shown = apps.filter((app) => !normalized || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(normalized)).slice(0, 8);
+  const shown = apps.filter((app) => matchesQuery(app, normalized)).slice(0, 8);
   return createElement4(
-    "details",
+    "div",
     { "data-dsh-ee-ui": "hero-apps", style: { position: "relative", display: "inline-block" } },
-    createElement4("summary", { style: { cursor: "pointer", listStyle: "none", fontSize: 12, padding: "4px 7px", whiteSpace: "nowrap" } }, "\u4F01\u4E1A\u5E94\u7528"),
-    createElement4(
-      "div",
-      { style: { position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 30, width: 280, padding: 8, borderRadius: 8, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 8px 30px #0003" } },
-      apps.length > 8 ? createElement4("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: query, onChange: (event) => onSearch(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid #8886", background: "transparent", color: "inherit" } }) : null,
-      createElement4("div", { style: { display: "grid", gap: 4 } }, ...shown.map((app) => createElement4(
-        "button",
+    createElement4("button", { type: "button", onClick: onToggle, "aria-expanded": open2, "aria-haspopup": "menu", style: { ...buttonStyle, fontSize: 12, padding: "4px 7px", whiteSpace: "nowrap" } }, "\u4F01\u4E1A\u5E94\u7528"),
+    open2 ? [
+      createElement4("div", { key: "backdrop", "data-dsh-ee-ui": "hero-apps-backdrop", onClick: onToggle, style: { position: "fixed", inset: 0, zIndex: 70 } }),
+      createElement4(
+        "div",
         {
-          key: app.name,
-          type: "button",
-          onClick: () => onOpen(app),
-          style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, padding: 7, borderRadius: 6, width: "100%" }
+          key: "menu",
+          role: "menu",
+          style: { position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 80, width: 280, maxHeight: "min(420px, calc(100vh - 96px))", overflowY: "auto", padding: 8, borderRadius: 8, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 8px 30px #0003" }
         },
-        appIcon(createElement4, app),
-        createElement4(
-          "span",
-          { style: { minWidth: 0 } },
-          createElement4("span", { style: { display: "block", fontSize: 13 } }, app.title),
-          createElement4("span", { style: { display: "block", fontSize: 11, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.starters[0] || app.description)
-        )
-      ))),
-      notice ? createElement4("p", { role: "status", style: { margin: "7px 4px 0", fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" } }, notice) : null
-    )
+        apps.length > 8 ? createElement4("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: query, onChange: (event) => onSearch(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid #8886", background: "transparent", color: "inherit" } }) : null,
+        createElement4("div", { style: { display: "grid", gap: 4 } }, ...shown.map((app) => createElement4(
+          "button",
+          {
+            key: app.name,
+            type: "button",
+            onClick: () => onOpen(app),
+            style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, padding: 7, borderRadius: 6, width: "100%" }
+          },
+          appIcon(createElement4, app),
+          createElement4(
+            "span",
+            { style: { minWidth: 0 } },
+            createElement4("span", { style: { display: "block", fontSize: 13 } }, app.title),
+            createElement4("span", { style: { display: "block", fontSize: 11, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.starters[0] || app.description)
+          )
+        ))),
+        notice ? createElement4("p", { role: "status", style: { margin: "7px 4px 0", fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" } }, notice) : null
+      )
+    ] : null
   );
 }
 function startText(app, starter) {
@@ -20706,35 +20838,96 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
       void fill(app).then(setNotice);
     },
     web,
-    toggle: () => {
-    },
     search: () => {
     }
   });
   const AppsSection = () => {
     const overview = useOverview();
     const state = useApps();
-    const [expanded, setExpanded] = (0, import_react.useState)(false);
+    const [collapsed, setCollapsed] = (0, import_react.useState)(false);
+    const [galleryOpen, setGalleryOpen] = (0, import_react.useState)(false);
+    const [menuFor, setMenuFor] = (0, import_react.useState)("");
+    const [menuAnchor, setMenuAnchor] = (0, import_react.useState)(void 0);
     const [query, setQuery] = (0, import_react.useState)("");
     const [notice, setNotice] = (0, import_react.useState)("");
     const [availableOpen, setAvailableOpen] = (0, import_react.useState)(false);
     const [confirmDisable, setConfirmDisable] = (0, import_react.useState)("");
+    const closeMenu = () => {
+      setMenuFor("");
+      setMenuAnchor(void 0);
+    };
+    const closeLayers = () => {
+      closeMenu();
+      setGalleryOpen(false);
+    };
+    const toggleMenu = (name, event) => {
+      if (!name || name === menuFor) {
+        closeMenu();
+        return;
+      }
+      const rect = event?.currentTarget?.getBoundingClientRect?.();
+      const innerW = typeof window === "undefined" ? 360 : window.innerWidth;
+      const innerH = typeof window === "undefined" ? 640 : window.innerHeight;
+      const up = !rect || rect.bottom + 340 > innerH - 8;
+      setMenuAnchor({ up, right: rect ? Math.max(8, innerW - rect.right) : 8, top: rect ? rect.bottom + 4 : void 0, bottom: rect ? innerH - rect.top + 4 : 64 });
+      setMenuFor(name);
+    };
+    (0, import_react.useEffect)(() => {
+      if (!menuFor && !galleryOpen) return;
+      if (typeof window === "undefined") return;
+      const onKey = (event) => {
+        if (event?.key === "Escape") closeLayers();
+      };
+      const onScroll = () => closeMenu();
+      window.addEventListener("keydown", onKey);
+      window.addEventListener("resize", onScroll);
+      window.document?.addEventListener?.("scroll", onScroll, true);
+      return () => {
+        window.removeEventListener("keydown", onKey);
+        window.removeEventListener("resize", onScroll);
+        window.document?.removeEventListener?.("scroll", onScroll, true);
+      };
+    }, [menuFor, galleryOpen]);
     if (!overview.data && !overview.failed) return null;
-    const actions = { ...useActions(setNotice, launchSidebar, setConfirmDisable), toggle: () => setExpanded(!expanded), search: setQuery, toggleAvailable: () => setAvailableOpen(!availableOpen) };
+    const actions = {
+      ...useActions(setNotice, launchSidebar, setConfirmDisable),
+      search: setQuery,
+      toggleAvailable: () => setAvailableOpen(!availableOpen),
+      toggleCollapsed: () => {
+        setCollapsed(!collapsed);
+        closeMenu();
+      },
+      toggleGallery: () => {
+        setGalleryOpen(!galleryOpen);
+        closeMenu();
+      },
+      toggleMenu,
+      closeLayers
+    };
     const statuses = Object.fromEntries(state.apps.map((app) => {
       const id = state.bindings[app.name]?.sessionId;
       return [app.name, id ? visibleAppStatus(applicationStatus(state.sessionSnapshot, id), `${app.name}:${id}`, seen) : void 0];
     }));
-    return appsSection(import_react.createElement, { apps: state.apps, available: state.available, availableOpen, confirmDisable, loggedIn: !!overview.data?.me, expanded, query, notice, statuses }, actions);
+    return appsSection(import_react.createElement, { apps: state.apps, available: state.available, availableOpen, confirmDisable, loggedIn: !!overview.data?.me, collapsed, galleryOpen, menuFor, menuAnchor, query, notice, statuses }, actions);
   };
   const HeroApps = () => {
     const state = useApps();
     const [query, setQuery] = (0, import_react.useState)("");
     const [notice, setNotice] = (0, import_react.useState)("");
+    const [menuOpen, setMenuOpen] = (0, import_react.useState)(false);
     const open2 = (app) => {
+      setMenuOpen(false);
       void openWithFallback(app, launcher.launchHero).then(setNotice);
     };
-    return heroAppsMenu(import_react.createElement, state.apps, open2, query, setQuery, notice);
+    (0, import_react.useEffect)(() => {
+      if (!menuOpen || typeof window === "undefined") return;
+      const onKey = (event) => {
+        if (event?.key === "Escape") setMenuOpen(false);
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [menuOpen]);
+    return heroAppsMenu(import_react.createElement, state.apps, open2, query, setQuery, notice, menuOpen, () => setMenuOpen(!menuOpen));
   };
   const InProgress = () => {
     const state = useApps();

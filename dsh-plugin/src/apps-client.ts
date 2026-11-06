@@ -1,5 +1,5 @@
 import { createElement, useEffect, useState } from "react";
-import { appsSection, heroAppsMenu, inProgressItems, inProgressView, startText, type AppsViewActions } from "./apps-view.js";
+import { appsSection, heroAppsMenu, inProgressItems, inProgressView, startText, type AppsViewActions, type MenuAnchor } from "./apps-view.js";
 import { fillInput, openSession } from "./host-session.js";
 import { createLauncher, singleFlight } from "./app-launcher.js";
 import type { CatalogApp } from "./skills.js";
@@ -149,32 +149,76 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     unbind: (app) => { void remote.unbindApp({ name: app.name }).then((result: any) => { const bindings = unwrapRemote(result); update({ bindings }); setNotice("已解除绑定"); }).catch(() => setNotice("解除绑定失败，请稍后重试。")); },
     fill: (app) => { void fill(app).then(setNotice); },
     web,
-    toggle: () => {},
     search: () => {},
   });
 
   const AppsSection = () => {
     const overview = useOverview();
     const state = useApps();
-    const [expanded, setExpanded] = useState(false);
+    const [collapsed, setCollapsed] = useState(false);
+    const [galleryOpen, setGalleryOpen] = useState(false);
+    const [menuFor, setMenuFor] = useState("");
+    const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | undefined>(undefined);
     const [query, setQuery] = useState("");
     const [notice, setNotice] = useState("");
     const [availableOpen, setAvailableOpen] = useState(false);
     const [confirmDisable, setConfirmDisable] = useState("");
+    const closeMenu = () => { setMenuFor(""); setMenuAnchor(undefined); };
+    const closeLayers = () => { closeMenu(); setGalleryOpen(false); };
+    // 「⋯」菜单用 fixed 定位贴着按钮：靠窗口下沿时向上展开，避免被窗口裁掉
+    const toggleMenu = (name: string, event?: any) => {
+      if (!name || name === menuFor) { closeMenu(); return; }
+      const rect = event?.currentTarget?.getBoundingClientRect?.();
+      const innerW = typeof window === "undefined" ? 360 : window.innerWidth;
+      const innerH = typeof window === "undefined" ? 640 : window.innerHeight;
+      const up = !rect || rect.bottom + 340 > innerH - 8;
+      setMenuAnchor({ up, right: rect ? Math.max(8, innerW - rect.right) : 8, top: rect ? rect.bottom + 4 : undefined, bottom: rect ? innerH - rect.top + 4 : 64 });
+      setMenuFor(name);
+    };
+    // Escape 关浮层；滚动/缩放后 fixed 菜单会失去锚点，直接关掉
+    useEffect(() => {
+      if (!menuFor && !galleryOpen) return;
+      if (typeof window === "undefined") return;
+      const onKey = (event: any) => { if (event?.key === "Escape") closeLayers(); };
+      const onScroll = () => closeMenu();
+      window.addEventListener("keydown", onKey);
+      window.addEventListener("resize", onScroll);
+      window.document?.addEventListener?.("scroll", onScroll, true);
+      return () => {
+        window.removeEventListener("keydown", onKey);
+        window.removeEventListener("resize", onScroll);
+        window.document?.removeEventListener?.("scroll", onScroll, true);
+      };
+    }, [menuFor, galleryOpen]);
     if (!overview.data && !overview.failed) return null;
-    const actions = { ...useActions(setNotice, launchSidebar, setConfirmDisable), toggle: () => setExpanded(!expanded), search: setQuery, toggleAvailable: () => setAvailableOpen(!availableOpen) };
+    const actions = {
+      ...useActions(setNotice, launchSidebar, setConfirmDisable),
+      search: setQuery,
+      toggleAvailable: () => setAvailableOpen(!availableOpen),
+      toggleCollapsed: () => { setCollapsed(!collapsed); closeMenu(); },
+      toggleGallery: () => { setGalleryOpen(!galleryOpen); closeMenu(); },
+      toggleMenu,
+      closeLayers,
+    };
     const statuses = Object.fromEntries(state.apps.map((app) => {
       const id = state.bindings[app.name]?.sessionId;
       return [app.name, id ? visibleAppStatus(applicationStatus(state.sessionSnapshot, id), `${app.name}:${id}`, seen) : undefined];
     }));
-    return appsSection(createElement, { apps: state.apps, available: state.available, availableOpen, confirmDisable, loggedIn: !!overview.data?.me, expanded, query, notice, statuses }, actions);
+    return appsSection(createElement, { apps: state.apps, available: state.available, availableOpen, confirmDisable, loggedIn: !!overview.data?.me, collapsed, galleryOpen, menuFor, menuAnchor, query, notice, statuses }, actions);
   };
   const HeroApps = () => {
     const state = useApps();
     const [query, setQuery] = useState("");
     const [notice, setNotice] = useState("");
-    const open = (app: CatalogApp) => { void openWithFallback(app, launcher.launchHero).then(setNotice); };
-    return heroAppsMenu(createElement, state.apps, open, query, setQuery, notice);
+    const [menuOpen, setMenuOpen] = useState(false);
+    const open = (app: CatalogApp) => { setMenuOpen(false); void openWithFallback(app, launcher.launchHero).then(setNotice); };
+    useEffect(() => {
+      if (!menuOpen || typeof window === "undefined") return;
+      const onKey = (event: any) => { if (event?.key === "Escape") setMenuOpen(false); };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [menuOpen]);
+    return heroAppsMenu(createElement, state.apps, open, query, setQuery, notice, menuOpen, () => setMenuOpen(!menuOpen));
   };
   const InProgress = () => {
     const state = useApps();

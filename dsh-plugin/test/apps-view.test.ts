@@ -4,7 +4,7 @@ import { appIcon, appsSection, heroAppsMenu, inProgressItems, inProgressView, st
 import type { CatalogApp } from "../src/skills.js";
 
 const createElement = (type: string, props: any, ...children: any[]) => ({ type, props, children });
-const actions = { login() {}, open() {}, fill() {}, web() {}, newSession() {}, unbind() {}, toggle() {}, search() {} };
+const actions = { login() {}, open() {}, fill() {}, web() {}, newSession() {}, unbind() {}, search() {} };
 const app = (n: number): CatalogApp => ({ name: `app-${n}`, title: `应用${n}`, description: "说明", starters: [`问题${n}`], launch: "new", version: 1 });
 
 test("空列表隐藏入口，未登录显示登录", () => {
@@ -14,16 +14,32 @@ test("空列表隐藏入口，未登录显示登录", () => {
   assert.equal(heroAppsMenu(createElement, [], () => {}), null);
 });
 
-test("侧栏最多六项，更多展开，超过八项出现搜索", () => {
-  const folded = appsSection(createElement, { apps: Array.from({ length: 10 }, (_, i) => app(i)), loggedIn: true }, actions);
+test("侧栏最多六项，「查看全部」打开完整选择，超过八项出现搜索", () => {
+  const apps = Array.from({ length: 10 }, (_, i) => app(i));
+  const folded = appsSection(createElement, { apps, loggedIn: true }, actions);
   const text = JSON.stringify(folded);
   assert.match(text, /应用0/);
   assert.match(text, /应用5/);
   assert.doesNotMatch(text, /应用6/);
-  assert.match(text, /更多（4）/);
+  assert.match(text, /查看全部（10）/);
   assert.match(text, /搜索企业应用/);
-  const expanded = appsSection(createElement, { apps: Array.from({ length: 10 }, (_, i) => app(i)), loggedIn: true, expanded: true }, actions);
-  assert.match(JSON.stringify(expanded), /应用9/);
+  const gallery = appsSection(createElement, { apps, loggedIn: true, galleryOpen: true }, actions);
+  const galleryText = JSON.stringify(gallery);
+  assert.match(galleryText, /apps-gallery/);
+  assert.match(galleryText, /应用9/);
+  const empty = appsSection(createElement, { apps, loggedIn: true, galleryOpen: true, query: "不存在" }, actions);
+  assert.match(JSON.stringify(empty), /没有匹配的应用/);
+});
+
+test("「企业应用」区块可收起：收起后只剩标题行，展开恢复列表", () => {
+  const folded = appsSection(createElement, { apps: [app(1), app(2)], loggedIn: true, collapsed: true }, actions);
+  const text = JSON.stringify(folded);
+  assert.match(text, /企业应用/);
+  assert.match(text, /（2）/);
+  assert.doesNotMatch(text, /应用1/);
+  assert.doesNotMatch(text, /查看全部/);
+  const open = appsSection(createElement, { apps: [app(1), app(2)], loggedIn: true }, actions);
+  assert.match(JSON.stringify(open), /应用1/);
 });
 
 test("startText 只有命令或命令加示例问题", () => {
@@ -31,10 +47,14 @@ test("startText 只有命令或命令加示例问题", () => {
   assert.equal(startText(app(1), "查一下"), "/app-1\n查一下");
 });
 
-test("没有图标时使用标题首字，首屏菜单最多八项", () => {
+test("没有图标时使用标题首字，首屏菜单打开后最多八项", () => {
   const icon = appIcon(createElement, app(1));
   assert.equal(icon.children[0], "应");
-  const menu = heroAppsMenu(createElement, Array.from({ length: 12 }, (_, i) => app(i)), () => {});
+  const closed = heroAppsMenu(createElement, Array.from({ length: 12 }, (_, i) => app(i)), () => {});
+  const closedText = JSON.stringify(closed);
+  assert.match(closedText, /企业应用/);
+  assert.doesNotMatch(closedText, /问题0/);
+  const menu = heroAppsMenu(createElement, Array.from({ length: 12 }, (_, i) => app(i)), () => {}, "", () => {}, "", true, () => {});
   const text = JSON.stringify(menu);
   assert.match(text, /企业应用/);
   assert.match(text, /问题7/);
@@ -42,24 +62,28 @@ test("没有图标时使用标题首字，首屏菜单最多八项", () => {
 });
 
 test("状态点 need 黄、busy 蓝、done 灰，菜单支持重开与解绑", () => {
-  const view = appsSection(createElement, { apps: [app(1)], loggedIn: true, statuses: { "app-1": "done" } }, actions);
+  const view = appsSection(createElement, { apps: [app(1)], loggedIn: true, statuses: { "app-1": "done" }, menuFor: "app-1", menuAnchor: { up: true, right: 8, bottom: 64 } }, actions);
   const text = JSON.stringify(view);
   assert.match(text, /本轮结束/);
   assert.match(text, /#737373/);
   assert.match(text, /新开一个会话/);
   assert.match(text, /解除绑定/);
   assert.doesNotMatch(text, /成功/);
+  const closed = appsSection(createElement, { apps: [app(1)], loggedIn: true }, actions);
+  const closedText = JSON.stringify(closed);
+  assert.doesNotMatch(closedText, /新开一个会话/);
+  assert.doesNotMatch(closedText, /app-menu-backdrop/);
 });
 
 test("首屏降级提示实际渲染在菜单里", () => {
-  const menu = heroAppsMenu(createElement, [app(1)], () => {}, "", () => {}, "已复制 /app-1");
+  const menu = heroAppsMenu(createElement, [app(1)], () => {}, "", () => {}, "已复制 /app-1", true, () => {});
   assert.match(JSON.stringify(menu), /已复制 \/app-1/);
 });
 
 test("「⋯」菜单列出示例问题，点一条带着它开始", () => {
   const started: string[] = [];
   const withStarters = { ...app(1), starters: ["问题一", "问".repeat(300), "", "三", "四", "五", "六", "七"] };
-  const section = appsSection(createElement, { apps: [withStarters], loggedIn: true }, { ...actions, startWith: (_app: CatalogApp, starter: string) => started.push(starter) });
+  const section = appsSection(createElement, { apps: [withStarters], loggedIn: true, menuFor: withStarters.name }, { ...actions, startWith: (_app: CatalogApp, starter: string) => started.push(starter) });
   const buttons: any[] = [];
   const walk = (node: any) => {
     if (!node || typeof node !== "object") return;
@@ -71,7 +95,7 @@ test("「⋯」菜单列出示例问题，点一条带着它开始", () => {
   assert.match(JSON.stringify(section), /从示例问题开始/);
   buttons[0].props.onClick();
   assert.deepEqual(started, ["问题一"]);
-  const plain = appsSection(createElement, { apps: [{ ...app(2), starters: [] }], loggedIn: true }, { ...actions, startWith: () => {} });
+  const plain = appsSection(createElement, { apps: [{ ...app(2), starters: [] }], loggedIn: true, menuFor: "app-2" }, { ...actions, startWith: () => {} });
   assert.doesNotMatch(JSON.stringify(plain), /从示例问题开始/);
 });
 
@@ -113,7 +137,7 @@ test("只有自选的应用能停用，要点两次", () => {
   const withDisable = { ...actions, disable: (target: CatalogApp, confirmed: boolean) => calls.push(`${target.name}:${confirmed}`) };
   const optional = { ...app(1), delivery: "optional" as const };
   const auto = { ...app(2), delivery: "auto" as const };
-  const first = JSON.stringify(appsSection(createElement, { apps: [optional, auto], loggedIn: true }, withDisable));
+  const first = JSON.stringify(appsSection(createElement, { apps: [optional, auto], loggedIn: true, menuFor: "app-1" }, withDisable));
   assert.equal(first.split('"停用"').length - 1, 1);
   const buttons: any[] = [];
   const walk = (node: any) => {
@@ -121,10 +145,10 @@ test("只有自选的应用能停用，要点两次", () => {
     if (node.type === "button" && (node.children.includes("停用") || node.children.includes("确认停用"))) buttons.push(node);
     for (const child of (node.children ?? []).flat(Infinity)) walk(child);
   };
-  walk(appsSection(createElement, { apps: [optional], loggedIn: true }, withDisable));
+  walk(appsSection(createElement, { apps: [optional], loggedIn: true, menuFor: "app-1" }, withDisable));
   buttons[0].props.onClick();
   buttons.length = 0;
-  walk(appsSection(createElement, { apps: [optional], loggedIn: true, confirmDisable: "app-1" }, withDisable));
+  walk(appsSection(createElement, { apps: [optional], loggedIn: true, confirmDisable: "app-1", menuFor: "app-1" }, withDisable));
   assert.equal(buttons[0].children[0], "确认停用");
   buttons[0].props.onClick();
   assert.deepEqual(calls, ["app-1:false", "app-1:true"]);

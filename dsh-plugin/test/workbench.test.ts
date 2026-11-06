@@ -181,10 +181,12 @@ test("看板只显示文字；没有内容时提示", () => {
 });
 
 test("应用菜单只在有工作台时显示「打开工作台」", () => {
-  const actions = { login() {}, open() {}, fill() {}, web() {}, newSession() {}, unbind() {}, toggle() {}, search() {}, openWorkbench() {} };
+  const actions = { login() {}, open() {}, fill() {}, web() {}, newSession() {}, unbind() {}, search() {}, openWorkbench() {} };
   const plain: CatalogApp = { ...app, name: "plain", workbench: undefined };
-  const text = JSON.stringify(appsSection(h, { apps: [app, plain], loggedIn: true }, actions));
-  assert.equal(text.split("打开工作台").length - 1, 1);
+  const openMenu = JSON.stringify(appsSection(h, { apps: [app], loggedIn: true, menuFor: app.name }, actions));
+  assert.equal(openMenu.split("打开工作台").length - 1, 1);
+  const closedMenu = JSON.stringify(appsSection(h, { apps: [plain], loggedIn: true, menuFor: plain.name }, actions));
+  assert.equal(closedMenu.split("打开工作台").length - 1, 0);
 });
 
 function fakeSidebar(mounted: string, tabs: any[] = []) {
