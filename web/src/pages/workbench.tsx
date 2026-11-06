@@ -8,7 +8,8 @@ import { useAuth } from "../lib/auth";
 import { api, formatTokens, type MyOverview, type MyQuota } from "../lib/api";
 import { useApi } from "../lib/use-api";
 import { pluginPath } from "../components/plugin-card";
-import { Badge, Button, Card, CardHeader, PageHeader, PluginIcon, Stat } from "../components/ui";
+import { Badge, Button, Card, CardHeader, PluginIcon, Stat, StatStrip } from "../components/ui";
+import { HoverArrow, Ribbon } from "../components/landing-graphics";
 import { statusBadge } from "../components/status";
 import { PageLink } from "../lib/menus";
 import { useTranslation } from "react-i18next";
@@ -55,9 +56,28 @@ export default function Workbench() {
 
   return (
     <div>
-      <PageHeader title={t("workbench.title")} desc={[user?.display_name || user?.username, user?.department].filter(Boolean).join(" · ")} />
+      <section className="relative mb-4 overflow-hidden rounded-xl border border-neutral-200/70 bg-card px-6 py-7 shadow-card sm:px-8 sm:py-9">
+        <Ribbon className="pointer-events-none absolute -top-28 -right-24 h-[420px] w-[680px] max-sm:opacity-40" />
+        <div className="relative max-w-xl">
+          <h1 className="text-[clamp(1.75rem,3vw,2.25rem)] leading-tight font-bold tracking-[-0.02em] text-neutral-900">{t("workbench.title")}</h1>
+          <p className="mt-2 text-[15px] text-neutral-600">{[user?.display_name || user?.username, user?.department].filter(Boolean).join(" · ")}</p>
+          <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <PageLink
+              page="apps"
+              className="inline-flex h-9 items-center rounded-full bg-brand-500 px-4 text-sm font-semibold text-white shadow-card transition-colors hover:bg-brand-600"
+            >
+              {t("workbench.browseAll", { count: allApps.length })}
+              <HoverArrow />
+            </PageLink>
+            <PageLink page="publish" className="inline-flex h-9 items-center text-sm font-semibold text-brand-600 hover:text-neutral-900 dark:text-brand-300 dark:hover:text-white">
+              {t("workbench.shareNew")}
+              <HoverArrow />
+            </PageLink>
+          </div>
+        </div>
+      </section>
 
-      <Card className="grid grid-cols-4 divide-x divide-neutral-200/80">
+      <StatStrip>
         <Stat
           label={t("workbench.tokensThisMonth")}
           value={quota ? formatTokens(quota.month_tokens) : noValue}
@@ -74,14 +94,14 @@ export default function Workbench() {
           value={o ? o.contributions.length : noValue}
           hint={o ? t("workbench.contributionsReach", { count: o.reach }) : overview.error ? t("workbench.unavailable") : t("workbench.reading")}
         />
-      </Card>
+      </StatStrip>
 
       <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Card>
           <CardHeader
             title={t("workbench.myApps")}
             aside={
-              <PageLink page="apps" className="font-medium text-neutral-900 hover:underline">
+              <PageLink page="apps" className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
                 {t("workbench.browseAll", { count: allApps.length })}
               </PageLink>
             }
@@ -90,7 +110,7 @@ export default function Workbench() {
             {hub.data && myApps.length === 0 && (
               <li className="py-2 text-sm text-neutral-600">
                 {t("apps.emptyEnabled")}{" "}
-                <PageLink page="apps" className="font-medium text-neutral-900 hover:underline">
+                <PageLink page="apps" className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
                   {t("workbench.browseAll", { count: allApps.length })}
                 </PageLink>
               </li>
@@ -147,7 +167,7 @@ export default function Workbench() {
           <div className="mt-auto px-5 pb-5">
             <PageLink
               page="publish"
-              className="flex h-9 items-center justify-center rounded-md border border-neutral-300 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+              className="flex h-9 items-center justify-center rounded-md border border-neutral-200 text-sm font-semibold text-neutral-800 shadow-card hover:bg-neutral-50"
             >
               {t("workbench.shareNew")}
             </PageLink>
@@ -218,7 +238,7 @@ export default function Workbench() {
                       <button
                         type="button"
                         onClick={() => copyInstall(p.name)}
-                        className="ml-auto shrink-0 text-sm font-medium text-neutral-900 hover:underline"
+                        className="ml-auto shrink-0 text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200"
                       >
                         {t("workbench.install")}
                       </button>

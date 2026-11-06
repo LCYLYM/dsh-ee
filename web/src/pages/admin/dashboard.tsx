@@ -99,7 +99,7 @@ export default function AdminDashboard() {
           lead={String(pendingVersions)}
           unit={t("dashboard.pendingUnit")}
           note={
-            <PageLink page="admin-review" className="inline-flex items-center gap-1 font-medium text-neutral-900 hover:underline">
+            <PageLink page="admin-review" className="inline-flex items-center gap-1 font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
               {t("dashboard.goReview")} <ArrowRight size={14} />
             </PageLink>
           }
@@ -181,7 +181,7 @@ export default function AdminDashboard() {
           <CardHeader
             title={t("dashboard.topPlugins")}
             aside={
-              <PageLink page="admin-stats" className="font-medium text-neutral-900 hover:underline">
+              <PageLink page="admin-stats" className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
                 {t("dashboard.last14")}
               </PageLink>
             }
@@ -247,7 +247,7 @@ export default function AdminDashboard() {
               <CardHeader
                 title={t("dashboard.auditLog")}
                 aside={
-                  <PageLink page="admin-audit" className="font-medium text-neutral-900 hover:underline">
+                  <PageLink page="admin-audit" className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
                     {t("dashboard.allAudit")}
                   </PageLink>
                 }
@@ -291,7 +291,7 @@ function PendingCard({ plugins, total }: { plugins: Plugin[]; total: number }) {
       <CardHeader
         title={t("dashboard.pendingReview")}
         aside={
-          <PageLink page="admin-review" className="font-medium text-neutral-900 hover:underline">
+          <PageLink page="admin-review" className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
             {t("dashboard.pendingCount", { count: total })}
           </PageLink>
         }

@@ -185,7 +185,7 @@ export default function AdminRegistry() {
         <Card className="p-5">
           <h2 className="text-base font-medium text-neutral-900">{t("registryAdmin.clientConfig")}</h2>
           <p className="mt-1 text-sm text-neutral-600">
-            <Trans i18nKey="registryAdmin.clientConfigDesc" components={{ link: <PageLink page="setup" className="mx-1 font-medium text-neutral-900 hover:underline" /> }} />
+            <Trans i18nKey="registryAdmin.clientConfigDesc" components={{ link: <PageLink page="setup" className="mx-1 font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200" /> }} />
           </p>
           <div className="mt-4 space-y-3">
             <CopyBox label="~/.npmrc" text={npmrc} />
@@ -269,7 +269,7 @@ function TokensCard({ requireToken, onRequireToken }: { requireToken: boolean; o
         </div>
       </LoadState>
       <div className="border-t border-neutral-100 px-5 py-4 text-sm text-neutral-600">
-        <Trans i18nKey="registry.admin.tokensHint" components={{ link: <PageLink page="setup" className="font-medium text-neutral-900 hover:underline" /> }} />
+        <Trans i18nKey="registry.admin.tokensHint" components={{ link: <PageLink page="setup" className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200" /> }} />
       </div>
     </Card>
   );

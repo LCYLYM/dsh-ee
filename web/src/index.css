@@ -19,6 +19,20 @@
   --color-brand-900: #232e69;
   --color-brand-950: #141a3d;
   --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+
+  /* 中性色阶换成 Stripe 式的偏蓝灰：标题 #0a2540、正文 #425466、分隔线 #e3e8ee、浅底 #f6f9fc。
+     全站约 800 处 neutral-* 一起换过来，不用逐页改 class。 */
+  --color-neutral-50: #f6f9fc;
+  --color-neutral-100: #edf2f7;
+  --color-neutral-200: #e3e8ee;
+  --color-neutral-300: #c9d2dc;
+  --color-neutral-400: #9aa8b9;
+  --color-neutral-500: #6b7c93;
+  --color-neutral-600: #425466;
+  --color-neutral-700: #34465b;
+  --color-neutral-800: #1f3349;
+  --color-neutral-900: #0a2540;
+  --color-neutral-950: #061a2f;
 }
 
 /* 基础样式必须写在 @layer base 里：未分层的规则优先级高于 @layer 内的工具类，
@@ -194,6 +208,8 @@ svg .scene-fade { animation-name: scene-fade-in; }
   --color-lp-navy: var(--lp-navy);
   --shadow-lp: var(--lp-shadow);
   --shadow-lp-sm: var(--lp-shadow-sm);
+  --shadow-card: var(--app-shadow);
+  --shadow-card-lg: var(--app-shadow-lg);
 }
 
 @theme inline {
@@ -240,23 +256,23 @@ svg .scene-fade { animation-name: scene-fade-in; }
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --background: #ffffff;
+  --foreground: #0a2540;
+  --card: #ffffff;
+  --card-foreground: #0a2540;
+  --popover: #ffffff;
+  --popover-foreground: #0a2540;
+  --primary: #4d6bfe;
+  --primary-foreground: #ffffff;
+  --secondary: #f6f9fc;
+  --secondary-foreground: #0a2540;
+  --muted: #f6f9fc;
+  --muted-foreground: #6b7c93;
+  --accent: #edf2f7;
+  --accent-foreground: #0a2540;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  --border: #e3e8ee;
+  --input: #e3e8ee;
   --ring: var(--color-brand-500);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
@@ -264,81 +280,86 @@ svg .scene-fade { animation-name: scene-fade-in; }
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.5rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0a2540;
+  --sidebar-primary: #4d6bfe;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #edf2f7;
+  --sidebar-accent-foreground: #0a2540;
+  --sidebar-border: #e3e8ee;
+  --sidebar-ring: #4d6bfe;
+  /* 卡片的 Stripe 式双层柔和阴影 */
+  --app-shadow: 0 2px 5px -1px rgba(50, 50, 93, 0.08), 0 1px 3px -1px rgba(0, 0, 0, 0.06);
+  --app-shadow-lg: 0 13px 27px -5px rgba(50, 50, 93, 0.18), 0 8px 16px -8px rgba(0, 0, 0, 0.18);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: #0b1424;
+  --foreground: #f6f9fc;
+  --card: #111d33;
+  --card-foreground: #f6f9fc;
+  --popover: #111d33;
+  --popover-foreground: #f6f9fc;
+  --primary: #7e94fa;
+  --primary-foreground: #0a2540;
+  --secondary: #1c2a42;
+  --secondary-foreground: #f6f9fc;
+  --muted: #1c2a42;
+  --muted-foreground: #8193a8;
+  --accent: #1c2a42;
+  --accent-foreground: #f6f9fc;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.14);
+  --ring: #7e94fa;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: #0b1424;
+  --sidebar-foreground: #f6f9fc;
+  --sidebar-primary: #7e94fa;
+  --sidebar-primary-foreground: #0a2540;
+  --sidebar-accent: #1c2a42;
+  --sidebar-accent-foreground: #f6f9fc;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #7e94fa;
+  --app-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
+  --app-shadow-lg: 0 13px 27px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 /* 深色桥接：界面里有大量固定的 neutral-* 色阶（约 800 处），
    在 .dark 下把整条色阶翻转，等价于把浅色界面整体映射成深色界面，
-   不用逐个页面改 class。数值与上面的 --background / --card / --foreground 对齐。 */
+   不用逐个页面改 class。数值与上面的 --background / --card / --foreground 对齐，色相是落地页深色那套海军蓝。 */
 .dark {
-  --color-neutral-50: oklch(0.145 0 0);
-  --color-neutral-100: oklch(0.205 0 0);
-  --color-neutral-200: oklch(0.269 0 0);
-  --color-neutral-300: oklch(0.371 0 0);
-  --color-neutral-400: oklch(0.5 0 0);
-  --color-neutral-500: oklch(0.62 0 0);
-  --color-neutral-600: oklch(0.708 0 0);
-  --color-neutral-700: oklch(0.8 0 0);
-  --color-neutral-800: oklch(0.87 0 0);
-  --color-neutral-900: oklch(0.955 0 0);
-  --color-neutral-950: oklch(0.985 0 0);
+  --color-neutral-50: #0b1424;
+  --color-neutral-100: #111d33;
+  --color-neutral-200: #1c2a42;
+  --color-neutral-300: #2a3b57;
+  --color-neutral-400: #4a5d7a;
+  --color-neutral-500: #8193a8;
+  --color-neutral-600: #a3b3c4;
+  --color-neutral-700: #c0cddb;
+  --color-neutral-800: #d9e2eb;
+  --color-neutral-900: #eef3f8;
+  --color-neutral-950: #f6f9fc;
 }
 
 /* 刻意反色（深底浅字）的区块——终端预览、代码块、落地页的深色章节——
    在 .dark 下把色阶还原回原本的浅色系，否则会变成「浅底白字」看不出来。 */
 .dark .on-dark {
-  --color-neutral-50: oklch(0.985 0 0);
-  --color-neutral-100: oklch(0.97 0 0);
-  --color-neutral-200: oklch(0.922 0 0);
-  --color-neutral-300: oklch(0.87 0 0);
-  --color-neutral-400: oklch(0.708 0 0);
-  --color-neutral-500: oklch(0.556 0 0);
-  --color-neutral-600: oklch(0.439 0 0);
-  --color-neutral-700: oklch(0.371 0 0);
-  --color-neutral-800: oklch(0.269 0 0);
-  --color-neutral-900: oklch(0.205 0 0);
-  --color-neutral-950: oklch(0.145 0 0);
+  --color-neutral-50: #f6f9fc;
+  --color-neutral-100: #edf2f7;
+  --color-neutral-200: #e3e8ee;
+  --color-neutral-300: #c9d2dc;
+  --color-neutral-400: #9aa8b9;
+  --color-neutral-500: #6b7c93;
+  --color-neutral-600: #425466;
+  --color-neutral-700: #34465b;
+  --color-neutral-800: #1f3349;
+  --color-neutral-900: #0a2540;
+  --color-neutral-950: #061a2f;
 }
 
 @layer base {

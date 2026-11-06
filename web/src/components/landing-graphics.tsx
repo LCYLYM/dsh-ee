@@ -6,6 +6,16 @@ import { cx } from "./ui";
  * 纯 SVG / CSS，不依赖外部资源；动效在 index.css 里，减少动效时全部静止。
  */
 
+/** Stripe 式悬停箭头：平时是 ›，悬停时伸出箭杆（样式见 index.css 的 .lp-arrow）。 */
+export function HoverArrow() {
+  return (
+    <svg className="lp-arrow" width="10" height="10" viewBox="0 0 10 10" aria-hidden>
+      <path className="lp-arrow-line" d="M0 5h7" />
+      <path className="lp-arrow-tip" d="M1 1l4 4-4 4" />
+    </svg>
+  );
+}
+
 /** 首屏右上角的流动飘带：四条渐变色带从左下扫向右上。 */
 export function Ribbon({ className }: { className?: string }) {
   const id = useId();

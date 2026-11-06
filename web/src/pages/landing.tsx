@@ -6,7 +6,7 @@ import { PageLink } from "../lib/menus";
 import { LangSwitch } from "../components/lang-switch";
 import { ThemeToggle } from "../components/theme-toggle";
 import { LandingHeroScene } from "../components/landing-hero-scene";
-import { Backdrop, Globe, Ribbon } from "../components/landing-graphics";
+import { Backdrop, Globe, HoverArrow, Ribbon } from "../components/landing-graphics";
 import { FeatureGrid } from "../components/landing-features";
 import { cx } from "../components/ui";
 import { useTranslation } from "react-i18next";
@@ -52,16 +52,6 @@ function useScrolled() {
 }
 
 const delay = (ms: number) => ({ "--d": `${ms}ms` }) as React.CSSProperties;
-
-/** 平时是 ›，悬停时伸出箭杆。 */
-function HoverArrow() {
-  return (
-    <svg className="lp-arrow" width="10" height="10" viewBox="0 0 10 10" aria-hidden>
-      <path className="lp-arrow-line" d="M0 5h7" />
-      <path className="lp-arrow-tip" d="M1 1l4 4-4 4" />
-    </svg>
-  );
-}
 
 type Tone = "accent" | "navy" | "ghost" | "ghost-dark";
 

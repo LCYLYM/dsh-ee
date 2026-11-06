@@ -47,7 +47,7 @@ export default function Publish() {
             {way === "cli" && (
               <div className="space-y-4">
                 <p className="text-sm text-neutral-600">
-                  <Trans i18nKey="registry.publish.cliDesc" components={{ link: <PageLink page="setup" className="font-medium text-neutral-900 hover:underline" /> }} />
+                  <Trans i18nKey="registry.publish.cliDesc" components={{ link: <PageLink page="setup" className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200" /> }} />
                 </p>
                 <CopyBox label="~/.npmrc" text={`registry=${baseUrl}/npm/\n${baseUrl.replace(/^https?:/, "")}/npm/:_authToken=${t("registry.setup.tokenPlaceholder")}`} />
                 <CopyBox text={`pnpm build\nnpm publish`} />

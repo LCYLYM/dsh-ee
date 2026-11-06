@@ -140,7 +140,7 @@ export default function AdminSettings() {
             onChange={(v) => set("upstream", { dshfindFeed: v })}
           />
           <p className="text-sm text-neutral-600">
-            <Trans i18nKey="settingsAdmin.registryNote" components={{ link: <PageLink page="admin-registry" className="mx-1 font-medium text-neutral-900 hover:underline" /> }} />
+            <Trans i18nKey="settingsAdmin.registryNote" components={{ link: <PageLink page="admin-registry" className="mx-1 font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200" /> }} />
           </p>
           <Field label={t("settingsAdmin.newVersion")}>
             <Segmented

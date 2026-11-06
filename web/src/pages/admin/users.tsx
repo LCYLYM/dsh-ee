@@ -335,7 +335,7 @@ export default function AdminUsers() {
               {canRoles && (
                 <>
                   {" · "}
-                  <PageLink page="admin-roles" className="font-medium text-neutral-900 hover:underline">
+                  <PageLink page="admin-roles" className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
                     {t("users.manageRoles")}
                   </PageLink>
                 </>

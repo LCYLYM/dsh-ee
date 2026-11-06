@@ -170,7 +170,7 @@ function MenuForm({
                   onClick={() => set({ icon: name })}
                   className={cx(
                     "flex h-8 w-8 items-center justify-center rounded-md",
-                    m.icon === name ? "bg-foreground text-background" : "text-neutral-600 hover:bg-neutral-100",
+                    m.icon === name ? "bg-brand-500 text-white" : "text-neutral-600 hover:bg-neutral-100",
                   )}
                 >
                   <MenuIcon name={name} />

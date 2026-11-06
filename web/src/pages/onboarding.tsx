@@ -21,8 +21,6 @@ const pageForStep: Record<string, string> = {
 // 交给 Agent 之前必须在网页上做完的步骤：要填上游密钥（机密不经过 Agent），或者 Agent 自己的 DSH 要靠它们才能对话
 const agentPrereq = ["base_url", "provider", "models", "default_model"];
 
-const displayFont = { fontFamily: "Outfit, Satoshi, Avenir Next, Segoe UI, sans-serif" };
-
 function ConfigDialog({ step, onClose, onSaved, settings, providers, models, users }: {
   step: SetupStatus["steps"][number];
   onClose: () => void;
@@ -207,28 +205,28 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
     users.reload();
   };
   return (
-    <div className="mx-auto max-w-6xl pb-10" style={displayFont}>
-      <section className="grid gap-10 border-b border-stone-200 pb-12 lg:grid-cols-[1.4fr_.6fr] lg:gap-16">
+    <div className="mx-auto max-w-6xl pb-10">
+      <section className="grid gap-10 border-b border-neutral-200 pb-12 lg:grid-cols-[1.4fr_.6fr] lg:gap-16">
         <div className="onboarding-reveal">
-          <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-[.18em] text-teal-700">
-            <span className="onboarding-status-dot h-1.5 w-1.5 rounded-full bg-teal-600" />
+          <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-[.18em] text-brand-600 dark:text-brand-300">
+            <span className="onboarding-status-dot h-1.5 w-1.5 rounded-full bg-brand-500" />
             {t("onboarding.kicker")}
           </div>
-          <h1 className="mt-5 max-w-xl text-4xl font-medium leading-[1.08] tracking-[-.04em] text-stone-900 sm:text-5xl">
+          <h1 className="mt-5 max-w-xl text-4xl font-bold leading-[1.1] tracking-[-.03em] text-neutral-900 sm:text-5xl">
             {t("onboarding.heroTitle")}
           </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-stone-500">{t("onboarding.heroDesc")}</p>
+          <p className="mt-5 max-w-xl text-base leading-7 text-neutral-500">{t("onboarding.heroDesc")}</p>
         </div>
-        <div className="onboarding-reveal flex flex-col justify-end border-t border-stone-200 pt-6 lg:border-t-0 lg:border-l lg:pl-10 lg:pt-0" style={{ animationDelay: "90ms" }}>
+        <div className="onboarding-reveal flex flex-col justify-end border-t border-neutral-200 pt-6 lg:border-t-0 lg:border-l lg:pl-10 lg:pt-0" style={{ animationDelay: "90ms" }}>
           <div className="flex items-end justify-between gap-6 lg:block">
             <div>
-              <div className="text-xs font-medium tracking-[.14em] text-stone-400">{t("onboarding.requiredLabel")}</div>
-              <div className="mt-2 text-sm text-stone-600">{t("onboarding.progress", { done: completed, total: required.length })}</div>
+              <div className="text-xs font-medium tracking-[.14em] text-neutral-400">{t("onboarding.requiredLabel")}</div>
+              <div className="mt-2 text-sm text-neutral-600">{t("onboarding.progress", { done: completed, total: required.length })}</div>
             </div>
-            <div className="text-6xl font-light leading-none tracking-[-.06em] text-stone-900">{pct}<span className="ml-1 text-2xl">%</span></div>
+            <div className="bg-gradient-to-r from-brand-500 via-[#6d5dfc] to-[#ff7eb3] bg-clip-text text-6xl font-bold leading-none tracking-[-.04em] text-transparent">{pct}<span className="ml-1 text-2xl">%</span></div>
           </div>
-          <div className="mt-6 h-px overflow-hidden bg-stone-200" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-            <div className="h-full w-full origin-left bg-teal-600 transition-transform duration-500" style={{ transform: `scaleX(${pct / 100})` }} />
+          <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-neutral-200" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+            <div className="lp-mesh h-full w-full origin-left rounded-full transition-transform duration-500" style={{ transform: `scaleX(${pct / 100})` }} />
           </div>
         </div>
       </section>
@@ -239,22 +237,22 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
         {status.steps.map((step, index) => {
           const current = !step.done && !step.optional && status.next === step.id;
           return (
-            <li key={step.id} className={`onboarding-step group relative grid gap-4 border-b border-stone-200/90 py-6 sm:grid-cols-[2.5rem_1fr] ${current ? "bg-teal-50/55" : ""}`} style={{ animationDelay: `${120 + index * 45}ms` }}>
+            <li key={step.id} className={`onboarding-step group relative grid gap-4 border-b border-neutral-200/90 py-6 sm:grid-cols-[2.5rem_1fr] ${current ? "bg-brand-50/60 dark:bg-brand-500/10" : ""}`} style={{ animationDelay: `${120 + index * 45}ms` }}>
               <div className="relative flex justify-center pt-1">
-                <span className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold ${step.done ? "border-teal-600 bg-teal-600 text-white" : current ? "border-teal-600 bg-white text-teal-700" : "border-stone-300 bg-white text-stone-400"}`}>
+                <span className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold ${step.done ? "border-brand-500 bg-brand-500 text-white" : current ? "border-brand-500 bg-card text-brand-600" : "border-neutral-300 bg-card text-neutral-400"}`}>
                   {step.done ? <Check size={14} strokeWidth={2} /> : index + 1}
                 </span>
-                {index < status.steps.length - 1 && <span className="absolute bottom-[-1.75rem] top-7 w-px bg-stone-200" aria-hidden="true" />}
+                {index < status.steps.length - 1 && <span className="absolute bottom-[-1.75rem] top-7 w-px bg-neutral-200" aria-hidden="true" />}
               </div>
               <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
                 <div>
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <h2 className="text-lg font-medium tracking-tight text-stone-900">{step.title}</h2>
+                    <h2 className="text-lg font-semibold tracking-tight text-neutral-900">{step.title}</h2>
                     {step.optional && <Badge>{t("onboarding.optional")}</Badge>}
-                    {step.done && <span className="text-xs font-medium text-teal-700">{t("onboarding.done")}</span>}
-                    {current && <span className="text-xs font-semibold text-teal-700">{t("onboarding.next")}</span>}
+                    {step.done && <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{t("onboarding.done")}</span>}
+                    {current && <span className="text-xs font-semibold text-brand-600 dark:text-brand-300">{t("onboarding.next")}</span>}
                   </div>
-                  {(step.detail || step.how) && <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">{step.id === "demo" && !step.done ? t("demo.desc") : step.done ? step.detail : step.how || step.detail}</p>}
+                  {(step.detail || step.how) && <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">{step.id === "demo" && !step.done ? t("demo.desc") : step.done ? step.detail : step.how || step.detail}</p>}
                   {step.id === "demo" && <DemoImportStep done={step.done} onImported={reload} />}
                 </div>
                 <div className="md:pl-4">
@@ -262,7 +260,7 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
                     step.id === "connect" ? (
                       <Button size="sm" disabled={busy} onClick={publish}>{busy ? t("onboarding.publishing") : t("onboarding.publish")}</Button>
                     ) : step.optional ? (
-                      pageForStep[step.id] ? <PageLink page={pageForStep[step.id]} className="inline-flex h-8 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-sm text-stone-600 transition hover:border-teal-600 hover:text-teal-700 active:scale-[.98]">{t("onboarding.handle")} <ArrowRight size={13} /></PageLink> : null
+                      pageForStep[step.id] ? <PageLink page={pageForStep[step.id]} className="inline-flex h-8 items-center gap-2 rounded-md border border-neutral-200 bg-card px-3 font-semibold shadow-card text-sm text-neutral-600 transition hover:border-brand-300 hover:text-brand-600 active:scale-[.98]">{t("onboarding.handle")} <ArrowRight size={13} /></PageLink> : null
                     ) : (
                       <Button size="sm" variant="secondary" onClick={() => setEditing(step)}>{t("onboarding.handle")} <ArrowRight size={13} /></Button>
                     )
@@ -275,15 +273,16 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
       </ol>
 
       {status.install_command && (
-        <section className="mt-12 grid min-w-0 max-w-full gap-6 rounded-2xl bg-stone-900 p-7 text-stone-100 shadow-[0_18px_45px_-28px_rgba(28,25,23,.55)] sm:p-9 lg:grid-cols-[.75fr_1.25fr] lg:gap-12">
-          <div className="min-w-0">
-            <CheckCircle2 className="text-teal-300" size={22} />
-            <h2 className="mt-4 text-xl font-medium tracking-tight text-white">{t("onboarding.inviteTitle")}</h2>
-            <p className="mt-3 text-sm leading-6 text-stone-400">{t("onboarding.inviteDesc")}</p>
+        <section className="relative mt-12 grid min-w-0 max-w-full gap-6 overflow-hidden rounded-2xl bg-[#0a2540] p-7 text-[#adbdcc] shadow-card-lg sm:p-9 lg:grid-cols-[.75fr_1.25fr] lg:gap-12 dark:bg-[#050b16]">
+          <div aria-hidden className="lp-mesh pointer-events-none absolute -top-24 -right-24 h-64 w-96 rounded-full opacity-40 blur-3xl" />
+          <div className="relative min-w-0">
+            <CheckCircle2 className="text-[#80e9ff]" size={22} />
+            <h2 className="mt-4 text-xl font-bold tracking-[-0.01em] text-white">{t("onboarding.inviteTitle")}</h2>
+            <p className="mt-3 text-sm leading-6">{t("onboarding.inviteDesc")}</p>
           </div>
-          <div className="min-w-0">
-            <CopyBox text={status.install_command} />
-            {status.onboarding && <p className="mt-5 text-sm leading-6 whitespace-pre-wrap text-stone-400">{status.onboarding}</p>}
+          <div className="relative min-w-0">
+            <div className="rounded-md ring-1 ring-white/10"><CopyBox text={status.install_command} /></div>
+            {status.onboarding && <p className="mt-5 text-sm leading-6 whitespace-pre-wrap">{status.onboarding}</p>}
           </div>
         </section>
       )}
@@ -317,15 +316,15 @@ function AgentSetup({ status, reload }: { status: SetupStatus; reload: () => voi
   };
 
   return (
-    <section className="onboarding-reveal mt-8 rounded-2xl border border-teal-200 bg-teal-50/40 p-6 sm:p-7">
+    <section className="onboarding-reveal mt-8 rounded-2xl border border-neutral-200/70 bg-card p-6 shadow-card sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-2xl">
-          <div className="flex items-center gap-2 text-lg font-medium tracking-tight text-stone-900">
-            <Bot size={18} className="text-teal-700" />
+          <div className="flex items-center gap-2 text-lg font-semibold tracking-tight text-neutral-900">
+            <span className="lp-mesh flex h-7 w-7 items-center justify-center rounded-md text-white"><Bot size={16} /></span>
             {t("onboarding.agentTitle")}
           </div>
-          <p className="mt-2 text-sm leading-6 text-stone-500">{t("onboarding.agentDesc")}</p>
-          {!open && missing.length > 0 && <p className="mt-2 text-sm text-stone-600">{t("onboarding.agentNeed", { steps: missing.map((step) => step.title).join("、") })}</p>}
+          <p className="mt-2 text-sm leading-6 text-neutral-500">{t("onboarding.agentDesc")}</p>
+          {!open && missing.length > 0 && <p className="mt-2 text-sm text-neutral-600">{t("onboarding.agentNeed", { steps: missing.map((step) => step.title).join("、") })}</p>}
         </div>
         {!open && (
           <Button disabled={busy || missing.length > 0} onClick={() => void start()}>
@@ -334,7 +333,7 @@ function AgentSetup({ status, reload }: { status: SetupStatus; reload: () => voi
         )}
       </div>
       {open && (
-        <div className="mt-6 rounded-xl bg-white p-5">
+        <div className="mt-6 rounded-xl border border-neutral-200/70 bg-neutral-50 p-5">
           <AgentConnect admin />
         </div>
       )}

@@ -27,7 +27,7 @@ export function DemoImportStep({ done, onImported }: { done: boolean; onImported
     }
   };
 
-  if (!user?.is_super) return done ? null : <p className="mt-2 text-sm text-stone-500">{t("demo.superOnly")}</p>;
+  if (!user?.is_super) return done ? null : <p className="mt-2 text-sm text-neutral-500">{t("demo.superOnly")}</p>;
   return (
     <div className="mt-3 max-w-2xl text-sm">
       {result && (
@@ -44,11 +44,11 @@ export function DemoImportStep({ done, onImported }: { done: boolean; onImported
       )}
       {result && result.accounts.length > 0 && (
         <div className="mt-4">
-          <p className="mb-2 font-medium text-stone-900">{t("demo.accounts")}</p>
+          <p className="mb-2 font-medium text-neutral-900">{t("demo.accounts")}</p>
           <CopyBox wrap text={result.accounts.map((a) => `${a.display_name}（${a.department}）  ${a.username}  ${a.password}`).join("\n")} />
         </div>
       )}
-      {result && <p className="mt-3 text-stone-500">{t("demo.tryIt")}</p>}
+      {result && <p className="mt-3 text-neutral-500">{t("demo.tryIt")}</p>}
       {error && <p className="mt-3 text-red-600">{error}</p>}
       {!done && !result && !asking && (
         <Button size="sm" onClick={() => setAsking(true)} disabled={busy}>
@@ -57,7 +57,7 @@ export function DemoImportStep({ done, onImported }: { done: boolean; onImported
       )}
       {asking && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
-          <p className="text-stone-800">{t("demo.confirm")}</p>
+          <p className="text-neutral-800">{t("demo.confirm")}</p>
           <div className="mt-3 flex gap-2">
             <Button size="sm" onClick={() => void run()}>{t("demo.import")}</Button>
             <Button size="sm" variant="secondary" onClick={() => setAsking(false)}>{t("common.cancel")}</Button>

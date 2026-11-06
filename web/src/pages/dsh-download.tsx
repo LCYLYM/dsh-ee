@@ -38,7 +38,7 @@ function DownloadRow({ release, title }: { release: DshRelease; title: string })
         </div>
         <div className="mt-1 text-xs text-neutral-500">{release.verified ? t("download.officialVerified") : t("download.unverifiedDmg")}</div>
       </div>
-      <a href={release.download_url} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-foreground px-4 text-sm font-medium text-background hover:opacity-90">
+      <a href={release.download_url} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-brand-500 px-4 text-sm font-semibold text-white shadow-card hover:bg-brand-600">
         <Download size={14} /> {t("download.download")}
       </a>
     </div>

@@ -130,7 +130,7 @@ function PluginsTab({ limit }: { limit?: number }) {
         <Card className="p-12 text-center text-sm text-neutral-600">{t("common.loading")}</Card>
       ) : list.length === 0 ? (
         <Card className="p-12 text-center text-sm text-neutral-600">
-          <Trans i18nKey="market.empty" components={{ link: <PageLink page="publish" className="font-medium text-neutral-900 hover:underline" /> }} />
+          <Trans i18nKey="market.empty" components={{ link: <PageLink page="publish" className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200" /> }} />
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -331,7 +331,7 @@ export default function Hub() {
             <div className="mt-8">
               <div className="mb-3 flex items-baseline justify-between">
                 <h2 className="text-base font-medium text-neutral-900">{t("hub.tabs.plugin")}</h2>
-                <button type="button" onClick={() => setTab("plugin")} className="text-sm font-medium text-neutral-900 hover:underline">
+                <button type="button" onClick={() => setTab("plugin")} className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
                   {t("hub.viewAllPlugins", { count: plugins.length })}
                 </button>
               </div>

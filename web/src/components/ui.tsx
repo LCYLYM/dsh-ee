@@ -18,11 +18,11 @@ export function Button({
   return (
     <button
       className={cx(
-        "inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex items-center justify-center gap-1.5 rounded-md font-semibold transition active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50",
         size === "sm" ? "h-8 px-3 text-sm" : "h-9 px-4 text-sm",
-        variant === "primary" && "bg-foreground text-background hover:opacity-90",
-        variant === "secondary" && "border border-neutral-300 bg-card text-neutral-800 hover:bg-neutral-50",
-        variant === "ghost" && "text-neutral-600 hover:bg-neutral-100",
+        variant === "primary" && "bg-brand-500 text-white shadow-card hover:bg-brand-600",
+        variant === "secondary" && "border border-neutral-200 bg-card text-neutral-800 shadow-card hover:bg-neutral-50 hover:text-neutral-900",
+        variant === "ghost" && "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900",
         variant === "danger" && "border border-red-200 bg-card text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10",
         className,
       )}
@@ -48,7 +48,7 @@ export function Badge({ tone = "slate", children }: { tone?: keyof typeof tones;
 }
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cx("rounded-lg border border-neutral-200/80 bg-card", className)}>{children}</div>;
+  return <div className={cx("rounded-lg border border-neutral-200/70 bg-card shadow-card", className)}>{children}</div>;
 }
 
 export function Toggle({
@@ -120,7 +120,7 @@ export function Segmented<T extends string>({
           onClick={() => onChange(o.value)}
           className={cx(
             "rounded px-3 py-1 text-sm transition",
-            value === o.value ? "bg-card font-medium text-neutral-900 ring-1 ring-neutral-200" : "text-neutral-600 hover:text-neutral-900",
+            value === o.value ? "bg-card font-medium text-neutral-900 shadow-card ring-1 ring-neutral-200/70" : "text-neutral-600 hover:text-neutral-900",
           )}
         >
           {o.label}
@@ -212,9 +212,9 @@ export function Rating({ value, count }: { value: number; count?: number }) {
 export function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode; icon?: ReactNode }) {
   return (
     <div className="px-5 py-4">
-      <div className="text-sm text-neutral-600">{label}</div>
-      <div className="mt-1.5 text-2xl font-medium text-neutral-900 tabular-nums">{value}</div>
-      {hint && <div className="mt-1 text-xs text-neutral-600">{hint}</div>}
+      <div className="text-[13px] font-medium text-neutral-500">{label}</div>
+      <div className="mt-1.5 text-2xl font-semibold tracking-[-0.01em] text-neutral-900 tabular-nums">{value}</div>
+      {hint && <div className="mt-1 text-xs text-neutral-500">{hint}</div>}
     </div>
   );
 }
@@ -230,7 +230,7 @@ export function StatStrip({ children, cols = 4 }: { children: ReactNode; cols?: 
 export function CardHeader({ title, aside }: { title: ReactNode; aside?: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 px-5 pt-4 pb-3">
-      <h2 className="text-base font-medium text-neutral-900">{title}</h2>
+      <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
       {aside && <div className="text-sm text-neutral-600">{aside}</div>}
     </div>
   );
@@ -240,7 +240,7 @@ export function PageHeader({ title, desc, actions }: { title: string; desc?: Rea
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{title}</h1>
+        <h1 className="text-[26px] leading-tight font-bold tracking-[-0.02em] text-neutral-900">{title}</h1>
         {desc && <p className="mt-1 text-sm text-neutral-600">{desc}</p>}
       </div>
       {actions && <div className="flex gap-2">{actions}</div>}

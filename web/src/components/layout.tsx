@@ -36,11 +36,12 @@ function NavEntry({ m, onNavigate }: { m: Menu; onNavigate: () => void }) {
   const { t } = useTranslation();
   const title = useMenuTitle()(m);
   if (extras.hidden) return null;
-  const cls = "flex h-8 items-center gap-2.5 rounded-md px-3 text-sm transition-colors";
+  const cls = "group flex h-8 items-center gap-2.5 rounded-md px-3 text-sm font-medium transition-colors";
+  const idle = "text-neutral-600 hover:bg-neutral-100/70 hover:text-neutral-900";
   if (m.kind === "link") {
     return (
-      <a href={m.path} target="_blank" rel="noreferrer" onClick={onNavigate} className={cx(cls, "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900")}>
-        <MenuIcon name={m.icon || "ExternalLink"} className="text-neutral-500" />
+      <a href={m.path} target="_blank" rel="noreferrer" onClick={onNavigate} className={cx(cls, idle)}>
+        <MenuIcon name={m.icon || "ExternalLink"} className="text-neutral-400 group-hover:text-neutral-600" />
         {title}
         <ExternalLink size={12} className="ml-auto text-neutral-400" />
       </a>
@@ -52,14 +53,14 @@ function NavEntry({ m, onNavigate }: { m: Menu; onNavigate: () => void }) {
       end
       onClick={onNavigate}
       className={({ isActive }) =>
-        cx(cls, isActive ? "bg-neutral-200/70 text-neutral-900" : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900")
+        cx(cls, isActive ? "active bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-200" : idle)
       }
     >
-      <MenuIcon name={m.icon} className="text-neutral-500" />
+      <MenuIcon name={m.icon} className="text-neutral-400 group-hover:text-neutral-600 group-[.active]:text-brand-500 dark:group-[.active]:text-brand-300" />
       <span className="truncate">{title}</span>
-      {extras.off && <span className="text-xs text-neutral-500">{t("shell.off")}</span>}
+      {extras.off && <span className="text-xs font-normal text-neutral-500">{t("shell.off")}</span>}
       {!!extras.count && (
-        <span className="ml-auto rounded bg-red-50 px-1.5 text-xs leading-5 text-red-800 tabular-nums dark:bg-red-500/15 dark:text-red-300">{extras.count}</span>
+        <span className="ml-auto rounded-full bg-[#ff5996]/12 px-2 text-xs leading-5 font-semibold text-[#d1236c] tabular-nums dark:bg-[#ff5996]/20 dark:text-[#ff8fb8]">{extras.count}</span>
       )}
     </NavLink>
   );
@@ -75,15 +76,15 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
   return (
     <div className="flex min-h-full flex-col px-3 py-4">
       <Link to="/" className="flex items-center gap-2.5 px-3 pb-5" onClick={onNavigate}>
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-500 text-white">
+        <span className="lp-mesh flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-card">
           <Puzzle size={16} />
         </span>
         <span className="leading-tight">
-          <span className="block text-sm font-semibold text-neutral-900">dsh-ee</span>
-          <span className="block text-xs text-neutral-600">{settings.orgName}</span>
+          <span className="block text-[15px] font-bold tracking-[-0.01em] text-neutral-900">dsh-ee</span>
+          <span className="block text-xs text-neutral-500">{settings.orgName}</span>
         </span>
       </Link>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 pb-6">
         {loading && <div className="px-3 text-sm text-neutral-500">{t("shell.loadingMenus")}</div>}
         {error && (
           <button type="button" onClick={() => void reload()} className="px-3 text-left text-sm text-red-700 hover:underline">
@@ -94,7 +95,7 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
           n.kind === "group" ? (
             n.visible && n.children.some((c) => c.visible) ? (
               <div key={n.id}>
-                <div className="px-3 pb-1.5 text-xs text-neutral-500">{menuTitle(n)}</div>
+                <div className="px-3 pb-1.5 text-xs font-semibold tracking-wide text-neutral-400">{menuTitle(n)}</div>
                 <nav className="flex flex-col gap-0.5">
                   {n.children
                     .filter((c) => c.visible)
@@ -111,7 +112,7 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
           ) : null,
         )}
       </div>
-      <div className="mt-auto flex items-center justify-between px-3 pt-6">
+      <div className="mt-auto flex items-center justify-between border-t border-neutral-200/70 px-3 pt-4">
         <LangSwitch />
         <ThemeToggle />
       </div>
@@ -120,13 +121,13 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
           <Link
             to="/account"
             onClick={onNavigate}
-            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 py-1.5 text-sm hover:bg-neutral-100"
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 py-1.5 text-sm hover:bg-neutral-100/70"
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-xs text-neutral-700">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#73c8ff] via-brand-500 to-[#6d5dfc] text-xs font-semibold text-white">
               {(user.display_name || user.username).slice(0, 1).toUpperCase()}
             </span>
             <span className="min-w-0 leading-tight">
-              <span className="block truncate text-neutral-900">{user.display_name || user.username}</span>
+              <span className="block truncate font-medium text-neutral-900">{user.display_name || user.username}</span>
               <span className="block truncate text-xs text-neutral-600">
                 {[user.department, (user.roles ?? []).map((r) => L.role(r)).join(", ")].filter(Boolean).join(" · ")}
               </span>
@@ -137,7 +138,7 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
               type="button"
               aria-label={t("shell.logout")}
               onClick={() => void logout()}
-              className="rounded-md p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+              className="rounded-md p-2 text-neutral-400 hover:bg-neutral-100/70 hover:text-neutral-900"
             >
               <LogOut size={16} />
             </button>
@@ -161,11 +162,11 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-neutral-50 lg:flex">
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 overflow-y-auto border-r border-neutral-200/80 lg:block">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 overflow-y-auto border-r border-neutral-200/70 bg-card lg:block">
         <Sidebar onNavigate={() => {}} />
       </aside>
 
-      <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-neutral-200/80 bg-neutral-50 px-4 lg:hidden">
+      <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-neutral-200/70 bg-card/90 px-4 backdrop-blur lg:hidden">
         <button
           type="button"
           aria-label={open ? t("shell.closeNav") : t("shell.openNav")}
@@ -174,11 +175,11 @@ export function AppLayout() {
         >
           {open ? <X size={20} /> : <MenuGlyph size={20} />}
         </button>
-        <span className="text-sm font-semibold text-neutral-900">dsh-ee</span>
-        <span className="text-sm text-neutral-600">{settings.orgName}</span>
+        <span className="text-sm font-bold text-neutral-900">dsh-ee</span>
+        <span className="text-sm text-neutral-500">{settings.orgName}</span>
       </header>
       {open && (
-        <div className="fixed inset-x-0 top-12 bottom-0 z-20 overflow-y-auto bg-neutral-50 lg:hidden">
+        <div className="fixed inset-x-0 top-12 bottom-0 z-20 overflow-y-auto bg-card lg:hidden">
           <Sidebar onNavigate={() => setOpen(false)} />
         </div>
       )}
