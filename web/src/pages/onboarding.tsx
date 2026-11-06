@@ -10,6 +10,7 @@ import { Badge, Button, Card, CopyBox, Field, inputCls } from "../components/ui"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { ErrorNote } from "../components/api-ui";
 import { AgentConnect } from "../components/agent-connect";
+import { DemoImportStep } from "../components/demo-import";
 
 const pageForStep: Record<string, string> = {
   ldap: "admin-settings",
@@ -253,10 +254,11 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
                     {step.done && <span className="text-xs font-medium text-teal-700">{t("onboarding.done")}</span>}
                     {current && <span className="text-xs font-semibold text-teal-700">{t("onboarding.next")}</span>}
                   </div>
-                  {(step.detail || step.how) && <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">{step.done ? step.detail : step.how || step.detail}</p>}
+                  {(step.detail || step.how) && <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">{step.id === "demo" && !step.done ? t("demo.desc") : step.done ? step.detail : step.how || step.detail}</p>}
+                  {step.id === "demo" && <DemoImportStep done={step.done} onImported={reload} />}
                 </div>
                 <div className="md:pl-4">
-                  {!step.done && (
+                  {!step.done && step.id !== "demo" && (
                     step.id === "connect" ? (
                       <Button size="sm" disabled={busy} onClick={publish}>{busy ? t("onboarding.publishing") : t("onboarding.publish")}</Button>
                     ) : step.optional ? (

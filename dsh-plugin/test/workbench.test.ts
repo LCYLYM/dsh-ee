@@ -233,3 +233,15 @@ test("某个窗格打不开时其余照常打开", async () => {
   assert.equal(await openWorkbench({ sidebarRight: fake.sidebarRight }, webFirst, "s1"), true);
   assert.deepEqual(fake.opened.map((item: any) => item[1]), ["dsh-resource://dsh-ee-workbench/expense-helper/main"]);
 });
+
+test("没有原文窗格时，看板上的出处是 dsh-ee 网页链接，带版本和高亮行", async () => {
+  const { kbDocUrl } = await import("../src/workbench.js");
+  const { citationsView } = await import("../src/workbench-view.js");
+  assert.equal(kbDocUrl("https://ee.example.com", { doc: 12, version: 3, from: 5, to: 12 }), "https://ee.example.com/knowledge/docs/12?v=3#L5-12");
+  assert.equal(kbDocUrl("https://ee.example.com", { doc: 7, from: 4, to: 4 }), "https://ee.example.com/knowledge/docs/7#L4");
+  assert.equal(kbDocUrl("", { doc: 7, from: 4, to: 4 }), undefined);
+  const h = (type: any, props: any, ...children: any[]) => ({ type, props: props ?? {}, children });
+  const view = citationsView(h, [{ doc: 12, version: 3, from: 5, to: 12, quote: "住宿 550 元", title: "差旅费管理办法" }], 0, undefined, (c) => kbDocUrl("https://ee.example.com", c));
+  const text = JSON.stringify(view);
+  assert.match(text, /"type":"a","props":\{"href":"https:\/\/ee\.example\.com\/knowledge\/docs\/12\?v=3#L5-12","target":"_blank"/);
+});

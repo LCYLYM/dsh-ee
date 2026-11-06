@@ -24,6 +24,7 @@ export interface PanelHandlers {
   toggleKB?: (kb: string) => void;
   /** 点看板上的引用：在「原文」窗格打开 */
   openCitation?: (citation: Citation) => void;
+  citationHref?: (citation: Citation) => string | undefined;
 }
 
 const muted = { opacity: 0.65, fontSize: 12 };
@@ -135,14 +136,16 @@ const citationBadges: Record<NonNullable<Citation["status"]>, { text: string; co
 };
 
 /** 看板上的引用：编号、文档、行号与核对结果；点了在「原文」窗格打开。 */
-export function citationsView(h: H, items: Citation[], key: number, open?: (citation: Citation) => void) {
+export function citationsView(h: H, items: Citation[], key: number, open?: (citation: Citation) => void, hrefOf?: (citation: Citation) => string | undefined) {
   return h("ol", { key, style: { margin: 0, paddingLeft: 22, fontSize: 12, display: "grid", gap: 6 } },
     ...items.map((item, i) => {
       const badge = citationBadges[item.status ?? "unchecked"];
       const where = `${item.title || `文档 ${item.doc}`} · 第 ${item.from === item.to ? item.from : `${item.from}–${item.to}`} 行`;
       return h("li", { key: i, "data-citation": i + 1 },
         h("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 } },
-          open ? h("button", { type: "button", onClick: () => open(item), title: "查看原文", style: { ...buttonStyle, padding: "1px 6px" } }, where) : h("span", null, where),
+          open ? h("button", { type: "button", onClick: () => open(item), title: "查看原文", style: { ...buttonStyle, padding: "1px 6px" } }, where)
+            : hrefOf?.(item) ? h("a", { href: hrefOf(item), target: "_blank", rel: "noopener noreferrer", title: "在 dsh-ee 网页上看原文", style: { color: "inherit", textDecoration: "underline" } }, `${where} ↗`)
+            : h("span", null, where),
           h("span", { style: { color: badge.color, fontSize: 11, opacity: item.status === "unchecked" || !item.status ? 0.6 : 1 } }, badge.text)),
         h("div", { style: { ...muted, marginTop: 2, whiteSpace: "pre-wrap" } }, `“${item.quote}”`));
     }));
@@ -165,7 +168,7 @@ export function kbScopeView(h: H, widget: WorkbenchWidget, state: WidgetState | 
 }
 
 /** AI 看板：内容只当文字显示。 */
-export function boardView(h: H, widget: WorkbenchWidget, board: Board | null | undefined, openCitation?: (citation: Citation) => void) {
+export function boardView(h: H, widget: WorkbenchWidget, board: Board | null | undefined, openCitation?: (citation: Citation) => void, citationHref?: (citation: Citation) => string | undefined) {
   let body: any;
   if (!board?.blocks?.length) {
     body = h("div", { style: muted }, "AI 处理完以后会把结果写在这里。");
@@ -174,7 +177,7 @@ export function boardView(h: H, widget: WorkbenchWidget, board: Board | null | u
       ...board.blocks.map((block, b) => {
         if (block.type === "text") return h("div", { key: b, style: { whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6 } }, block.text);
         if (block.type === "list") return h("ul", { key: b, style: { margin: 0, paddingLeft: 18, fontSize: 12 } }, ...block.items.map((item, i) => h("li", { key: i }, item)));
-        if (block.type === "citations") return citationsView(h, block.items, b, openCitation);
+        if (block.type === "citations") return citationsView(h, block.items, b, openCitation, citationHref);
         return h("table", { key: b, style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
           h("thead", null, h("tr", null, ...block.columns.map((column, c) => h("th", { key: c, style: { textAlign: "left", padding: "3px 6px" } }, column)))),
           h("tbody", null, ...block.rows.map((row, r) => h("tr", { key: r }, ...row.map((cell, c) => h("td", { key: c, style: { padding: "3px 6px", borderTop: "1px solid color-mix(in srgb, currentColor 8%, transparent)" } }, cell))))));
@@ -203,7 +206,7 @@ export function panelView(h: H, pane: WorkbenchPane, state: PanelState, handlers
         case "form": return h("div", { key }, formView(h, index, widget, handlers));
         case "actions": return h("div", { key }, actionsView(h, index, widget, handlers));
         case "markdown": return h("div", { key }, markdownView(h, widget));
-        case "board": return h("div", { key }, boardView(h, widget, state.board, handlers.openCitation));
+        case "board": return h("div", { key }, boardView(h, widget, state.board, handlers.openCitation, handlers.citationHref));
         case "kb_scope": return h("div", { key }, kbScopeView(h, widget, state.data[index], handlers));
         default: return null;
       }

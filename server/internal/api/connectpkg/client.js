@@ -20854,6 +20854,12 @@ function docWindow(from) {
   const start = Math.max(1, from - 20);
   return { from: start, to: start + 199 };
 }
+function kbDocUrl(base, citation) {
+  if (!base || !Number.isInteger(citation.doc)) return void 0;
+  const version2 = citation.version && Number.isInteger(citation.version) && citation.version > 0 ? `?v=${citation.version}` : "";
+  const lines = citation.from === citation.to ? `#L${citation.from}` : `#L${citation.from}-${citation.to}`;
+  return `${base}/knowledge/docs/${citation.doc}${version2}${lines}`;
+}
 
 // src/workbench-open.ts
 function waitMounted(sidebarRight, sessionId, timeoutMs = 5e3) {
@@ -21035,7 +21041,7 @@ var citationBadges = {
   missing: { text: "\u2716 \u627E\u4E0D\u5230\u8FD9\u7BC7\u6587\u6863", color: "#b91c1c" },
   unchecked: { text: "\u672A\u6838\u5BF9", color: "inherit" }
 };
-function citationsView(h, items, key, open2) {
+function citationsView(h, items, key, open2, hrefOf) {
   return h(
     "ol",
     { key, style: { margin: 0, paddingLeft: 22, fontSize: 12, display: "grid", gap: 6 } },
@@ -21048,7 +21054,7 @@ function citationsView(h, items, key, open2) {
         h(
           "div",
           { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 } },
-          open2 ? h("button", { type: "button", onClick: () => open2(item), title: "\u67E5\u770B\u539F\u6587", style: { ...buttonStyle2, padding: "1px 6px" } }, where) : h("span", null, where),
+          open2 ? h("button", { type: "button", onClick: () => open2(item), title: "\u67E5\u770B\u539F\u6587", style: { ...buttonStyle2, padding: "1px 6px" } }, where) : hrefOf?.(item) ? h("a", { href: hrefOf(item), target: "_blank", rel: "noopener noreferrer", title: "\u5728 dsh-ee \u7F51\u9875\u4E0A\u770B\u539F\u6587", style: { color: "inherit", textDecoration: "underline" } }, `${where} \u2197`) : h("span", null, where),
           h("span", { style: { color: badge.color, fontSize: 11, opacity: item.status === "unchecked" || !item.status ? 0.6 : 1 } }, badge.text)
         ),
         h("div", { style: { ...muted, marginTop: 2, whiteSpace: "pre-wrap" } }, `\u201C${item.quote}\u201D`)
@@ -21079,7 +21085,7 @@ function kbScopeView(h, widget, state, handlers) {
     bases.length > 0 ? h("div", { style: { ...muted, marginTop: 6 } }, selected.length ? `\u53EA\u67E5\u52FE\u9009\u7684 ${selected.length} \u4E2A\u5E93` : "\u6CA1\u6709\u52FE\u9009\u65F6\u67E5\u5168\u90E8") : null
   );
 }
-function boardView(h, widget, board, openCitation) {
+function boardView(h, widget, board, openCitation, citationHref) {
   let body;
   if (!board?.blocks?.length) {
     body = h("div", { style: muted }, "AI \u5904\u7406\u5B8C\u4EE5\u540E\u4F1A\u628A\u7ED3\u679C\u5199\u5728\u8FD9\u91CC\u3002");
@@ -21090,7 +21096,7 @@ function boardView(h, widget, board, openCitation) {
       ...board.blocks.map((block, b) => {
         if (block.type === "text") return h("div", { key: b, style: { whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6 } }, block.text);
         if (block.type === "list") return h("ul", { key: b, style: { margin: 0, paddingLeft: 18, fontSize: 12 } }, ...block.items.map((item, i) => h("li", { key: i }, item)));
-        if (block.type === "citations") return citationsView(h, block.items, b, openCitation);
+        if (block.type === "citations") return citationsView(h, block.items, b, openCitation, citationHref);
         return h(
           "table",
           { key: b, style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
@@ -21123,7 +21129,7 @@ function panelView(h, pane, state, handlers) {
         case "markdown":
           return h("div", { key }, markdownView(h, widget));
         case "board":
-          return h("div", { key }, boardView(h, widget, state.board, handlers.openCitation));
+          return h("div", { key }, boardView(h, widget, state.board, handlers.openCitation, handlers.citationHref));
         case "kb_scope":
           return h("div", { key }, kbScopeView(h, widget, state.data[index], handlers));
         default:
@@ -21206,6 +21212,11 @@ function createDocTargets() {
 }
 function registerWorkbench(ctx, deps) {
   const { remote, unwrapRemote: unwrapRemote2 } = deps;
+  let docBase = "";
+  const loadDocBase = () => Promise.resolve(remote.serverSettings?.()).then((value) => {
+    docBase = unwrapRemote2(value)?.base ?? docBase;
+  }, () => void 0);
+  void loadDocBase();
   const titleOf = (address) => {
     const parsed = parseWorkbenchAddress(address);
     const pane = deps.appsNow().find((app) => app.name === parsed?.app)?.workbench?.panes.find((item) => item.id === parsed?.pane);
@@ -21277,6 +21288,9 @@ function registerWorkbench(ctx, deps) {
     const hasBoard = !!pane.widgets?.some((widget) => widget.type === "board");
     (0, import_react2.useEffect)(loadAll, [app.name, app.version, pane.id]);
     (0, import_react2.useEffect)(() => {
+      void loadDocBase();
+    }, [app.name]);
+    (0, import_react2.useEffect)(() => {
       if (!hasBoard || !visible) return;
       void loadBoard();
       const timer = setInterval(() => void loadBoard(), 3e3);
@@ -21314,7 +21328,9 @@ function registerWorkbench(ctx, deps) {
           ctx.sidebarRight.openResource(workbenchAddress(app.name, docPane.id), { preferNewPane: true });
         } catch {
         }
-      } : void 0
+      } : void 0,
+      // 没有原文窗格（默认）：出处是链接，点开在 dsh-ee 网页上看
+      citationHref: docPane ? void 0 : (citation) => kbDocUrl(docBase, citation)
     };
     return panelView(import_react2.createElement, pane, { data, board, notice }, handlers);
   };

@@ -145,7 +145,11 @@ export default function KnowledgeDoc() {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const { notify } = useStore();
-  const [version, setVersion] = useState<number | undefined>(undefined);
+  // ?v=3：看引用时的那一版（DSH 里的出处链接带着），行号按那一版算
+  const [version, setVersion] = useState<number | undefined>(() => {
+    const v = Number(new URLSearchParams(location.search).get("v"));
+    return Number.isInteger(v) && v > 0 ? v : undefined;
+  });
   const detail = useApi(() => api.kbDoc(Number(id), version));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");

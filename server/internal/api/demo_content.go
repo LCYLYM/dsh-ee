@@ -144,7 +144,6 @@ func demoTravelWorkbench() *appWorkbench {
 				{Label: "报销要哪些票据", Prompt: "出差回来报销要准备哪些票据、多久之内交、谁审批？带出处。"},
 			}},
 		}},
-		{ID: "doc", Type: "kb_doc", Title: "制度原文"},
 	}}
 }
 
@@ -164,7 +163,6 @@ func demoOnboardingWorkbench() *appWorkbench {
 				Columns:    []wbColumn{{Field: "title", Title: "文档"}, {Field: "kb_title", Title: "知识库"}},
 				RowActions: []wbAction{{Label: "讲了什么", Prompt: "用几句话总结文档「{{row.title}}」（文档编号 {{row.doc}}）讲了什么，带出处。"}}},
 		}},
-		{ID: "doc", Type: "kb_doc", Title: "手册原文"},
 	}}
 }
 

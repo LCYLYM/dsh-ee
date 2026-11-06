@@ -243,3 +243,11 @@ export function docWindow(from: number): { from: number; to: number } {
   const start = Math.max(1, from - 20);
   return { from: start, to: start + 199 };
 }
+
+/** 知识库原文在 dsh-ee 网页上的地址，引用的几行会高亮；不知道 dsh-ee 地址时返回 undefined。 */
+export function kbDocUrl(base: string, citation: Pick<Citation, "doc" | "version" | "from" | "to">): string | undefined {
+  if (!base || !Number.isInteger(citation.doc)) return undefined;
+  const version = citation.version && Number.isInteger(citation.version) && citation.version > 0 ? `?v=${citation.version}` : "";
+  const lines = citation.from === citation.to ? `#L${citation.from}` : `#L${citation.from}-${citation.to}`;
+  return `${base}/knowledge/docs/${citation.doc}${version}${lines}`;
+}

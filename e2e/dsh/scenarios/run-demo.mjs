@@ -5,10 +5,11 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
+import { chromium } from 'playwright-core'
 import { waitFor } from '../lib.mjs'
 import { startFakeLlm, textResponse } from '../spikes/fake-llm.mjs'
 import {
-  modelRequest, openPage, prepare, repo, save, scenarioEnv, setupDevice, startServer, startWeb, stopProcess, stopWeb, work,
+  adminPassword, modelRequest, openPage, prepare, repo, save, scenarioEnv, setupDevice, startServer, startWeb, stopProcess, stopWeb, work,
 } from './harness.mjs'
 
 const shots = path.join(repo, 'e2e/shots/demo')
@@ -21,9 +22,44 @@ async function main() {
   let browser
   try {
     const { admin, employee } = await prepare(server.base, fake)
-    const imported = (await admin.request('POST', '/api/admin/demo', undefined, 200)).data
-    const failed = imported.items.filter((item) => item.result !== 'created')
-    assert.equal(failed.length, 0, `示例内容没全建成：${JSON.stringify(failed)}`)
+    // S0：管理员在网页部署清单（/go?setup=1）里点「导入示例内容」
+    const adminBrowser = await chromium.launch({ executablePath: process.env.CHROME, headless: true, args: ['--no-sandbox'] })
+    try {
+      const web0 = await adminBrowser.newPage({ viewport: { width: 1440, height: 1000 }, locale: 'zh-CN' })
+      await web0.goto(`${server.base}/login?next=${encodeURIComponent('/go?setup=1')}`)
+      await web0.locator('input[autocomplete="username"], input[name="username"]').first().fill('admin')
+      await web0.locator('input[type="password"]').first().fill(adminPassword)
+      await web0.keyboard.press('Enter')
+      const step = web0.locator('li').filter({ has: web0.getByRole('heading', { name: '示例内容', exact: true }) })
+      await step.getByRole('button', { name: '导入示例内容', exact: true }).click({ timeout: 20_000 }).catch(async (error) => {
+        await web0.screenshot({ path: path.join(work, 'failure-go.png'), fullPage: true })
+        fs.writeFileSync(path.join(work, 'failure-go.txt'), `${web0.url()}\n${await web0.locator('body').innerText()}`)
+        throw error
+      })
+      await step.getByText('导入后，两个示例微应用', { exact: false }).waitFor()
+      await step.getByRole('button', { name: '导入示例内容', exact: true }).click()
+      await step.getByText('演示员工账号', { exact: false }).waitFor({ timeout: 30_000 })
+      const accounts = await step.innerText()
+      assert.match(accounts, /demo\.zhang/)
+      await web0.screenshot({ path: path.join(shots, 'go-import.png'), fullPage: true })
+      // 出处链接：没登录时先去登录，登录后回到原文并高亮那几行
+      const linkPage = await (await adminBrowser.newContext({ locale: 'zh-CN' })).newPage()
+      const docs = (await admin.request('GET', '/api/kb')).data
+      const kb = (docs.bases ?? docs.items ?? docs).find((item) => item.slug === 'travel-policy')
+      const detail = (await admin.request('GET', `/api/kb/${kb.id}`)).data
+      const doc = (detail.docs ?? []).find((item) => item.title === '差旅费管理办法')
+      await linkPage.goto(`${server.base}/knowledge/docs/${doc.id}?v=1#L24-30`)
+      await linkPage.locator('input[type="password"]').first().waitFor()
+      await linkPage.locator('input[autocomplete="username"], input[name="username"]').first().fill('admin')
+      await linkPage.locator('input[type="password"]').first().fill(adminPassword)
+      await linkPage.keyboard.press('Enter')
+      await waitFor(() => linkPage.url().endsWith(`/knowledge/docs/${doc.id}?v=1#L24-30`), '登录后回到出处链接（带高亮行）', 20_000)
+      await linkPage.getByText('第四条', { exact: false }).first().waitFor()
+      await linkPage.screenshot({ path: path.join(shots, 'citation-link.png'), fullPage: false })
+      save('demo-s0', { status: 'pass', importedFromGo: true, linkKeepsHighlight: true })
+    } finally {
+      await adminBrowser.close()
+    }
     await admin.request('POST', '/api/admin/connect/publish', {}, 200)
     const script = path.join(work, 'setup.sh')
     fs.writeFileSync(script, await (await fetch(`${server.base}/setup.sh`)).text(), { mode: 0o700 })
@@ -72,6 +108,7 @@ async function main() {
     await page.getByText('BX-1001', { exact: true }).first().waitFor({ timeout: 30_000 })
     const body = await page.locator('body').innerText()
     for (const want of ['本月已报', '部门剩余预算', '出差报销计算器', '计算结果', '报销单']) assert.ok(body.includes(want), `工作台上应有「${want}」`)
+    assert.equal(await page.getByText('制度原文', { exact: true }).count(), 0, '原文不再单独开一栏')
     await page.screenshot({ path: path.join(shots, 'travel-workbench.png'), fullPage: true })
     save('demo-s2', { status: 'pass', claimsVisible: true })
 

@@ -229,7 +229,7 @@ func TestKnowledge(t *testing.T) {
 		} `json:"apps"`
 	}
 	_ = json.Unmarshal(body, &cat)
-	if len(cat.Apps) != 1 || cat.Apps[0].Name != "kb-qa" || cat.Apps[0].Title != "知识问答" || cat.Apps[0].Workbench == nil || cat.Apps[0].Workbench.Panes[1].Type != "kb_doc" {
+	if len(cat.Apps) != 1 || cat.Apps[0].Name != "kb-qa" || cat.Apps[0].Title != "知识问答" || cat.Apps[0].Workbench == nil || len(cat.Apps[0].Workbench.Panes) != 1 || cat.Apps[0].Workbench.Panes[0].Type != "panel" {
 		t.Fatalf("应有预置的知识问答：%s", body)
 	}
 	code, body, _ = bob.do("GET", "/api/dsh/skills/kb-qa", nil, nil)

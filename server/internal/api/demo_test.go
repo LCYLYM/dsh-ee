@@ -79,6 +79,35 @@ func TestDemoImport(t *testing.T) {
 		t.Fatalf("导入后应显示已导入：%s", body)
 	}
 
+	// 部署清单（/go）里「示例内容」一步变成已完成
+	code, body = admin.do("GET", "/api/admin/setup-status", nil, nil)
+	expect(t, "部署清单", code, 200, body)
+	var setup struct {
+		Steps []struct {
+			ID       string
+			Done     bool
+			Optional bool
+		}
+	}
+	_ = json.Unmarshal(body, &setup)
+	if !slices.ContainsFunc(setup.Steps, func(s struct {
+		ID       string
+		Done     bool
+		Optional bool
+	}) bool {
+		return s.ID == "demo" && s.Done && s.Optional
+	}) {
+		t.Fatalf("部署清单里应有已完成的可选步骤 demo：%s", body)
+	}
+
+	// 填了访问地址：微应用指令里教模型把出处写成网页链接
+	code, body = admin.do("GET", "/api/settings", nil, nil)
+	expect(t, "读设置", code, 200, body)
+	set := decodeAs[map[string]any](t, body)
+	set["baseUrl"] = "https://ee.example.com"
+	code, body = admin.do("PUT", "/api/admin/settings", set, nil)
+	expect(t, "填访问地址", code, 200, body)
+
 	// 演示员工用返回的密码登录，接入 DSH
 	zhang := newClient(t, ts.URL)
 	code, body = zhang.do("POST", "/api/auth/login", map[string]string{"username": res.Accounts[0].Username, "password": res.Accounts[0].Password}, nil)
@@ -110,8 +139,8 @@ func TestDemoImport(t *testing.T) {
 	// 微应用指令里带着知识库规则和工作台
 	code, body, _ = dsh.do("GET", "/api/dsh/skills/travel-expense", nil, nil)
 	expect(t, "读微应用", code, 200, body)
-	for _, want := range []string{"差旅与报销制度（示例）", "## 工作台", "ee_workbench", "demo-travel__"} {
-		if !strings.Contains(string(body), want) {
+	for _, want := range []string{"差旅与报销制度（示例）", "## 工作台", "ee_workbench", "demo-travel__", "https://ee.example.com/knowledge/docs/<文档编号>?v=<版本>#L<起始行>-<结束行>"} {
+		if !strings.Contains(decodeAs[struct{ Content string }](t, body).Content, want) {
 			t.Fatalf("微应用指令里应有 %q", want)
 		}
 	}

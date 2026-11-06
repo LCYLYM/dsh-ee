@@ -3,7 +3,7 @@ import { createElement, useEffect, useRef, useState } from "react";
 import { sendUnknownNotice } from "./app-launcher.js";
 import { currentSessionOf, sendToSession } from "./host-session.js";
 import type { CatalogApp } from "./skills.js";
-import { docWindow, fillPrompt, parseWorkbenchAddress, scopeText, workbenchAddress, workbenchScheme, type Board, type Citation, type KBaseItem, type WorkbenchAction, type WorkbenchPane } from "./workbench.js";
+import { docWindow, fillPrompt, kbDocUrl, parseWorkbenchAddress, scopeText, workbenchAddress, workbenchScheme, type Board, type Citation, type KBaseItem, type WorkbenchAction, type WorkbenchPane } from "./workbench.js";
 import { openWorkbench } from "./workbench-open.js";
 import { kbDocView, missingPaneView, panelView, type DocTarget, type PanelHandlers, type WidgetState } from "./workbench-view.js";
 
@@ -46,6 +46,10 @@ export interface WorkbenchDeps {
 
 export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
   const { remote, unwrapRemote } = deps;
+  // 出处链接用的 dsh-ee 地址；员工在设置里改了地址，下次打开面板时重读
+  let docBase = "";
+  const loadDocBase = () => Promise.resolve(remote.serverSettings?.()).then((value: any) => { docBase = unwrapRemote(value)?.base ?? docBase; }, () => undefined);
+  void loadDocBase();
   const titleOf = (address: string) => {
     const parsed = parseWorkbenchAddress(address);
     const pane = deps.appsNow().find((app) => app.name === parsed?.app)?.workbench?.panes.find((item) => item.id === parsed?.pane);
@@ -127,6 +131,7 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
 
     // 打开标签页或配置变化时取一次数；不做定时刷新，组件上有刷新按钮
     useEffect(loadAll, [app.name, app.version, pane.id]);
+    useEffect(() => { void loadDocBase(); }, [app.name]);
     // 看板：标签页可见时每 3 秒读一次本机文件，不可见时停止
     useEffect(() => {
       if (!hasBoard || !visible) return;
@@ -168,6 +173,8 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
           // 打不开新窗格时，原文窗格如果已经开着，也会跟着切过去
         }
       } : undefined,
+      // 没有原文窗格（默认）：出处是链接，点开在 dsh-ee 网页上看
+      citationHref: docPane ? undefined : (citation: Citation) => kbDocUrl(docBase, citation),
     };
     return panelView(createElement, pane, { data, board, notice }, handlers);
   };

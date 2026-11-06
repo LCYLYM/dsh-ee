@@ -91,7 +91,8 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
   if (!user) {
     if (loggedOut) return <Navigate to="/login" replace />;
-    const next = encodeURIComponent(loc.pathname + loc.search);
+    // 带上 #L5-8：从 DSH 里点知识库出处进来、登录后还要高亮那几行
+    const next = encodeURIComponent(loc.pathname + loc.search + loc.hash);
     return <Navigate to={`/login?next=${next}`} replace />;
   }
   return children;

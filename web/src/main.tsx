@@ -55,7 +55,9 @@ function Start() {
   // 只有第一次加载显示加载中；之后的刷新不能卸掉清单页（上面有进行中的 Agent 接入）
   if (loading || (!setup.data && setup.loading) || (!welcome.data && welcome.loading)) return <Status title={t("common.loading")} />;
   if (!homePath) return <Status title={t("shell.noPages")}>{t("shell.noPagesHint")}</Status>;
-  if (setup.data && !setup.data.required_done) return <Onboarding status={setup.data} reload={reload} />;
+  // /go?setup=1：必做项都完成后，管理员也能回来看清单（例如导入示例内容）
+  const forced = new URLSearchParams(window.location.search).has("setup");
+  if (setup.data && (!setup.data.required_done || forced)) return <Onboarding status={setup.data} reload={reload} />;
   if (welcome.data?.show) return <Navigate to="/get-started" replace />;
   return <Navigate to={homePath} replace />;
 }

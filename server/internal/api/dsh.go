@@ -152,6 +152,8 @@ type dshCatalog struct {
 	system map[string]string
 	// 员工能查的知识库（kb__ 工具与「知识问答」）
 	kbases []*store.KBase
+	// dsh-ee 网页地址，用来给知识库引用拼原文链接；不知道时为空，不出链接
+	base string
 }
 
 // userCatalog 算出某个员工的 DSH 此刻应有的技能、连接与必装插件：
@@ -187,6 +189,7 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	if c.kbases, err = s.readableKBases(ctx, v); err != nil {
 		return nil, err
 	}
+	c.base, _ = s.connectBase(ctx, nil)
 	var connIDs []int64
 	for _, a := range on {
 		lv := live[a.ID]
@@ -294,7 +297,7 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	if err != nil {
 		return nil, err
 	}
-	if app, skill, body := kbQAApp(set, c.ServerName, c.kbases); app != nil {
+	if app, skill, body := kbQAApp(set, c.ServerName, c.base, c.kbases); app != nil {
 		c.Skills = slices.DeleteFunc(c.Skills, func(k dshSkill) bool { return k.Name == kbQAName })
 		c.Apps = slices.DeleteFunc(c.Apps, func(a dshApp) bool { return a.Name == kbQAName })
 		c.AvailableApps = slices.DeleteFunc(c.AvailableApps, func(a dshApp) bool { return a.Name == kbQAName })
@@ -544,7 +547,7 @@ func appContent(sp *assetSpec, c *dshCatalog) string {
 				}
 			}
 		}
-		b.WriteString(kbRules(c.ServerName, bases, board))
+		b.WriteString(kbRules(c.ServerName, c.base, bases, board))
 	}
 	if missing := missingAppCapabilities(sp, c); len(missing) > 0 {
 		fmt.Fprintf(&b, "\n注意：这些能力不在当前用户的可用范围内，不要尝试调用：%s\n", strings.Join(missing, "、"))

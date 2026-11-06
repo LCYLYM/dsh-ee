@@ -187,7 +187,12 @@ type demoAccount struct {
 
 // GET /api/admin/demo：示例内容里各项现在有没有。
 func (s *Server) handleDemoStatus(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	items, imported := s.demoState(r.Context())
+	writeJSON(w, http.StatusOK, map[string]any{"items": items, "imported": imported})
+}
+
+// demoState 列出示例内容里各项现在有没有，全都有算已导入。
+func (s *Server) demoState(ctx context.Context) ([]demoItem, bool) {
 	items := []demoItem{}
 	for _, b := range demoKBases {
 		items = append(items, s.demoExists(ctx, "kb", b.Slug, b.Title))
@@ -206,7 +211,7 @@ func (s *Server) handleDemoStatus(w http.ResponseWriter, r *http.Request) {
 	for _, it := range items {
 		imported = imported && it.Result == "exists"
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items, "imported": imported})
+	return items, imported
 }
 
 func (s *Server) demoExists(ctx context.Context, kind, slug, title string) demoItem {

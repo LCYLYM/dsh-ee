@@ -142,7 +142,8 @@ export default {
     confirm: "The two demo micro-apps will appear in everyone's DSH, and two demo employee accounts will be created. Import now?",
     accounts: "Demo employee accounts (passwords are shown only once — write them down)",
     failed: "failed",
-    tryIt: "Open the travel expense calculator from the DSH sidebar to try it. To remove the demo, delete the items marked \"示例\" in the hub, knowledge bases and users.",
+    superOnly: "Only a super admin can import demo content.",
+    tryIt: "Open the travel expense calculator from the DSH sidebar to try it: every citation in the AI's answer is a link to the source on this site. To remove the demo, delete the items marked \"示例\" in the hub, knowledge bases and users.",
     kinds: { kb: "Knowledge base", connection: "Connection", skill: "Skill", prompt: "Prompt", app: "Micro-app", user: "Employee" },
   },
 } satisfies Messages<typeof zh>;
