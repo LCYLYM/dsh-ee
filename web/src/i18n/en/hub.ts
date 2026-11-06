@@ -121,7 +121,10 @@ export default {
     webPane: "Web page",
     sources: "Tools usable as data sources (enabled, read-only tools of the selected connections):",
     noSources: "The selected connections have no enabled read-only tools, so metric and table widgets cannot be used yet.",
-    widget: { metric: "Metric", table: "Table", form: "Form", actions: "Quick actions", markdown: "Notes", board: "AI board" },
+    widget: { metric: "Metric", table: "Table", chart: "Chart", checklist: "Checklist", form: "Form", actions: "Quick actions", markdown: "Notes", heading: "Section heading", board: "AI board", kb_scope: "Which knowledge bases" },
+    chartKinds: { line: "Line", bar: "Bar", pie: "Pie" },
+    detail: "Open a row to see: {{fields}}",
+    empty: "When empty: {{text}}",
   },
   editor: {
     newSkill: "Write a skill",

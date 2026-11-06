@@ -583,15 +583,24 @@ export interface WorkbenchAction {
 }
 
 export interface WorkbenchWidget {
-  type: "metric" | "table" | "form" | "actions" | "markdown" | "board";
+  type: "metric" | "table" | "chart" | "checklist" | "form" | "actions" | "markdown" | "heading" | "board" | "kb_scope";
   title?: string;
   text?: string;
   source?: { connection: string; tool: string; args?: Record<string, unknown> };
   field?: string;
   format?: string;
+  delta_field?: string;
   rows?: string;
   columns?: { field: string; title: string; format?: string }[];
   row_actions?: WorkbenchAction[];
+  detail?: { field: string; title: string; format?: string }[];
+  chart?: "line" | "bar" | "pie";
+  x?: string;
+  y?: { field: string; title: string; format?: string }[];
+  items?: { id: string; text: string }[];
+  item_field?: string;
+  id_field?: string;
+  empty?: { text: string; action?: WorkbenchAction };
   fields?: { name: string; label: string; kind: string; required?: boolean; options?: string[] }[];
   submit?: WorkbenchAction;
   actions?: WorkbenchAction[];
@@ -599,7 +608,7 @@ export interface WorkbenchWidget {
 
 export interface WorkbenchPane {
   id: string;
-  type: "panel" | "web";
+  type: "panel" | "web" | "kb_doc";
   title: string;
   url?: string;
   widgets?: WorkbenchWidget[];

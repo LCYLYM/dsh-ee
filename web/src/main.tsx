@@ -1,6 +1,6 @@
 import { StrictMode, useCallback } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes, useParams, useSearchParams } from "react-router";
 import "./index.css";
 import "./i18n";
 import { initTheme } from "./lib/theme";
@@ -61,6 +61,20 @@ function Start() {
   if (setup.data && (!setup.data.required_done || forced)) return <Onboarding status={setup.data} reload={reload} />;
   if (welcome.data?.show) return <Navigate to="/get-started" replace />;
   return <Navigate to={homePath} replace />;
+}
+
+/**
+ * /connections/<标识>：DSH 工作台里「无权限 → 去申请」的链接只知道连接的标识，
+ * 这里换成连接的详情页（上面有申请使用的入口）。
+ */
+function ConnectionBySlug() {
+  const { slug } = useParams();
+  const hub = useApi(api.hub);
+  const { t } = useTranslation();
+  if (hub.loading && !hub.data) return <Status title={t("common.loading")} />;
+  const a = hub.data?.assets.find((x) => x.kind === "connection" && x.slug === slug);
+  if (!a) return <Status title={t("shell.notFound")}>{t("shell.notFoundHint")}</Status>;
+  return <Navigate to={`/assets/${a.id}`} replace />;
 }
 
 function NotFound() {
@@ -133,6 +147,7 @@ function AppRoutes() {
         <Route path="assets/new" element={<AssetEditor />} />
         <Route path="assets/:id" element={<AssetDetail />} />
         <Route path="assets/:id/edit" element={<AssetEditor />} />
+        <Route path="connections/:slug" element={<ConnectionBySlug />} />
         <Route path="knowledge/docs/:id" element={<KnowledgeDoc />} />
         <Route path="knowledge/:id" element={<KnowledgeBase />} />
         {!pages.some((m) => m.path === "/market") && <Route path="market" element={<LegacyHub />} />}

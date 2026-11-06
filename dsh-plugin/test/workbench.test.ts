@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { appsSection } from "../src/apps-view.js";
 import type { CatalogApp } from "../src/skills.js";
-import { checkBoardBlocks, checkForm, fillPrompt, formatValue, getPath, parseWorkbenchAddress, tableRows, toolValue, workbenchAddress, type AppWorkbench } from "../src/workbench.js";
+import { checkBoardBlocks, checkForm, fillPrompt, formatValue, getPath, parseWorkbenchAddress, tableRows, toolValue, workbenchAddress, type AppWorkbench, type WorkbenchPane } from "../src/workbench.js";
 import { BoardStore, readWidgetData, runWorkbenchTool } from "../src/workbench-host.js";
 import { boardView, missingPaneView, panelView, type PanelHandlers } from "../src/workbench-view.js";
 import { openWorkbench, waitMounted, workbenchOpenIn } from "../src/workbench-open.js";
@@ -246,4 +246,111 @@ test("没有原文窗格时，看板上的出处是 dsh-ee 网页链接，带版
   const view = citationsView(h, [{ doc: 12, version: 3, from: 5, to: 12, quote: "住宿 550 元", title: "差旅费管理办法" }], 0, undefined, (c) => kbDocUrl("https://ee.example.com", c));
   const text = JSON.stringify(view);
   assert.match(text, /"type":"a","props":\{"href":"https:\/\/ee\.example\.com\/knowledge\/docs\/12\?v=3#L5-12","target":"_blank"/);
+});
+
+// ---- 工作台组件升级：图表、清单、详情卡、四种状态 ----
+
+test("大数字、变化比例、图表序列与清单条目", async () => {
+  const { compactNumber, formatDelta, chartSeries, checklistItems } = await import("../src/workbench.js");
+  assert.equal(compactNumber(123456), "12.3 万");
+  assert.equal(compactNumber(-250000000), "-2.5 亿");
+  assert.equal(compactNumber(980), "980");
+  assert.equal(formatValue(15000, "compact"), "1.5 万");
+  assert.deepEqual(formatDelta(0.123), { text: "↑12.3%", direction: "up" });
+  assert.deepEqual(formatDelta("-0.05"), { text: "↓5%", direction: "down" });
+  assert.deepEqual(formatDelta(0), { text: "持平", direction: "flat" });
+  assert.equal(formatDelta("abc"), undefined);
+  const data = chartSeries({ items: [{ m: "5月", a: 10, b: "x" }, { m: "6月", a: "20", b: 3 }] }, { rows: "items", x: "m", y: [{ field: "a", title: "金额" }, { field: "b", title: "单数" }] });
+  assert.deepEqual(data.labels, ["5月", "6月"]);
+  assert.deepEqual(data.series.map((s) => s.values), [[10, 20], [0, 3]]);
+  assert.deepEqual(checklistItems({ items: [{ id: "laptop", text: "领电脑" }] }), [{ id: "laptop", text: "领电脑" }]);
+  assert.deepEqual(checklistItems({ rows: "items", item_field: "name", id_field: "id" }, { items: [{ id: 7, name: "签合同" }, { id: 7, name: "重复" }, { name: "没编号" }] }), [{ id: "7", text: "签合同" }, { id: "没编号", text: "没编号" }]);
+});
+
+const upgraded: WorkbenchPane = {
+  id: "main", type: "panel", title: "新组件",
+  widgets: [
+    { type: "heading", title: "本月" },
+    { type: "metric", title: "已报", source: { connection: "expense", tool: "summary" }, field: "total", format: "compact", delta_field: "change" },
+    { type: "chart", title: "趋势", chart: "line", source: { connection: "expense", tool: "trend" }, rows: "items", x: "m", y: [{ field: "a", title: "金额" }, { field: "b", title: "单数" }] },
+    { type: "chart", title: "构成", chart: "pie", source: { connection: "expense", tool: "trend" }, rows: "items", x: "m", y: [{ field: "a", title: "金额" }] },
+    { type: "checklist", title: "入职清单", items: [{ id: "laptop", text: "领电脑" }, { id: "badge", text: "办工牌" }] },
+    { type: "table", title: "单据", source: { connection: "expense", tool: "list" }, rows: "items", columns: [{ field: "id", title: "单号" }], detail: [{ field: "reason", title: "事由" }], empty: { text: "这个月还没有报销单", action: { label: "新建一张", prompt: "帮我新建一张报销单" } } },
+  ],
+};
+
+test("新组件渲染：分组标题、指标变化、折线与饼图、清单进度、详情卡展开", () => {
+  const hs = handlers();
+  let toggled = "";
+  let expandedRow: number | undefined;
+  const view = panelView(h, upgraded, {
+    data: {
+      1: { status: "ready", value: { total: 123456, change: 0.08 } },
+      2: { status: "ready", value: { items: [{ m: "5月", a: 10, b: 1 }, { m: "6月", a: 30, b: 2 }] } },
+      3: { status: "ready", value: { items: [{ m: "差旅", a: 3 }, { m: "餐费", a: 1 }] } },
+      5: { status: "ready", value: { items: [{ id: "B1", reason: "去上海见客户" }] } },
+    },
+  }, { ...hs, checked: () => ["badge"], toggleCheck: (_i, id) => { toggled = id; }, expandedRow: () => expandedRow, toggleRow: (_i, r) => { expandedRow = r; } });
+  const text = JSON.stringify(view);
+  assert.equal(find(view, (node) => node.type === "h3")[0].children[0], "本月");
+  assert.match(text, /12\.3 万/);
+  assert.match(text, /↑8%/);
+  assert.equal(find(view, (node) => node.type === "polyline").length, 2);
+  assert.equal(find(view, (node) => node.type === "path").length, 2);
+  assert.match(text, /差旅：3（75%）/);
+  assert.match(text, /1\/2/);
+  const boxes = find(view, (node) => node.type === "input" && node.props.type === "checkbox");
+  assert.deepEqual(boxes.map((node) => node.props.checked), [false, true]);
+  boxes[0].props.onChange();
+  assert.equal(toggled, "laptop");
+  assert.equal(find(view, (node) => node.type === "dl").length, 0);
+  find(view, (node) => node.type === "button" && node.props["aria-label"] === "展开详情")[0].props.onClick({ stopPropagation() {} });
+  assert.equal(expandedRow, 0);
+  const open = panelView(h, upgraded, { data: { 5: { status: "ready", value: { items: [{ id: "B1", reason: "去上海见客户" }] } } } }, { ...hs, expandedRow: (i) => (i === 5 ? 0 : undefined) });
+  assert.match(JSON.stringify(find(open, (node) => node.type === "dl")), /去上海见客户/);
+});
+
+test("四种状态：骨架屏、空状态带建议操作、无权限带申请链接、出错可重试", () => {
+  const table = upgraded.widgets![5];
+  const one: WorkbenchPane = { ...upgraded, widgets: [table] };
+  const states = (state: any, extra: Partial<PanelHandlers> = {}) => panelView(h, one, { data: { 0: state } }, { ...handlers(), ...extra });
+  const loading = states(undefined);
+  assert.equal(find(loading, (node) => node.props?.["data-state"] === "loading").length, 1);
+  const hs = handlers();
+  const empty = panelView(h, one, { data: { 0: { status: "ready", value: { items: [] } } } }, hs);
+  assert.match(JSON.stringify(empty), /这个月还没有报销单/);
+  find(empty, (node) => node.type === "button" && node.children.includes("新建一张"))[0].props.onClick();
+  assert.deepEqual(hs.sent, ["0:empty=帮我新建一张报销单"]);
+  const forbidden = states({ status: "forbidden" }, { requestHref: (c) => `https://ee.example.com/connections/${c}` });
+  assert.match(JSON.stringify(forbidden), /你还没有「expense」里「list」的使用权限/);
+  assert.equal(find(forbidden, (node) => node.type === "a")[0].props.href, "https://ee.example.com/connections/expense");
+  let retried = -1;
+  const error = states({ status: "error", error: "超时" }, { refresh: (i) => { retried = i; } });
+  assert.match(JSON.stringify(error), /取数失败：超时/);
+  find(error, (node) => node.type === "button" && node.children.includes("重试"))[0].props.onClick();
+  assert.equal(retried, 0);
+});
+
+test("ee_workbench 更新清单：按标题找清单、只认配置里的编号、按会话保存", async () => {
+  const { ChecklistStore } = await import("../src/workbench-host.js");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dsh-ee-checklist-"));
+  const checklists = new ChecklistStore(dir);
+  const withList: CatalogApp = { ...app, name: "onboarding", workbench: { panes: [upgraded] } };
+  const deps = { boards: new BoardStore(dir), checklists, readApps: async () => [withList], boundSession: () => "bound" };
+  const exec = { agent: { session: { id: "s1" } } };
+  assert.equal(await runWorkbenchTool(deps, { action: "checklist", app: "onboarding", done: ["laptop"] }, exec), "已更新清单「入职清单」：完成 1/2");
+  assert.deepEqual(checklists.read("onboarding", "s1")?.lists, { "main:4": ["laptop"] });
+  await runWorkbenchTool(deps, { action: "checklist", app: "onboarding", title: "入职清单", done: ["badge"], undone: ["laptop"] }, exec);
+  assert.deepEqual(checklists.read("onboarding", "s1")?.lists["main:4"], ["badge"]);
+  await assert.rejects(runWorkbenchTool(deps, { action: "checklist", app: "onboarding", done: ["nope"] }, exec), /没有条目 nope/);
+  await assert.rejects(runWorkbenchTool(deps, { action: "checklist", app: "onboarding", title: "别的", done: ["badge"] }, exec), /没有标题是「别的」的清单/);
+  await assert.rejects(runWorkbenchTool(deps, { action: "checklist", app: "onboarding" }, exec), /至少填一个/);
+  await assert.rejects(runWorkbenchTool(deps, { action: "checklist", app: "expense-helper", done: ["x"] }, exec), /没有微应用/);
+  await assert.rejects(runWorkbenchTool({ ...deps, readApps: async () => [app] }, { action: "checklist", app: "expense-helper", done: ["x"] }, exec), /没有清单/);
+  // 拿不到调用方会话时用绑定的会话；别的会话不受影响
+  await runWorkbenchTool(deps, { action: "checklist", app: "onboarding", done: ["laptop"] });
+  assert.deepEqual(checklists.read("onboarding", "bound")?.lists["main:4"], ["laptop"]);
+  assert.deepEqual(checklists.read("onboarding", "s1")?.lists["main:4"], ["badge"]);
+  assert.throws(() => checklists.update("onboarding", "s1", "../x", ["a"], []), /清单编号不合法/);
+  fs.rmSync(dir, { recursive: true, force: true });
 });

@@ -30,24 +30,47 @@ type wbPane struct {
 }
 
 type wbWidget struct {
-	Type  string `json:"type"` // metric | table | form | actions | markdown | board | kb_scope
+	Type  string `json:"type"` // metric | table | chart | checklist | form | actions | markdown | heading | board | kb_scope
 	Title string `json:"title,omitempty"`
 	// markdown：说明文字
 	Text string `json:"text,omitempty"`
 	// metric、table：取数用的只读企业工具
 	Source *wbSource `json:"source,omitempty"`
-	// metric：结果里的字段（点号路径）
-	Field  string `json:"field,omitempty"`
-	Format string `json:"format,omitempty"`
-	// table：结果里的列表（点号路径，空表示结果本身）、列与行按钮
-	Rows       string     `json:"rows,omitempty"`
+	// metric：结果里的字段（点号路径）；delta_field 是相比上期的变化比例（0.12 显示为 ↑12%）
+	Field      string `json:"field,omitempty"`
+	Format     string `json:"format,omitempty"`
+	DeltaField string `json:"delta_field,omitempty"`
+	// table、chart、checklist：结果里的列表（点号路径，空表示结果本身）
+	Rows string `json:"rows,omitempty"`
+	// table：列、行按钮与点开一行看到的详情卡字段
 	Columns    []wbColumn `json:"columns,omitempty"`
 	RowActions []wbAction `json:"row_actions,omitempty"`
+	Detail     []wbColumn `json:"detail,omitempty"`
+	// chart：line / bar / pie；x 是横轴（饼图的分类）字段，y 是 1～4 个数值序列（饼图只能 1 个）
+	Chart string     `json:"chart,omitempty"`
+	X     string     `json:"x,omitempty"`
+	Y     []wbColumn `json:"y,omitempty"`
+	// checklist：管理员写好的条目，或从只读工具取（rows + item_field + id_field）
+	Items     []wbCheckItem `json:"items,omitempty"`
+	ItemField string        `json:"item_field,omitempty"`
+	IDField   string        `json:"id_field,omitempty"`
+	// 有数据源的组件取到空数据时显示的一句说明和一个建议操作
+	Empty *wbEmpty `json:"empty,omitempty"`
 	// form：字段与提交
 	Fields []wbField `json:"fields,omitempty"`
 	Submit *wbAction `json:"submit,omitempty"`
 	// actions：快捷按钮
 	Actions []wbAction `json:"actions,omitempty"`
+}
+
+type wbCheckItem struct {
+	ID   string `json:"id"`
+	Text string `json:"text"`
+}
+
+type wbEmpty struct {
+	Text   string    `json:"text"`
+	Action *wbAction `json:"action,omitempty"`
 }
 
 type wbSource struct {
@@ -81,7 +104,9 @@ var (
 	wbPathRe        = regexp.MustCompile(`^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$`)
 	// {{scope.kbs}} 是同一个面板上「查哪些库」勾选的知识库，没勾就是全部
 	wbPlaceholderRe = regexp.MustCompile(`\{\{\s*([a-z]+)\.([A-Za-z0-9_.]+)\s*\}\}`)
-	wbFormats       = []string{"", "money", "number", "percent", "date"}
+	wbFormats       = []string{"", "money", "number", "compact", "percent", "date"}
+	wbCheckIDRe     = regexp.MustCompile(`^[A-Za-z0-9_-]{1,40}$`)
+	wbChartKinds    = []string{"line", "bar", "pie"}
 )
 
 // validateWorkbench 只检查结构；数据源是不是只读工具要查库，见 checkWorkbenchSources。
@@ -154,7 +179,10 @@ func validateWidget(w *wbWidget, connections []string) string {
 			return "要显示的字段（field）必填，用点号路径，例如 summary.total"
 		}
 		if !slices.Contains(wbFormats, w.Format) {
-			return "显示格式只能是 money / number / percent / date 或留空"
+			return "显示格式只能是 money / number / compact / percent / date 或留空"
+		}
+		if w.DeltaField != "" && !wbPathRe.MatchString(w.DeltaField) {
+			return "变化比例字段（delta_field）要用点号路径"
 		}
 	case "table":
 		keepSource, keepRows = true, true
@@ -177,8 +205,14 @@ func validateWidget(w *wbWidget, connections []string) string {
 				return fmt.Sprintf("第 %d 列的标题必填，最多 40 个字", k+1)
 			}
 			if !slices.Contains(wbFormats, c.Format) {
-				return fmt.Sprintf("第 %d 列的显示格式只能是 money / number / percent / date 或留空", k+1)
+				return fmt.Sprintf("第 %d 列的显示格式只能是 money / number / compact / percent / date 或留空", k+1)
 			}
+		}
+		if len(w.Detail) > 12 {
+			return "详情卡最多 12 个字段"
+		}
+		if msg := validateColumns(w.Detail, "详情卡"); msg != "" {
+			return msg
 		}
 		if len(w.RowActions) > 3 {
 			return "每行最多 3 个按钮"
@@ -240,6 +274,72 @@ func validateWidget(w *wbWidget, connections []string) string {
 				return fmt.Sprintf("第 %d 个按钮：%s", k+1, msg)
 			}
 		}
+	case "chart":
+		keepSource, keepRows = true, true
+		if msg := validateSource(w.Source, connections); msg != "" {
+			return msg
+		}
+		if !slices.Contains(wbChartKinds, w.Chart) {
+			return "图表类型（chart）只能是 line / bar / pie"
+		}
+		if w.Rows != "" && !wbPathRe.MatchString(w.Rows) {
+			return "列表位置（rows）要用点号路径，例如 data.items"
+		}
+		if !wbPathRe.MatchString(w.X) {
+			return "横轴字段（x）必填，用点号路径，例如 month"
+		}
+		if len(w.Y) == 0 || len(w.Y) > 4 {
+			return "数值序列（y）要有 1～4 个"
+		}
+		if w.Chart == "pie" && len(w.Y) != 1 {
+			return "饼图只能有 1 个数值序列"
+		}
+		if msg := validateColumns(w.Y, "数值序列"); msg != "" {
+			return msg
+		}
+	case "checklist":
+		if w.Source != nil {
+			keepSource, keepRows = true, true
+			if len(w.Items) > 0 {
+				return "清单的条目要么写在配置里（items），要么从数据源取，不能都填"
+			}
+			if msg := validateSource(w.Source, connections); msg != "" {
+				return msg
+			}
+			if w.Rows != "" && !wbPathRe.MatchString(w.Rows) {
+				return "列表位置（rows）要用点号路径，例如 data.items"
+			}
+			if !wbPathRe.MatchString(w.ItemField) {
+				return "从数据源取条目时，要指定条目文字的字段（item_field）"
+			}
+			if w.IDField != "" && !wbPathRe.MatchString(w.IDField) {
+				return "条目编号字段（id_field）要用点号路径"
+			}
+		} else {
+			w.ItemField, w.IDField = "", ""
+			if len(w.Items) == 0 || len(w.Items) > 30 {
+				return "清单要有 1～30 个条目，或者指定数据源"
+			}
+			ids := map[string]bool{}
+			for k := range w.Items {
+				it := &w.Items[k]
+				it.ID, it.Text = strings.TrimSpace(it.ID), strings.TrimSpace(it.Text)
+				if !wbCheckIDRe.MatchString(it.ID) {
+					return fmt.Sprintf("第 %d 个条目的 id 只能用字母、数字、下划线和短横线", k+1)
+				}
+				if ids[it.ID] {
+					return fmt.Sprintf("第 %d 个条目的 id %s 重复了", k+1, it.ID)
+				}
+				ids[it.ID] = true
+				if it.Text == "" || !limitRunes(it.Text, 200) {
+					return fmt.Sprintf("第 %d 个条目的文字必填，最多 200 个字", k+1)
+				}
+			}
+		}
+	case "heading":
+		if w.Title == "" {
+			return "分组标题必填"
+		}
 	case "markdown":
 		keepText = true
 		w.Text = strings.TrimSpace(w.Text)
@@ -252,17 +352,42 @@ func validateWidget(w *wbWidget, connections []string) string {
 		keepSource = true
 		w.Source = &wbSource{Connection: kbConn, Tool: "list"}
 	default:
-		return "类型只能是 metric / table / form / actions / markdown / board / kb_scope"
+		return "类型只能是 metric / table / chart / checklist / form / actions / markdown / heading / board / kb_scope"
+	}
+	// 空状态：只给有数据源的组件
+	if w.Empty != nil {
+		if !keepSource || w.Type == "kb_scope" {
+			w.Empty = nil
+		} else {
+			w.Empty.Text = strings.TrimSpace(w.Empty.Text)
+			if w.Empty.Text == "" || !limitRunes(w.Empty.Text, 200) {
+				return "空状态的说明必填，最多 200 个字"
+			}
+			if w.Empty.Action != nil {
+				if msg := validateAction(w.Empty.Action, "", nil); msg != "" {
+					return "空状态的按钮：" + msg
+				}
+			}
+		}
 	}
 	// 其它类型用不到的字段清掉，避免存进版本里误导审核
 	if !keepSource {
 		w.Source = nil
 	}
 	if !keepField {
-		w.Field, w.Format = "", ""
+		w.Field, w.Format, w.DeltaField = "", "", ""
 	}
 	if !keepRows {
-		w.Rows, w.Columns, w.RowActions = "", nil, nil
+		w.Rows = ""
+	}
+	if w.Type != "table" {
+		w.Columns, w.RowActions, w.Detail = nil, nil, nil
+	}
+	if w.Type != "chart" {
+		w.Chart, w.X, w.Y = "", "", nil
+	}
+	if w.Type != "checklist" {
+		w.Items, w.ItemField, w.IDField = nil, "", ""
 	}
 	if !keepForm {
 		w.Fields, w.Submit = nil, nil
@@ -272,6 +397,24 @@ func validateWidget(w *wbWidget, connections []string) string {
 	}
 	if !keepText {
 		w.Text = ""
+	}
+	return ""
+}
+
+// validateColumns 检查详情卡字段、图表序列这类「字段 + 标题 + 格式」的列表。
+func validateColumns(cols []wbColumn, what string) string {
+	for k := range cols {
+		c := &cols[k]
+		c.Title = strings.TrimSpace(c.Title)
+		if !wbPathRe.MatchString(c.Field) {
+			return fmt.Sprintf("%s第 %d 项的字段格式不对", what, k+1)
+		}
+		if c.Title == "" || !limitRunes(c.Title, 40) {
+			return fmt.Sprintf("%s第 %d 项的标题必填，最多 40 个字", what, k+1)
+		}
+		if !slices.Contains(wbFormats, c.Format) {
+			return fmt.Sprintf("%s第 %d 项的显示格式只能是 money / number / compact / percent / date 或留空", what, k+1)
+		}
 	}
 	return ""
 }
@@ -391,6 +534,7 @@ func workbenchContent(wb *appWorkbench) string {
 	var b strings.Builder
 	b.WriteString("\n## 工作台\n\n用户的屏幕右侧有这个应用的工作台：\n\n")
 	board := false
+	var checklists []wbWidget
 	for _, p := range wb.Panes {
 		if p.Type == "web" {
 			fmt.Fprintf(&b, "- 「%s」：内部系统网页 %s（你看不到页面内容）\n", p.Title, p.URL)
@@ -404,11 +548,17 @@ func workbenchContent(wb *appWorkbench) string {
 		for _, w := range p.Widgets {
 			title := w.Title
 			if title == "" {
-				title = map[string]string{"metric": "指标", "table": "表格", "form": "表单", "actions": "快捷按钮", "markdown": "说明", "board": "AI 看板", "kb_scope": "知识库选择"}[w.Type]
+				title = map[string]string{"metric": "指标", "table": "表格", "chart": "图表", "checklist": "清单", "form": "表单", "actions": "快捷按钮", "markdown": "说明", "board": "AI 看板", "kb_scope": "知识库选择"}[w.Type]
+			}
+			if w.Type == "heading" {
+				continue
 			}
 			parts = append(parts, title)
-			if w.Type == "board" {
+			switch w.Type {
+			case "board":
 				board = true
+			case "checklist":
+				checklists = append(checklists, w)
 			}
 		}
 		fmt.Fprintf(&b, "- 「%s」：%s\n", p.Title, strings.Join(parts, "、"))
@@ -416,6 +566,22 @@ func workbenchContent(wb *appWorkbench) string {
 	b.WriteString("\n用户在面板上点按钮或提交表单时，会以普通消息的形式发给你，内容里带着那一行或那张表单的数据。照常处理，需要改业务数据时用企业系统的工具。\n")
 	if board {
 		b.WriteString("\n处理完一件事以后，用 `ee_workbench` 工具（action 为 `board`）把结果写到 AI 看板上：用简短的文字、清单或表格概括本轮结论，不要重复整段对话。看板只显示最新一次写入的内容。\n")
+	}
+	for _, c := range checklists {
+		fmt.Fprintf(&b, "\n清单「%s」：用户确认某一项已经办完时，用 `ee_workbench` 工具（action 为 `checklist`，title 写「%s」）把它标成完成：done 填条目编号，标错了用 undone 撤回。", c.Title, c.Title)
+		if len(c.Items) > 0 {
+			b.WriteString("条目编号：")
+			for i, it := range c.Items {
+				if i > 0 {
+					b.WriteString("；")
+				}
+				fmt.Fprintf(&b, "`%s` %s", it.ID, it.Text)
+			}
+			b.WriteString("。")
+		} else {
+			fmt.Fprintf(&b, "条目来自 `%s__%s`，编号是每一项的 `%s` 字段。", c.Source.Connection, c.Source.Tool, firstNonEmpty(c.IDField, c.ItemField))
+		}
+		b.WriteString("\n")
 	}
 	return b.String()
 }
@@ -447,4 +613,13 @@ func (s *Server) anyLiveWebPane(ctx context.Context) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func firstNonEmpty(xs ...string) string {
+	for _, x := range xs {
+		if x != "" {
+			return x
+		}
+	}
+	return ""
 }

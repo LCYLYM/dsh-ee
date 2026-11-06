@@ -2852,8 +2852,8 @@ function validateName(subject, value) {
 }
 
 // src/brand.ts
-var _updatePlugin_dec, _saveServer_dec, _testServer_dec, _serverSettings_dec, _doctor_dec, _login_dec, _overview_dec, _kbDoc_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
-var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _kbDoc_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _serverSettings_dec = [Remote], _testServer_dec = [Remote], _saveServer_dec = [Remote], _updatePlugin_dec = [Remote], _a) {
+var _updatePlugin_dec, _saveServer_dec, _testServer_dec, _serverSettings_dec, _doctor_dec, _login_dec, _overview_dec, _kbDoc_dec, _setChecklist_dec, _checklists_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
+var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _checklists_dec = [Remote], _setChecklist_dec = [Remote], _kbDoc_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _serverSettings_dec = [Remote], _testServer_dec = [Remote], _saveServer_dec = [Remote], _updatePlugin_dec = [Remote], _a) {
   constructor(ctx, actions) {
     super(ctx, "dshEE");
     this.actions = actions;
@@ -2888,6 +2888,12 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
   }
   async board(request) {
     return this.actions.readBoard(request);
+  }
+  async checklists(request) {
+    return this.actions.readChecklists(request);
+  }
+  async setChecklist(request) {
+    return this.actions.setChecklist(request);
   }
   async kbDoc(request) {
     return this.actions.readKBDoc(request);
@@ -2925,6 +2931,8 @@ __decorateElement(_init, 1, "bindApp", _bindApp_dec, DshEEClientService);
 __decorateElement(_init, 1, "unbindApp", _unbindApp_dec, DshEEClientService);
 __decorateElement(_init, 1, "workbenchData", _workbenchData_dec, DshEEClientService);
 __decorateElement(_init, 1, "board", _board_dec, DshEEClientService);
+__decorateElement(_init, 1, "checklists", _checklists_dec, DshEEClientService);
+__decorateElement(_init, 1, "setChecklist", _setChecklist_dec, DshEEClientService);
 __decorateElement(_init, 1, "kbDoc", _kbDoc_dec, DshEEClientService);
 __decorateElement(_init, 1, "overview", _overview_dec, DshEEClientService);
 __decorateElement(_init, 1, "login", _login_dec, DshEEClientService);
@@ -3239,6 +3247,7 @@ import path6 from "node:path";
 import { createHash } from "node:crypto";
 
 // src/workbench.ts
+var checklistKey = (pane, widget) => `${pane}:${widget}`;
 function toolValue(result) {
   if (result?.isError) {
     const text2 = (result.content ?? []).filter((part) => part?.type === "text").map((part) => part.text).join("\n");
@@ -3358,16 +3367,29 @@ async function verifyCitations(tools, blocks) {
   return { blocks: out, bad, stale };
 }
 var safeName = /^[A-Za-z0-9_-]{1,80}$/;
+function sessionFile(dir, app, sessionId) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(app) || app.length > 48) throw new Error("\u5FAE\u5E94\u7528\u540D\u4E0D\u5408\u6CD5");
+  if (typeof sessionId !== "string" || !sessionId) throw new Error("\u4F1A\u8BDD id \u4E0D\u5408\u6CD5");
+  const session = safeName.test(sessionId) ? sessionId : createHash("sha256").update(sessionId).digest("hex").slice(0, 32);
+  return path6.join(dir, `${app}--${session}.json`);
+}
+function writeAtomic(dir, file, value, sequence) {
+  fs5.mkdirSync(dir, { recursive: true, mode: 448 });
+  const temp = `${file}.${process.pid}.${sequence}.tmp`;
+  try {
+    fs5.writeFileSync(temp, JSON.stringify(value) + "\n", { mode: 384 });
+    fs5.renameSync(temp, file);
+  } finally {
+    if (fs5.existsSync(temp)) fs5.unlinkSync(temp);
+  }
+}
 var BoardStore = class {
   constructor(dir = path6.join(dshHome(), "dsh-ee", "boards")) {
     this.dir = dir;
   }
   sequence = 0;
   file(app, sessionId) {
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(app) || app.length > 48) throw new Error("\u5FAE\u5E94\u7528\u540D\u4E0D\u5408\u6CD5");
-    if (typeof sessionId !== "string" || !sessionId) throw new Error("\u4F1A\u8BDD id \u4E0D\u5408\u6CD5");
-    const session = safeName.test(sessionId) ? sessionId : createHash("sha256").update(sessionId).digest("hex").slice(0, 32);
-    return path6.join(this.dir, `${app}--${session}.json`);
+    return sessionFile(this.dir, app, sessionId);
   }
   read(app, sessionId) {
     try {
@@ -3381,24 +3403,47 @@ var BoardStore = class {
   write(app, sessionId, blocks) {
     const file = this.file(app, sessionId);
     const board = { app, sessionId, updatedAt: (/* @__PURE__ */ new Date()).toISOString(), blocks };
-    fs5.mkdirSync(this.dir, { recursive: true, mode: 448 });
-    const temp = `${file}.${process.pid}.${++this.sequence}.tmp`;
-    try {
-      fs5.writeFileSync(temp, JSON.stringify(board) + "\n", { mode: 384 });
-      fs5.renameSync(temp, file);
-    } finally {
-      if (fs5.existsSync(temp)) fs5.unlinkSync(temp);
-    }
+    writeAtomic(this.dir, file, board, ++this.sequence);
     return board;
+  }
+};
+var maxChecked = 100;
+var ChecklistStore = class {
+  constructor(dir = path6.join(dshHome(), "dsh-ee", "checklists")) {
+    this.dir = dir;
+  }
+  sequence = 0;
+  read(app, sessionId) {
+    try {
+      const value = JSON.parse(fs5.readFileSync(sessionFile(this.dir, app, sessionId), "utf8"));
+      if (value?.app !== app || value?.sessionId !== sessionId || typeof value?.lists !== "object" || !value.lists) return void 0;
+      return value;
+    } catch {
+      return void 0;
+    }
+  }
+  /** 把 done 里的条目勾上、undone 里的取消；返回这个清单现在勾了哪些。 */
+  update(app, sessionId, key, done, undone) {
+    if (!/^[a-z0-9-]{1,32}:\d{1,2}$/.test(key)) throw new Error("\u6E05\u5355\u7F16\u53F7\u4E0D\u5408\u6CD5");
+    const file = sessionFile(this.dir, app, sessionId);
+    const current = this.read(app, sessionId) ?? { app, sessionId, updatedAt: "", lists: {} };
+    const set = new Set(current.lists[key] ?? []);
+    for (const id of done) set.add(id);
+    for (const id of undone) set.delete(id);
+    const next = [...set].slice(0, maxChecked);
+    const value = { app, sessionId, updatedAt: (/* @__PURE__ */ new Date()).toISOString(), lists: { ...current.lists, [key]: next } };
+    writeAtomic(this.dir, file, value, ++this.sequence);
+    return next;
   }
 };
 var workbenchToolName = "ee_workbench";
 async function runWorkbenchTool(deps, args, exec) {
-  if (args?.action !== "board") throw new Error("action \u53EA\u80FD\u662F board");
+  if (args?.action !== "board" && args?.action !== "checklist") throw new Error("action \u53EA\u80FD\u662F board \u6216 checklist");
   const app = String(args?.app ?? "");
   const apps = await deps.readApps();
   const target = apps.find((item) => item.name === app);
   if (!target) throw new Error(`\u6CA1\u6709\u5FAE\u5E94\u7528 ${app}\uFF0C\u6216\u5B83\u4E0D\u5728\u4F60\u7684\u53EF\u7528\u8303\u56F4\u5185`);
+  if (args.action === "checklist") return runChecklist(deps, target, args, exec);
   if (!target.workbench?.panes.some((pane) => pane.widgets?.some((widget) => widget.type === "board"))) throw new Error(`\u5FAE\u5E94\u7528 ${app} \u7684\u5DE5\u4F5C\u53F0\u6CA1\u6709 AI \u770B\u677F`);
   const checked = checkBoardBlocks(args?.blocks);
   if (!checked.blocks) throw new Error(checked.error);
@@ -3411,16 +3456,47 @@ async function runWorkbenchTool(deps, args, exec) {
   if (verified.stale.length) notes.push(`\u5F15\u7528 ${verified.stale.map((n) => `[${n}]`).join(" ")} \u7684\u6587\u6863\u5DF2\u7ECF\u66F4\u65B0\uFF0C\u8BF7\u8BFB\u6700\u65B0\u7248\u672C\u786E\u8BA4\u7ED3\u8BBA\u6CA1\u6709\u53D8\u3002`);
   return notes.join("\n");
 }
+function runChecklist(deps, target, args, exec) {
+  if (!deps.checklists) throw new Error("\u8FD9\u4E2A\u7248\u672C\u7684\u63A5\u5165\u63D2\u4EF6\u4E0D\u652F\u6301\u6E05\u5355");
+  const found = [];
+  for (const pane of target.workbench?.panes ?? []) {
+    (pane.widgets ?? []).forEach((widget2, index) => {
+      if (widget2.type === "checklist") found.push({ key: checklistKey(pane.id, index), widget: widget2 });
+    });
+  }
+  if (!found.length) throw new Error(`\u5FAE\u5E94\u7528 ${target.name} \u7684\u5DE5\u4F5C\u53F0\u6CA1\u6709\u6E05\u5355`);
+  const title = typeof args?.title === "string" ? args.title.trim() : "";
+  const picked = title ? found.filter((item) => item.widget.title === title) : found;
+  if (picked.length !== 1) throw new Error(title ? `\u6CA1\u6709\u6807\u9898\u662F\u300C${title}\u300D\u7684\u6E05\u5355\uFF1B\u53EF\u9009\uFF1A${found.map((item) => `\u300C${item.widget.title}\u300D`).join("")}` : `\u6709 ${found.length} \u4E2A\u6E05\u5355\uFF0C\u8BF7\u7528 title \u6307\u5B9A\uFF1A${found.map((item) => `\u300C${item.widget.title}\u300D`).join("")}`);
+  const ids = (value) => Array.isArray(value) ? value.map((x) => String(x).trim()).filter((x) => x && x.length <= 80) : [];
+  const done = ids(args?.done);
+  const undone = ids(args?.undone);
+  if (!done.length && !undone.length) throw new Error("done \u4E0E undone \u81F3\u5C11\u586B\u4E00\u4E2A");
+  const { key, widget } = picked[0];
+  if (widget.items?.length) {
+    const known = widget.items.map((item) => item.id);
+    const unknown = [...done, ...undone].filter((id) => !known.includes(id));
+    if (unknown.length) throw new Error(`\u6E05\u5355\u300C${widget.title}\u300D\u91CC\u6CA1\u6709\u6761\u76EE ${unknown.join("\u3001")}\uFF1B\u6761\u76EE\u7F16\u53F7\uFF1A${known.join("\u3001")}`);
+  }
+  const sessionId = exec?.agent?.session?.id ?? deps.boundSession(target.name);
+  if (typeof sessionId !== "string" || !sessionId) throw new Error("\u627E\u4E0D\u5230\u8981\u66F4\u65B0\u6E05\u5355\u7684\u4F1A\u8BDD");
+  const now = deps.checklists.update(target.name, sessionId, key, done, undone);
+  const total = widget.items?.length;
+  return total ? `\u5DF2\u66F4\u65B0\u6E05\u5355\u300C${widget.title}\u300D\uFF1A\u5B8C\u6210 ${widget.items.filter((item) => now.includes(item.id)).length}/${total}` : `\u5DF2\u66F4\u65B0\u6E05\u5355\u300C${widget.title}\u300D\uFF1A\u5DF2\u5B8C\u6210 ${now.length} \u9879`;
+}
 function registerWorkbenchTool(ctx, deps) {
   return ctx.tools.register({
     name: workbenchToolName,
-    description: "\u66F4\u65B0\u5F53\u524D\u5FAE\u5E94\u7528\u5DE5\u4F5C\u53F0\u4E0A\u7684\u300CAI \u770B\u677F\u300D\u3002\u53EA\u7528\u6765\u628A\u672C\u8F6E\u5904\u7406\u7ED3\u679C\u5199\u5230\u770B\u677F\u4E0A\uFF0C\u4E0D\u4F1A\u6539\u4EFB\u4F55\u4E1A\u52A1\u6570\u636E\u3002\u6BCF\u6B21\u8C03\u7528\u6574\u4F53\u66FF\u6362\u770B\u677F\u5185\u5BB9\u3002citations \u5757\u91CC\u7684\u77E5\u8BC6\u5E93\u5F15\u7528\u4F1A\u81EA\u52A8\u6838\u5BF9\uFF0C\u8FD4\u56DE\u7ED3\u679C\u4F1A\u6307\u51FA\u5BF9\u4E0D\u4E0A\u539F\u6587\u7684\u5F15\u7528\u3002",
+    description: "\u66F4\u65B0\u5F53\u524D\u5FAE\u5E94\u7528\u5DE5\u4F5C\u53F0\uFF1Aaction=board \u628A\u672C\u8F6E\u5904\u7406\u7ED3\u679C\u5199\u5230\u300CAI \u770B\u677F\u300D\uFF08\u6BCF\u6B21\u6574\u4F53\u66FF\u6362\uFF0Ccitations \u5757\u91CC\u7684\u77E5\u8BC6\u5E93\u5F15\u7528\u4F1A\u81EA\u52A8\u6838\u5BF9\uFF09\uFF1Baction=checklist \u52FE\u9009\u6216\u53D6\u6D88\u5DE5\u4F5C\u53F0\u6E05\u5355\u91CC\u7684\u6761\u76EE\uFF08done / undone \u586B\u6761\u76EE\u7F16\u53F7\uFF09\u3002\u4E0D\u4F1A\u6539\u4EFB\u4F55\u4E1A\u52A1\u6570\u636E\u3002",
     parameters: {
       type: "object",
-      required: ["action", "app", "blocks"],
+      required: ["action", "app"],
       properties: {
-        action: { type: "string", enum: ["board"] },
+        action: { type: "string", enum: ["board", "checklist"] },
         app: { type: "string", description: "\u5FAE\u5E94\u7528\u540D\uFF0C\u4E5F\u5C31\u662F /\u540D\u5B57 \u91CC\u7684\u540D\u5B57" },
+        title: { type: "string", description: "checklist\uFF1A\u6E05\u5355\u7684\u6807\u9898\uFF1B\u5DE5\u4F5C\u53F0\u53EA\u6709\u4E00\u4E2A\u6E05\u5355\u65F6\u53EF\u4EE5\u4E0D\u586B" },
+        done: { type: "array", items: { type: "string" }, description: "checklist\uFF1A\u6807\u6210\u5B8C\u6210\u7684\u6761\u76EE\u7F16\u53F7" },
+        undone: { type: "array", items: { type: "string" }, description: "checklist\uFF1A\u64A4\u56DE\u5B8C\u6210\u7684\u6761\u76EE\u7F16\u53F7" },
         blocks: {
           type: "array",
           maxItems: 20,
@@ -3498,6 +3574,7 @@ function apply(ctx, input) {
     });
     const appBindings = new AppBindings();
     const boards = new BoardStore();
+    const checklists = new ChecklistStore();
     registerDoctor(ctx, config, tokens, http, bridge, appBindings);
     const skillsReady = registerSkills(ctx, config, http).then((loaded) => {
       refreshSkills = loaded.refreshNow;
@@ -3520,6 +3597,14 @@ function apply(ctx, input) {
       unbindApp: async (name2) => appBindings.unbind(name2),
       workbenchData: async (request) => readWidgetData(await (await skillsReady).readApps(), bridge, request),
       readBoard: async (request) => boards.read(String(request?.app ?? ""), String(request?.sessionId ?? "")) ?? null,
+      readChecklists: async (request) => checklists.read(String(request?.app ?? ""), String(request?.sessionId ?? ""))?.lists ?? {},
+      setChecklist: async (request) => {
+        const app = String(request?.app ?? "");
+        const id = String(request?.id ?? "").trim();
+        if (!id || id.length > 80) throw new Error("\u6761\u76EE\u7F16\u53F7\u4E0D\u5408\u6CD5");
+        if (!(await (await skillsReady).readApps()).some((item) => item.name === app)) throw new Error("\u76EE\u5F55\u91CC\u6CA1\u6709\u8FD9\u4E2A\u5FAE\u5E94\u7528");
+        return checklists.update(app, String(request?.sessionId ?? ""), String(request?.key ?? ""), request?.done ? [id] : [], request?.done ? [] : [id]);
+      },
       readKBDoc: (request) => readKBDoc(bridge, request),
       readOverview: () => readEnterpriseOverview(config, http, bridge).catch((error) => ({ failure: overviewFailure(config, error) })),
       login: () => commands.login(),
@@ -3531,6 +3616,7 @@ function apply(ctx, input) {
     });
     const disposeWorkbenchTool = registerWorkbenchTool(ctx, {
       boards,
+      checklists,
       readApps: () => skills.readApps(),
       boundSession: (app) => appBindings.list()[app]?.sessionId,
       tools: bridge

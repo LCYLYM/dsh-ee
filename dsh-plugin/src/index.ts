@@ -13,7 +13,7 @@ import { updateConnect } from "./connect-update.js";
 import { uploadPackage } from "./upload.js";
 import { AppBindings } from "./app-bindings.js";
 import { setAppSubscription } from "./app-subscription.js";
-import { BoardStore, readKBDoc, readWidgetData, registerWorkbenchTool } from "./workbench-host.js";
+import { BoardStore, ChecklistStore, readKBDoc, readWidgetData, registerWorkbenchTool } from "./workbench-host.js";
 import type { DshContext, PluginConfig } from "./dsh.js";
 
 export const name = "dsh-ee-connect";
@@ -53,6 +53,7 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
     });
     const appBindings = new AppBindings();
     const boards = new BoardStore();
+    const checklists = new ChecklistStore();
     registerDoctor(ctx, config, tokens, http, bridge, appBindings);
     const skillsReady = registerSkills(ctx, config, http).then((loaded) => {
       refreshSkills = loaded.refreshNow;
@@ -75,6 +76,14 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
       unbindApp: async (name) => appBindings.unbind(name),
       workbenchData: async (request) => readWidgetData(await (await skillsReady).readApps(), bridge, request),
       readBoard: async (request) => boards.read(String(request?.app ?? ""), String(request?.sessionId ?? "")) ?? null,
+      readChecklists: async (request) => checklists.read(String(request?.app ?? ""), String(request?.sessionId ?? ""))?.lists ?? {},
+      setChecklist: async (request) => {
+        const app = String(request?.app ?? "");
+        const id = String(request?.id ?? "").trim();
+        if (!id || id.length > 80) throw new Error("条目编号不合法");
+        if (!(await (await skillsReady).readApps()).some((item) => item.name === app)) throw new Error("目录里没有这个微应用");
+        return checklists.update(app, String(request?.sessionId ?? ""), String(request?.key ?? ""), request?.done ? [id] : [], request?.done ? [] : [id]);
+      },
       readKBDoc: (request) => readKBDoc(bridge, request),
       readOverview: () => readEnterpriseOverview(config, http, bridge).catch((error) => ({ failure: overviewFailure(config, error) })),
       login: () => commands.login(),
@@ -86,6 +95,7 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
     });
     const disposeWorkbenchTool = registerWorkbenchTool(ctx, {
       boards,
+      checklists,
       readApps: () => skills!.readApps(),
       boundSession: (app) => appBindings.list()[app]?.sessionId,
       tools: bridge,

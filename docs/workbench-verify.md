@@ -88,3 +88,30 @@
 - `sidebarRight.mounted` 在新建会话后迟迟不变：我等 5 秒，超时就不打开工作台，也不报错。这时用「⋯ → 打开工作台」能不能打开，是区分原因的关键。
 - `openTab('browser')` 在 web profile 没生效：先确认第 0 步第 5 条的补丁行确实在装好的插件里。
 - 看板不更新：看 `$DSH_HOME/dsh-ee/boards/` 下有没有文件、文件名里的会话 id 对不对。
+
+## 6. 第一版 M2：工作台组件升级（2026-11-07）
+
+新增 `chart`（折线 / 柱状 / 饼图，SVG 自己画）、`checklist`（配置的条目或只读工具取，勾选按会话存在 `$DSH_HOME/dsh-ee/checklists/`，AI 用 `ee_workbench` 的 `action: "checklist"` 更新）、`heading`（分组标题），`table` 的 `detail`（点一行展开详情卡），`metric` 的 `delta_field` 与 `compact` 格式，以及所有带数据源的组件的四种状态：骨架屏、空状态（`empty.text` + `empty.action`）、无权限（链接到 dsh-ee 的 `/connections/<标识>`）、出错（原因 + 重试）。配置示例见网页编辑器的「插入示例」。
+
+**参考图**：每种组件的每种状态，用插件里真实的渲染函数画出来（不是 DSH 里的截图）：
+
+- 亮色：[images/workbench-states/workbench-light.png](images/workbench-states/workbench-light.png)
+- 暗色：[images/workbench-states/workbench-dark.png](images/workbench-states/workbench-dark.png)
+
+重新生成：`cd dsh-plugin && npx tsx scripts/gallery.ts /tmp/g && node ../e2e/workbench-gallery.mjs /tmp/g`。
+
+在 Mac 上（web profile 与 Desktop 各一次，亮色、暗色各一次）对照参考图检查：
+
+| # | 操作 | 期望 |
+|---|---|---|
+| M2-1 | 网页编辑一个应用，工作台点「插入示例」，把 `month_summary` 等工具名换成你连接里真实的只读工具后保存；再把图表的工具换成写工具保存 | 第一次保存成功；第二次被拒绝，提示「不是只读工具」 |
+| M2-2 | 在 DSH 里打开这个应用 | 先看到骨架屏，再出数据；数字变化时有轻微淡入；分组标题把组件分成「本月 / 办事」两组 |
+| M2-3 | 图表 | 折线 / 柱状 / 饼图都画得出来，悬停有数值（`<title>`），暗色下坐标轴和文字看得清 |
+| M2-4 | 点表格某行（或左侧 ▸） | 展开详情卡；再点收起；行按钮照旧把一段话发给 AI，不会顺带展开 |
+| M2-5 | 勾清单的两项，刷新页面，换一个会话再回来 | 刷新后勾选还在；新会话里是空的；回到原会话勾选恢复 |
+| M2-6 | 对 AI 说「电脑已经领了」 | AI 调 `ee_workbench`（`action: checklist`），3 秒内清单那一项被勾上 |
+| M2-7 | 管理端把表格用的工具限定给员工没有的角色 | 显示「无权限：你还没有「连接」里「工具」的使用权限」和「去申请权限 ↗」，点开到 dsh-ee 这个连接的详情页 |
+| M2-8 | 让连接的上游暂时连不上，点刷新 | 显示「取数失败：原因」和「重试」，恢复后点重试能出数据 |
+| M2-9 | 让表格的工具返回空列表 | 显示配置的空状态说明和建议按钮，点按钮把一段话发给 AI |
+
+已验证：Go `TestWorkbench`（新组件的校验、只读工具检查、指令里的清单说明）、插件单测（渲染、四种状态、清单的 AI 更新与会话隔离）。没验证：真实 DSH 里的表现（上表）。

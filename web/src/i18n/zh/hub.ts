@@ -119,7 +119,10 @@ export default {
     webPane: "网页",
     sources: "可以当数据源的工具（依赖连接里启用并且只读的）：",
     noSources: "依赖的连接里没有启用的只读工具，指标和表格组件暂时用不了。",
-    widget: { metric: "指标", table: "表格", form: "表单", actions: "快捷按钮", markdown: "说明", board: "AI 看板" },
+    widget: { metric: "指标", table: "表格", chart: "图表", checklist: "清单", form: "表单", actions: "快捷按钮", markdown: "说明", heading: "分组标题", board: "AI 看板", kb_scope: "查哪些库" },
+    chartKinds: { line: "折线图", bar: "柱状图", pie: "饼图" },
+    detail: "点开一行看详情：{{fields}}",
+    empty: "没有数据时：{{text}}",
   },
   editor: {
     newSkill: "写一个技能",

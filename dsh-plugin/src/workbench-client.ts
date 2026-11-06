@@ -3,7 +3,7 @@ import { createElement, useEffect, useRef, useState } from "react";
 import { sendUnknownNotice } from "./app-launcher.js";
 import { currentSessionOf, sendToSession } from "./host-session.js";
 import type { CatalogApp } from "./skills.js";
-import { docWindow, fillPrompt, kbDocUrl, parseWorkbenchAddress, scopeText, workbenchAddress, workbenchScheme, type Board, type Citation, type KBaseItem, type WorkbenchAction, type WorkbenchPane } from "./workbench.js";
+import { checklistKey, docWindow, fillPrompt, kbDocUrl, parseWorkbenchAddress, scopeText, workbenchAddress, workbenchScheme, type Board, type Citation, type KBaseItem, type WorkbenchAction, type WorkbenchPane } from "./workbench.js";
 import { openWorkbench } from "./workbench-open.js";
 import { kbDocView, missingPaneView, panelView, type DocTarget, type PanelHandlers, type WidgetState } from "./workbench-view.js";
 
@@ -104,7 +104,9 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
     const [forms, setForms] = useState<Record<number, Record<string, any>>>({});
     const [formErrors, setFormErrors] = useState<Record<number, string>>({});
     const [selectedKBs, setSelectedKBs] = useState<string[]>([]);
-    const { sending, notice, send: sendText } = useSending();
+    const [checks, setChecks] = useState<Record<string, string[]>>({});
+    const [expanded, setExpanded] = useState<Record<number, number | undefined>>({});
+    const { sending, notice, setNotice, send: sendText } = useSending();
     const sessionRef = useRef("");
     if (!sessionRef.current) sessionRef.current = onScreenSession(ctx);
 
@@ -128,19 +130,45 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
       }
     };
     const hasBoard = !!pane.widgets?.some((widget) => widget.type === "board");
+    const hasChecklist = !!pane.widgets?.some((widget) => widget.type === "checklist");
+    const loadChecks = async () => {
+      if (!sessionRef.current) return;
+      try {
+        const lists = unwrapRemote(await remote.checklists({ app: app.name, sessionId: sessionRef.current }));
+        if (lists && typeof lists === "object") setChecks(lists);
+      } catch {
+        // 读不到时保留上一次的勾选
+      }
+    };
+    const toggleCheck = (index: number, id: string) => {
+      const key = checklistKey(pane.id, index);
+      if (!sessionRef.current) return setNotice("没有找到当前会话，勾选不会保存");
+      const done = !(checks[key] ?? []).includes(id);
+      setChecks((current) => ({ ...current, [key]: done ? [...(current[key] ?? []), id] : (current[key] ?? []).filter((x) => x !== id) }));
+      Promise.resolve(remote.setChecklist({ app: app.name, sessionId: sessionRef.current, key, id, done }))
+        .then((raw: any) => {
+          const next = unwrapRemote(raw);
+          if (Array.isArray(next)) setChecks((current) => ({ ...current, [key]: next }));
+        })
+        .catch(() => setNotice("勾选没有保存，请稍后再试"));
+    };
 
     // 打开标签页或配置变化时取一次数；不做定时刷新，组件上有刷新按钮
     useEffect(loadAll, [app.name, app.version, pane.id]);
     useEffect(() => { void loadDocBase(); }, [app.name]);
-    // 看板：标签页可见时每 3 秒读一次本机文件，不可见时停止
+    // 看板与清单：标签页可见时每 3 秒读一次本机文件（AI 会更新它们），不可见时停止
     useEffect(() => {
-      if (!hasBoard || !visible) return;
-      void loadBoard();
-      const timer = setInterval(() => void loadBoard(), 3000);
+      if ((!hasBoard && !hasChecklist) || !visible) return;
+      const tick = () => {
+        if (hasBoard) void loadBoard();
+        if (hasChecklist) void loadChecks();
+      };
+      tick();
+      const timer = setInterval(tick, 3000);
       return () => clearInterval(timer);
-    }, [hasBoard, visible, app.name]);
+    }, [hasBoard, hasChecklist, visible, app.name]);
     // 右侧栏的「刷新」命令：重新取数
-    useEffect(() => info?.tab?.actions?.bindCommands?.({ refresh: () => { loadAll(); void loadBoard(); } }), [info?.tab?.id, app.version]);
+    useEffect(() => info?.tab?.actions?.bindCommands?.({ refresh: () => { loadAll(); void loadBoard(); void loadChecks(); } }), [info?.tab?.id, app.version]);
 
     // {{scope.kbs}}：「查哪些库」组件取到的库里勾选了哪些
     const scopeIndex = (pane.widgets ?? []).findIndex((widget) => widget.type === "kb_scope");
@@ -165,6 +193,12 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
       setFormError: (index, error) => setFormErrors((current) => ({ ...current, [index]: error })),
       selectedKBs,
       toggleKB: (kb) => setSelectedKBs((current) => (current.includes(kb) ? current.filter((item) => item !== kb) : [...current, kb])),
+      checked: (index) => checks[checklistKey(pane.id, index)] ?? [],
+      toggleCheck,
+      expandedRow: (index) => expanded[index],
+      toggleRow: (index, row) => setExpanded((current) => ({ ...current, [index]: current[index] === row ? undefined : row })),
+      // 无权限时「去申请」：dsh-ee 网页上这个连接的页面（有申请入口）
+      requestHref: (connection) => (docBase ? `${docBase}/connections/${encodeURIComponent(connection)}` : undefined),
       openCitation: docPane ? (citation: Citation) => {
         docTargets.set(app.name, { doc: citation.doc, version: citation.version, from: citation.from, to: citation.to, quote: citation.quote, title: citation.title });
         try {

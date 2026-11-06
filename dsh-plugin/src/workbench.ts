@@ -14,16 +14,36 @@ export interface WorkbenchField {
   options?: string[];
 }
 
+export interface WorkbenchColumn {
+  field: string;
+  title: string;
+  format?: string;
+}
+
 export interface WorkbenchWidget {
-  type: "metric" | "table" | "form" | "actions" | "markdown" | "board" | "kb_scope";
+  type: "metric" | "table" | "chart" | "checklist" | "form" | "actions" | "markdown" | "heading" | "board" | "kb_scope";
   title?: string;
   text?: string;
   source?: { connection: string; tool: string; args?: Record<string, unknown> };
   field?: string;
   format?: string;
+  /** metric：相比上期的变化比例（0.12 显示为 ↑12%） */
+  delta_field?: string;
   rows?: string;
-  columns?: { field: string; title: string; format?: string }[];
+  columns?: WorkbenchColumn[];
   row_actions?: WorkbenchAction[];
+  /** table：点开一行看到的详情卡字段 */
+  detail?: WorkbenchColumn[];
+  /** chart：折线、柱状或饼图；x 是横轴（饼图的分类），y 是数值序列 */
+  chart?: "line" | "bar" | "pie";
+  x?: string;
+  y?: WorkbenchColumn[];
+  /** checklist：配置好的条目，或从数据源取（item_field、id_field） */
+  items?: { id: string; text: string }[];
+  item_field?: string;
+  id_field?: string;
+  /** 取到空数据时的一句说明和一个建议操作 */
+  empty?: { text: string; action?: WorkbenchAction };
   fields?: WorkbenchField[];
   submit?: WorkbenchAction;
   actions?: WorkbenchAction[];
@@ -79,6 +99,8 @@ export function formatValue(value: any, format?: string): string {
       return Number.isFinite(number) ? number.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(value);
     case "number":
       return Number.isFinite(number) ? number.toLocaleString("zh-CN") : String(value);
+    case "compact":
+      return Number.isFinite(number) ? compactNumber(number) : String(value);
     case "percent":
       return Number.isFinite(number) ? `${Number((number * 100).toFixed(2))}%` : String(value);
     case "date": {
@@ -89,6 +111,59 @@ export function formatValue(value: any, format?: string): string {
       return typeof value === "object" ? JSON.stringify(value) : String(value);
   }
 }
+
+/** 1.2 万、3.4 亿：大数字在窄面板上也放得下。 */
+export function compactNumber(n: number): string {
+  const abs = Math.abs(n);
+  const trim = (x: number) => Number(x.toFixed(x >= 100 ? 0 : 1)).toLocaleString("zh-CN");
+  if (abs >= 1e8) return `${n < 0 ? "-" : ""}${trim(abs / 1e8)} 亿`;
+  if (abs >= 1e4) return `${n < 0 ? "-" : ""}${trim(abs / 1e4)} 万`;
+  return n.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+}
+
+/** 变化比例 → 「↑12%」「↓3.5%」「持平」；不是数字时返回空字符串。 */
+export function formatDelta(value: any): { text: string; direction: "up" | "down" | "flat" } | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  if (Math.abs(n) < 0.0005) return { text: "持平", direction: "flat" };
+  return { text: `${n > 0 ? "↑" : "↓"}${Number((Math.abs(n) * 100).toFixed(1))}%`, direction: n > 0 ? "up" : "down" };
+}
+
+/** 图表的数据：横轴标签与每个序列的数值（取不到或不是数字的当 0）；最多 60 个点。 */
+export function chartSeries(result: any, widget: Pick<WorkbenchWidget, "rows" | "x" | "y">): { labels: string[]; series: { title: string; format?: string; values: number[] }[] } {
+  const list = getPath(result, widget.rows);
+  const rows = Array.isArray(list) ? list.slice(0, 60) : [];
+  return {
+    labels: rows.map((row) => formatValue(getPath(row, widget.x))),
+    series: (widget.y ?? []).map((y) => ({
+      title: y.title,
+      format: y.format,
+      values: rows.map((row) => {
+        const n = Number(getPath(row, y.field));
+        return Number.isFinite(n) ? n : 0;
+      }),
+    })),
+  };
+}
+
+/** 清单的条目：配置里写好的，或从数据源结果里取（id 取不到时用文字本身）。最多 50 条。 */
+export function checklistItems(widget: Pick<WorkbenchWidget, "items" | "rows" | "item_field" | "id_field">, result?: any): { id: string; text: string }[] {
+  if (widget.items?.length) return widget.items;
+  const list = getPath(result, widget.rows);
+  if (!Array.isArray(list)) return [];
+  const out: { id: string; text: string }[] = [];
+  for (const row of list.slice(0, 50)) {
+    const text = formatValue(getPath(row, widget.item_field));
+    const raw = getPath(row, widget.id_field || widget.item_field);
+    const id = raw === null || raw === undefined || raw === "" ? text : String(raw);
+    if (!out.some((item) => item.id === id)) out.push({ id, text });
+  }
+  return out;
+}
+
+/** 清单状态的键：窗格 id + 组件序号。 */
+export const checklistKey = (pane: string, widget: number) => `${pane}:${widget}`;
 
 const maxValueLength = 500;
 const placeholder = /\{\{\s*(row|form|scope)\.([A-Za-z0-9_.]+)\s*\}\}/g;

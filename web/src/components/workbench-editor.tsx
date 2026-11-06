@@ -5,19 +5,25 @@ import { Button, cx, Field } from "./ui";
 
 const textareaCls = "w-full rounded-md border border-neutral-300 bg-card px-3 py-2 font-mono text-xs outline-none placeholder:text-neutral-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
 
-/** 示例工作台：连接名换成这个微应用已选的第一个连接。 */
+/** 示例工作台：连接名换成这个微应用已选的第一个连接。每种组件放一个，照着改最快。 */
 export function sampleWorkbench(connection: string): AppWorkbench {
   return {
     panes: [
       {
         type: "panel", id: "main", title: "报销工作台",
         widgets: [
-          { type: "metric", title: "本月已报", source: { connection, tool: "month_summary" }, field: "total", format: "money" },
+          { type: "heading", title: "本月" },
+          { type: "metric", title: "本月已报", source: { connection, tool: "month_summary" }, field: "total", format: "money", delta_field: "change" },
+          { type: "chart", title: "近 6 个月报销", chart: "bar", source: { connection, tool: "monthly_totals" }, rows: "items", x: "month", y: [{ field: "amount", title: "金额", format: "money" }] },
           {
             type: "table", title: "待我审批", source: { connection, tool: "list_pending", args: { limit: 20 } }, rows: "items",
             columns: [{ field: "id", title: "单号" }, { field: "applicant", title: "申请人" }, { field: "amount", title: "金额", format: "money" }],
+            detail: [{ field: "reason", title: "事由" }, { field: "submitted_at", title: "提交时间", format: "date" }],
             row_actions: [{ label: "让 AI 审核", prompt: "审核报销单 {{row.id}}（申请人 {{row.applicant}}，金额 {{row.amount}}），给出是否通过和理由" }],
+            empty: { text: "没有待你审批的单据", action: { label: "看看我提交的", prompt: "列出我最近提交的报销单和状态" } },
           },
+          { type: "heading", title: "办事" },
+          { type: "checklist", title: "报销前检查", items: [{ id: "invoice", text: "发票抬头是公司全称" }, { id: "approval", text: "出差申请已审批" }, { id: "receipt", text: "行程单与发票金额一致" }] },
           {
             type: "form", title: "新建报销",
             fields: [{ name: "amount", label: "金额", kind: "number", required: true }, { name: "reason", label: "事由", kind: "text" }],
@@ -51,7 +57,10 @@ export function parseWorkbench(text: string): { value?: AppWorkbench; error?: st
 function WidgetPreview({ w }: { w: WorkbenchWidget }) {
   const { t } = useTranslation();
   const label = t(`appWorkbench.widget.${w.type}`, { defaultValue: w.type });
+  if (w.type === "heading") return <div className="pt-1 text-xs font-semibold text-neutral-600">{w.title}</div>;
   const detail = w.type === "table" ? (w.columns ?? []).map((c) => c.title).join(" · ")
+    : w.type === "chart" ? `${t(`appWorkbench.chartKinds.${w.chart ?? "line"}`, { defaultValue: w.chart })} · ${w.x} → ${(w.y ?? []).map((y) => y.title).join(" · ")}`
+    : w.type === "checklist" ? (w.items?.length ? w.items.map((i) => i.text).join(" · ") : w.item_field)
     : w.type === "form" ? (w.fields ?? []).map((f) => f.label).join(" · ")
     : w.type === "actions" ? (w.actions ?? []).map((a) => a.label).join(" · ")
     : w.type === "metric" ? w.field
@@ -61,6 +70,8 @@ function WidgetPreview({ w }: { w: WorkbenchWidget }) {
     <div className="rounded-md border border-dashed border-neutral-300 px-3 py-2">
       <div className="text-xs font-medium text-neutral-800">{w.title || label} <span className="font-normal text-neutral-500">· {label}</span></div>
       {detail && <div className="mt-1 truncate text-xs text-neutral-500">{detail}</div>}
+      {w.detail?.length ? <div className="mt-1 truncate text-xs text-neutral-500">{t("appWorkbench.detail", { fields: w.detail.map((d) => d.title).join(" · ") })}</div> : null}
+      {w.empty && <div className="mt-1 truncate text-xs text-neutral-500">{t("appWorkbench.empty", { text: w.empty.text })}</div>}
       {w.source && <div className="mt-1 font-mono text-[11px] text-neutral-400">{w.source.connection} / {w.source.tool}</div>}
     </div>
   );

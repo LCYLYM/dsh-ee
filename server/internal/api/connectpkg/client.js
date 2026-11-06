@@ -20994,6 +20994,8 @@ function formatValue(value, format) {
       return Number.isFinite(number4) ? number4.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(value);
     case "number":
       return Number.isFinite(number4) ? number4.toLocaleString("zh-CN") : String(value);
+    case "compact":
+      return Number.isFinite(number4) ? compactNumber(number4) : String(value);
     case "percent":
       return Number.isFinite(number4) ? `${Number((number4 * 100).toFixed(2))}%` : String(value);
     case "date": {
@@ -21004,6 +21006,49 @@ function formatValue(value, format) {
       return typeof value === "object" ? JSON.stringify(value) : String(value);
   }
 }
+function compactNumber(n) {
+  const abs = Math.abs(n);
+  const trim = (x) => Number(x.toFixed(x >= 100 ? 0 : 1)).toLocaleString("zh-CN");
+  if (abs >= 1e8) return `${n < 0 ? "-" : ""}${trim(abs / 1e8)} \u4EBF`;
+  if (abs >= 1e4) return `${n < 0 ? "-" : ""}${trim(abs / 1e4)} \u4E07`;
+  return n.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+}
+function formatDelta(value) {
+  if (value === null || value === void 0 || value === "") return void 0;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return void 0;
+  if (Math.abs(n) < 5e-4) return { text: "\u6301\u5E73", direction: "flat" };
+  return { text: `${n > 0 ? "\u2191" : "\u2193"}${Number((Math.abs(n) * 100).toFixed(1))}%`, direction: n > 0 ? "up" : "down" };
+}
+function chartSeries(result, widget) {
+  const list = getPath(result, widget.rows);
+  const rows = Array.isArray(list) ? list.slice(0, 60) : [];
+  return {
+    labels: rows.map((row) => formatValue(getPath(row, widget.x))),
+    series: (widget.y ?? []).map((y) => ({
+      title: y.title,
+      format: y.format,
+      values: rows.map((row) => {
+        const n = Number(getPath(row, y.field));
+        return Number.isFinite(n) ? n : 0;
+      })
+    }))
+  };
+}
+function checklistItems(widget, result) {
+  if (widget.items?.length) return widget.items;
+  const list = getPath(result, widget.rows);
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const row of list.slice(0, 50)) {
+    const text = formatValue(getPath(row, widget.item_field));
+    const raw = getPath(row, widget.id_field || widget.item_field);
+    const id = raw === null || raw === void 0 || raw === "" ? text : String(raw);
+    if (!out.some((item) => item.id === id)) out.push({ id, text });
+  }
+  return out;
+}
+var checklistKey = (pane, widget) => `${pane}:${widget}`;
 var maxValueLength = 500;
 var placeholder = /\{\{\s*(row|form|scope)\.([A-Za-z0-9_.]+)\s*\}\}/g;
 function placeholderValue(value) {
@@ -21103,43 +21148,104 @@ async function openWorkbench(ctx, app, sessionId, force = false) {
 
 // src/workbench-view.ts
 var muted = { opacity: 0.65, fontSize: 12 };
-var card = { border: "1px solid color-mix(in srgb, currentColor 14%, transparent)", borderRadius: 8, padding: "10px 12px" };
+var card = { border: "1px solid color-mix(in srgb, currentColor 14%, transparent)", borderRadius: 10, padding: "10px 12px", background: "color-mix(in srgb, currentColor 2%, transparent)" };
 var buttonStyle2 = { border: "1px solid color-mix(in srgb, currentColor 25%, transparent)", borderRadius: 6, background: "transparent", color: "inherit", cursor: "pointer", padding: "3px 9px", fontSize: 12 };
-var widgetNames = { metric: "\u6307\u6807", table: "\u8868\u683C", form: "\u8868\u5355", actions: "\u5FEB\u6377\u6309\u94AE", markdown: "\u8BF4\u660E", board: "AI \u770B\u677F", kb_scope: "\u67E5\u54EA\u4E9B\u5E93" };
+var warn = "#b45309";
+var seriesColors = ["#4f6ef7", "#16a34a", "#f59e0b", "#db2777"];
+var widgetNames = { metric: "\u6307\u6807", table: "\u8868\u683C", chart: "\u56FE\u8868", checklist: "\u6E05\u5355", form: "\u8868\u5355", actions: "\u5FEB\u6377\u6309\u94AE", markdown: "\u8BF4\u660E", heading: "", board: "AI \u770B\u677F", kb_scope: "\u67E5\u54EA\u4E9B\u5E93" };
+var panelCss = "@keyframes dshee-in{from{opacity:.2;transform:translateY(3px)}to{opacity:1;transform:none}}@keyframes dshee-pulse{0%,100%{opacity:.45}50%{opacity:.9}}";
 function button2(h, label, onClick, disabled = false, key) {
   return h("button", { key, type: "button", onClick, disabled, style: { ...buttonStyle2, opacity: disabled ? 0.5 : 1, cursor: disabled ? "default" : "pointer" } }, label);
 }
-function header(h, widget, refresh) {
+function header(h, widget, refresh, aside) {
   return h(
     "div",
     { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 } },
     h("strong", { style: { fontSize: 13 } }, widget.title || widgetNames[widget.type]),
-    refresh ? h("button", { type: "button", onClick: refresh, "aria-label": "\u5237\u65B0", title: "\u5237\u65B0", style: { ...buttonStyle2, border: 0, padding: "0 4px" } }, "\u21BB") : null
+    h(
+      "span",
+      { style: { display: "flex", alignItems: "center", gap: 6 } },
+      aside ?? null,
+      refresh ? h("button", { type: "button", onClick: refresh, "aria-label": "\u5237\u65B0", title: "\u5237\u65B0", style: { ...buttonStyle2, border: 0, padding: "0 4px" } }, "\u21BB") : null
+    )
+  );
+}
+function skeleton(h, shape = "rows") {
+  const bar = (key, width, height = 10) => h("div", { key, style: { width, height, borderRadius: 4, background: "color-mix(in srgb, currentColor 12%, transparent)", animation: "dshee-pulse 1.4s ease-in-out infinite" } });
+  const bars = shape === "metric" ? [bar(0, "45%", 22), bar(1, "30%", 8)] : shape === "chart" ? [bar(0, "100%", 90)] : [bar(0, "90%"), bar(1, "75%"), bar(2, "82%")];
+  return h(
+    "div",
+    { "data-state": "loading", "aria-busy": "true", style: { display: "grid", gap: 7, padding: "2px 0" } },
+    ...bars,
+    h("span", { style: { position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" } }, "\u52A0\u8F7D\u4E2D\u2026")
   );
 }
 function stateNote(h, state) {
-  if (!state || state.status === "loading") return h("div", { style: muted }, "\u52A0\u8F7D\u4E2D\u2026");
-  if (state.status === "forbidden") return h("div", { style: muted }, "\u65E0\u6743\u9650\uFF1A\u4F60\u6CA1\u6709\u8FD9\u4E2A\u6570\u636E\u6E90\u7684\u4F7F\u7528\u6743\u9650");
-  if (state.status === "error") return h("div", { style: { ...muted, color: "#b45309", opacity: 1, overflowWrap: "anywhere" } }, `\u53D6\u6570\u5931\u8D25\uFF1A${state.error}`);
+  if (!state || state.status === "loading") return skeleton(h);
+  if (state.status === "forbidden") return h("div", { "data-state": "forbidden", style: muted }, "\u65E0\u6743\u9650\uFF1A\u4F60\u6CA1\u6709\u8FD9\u4E2A\u6570\u636E\u6E90\u7684\u4F7F\u7528\u6743\u9650");
+  if (state.status === "error") return h("div", { "data-state": "error", style: { ...muted, color: warn, opacity: 1, overflowWrap: "anywhere" } }, `\u53D6\u6570\u5931\u8D25\uFF1A${state.error}`);
   return null;
 }
-function metricView(h, widget, state, refresh) {
-  const note = stateNote(h, state);
+function stateView(h, index, widget, state, handlers, shape = "rows") {
+  if (!state || state.status === "loading") return skeleton(h, shape);
+  if (state.status === "forbidden") {
+    const connection = widget.source?.connection ?? "";
+    const href = connection ? handlers.requestHref?.(connection) : void 0;
+    return h(
+      "div",
+      { "data-state": "forbidden", style: { fontSize: 12, display: "grid", gap: 4 } },
+      h("span", { style: { opacity: 0.8 } }, `\u65E0\u6743\u9650\uFF1A\u4F60\u8FD8\u6CA1\u6709\u300C${connection || "\u8FD9\u4E2A\u6570\u636E\u6E90"}\u300D\u91CC\u300C${widget.source?.tool ?? ""}\u300D\u7684\u4F7F\u7528\u6743\u9650\u3002`),
+      href ? h("a", { href, target: "_blank", rel: "noopener noreferrer", style: { color: "inherit", textDecoration: "underline", width: "fit-content" } }, "\u53BB\u7533\u8BF7\u6743\u9650 \u2197") : h("span", { style: muted }, "\u8BF7\u8054\u7CFB\u7BA1\u7406\u5458\u5F00\u901A\u3002")
+    );
+  }
+  if (state.status === "error") {
+    return h(
+      "div",
+      { "data-state": "error", role: "alert", style: { fontSize: 12, display: "grid", gap: 6, justifyItems: "start" } },
+      h("span", { style: { color: warn, overflowWrap: "anywhere" } }, `\u53D6\u6570\u5931\u8D25\uFF1A${state.error}`),
+      button2(h, "\u91CD\u8BD5", () => handlers.refresh(index), false, "retry")
+    );
+  }
+  return null;
+}
+function emptyView(h, index, widget, handlers, fallback = "\u6682\u65E0\u6570\u636E") {
+  const action = widget.empty?.action;
+  const key = `${index}:empty`;
   return h(
-    "section",
-    { style: card },
-    header(h, widget, refresh),
-    note ?? h("div", { style: { fontSize: 24, fontWeight: 600 } }, formatValue(getPath(state.value, widget.field), widget.format))
+    "div",
+    { "data-state": "empty", style: { display: "grid", gap: 6, justifyItems: "start", fontSize: 12 } },
+    h("span", { style: { opacity: 0.7 } }, widget.empty?.text || fallback),
+    action ? button2(h, action.label, () => handlers.send(key, action, {}), handlers.sending.has(key), key) : null
   );
 }
+function metricView(h, widget, state, refresh, handlers, index = 0) {
+  const note = handlers ? stateView(h, index, widget, state, handlers, "metric") : stateNote(h, state);
+  let body = note;
+  if (!note) {
+    const value = getPath(state.value, widget.field);
+    const text = formatValue(value, widget.format);
+    const delta = widget.delta_field ? formatDelta(getPath(state.value, widget.delta_field)) : void 0;
+    body = h(
+      "div",
+      { style: { display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" } },
+      // key 跟着值走：值变了重新挂载，播一次淡入
+      h("span", { key: text, "data-value": text, style: { fontSize: 24, fontWeight: 600, fontVariantNumeric: "tabular-nums", animation: "dshee-in .35s ease-out" } }, text),
+      delta ? h("span", { style: { fontSize: 12, fontWeight: 500, color: delta.direction === "up" ? "#16a34a" : delta.direction === "down" ? "#dc2626" : "inherit", opacity: delta.direction === "flat" ? 0.6 : 1 } }, delta.text) : null
+    );
+  }
+  return h("section", { style: card }, header(h, widget, refresh), body);
+}
 function tableView(h, index, widget, state, handlers) {
-  const note = stateNote(h, state);
+  const note = stateView(h, index, widget, state, handlers);
   const columns = widget.columns ?? [];
   const actions = widget.row_actions ?? [];
+  const detail = widget.detail ?? [];
+  const open2 = handlers.expandedRow?.(index);
   let body = note;
   if (!note) {
     const { rows, total } = tableRows(state.value, widget.rows);
-    body = rows.length === 0 ? h("div", { style: muted }, "\u6682\u65E0\u6570\u636E") : h(
+    const span = columns.length + (actions.length ? 1 : 0) + (detail.length ? 1 : 0);
+    body = rows.length === 0 ? emptyView(h, index, widget, handlers) : h(
       "div",
       { style: { overflowX: "auto" } },
       h(
@@ -21148,27 +21254,186 @@ function tableView(h, index, widget, state, handlers) {
         h("thead", null, h(
           "tr",
           null,
-          ...columns.map((column, c) => h("th", { key: c, style: { textAlign: "left", padding: "4px 6px", borderBottom: "1px solid color-mix(in srgb, currentColor 15%, transparent)", whiteSpace: "nowrap" } }, column.title)),
+          detail.length ? h("th", { key: "toggle", style: { width: 18 } }) : null,
+          ...columns.map((column, c) => h("th", { key: c, style: { textAlign: "left", padding: "4px 6px", borderBottom: "1px solid color-mix(in srgb, currentColor 15%, transparent)", whiteSpace: "nowrap", fontWeight: 500, opacity: 0.75 } }, column.title)),
           actions.length ? h("th", { key: "actions" }) : null
         )),
-        h("tbody", null, ...rows.map((row, r) => h(
-          "tr",
-          { key: r },
-          ...columns.map((column, c) => h("td", { key: c, style: { padding: "4px 6px", borderBottom: "1px solid color-mix(in srgb, currentColor 8%, transparent)" } }, formatValue(getPath(row, column.field), column.format))),
-          actions.length ? h(
+        h("tbody", null, ...rows.flatMap((row, r) => {
+          const expanded = open2 === r;
+          const line = h(
+            "tr",
+            { key: r, style: { cursor: detail.length ? "pointer" : "default", background: expanded ? "color-mix(in srgb, currentColor 5%, transparent)" : "transparent" }, onClick: detail.length ? () => handlers.toggleRow?.(index, r) : void 0 },
+            detail.length ? h("td", { key: "toggle", style: { padding: "4px 2px", opacity: 0.6 } }, h("button", { type: "button", "aria-expanded": expanded, "aria-label": expanded ? "\u6536\u8D77\u8BE6\u60C5" : "\u5C55\u5F00\u8BE6\u60C5", onClick: (event) => {
+              event?.stopPropagation?.();
+              handlers.toggleRow?.(index, r);
+            }, style: { ...buttonStyle2, border: 0, padding: 0 } }, expanded ? "\u25BE" : "\u25B8")) : null,
+            ...columns.map((column, c) => h("td", { key: c, style: { padding: "4px 6px", borderBottom: "1px solid color-mix(in srgb, currentColor 8%, transparent)", fontVariantNumeric: "tabular-nums" } }, formatValue(getPath(row, column.field), column.format))),
+            actions.length ? h(
+              "td",
+              { key: "actions", style: { padding: "4px 6px", whiteSpace: "nowrap" }, onClick: (event) => event?.stopPropagation?.() },
+              ...actions.map((action, a) => {
+                const key = `${index}:row:${r}:${a}`;
+                return button2(h, action.label, () => handlers.send(key, action, { row }), handlers.sending.has(key), key);
+              })
+            ) : null
+          );
+          if (!expanded) return [line];
+          return [line, h("tr", { key: `${r}:detail` }, h(
             "td",
-            { key: "actions", style: { padding: "4px 6px", whiteSpace: "nowrap" } },
-            ...actions.map((action, a) => {
-              const key = `${index}:row:${r}:${a}`;
-              return button2(h, action.label, () => handlers.send(key, action, { row }), handlers.sending.has(key), key);
-            })
-          ) : null
-        )))
+            { colSpan: span, style: { padding: "6px 8px 10px 24px", borderBottom: "1px solid color-mix(in srgb, currentColor 8%, transparent)" } },
+            h(
+              "dl",
+              { "data-detail": r, style: { margin: 0, display: "grid", gridTemplateColumns: "max-content minmax(0, 1fr)", gap: "4px 12px", animation: "dshee-in .2s ease-out" } },
+              ...detail.flatMap((field, f) => [
+                h("dt", { key: `t${f}`, style: { opacity: 0.6 } }, field.title),
+                h("dd", { key: `d${f}`, style: { margin: 0, overflowWrap: "anywhere" } }, formatValue(getPath(row, field.field), field.format))
+              ])
+            )
+          ))];
+        }))
       ),
       total > rows.length ? h("div", { style: { ...muted, marginTop: 6 } }, `\u5171 ${total} \u884C\uFF0C\u53EA\u663E\u793A\u524D ${rows.length} \u884C`) : null
     );
   }
   return h("section", { style: card }, header(h, widget, () => handlers.refresh(index)), body);
+}
+function chartView(h, index, widget, state, handlers) {
+  const note = stateView(h, index, widget, state, handlers, "chart");
+  let body = note;
+  if (!note) {
+    const data = chartSeries(state.value, widget);
+    body = data.labels.length === 0 ? emptyView(h, index, widget, handlers) : widget.chart === "pie" ? pieChart(h, data) : xyChart(h, widget.chart === "bar" ? "bar" : "line", data);
+  }
+  return h("section", { style: card }, header(h, widget, () => handlers.refresh(index)), body);
+}
+function legend(h, items) {
+  return h(
+    "div",
+    { style: { display: "flex", flexWrap: "wrap", gap: "4px 12px", marginTop: 6, fontSize: 11 } },
+    ...items.map((item, i) => h(
+      "span",
+      { key: i, style: { display: "inline-flex", alignItems: "center", gap: 4 } },
+      h("span", { style: { width: 8, height: 8, borderRadius: 2, background: item.color, display: "inline-block" } }),
+      item.label,
+      item.value ? h("span", { style: { opacity: 0.6 } }, item.value) : null
+    ))
+  );
+}
+function niceMax(max) {
+  if (max <= 0) return 1;
+  const step = 10 ** Math.floor(Math.log10(max));
+  return Math.ceil(max / step) * step;
+}
+function xyChart(h, kind, data) {
+  const W = 320, H = 150, left = 34, bottom = 18, top = 8, right = 6;
+  const max = niceMax(Math.max(0, ...data.series.flatMap((s) => s.values)));
+  const n = data.labels.length;
+  const plotW = W - left - right, plotH = H - top - bottom;
+  const y = (v) => top + plotH - Math.max(0, v) / max * plotH;
+  const slot = plotW / Math.max(n, 1);
+  const xMid = (i) => left + slot * i + slot / 2;
+  const fmt = (v) => formatValue(v, data.series[0]?.format === "money" || data.series[0]?.format === "compact" ? "compact" : "number");
+  const grid = [0, 0.5, 1].map((f) => h(
+    "g",
+    { key: `g${f}` },
+    h("line", { x1: left, x2: W - right, y1: y(max * f), y2: y(max * f), stroke: "currentColor", strokeOpacity: f === 0 ? 0.3 : 0.1, strokeDasharray: f === 0 ? void 0 : "3 3" }),
+    h("text", { x: left - 4, y: y(max * f) + 3, textAnchor: "end", fontSize: 9, fill: "currentColor", fillOpacity: 0.55 }, fmt(max * f))
+  ));
+  const marks = data.series.flatMap((s, si) => {
+    const color = seriesColors[si % seriesColors.length];
+    if (kind === "bar") {
+      const groupW = slot * 0.7;
+      const barW = groupW / data.series.length;
+      return s.values.map((v, i) => h(
+        "rect",
+        { key: `b${si}-${i}`, x: left + slot * i + (slot - groupW) / 2 + barW * si, y: y(v), width: Math.max(barW - 1, 1), height: Math.max(top + plotH - y(v), 0), rx: 2, fill: color },
+        h("title", null, `${data.labels[i]} \xB7 ${s.title}\uFF1A${formatValue(v, s.format)}`)
+      ));
+    }
+    const points = s.values.map((v, i) => `${xMid(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    return [
+      h("polyline", { key: `l${si}`, points, fill: "none", stroke: color, strokeWidth: 2, strokeLinejoin: "round", strokeLinecap: "round" }),
+      ...s.values.map((v, i) => h(
+        "circle",
+        { key: `c${si}-${i}`, cx: xMid(i), cy: y(v), r: n > 24 ? 1.5 : 2.5, fill: color },
+        h("title", null, `${data.labels[i]} \xB7 ${s.title}\uFF1A${formatValue(v, s.format)}`)
+      ))
+    ];
+  });
+  const ticks = n <= 1 ? [0] : n <= 6 ? data.labels.map((_, i) => i) : [0, Math.floor((n - 1) / 2), n - 1];
+  const xLabels = ticks.map((i) => h("text", { key: `x${i}`, x: xMid(i), y: H - 4, textAnchor: "middle", fontSize: 9, fill: "currentColor", fillOpacity: 0.6 }, data.labels[i]));
+  return h(
+    "div",
+    null,
+    h("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img", "aria-label": data.series.map((s) => s.title).join("\u3001"), style: { display: "block", overflow: "visible" } }, ...grid, ...marks, ...xLabels),
+    data.series.length > 1 ? legend(h, data.series.map((s, i) => ({ label: s.title, color: seriesColors[i % seriesColors.length] }))) : null
+  );
+}
+function pieChart(h, data) {
+  const series = data.series[0];
+  const values = series?.values.map((v) => Math.max(0, v)) ?? [];
+  const total = values.reduce((a, b) => a + b, 0);
+  if (!total) return h("div", { "data-state": "empty", style: muted }, "\u6682\u65E0\u6570\u636E");
+  const R = 54, C = 60;
+  const palette = (i) => seriesColors[i % seriesColors.length];
+  const shade = (i) => i < seriesColors.length ? palette(i) : `color-mix(in srgb, ${palette(i)} ${100 - 25 * Math.floor(i / seriesColors.length)}%, transparent)`;
+  let angle = -Math.PI / 2;
+  const slices = values.map((v, i) => {
+    const sweep = v / total * Math.PI * 2;
+    const a0 = angle;
+    angle += sweep;
+    const tip = `${data.labels[i]}\uFF1A${formatValue(v, series.format)}\uFF08${Math.round(v / total * 100)}%\uFF09`;
+    if (sweep >= Math.PI * 2 - 1e-6) return h("circle", { key: i, cx: C, cy: C, r: R, fill: shade(i) }, h("title", null, tip));
+    const p = (a) => `${(C + R * Math.cos(a)).toFixed(2)} ${(C + R * Math.sin(a)).toFixed(2)}`;
+    return h("path", { key: i, d: `M ${C} ${C} L ${p(a0)} A ${R} ${R} 0 ${sweep > Math.PI ? 1 : 0} 1 ${p(angle)} Z`, fill: shade(i), stroke: "var(--background, transparent)", strokeWidth: 1 }, h("title", null, tip));
+  });
+  return h(
+    "div",
+    { style: { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" } },
+    h("svg", { viewBox: "0 0 120 120", width: 120, height: 120, role: "img", "aria-label": series.title }, ...slices, h("circle", { cx: C, cy: C, r: 26, fill: "var(--background, Canvas)" })),
+    h("div", { style: { flex: 1, minWidth: 120 } }, legend(h, data.labels.map((label, i) => ({ label, color: shade(i), value: `${Math.round(values[i] / total * 100)}%` }))))
+  );
+}
+function checklistView(h, index, widget, state, handlers) {
+  const fromSource = !!widget.source && !widget.items?.length;
+  const note = fromSource ? stateView(h, index, widget, state, handlers) : null;
+  const items = note ? [] : checklistItems(widget, state?.value);
+  const checked = handlers.checked?.(index) ?? [];
+  const done = items.filter((item) => checked.includes(item.id)).length;
+  let body = note;
+  if (!note) {
+    body = items.length === 0 ? emptyView(h, index, widget, handlers) : h(
+      "div",
+      { style: { display: "grid", gap: 8 } },
+      h(
+        "div",
+        { style: { height: 4, borderRadius: 999, background: "color-mix(in srgb, currentColor 10%, transparent)", overflow: "hidden" } },
+        h("div", { style: { width: `${done / items.length * 100}%`, height: "100%", background: seriesColors[1], transition: "width .3s ease-out" } })
+      ),
+      h(
+        "ul",
+        { style: { listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 4 } },
+        ...items.map((item) => {
+          const on = checked.includes(item.id);
+          return h(
+            "li",
+            { key: item.id },
+            h(
+              "label",
+              { style: { display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, cursor: "pointer" } },
+              h("input", { type: "checkbox", checked: on, onChange: () => handlers.toggleCheck?.(index, item.id), style: { marginTop: 2 } }),
+              h("span", { style: { textDecoration: on ? "line-through" : "none", opacity: on ? 0.55 : 1 } }, item.text)
+            )
+          );
+        })
+      )
+    );
+  }
+  const progress = items.length ? h("span", { style: { ...muted, fontVariantNumeric: "tabular-nums" } }, `${done}/${items.length}`) : null;
+  return h("section", { style: card }, header(h, widget, fromSource ? () => handlers.refresh(index) : void 0, progress), body);
+}
+function headingView(h, widget) {
+  return h("h3", { style: { margin: "6px 2px -2px", fontSize: 12, fontWeight: 600, letterSpacing: "0.02em", opacity: 0.7 } }, widget.title);
 }
 function formView(h, index, widget, handlers) {
   const values = handlers.formValues(index);
@@ -21255,8 +21520,8 @@ function citationsView(h, items, key, open2, hrefOf) {
     })
   );
 }
-function kbScopeView(h, widget, state, handlers) {
-  const note = stateNote(h, state);
+function kbScopeView(h, widget, state, handlers, index = 0) {
+  const note = stateView(h, index, widget, state, handlers);
   const bases = note ? [] : getPath(state.value, "items") ?? [];
   const selected = handlers.selectedKBs ?? [];
   const body = note ?? (bases.length === 0 ? h("div", { style: muted }, "\u4F60\u8FD8\u6CA1\u6709\u53EF\u4EE5\u67E5\u7684\u77E5\u8BC6\u5E93") : h(
@@ -21307,24 +21572,31 @@ function panelView(h, pane, state, handlers) {
   return h(
     "div",
     { "data-dsh-ee-ui": "workbench", style: { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } },
+    h("style", { key: "css" }, panelCss),
     state.notice ? h("p", { role: "status", style: { margin: 0, fontSize: 12, overflowWrap: "anywhere" } }, state.notice) : null,
     ...widgets.map((widget, index) => {
       const key = `w${index}`;
       switch (widget.type) {
         case "metric":
-          return h("div", { key }, metricView(h, widget, state.data[index], () => handlers.refresh(index)));
+          return h("div", { key }, metricView(h, widget, state.data[index], () => handlers.refresh(index), handlers, index));
         case "table":
           return h("div", { key }, tableView(h, index, widget, state.data[index], handlers));
+        case "chart":
+          return h("div", { key }, chartView(h, index, widget, state.data[index], handlers));
+        case "checklist":
+          return h("div", { key }, checklistView(h, index, widget, state.data[index], handlers));
         case "form":
           return h("div", { key }, formView(h, index, widget, handlers));
         case "actions":
           return h("div", { key }, actionsView(h, index, widget, handlers));
         case "markdown":
           return h("div", { key }, markdownView(h, widget));
+        case "heading":
+          return h("div", { key }, headingView(h, widget));
         case "board":
           return h("div", { key }, boardView(h, widget, state.board, handlers.openCitation, handlers.citationHref));
         case "kb_scope":
-          return h("div", { key }, kbScopeView(h, widget, state.data[index], handlers));
+          return h("div", { key }, kbScopeView(h, widget, state.data[index], handlers, index));
         default:
           return null;
       }
@@ -21455,7 +21727,9 @@ function registerWorkbench(ctx, deps) {
     const [forms, setForms] = (0, import_react2.useState)({});
     const [formErrors, setFormErrors] = (0, import_react2.useState)({});
     const [selectedKBs, setSelectedKBs] = (0, import_react2.useState)([]);
-    const { sending, notice, send: sendText } = useSending();
+    const [checks, setChecks] = (0, import_react2.useState)({});
+    const [expanded, setExpanded] = (0, import_react2.useState)({});
+    const { sending, notice, setNotice, send: sendText } = useSending();
     const sessionRef = (0, import_react2.useRef)("");
     if (!sessionRef.current) sessionRef.current = onScreenSession(ctx);
     const load = async (index) => {
@@ -21479,19 +21753,43 @@ function registerWorkbench(ctx, deps) {
       }
     };
     const hasBoard = !!pane.widgets?.some((widget) => widget.type === "board");
+    const hasChecklist = !!pane.widgets?.some((widget) => widget.type === "checklist");
+    const loadChecks = async () => {
+      if (!sessionRef.current) return;
+      try {
+        const lists = unwrapRemote2(await remote.checklists({ app: app.name, sessionId: sessionRef.current }));
+        if (lists && typeof lists === "object") setChecks(lists);
+      } catch {
+      }
+    };
+    const toggleCheck = (index, id) => {
+      const key = checklistKey(pane.id, index);
+      if (!sessionRef.current) return setNotice("\u6CA1\u6709\u627E\u5230\u5F53\u524D\u4F1A\u8BDD\uFF0C\u52FE\u9009\u4E0D\u4F1A\u4FDD\u5B58");
+      const done = !(checks[key] ?? []).includes(id);
+      setChecks((current) => ({ ...current, [key]: done ? [...current[key] ?? [], id] : (current[key] ?? []).filter((x) => x !== id) }));
+      Promise.resolve(remote.setChecklist({ app: app.name, sessionId: sessionRef.current, key, id, done })).then((raw) => {
+        const next = unwrapRemote2(raw);
+        if (Array.isArray(next)) setChecks((current) => ({ ...current, [key]: next }));
+      }).catch(() => setNotice("\u52FE\u9009\u6CA1\u6709\u4FDD\u5B58\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5"));
+    };
     (0, import_react2.useEffect)(loadAll, [app.name, app.version, pane.id]);
     (0, import_react2.useEffect)(() => {
       void loadDocBase();
     }, [app.name]);
     (0, import_react2.useEffect)(() => {
-      if (!hasBoard || !visible) return;
-      void loadBoard();
-      const timer = setInterval(() => void loadBoard(), 3e3);
+      if (!hasBoard && !hasChecklist || !visible) return;
+      const tick = () => {
+        if (hasBoard) void loadBoard();
+        if (hasChecklist) void loadChecks();
+      };
+      tick();
+      const timer = setInterval(tick, 3e3);
       return () => clearInterval(timer);
-    }, [hasBoard, visible, app.name]);
+    }, [hasBoard, hasChecklist, visible, app.name]);
     (0, import_react2.useEffect)(() => info?.tab?.actions?.bindCommands?.({ refresh: () => {
       loadAll();
       void loadBoard();
+      void loadChecks();
     } }), [info?.tab?.id, app.version]);
     const scopeIndex = (pane.widgets ?? []).findIndex((widget) => widget.type === "kb_scope");
     const scopeState = scopeIndex >= 0 ? data[scopeIndex] : void 0;
@@ -21515,6 +21813,12 @@ function registerWorkbench(ctx, deps) {
       setFormError: (index, error62) => setFormErrors((current) => ({ ...current, [index]: error62 })),
       selectedKBs,
       toggleKB: (kb) => setSelectedKBs((current) => current.includes(kb) ? current.filter((item) => item !== kb) : [...current, kb]),
+      checked: (index) => checks[checklistKey(pane.id, index)] ?? [],
+      toggleCheck,
+      expandedRow: (index) => expanded[index],
+      toggleRow: (index, row) => setExpanded((current) => ({ ...current, [index]: current[index] === row ? void 0 : row })),
+      // 无权限时「去申请」：dsh-ee 网页上这个连接的页面（有申请入口）
+      requestHref: (connection) => docBase ? `${docBase}/connections/${encodeURIComponent(connection)}` : void 0,
       openCitation: docPane ? (citation) => {
         docTargets.set(app.name, { doc: citation.doc, version: citation.version, from: citation.from, to: citation.to, quote: citation.quote, title: citation.title });
         try {
@@ -21785,6 +22089,8 @@ var clientRemote = createTypertRemoteInfo({
     "dshEE/workbenchData": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/kbDoc": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/board": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/checklists": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/setChecklist": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/overview": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/login": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/doctor": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },

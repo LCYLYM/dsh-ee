@@ -99,7 +99,7 @@ func TestWorkbench(t *testing.T) {
 	bad("写错的占位符", func(wb map[string]any) {
 		widget(wb, 3)["actions"].([]any)[0].(map[string]any)["prompt"] = "看 {{ name }}"
 	}, "占位符只能写成")
-	bad("未知组件类型", func(wb map[string]any) { widget(wb, 4)["type"] = "chart" }, "第 1 个窗格第 5 个组件：类型只能是")
+	bad("未知组件类型", func(wb map[string]any) { widget(wb, 4)["type"] = "gauge" }, "第 1 个窗格第 5 个组件：类型只能是")
 	bad("网址不是 http", func(wb map[string]any) { wb["panes"].([]any)[1].(map[string]any)["url"] = "javascript:alert(1)" }, "网址必须以 http")
 	bad("窗格 id 重复", func(wb map[string]any) { wb["panes"].([]any)[1].(map[string]any)["id"] = "main" }, "id main 重复了")
 	bad("窗格太多", func(wb map[string]any) {
@@ -114,6 +114,38 @@ func TestWorkbench(t *testing.T) {
 		widget(wb, 2)["fields"].([]any)[1].(map[string]any)["options"] = []string{}
 	}, "下拉选项要有 1～20 项")
 	bad("未知字段", func(wb map[string]any) { widget(wb, 5)["html"] = "<b>x</b>" }, "spec 格式不对")
+
+	// ---- 图表、清单、详情卡、空状态：数据源同样只能是只读工具 ----
+	addWidget := func(wb map[string]any, w map[string]any) {
+		panel(wb)["widgets"] = append(panel(wb)["widgets"].([]any), w)
+	}
+	chart := func(kind string, tool string, ys ...string) map[string]any {
+		var y []any
+		for _, f := range ys {
+			y = append(y, map[string]any{"field": f, "title": f})
+		}
+		return map[string]any{"type": "chart", "title": "趋势", "chart": kind, "source": map[string]any{"connection": "crm", "tool": tool}, "rows": "items", "x": "month", "y": y}
+	}
+	bad("图表用写工具", func(wb map[string]any) { addWidget(wb, chart("line", "update", "amount")) }, "不是只读工具")
+	bad("图表类型不对", func(wb map[string]any) { addWidget(wb, chart("radar", "lookup", "amount")) }, "图表类型（chart）只能是")
+	bad("饼图两个序列", func(wb map[string]any) { addWidget(wb, chart("pie", "lookup", "a", "b")) }, "饼图只能有 1 个数值序列")
+	bad("图表没有序列", func(wb map[string]any) { addWidget(wb, chart("bar", "lookup")) }, "数值序列（y）要有 1～4 个")
+	bad("清单用写工具", func(wb map[string]any) {
+		addWidget(wb, map[string]any{"type": "checklist", "title": "待办", "source": map[string]any{"connection": "crm", "tool": "export"}, "item_field": "name"})
+	}, "不是只读工具")
+	bad("清单两种条目都填", func(wb map[string]any) {
+		addWidget(wb, map[string]any{"type": "checklist", "title": "待办", "source": map[string]any{"connection": "crm", "tool": "lookup"}, "item_field": "name", "items": []any{map[string]any{"id": "a", "text": "A"}}})
+	}, "不能都填")
+	bad("清单条目 id 重复", func(wb map[string]any) {
+		addWidget(wb, map[string]any{"type": "checklist", "title": "待办", "items": []any{map[string]any{"id": "a", "text": "A"}, map[string]any{"id": "a", "text": "B"}}})
+	}, "id a 重复了")
+	bad("详情卡字段不对", func(wb map[string]any) {
+		widget(wb, 1)["detail"] = []any{map[string]any{"field": "a b", "title": "x"}}
+	}, "详情卡第 1 项的字段格式不对")
+	bad("空状态按钮用占位符", func(wb map[string]any) {
+		widget(wb, 1)["empty"] = map[string]any{"text": "还没有客户", "action": map[string]any{"label": "去建一个", "prompt": "新建 {{row.name}}"}}
+	}, "空状态的按钮：快捷按钮不能用占位符")
+	bad("分组标题没写", func(wb map[string]any) { addWidget(wb, map[string]any{"type": "heading"}) }, "分组标题必填")
 
 	// ---- 合法配置：保存、下发、写进指令 ----
 	code, body = create("crm-helper", sampleWorkbench())
@@ -155,6 +187,36 @@ func TestWorkbench(t *testing.T) {
 	_, _, header = bob.do("GET", "/api/dsh/catalog", nil, nil)
 	if header.Get("ETag") == etag {
 		t.Fatal("工作台改了，目录 ETag 应变化")
+	}
+
+	// 新组件：分组标题、图表、清单（配置的条目与数据源）、详情卡、空状态都能保存，并写进指令
+	wb2 := sampleWorkbench()
+	widget(wb2, 1)["detail"] = []any{map[string]any{"field": "owner", "title": "负责人"}, map[string]any{"field": "renew_at", "title": "续约日期", "format": "date"}}
+	widget(wb2, 1)["empty"] = map[string]any{"text": "还没有客户", "action": map[string]any{"label": "去建一个", "prompt": "帮我新建一个客户"}}
+	widget(wb2, 0)["delta_field"] = "change"
+	widget(wb2, 0)["format"] = "compact"
+	addWidget(wb2, map[string]any{"type": "heading", "title": "趋势与待办"})
+	addWidget(wb2, chart("line", "lookup", "amount", "count"))
+	addWidget(wb2, chart("pie", "lookup", "amount"))
+	addWidget(wb2, map[string]any{"type": "checklist", "title": "入职清单", "items": []any{map[string]any{"id": "laptop", "text": "领电脑"}, map[string]any{"id": "badge", "text": "办工牌"}}})
+	addWidget(wb2, map[string]any{"type": "checklist", "title": "跟进清单", "source": map[string]any{"connection": "crm", "tool": "lookup"}, "rows": "items", "item_field": "name", "id_field": "id"})
+	code, body = create("crm-helper-v2", wb2)
+	expect(t, "新组件", code, 201, body)
+	_, raw, _ = bob.do("GET", "/api/dsh/catalog", nil, nil)
+	for _, want := range []string{`"type":"chart"`, `"chart":"pie"`, `"type":"checklist"`, `"id":"laptop"`, `"detail":[`, `"empty":{`, `"delta_field":"change"`, `"type":"heading"`} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("目录里应有 %s：%s", want, raw)
+		}
+	}
+	_, raw, _ = bob.do("GET", "/api/dsh/skills/crm-helper-v2", nil, nil)
+	content = decodeAs[struct{ Content string }](t, raw).Content
+	for _, want := range []string{"AI 看板、趋势、趋势、入职清单、跟进清单", "action 为 `checklist`，title 写「入职清单」", "`laptop` 领电脑；`badge` 办工牌", "条目来自 `crm__lookup`，编号是每一项的 `id` 字段"} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("指令里应有「%s」：\n%s", want, content)
+		}
+	}
+	if strings.Contains(content, "趋势与待办") {
+		t.Fatalf("分组标题不用写进指令：\n%s", content)
 	}
 
 	// 没有工作台的微应用：指令里不出现工作台一节
