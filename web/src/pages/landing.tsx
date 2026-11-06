@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { Check, Cpu, FileSearch, Puzzle, ShieldCheck, X } from "lucide-react";
+import { Check, Cpu, FileSearch, ShieldCheck, X } from "lucide-react";
+import { WhaleMark } from "../components/whale-mark";
 import { auditLog, clientPlatforms, microApps } from "../mock/data";
 import { PageLink } from "../lib/menus";
 import { LangSwitch } from "../components/lang-switch";
@@ -127,9 +128,7 @@ function WorkbenchFragment() {
     <div data-ui className="grid overflow-hidden rounded-xl bg-lp-card text-sm shadow-lp sm:grid-cols-[150px_1fr]">
       <div className="hidden flex-col gap-0.5 bg-lp-bg-alt p-3 sm:flex">
         <div className="flex items-center gap-2 px-2 pb-3 font-semibold text-lp-ink">
-          <span className="flex h-5 w-5 items-center justify-center rounded bg-lp-accent text-white dark:text-[#0a2540]">
-            <Puzzle size={11} />
-          </span>
+          <WhaleMark size={20} className="text-lp-accent" />
           dsh-ee
         </div>
         {(["overview", "apps", "market", "setup"] as const).map((n) => (
@@ -291,9 +290,7 @@ export default function Landing() {
       >
         <div className={cx(shell, "flex h-16 items-center gap-4 sm:gap-8")}>
           <Link to="/" className={cx("flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight whitespace-nowrap text-lp-ink")}>
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[linear-gradient(135deg,#6f88ff,#4d6bfe_50%,#8b5cf6)] text-white">
-              <Puzzle size={15} />
-            </span>
+            <WhaleMark size={30} className="text-lp-accent" />
             dsh-ee
           </Link>
           <nav className={cx("hidden gap-7 text-[15px] font-semibold text-lp-ink lg:flex")}>
@@ -321,17 +318,14 @@ export default function Landing() {
         {/* 首屏 */}
         <section className="relative">
           <div className={cx(shell, "relative pt-14 pb-16 sm:pt-20 lg:pt-24")}>
-            <h1 data-reveal className="max-w-3xl text-[clamp(2.75rem,6.6vw,5.25rem)] leading-[1.08] font-bold tracking-[-0.015em] text-lp-ink">
+            <h1 data-reveal className="max-w-3xl text-[clamp(2rem,4.4vw,3.5rem)] leading-[1.16] font-semibold tracking-[-0.02em] text-lp-ink">
               {t("landing.heroLine1")}
               <br />
               <span className="bg-[linear-gradient(100deg,#4d6bfe_10%,#8b5cf6_55%,#e8618c_95%)] bg-clip-text text-transparent dark:bg-[linear-gradient(100deg,#80e9ff,#a5b8fc_45%,#f0a6ff)]">
                 {t("landing.heroLine2")}
               </span>
             </h1>
-            <p data-reveal className="mt-7 max-w-[560px] text-lg leading-relaxed text-lp-body" style={delay(90)}>
-              {t("landing.heroDesc")}
-            </p>
-            <div data-reveal className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-3" style={delay(160)}>
+            <div data-reveal className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-3" style={delay(90)}>
               <Pill to="/go" tone="accent">
                 {t("landing.enter")}
               </Pill>
@@ -339,14 +333,6 @@ export default function Landing() {
                 {t("landing.seeHow")}
               </Pill>
             </div>
-            <ul data-reveal className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-lp-ink/75" style={delay(220)}>
-              {controls.map(({ key, icon: Icon }) => (
-                <li key={key} className="inline-flex items-center gap-1.5">
-                  <Icon size={16} className="text-lp-accent" />
-                  {t(`landing.controls.${key}.title`)}
-                </li>
-              ))}
-            </ul>
           </div>
           <div className="relative pb-24">
             <LandingHeroScene sources={sources} />
@@ -512,9 +498,7 @@ export default function Landing() {
         <div className="border-t border-lp-line">
           <div className={cx(shell, "flex flex-wrap items-center justify-between gap-4 py-8 text-sm text-lp-muted")}>
             <span className="flex items-center gap-2 font-bold text-lp-ink">
-              <span className="flex h-6 w-6 items-center justify-center rounded bg-[#0a2540] text-white dark:bg-lp-accent dark:text-[#0a2540]">
-                <Puzzle size={13} />
-              </span>
+              <WhaleMark size={24} className="text-lp-accent" />
               dsh-ee
             </span>
             <span>{t("landing.footerNote")}</span>

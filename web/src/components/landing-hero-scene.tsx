@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BookOpen, Boxes, Check, Database, Loader2, Monitor, Puzzle } from "lucide-react";
 import { cx } from "./ui";
+import { WhaleMark } from "./whale-mark";
 
 /**
  * 首屏场景：企业资产 → dsh-ee → DSH 客户端 → 交付结果，横向一条链。
@@ -83,6 +84,15 @@ export function LandingHeroScene({ sources }: { sources: readonly Source[] }) {
   const s = sources[active];
   const ask = t(`landing.sources.${s.key}.ask`);
   const answer = t(`landing.sources.${s.key}.answer`);
+  // 各步骤随动画逐个出现会让卡片不断变高：先按四类资产里最长的问题与回答占好空间
+  let reserveAsk = ask;
+  let reserveAnswer = answer;
+  for (const src of sources) {
+    const otherAsk = t(`landing.sources.${src.key}.ask`);
+    const otherAnswer = t(`landing.sources.${src.key}.answer`);
+    if (otherAsk.length > reserveAsk.length) reserveAsk = otherAsk;
+    if (otherAnswer.length > reserveAnswer.length) reserveAnswer = otherAnswer;
+  }
 
   useLayoutEffect(() => {
     const root = wrap.current;
@@ -248,7 +258,7 @@ export function LandingHeroScene({ sources }: { sources: readonly Source[] }) {
         >
           <div className="flex items-center gap-2.5">
             <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white text-[#3b5bdb]">
-              <Puzzle size={14} />
+              <WhaleMark size={20} />
             </span>
             <span className="font-semibold">dsh-ee</span>
             <span className="ml-auto rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-medium">{t("landing.scene.eeTag")}</span>
@@ -304,39 +314,56 @@ export function LandingHeroScene({ sources }: { sources: readonly Source[] }) {
             <span className="status-dot h-2 w-2 rounded-full bg-[#10b981]" />
           </div>
           <div key={active} className="mt-4 flex flex-col gap-3">
-            {phase >= 1 && (
-              <p
-                className="scene-card ml-auto max-w-[90%] rounded-2xl rounded-br-md bg-lp-accent px-3.5 py-2 text-sm leading-relaxed text-white dark:text-[#0a2540]"
-                style={delay(0)}
-              >
-                {ask}
+            {/* 提问：不可见占位按最长的问题定高，气泡覆盖在上面出现 */}
+            <div className="relative">
+              <p aria-hidden="true" className="invisible ml-auto max-w-[90%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed">
+                {reserveAsk}
               </p>
-            )}
-            {phase >= 2 && (
-              <div className="scene-card flex items-center gap-2 rounded-lg border border-lp-line px-3 py-2 text-xs" style={delay(0)}>
-                <span
-                  className={cx(
-                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors",
-                    phase >= 3 ? "bg-[#10b981] text-white" : "bg-lp-accent-soft text-lp-accent",
-                  )}
+              {phase >= 1 && (
+                <p
+                  className="scene-card absolute top-0 right-0 ml-auto max-w-[90%] rounded-2xl rounded-br-md bg-lp-accent px-3.5 py-2 text-sm leading-relaxed text-white dark:text-[#0a2540]"
+                  style={delay(0)}
                 >
-                  {phase >= 3 ? <Check size={12} strokeWidth={3} /> : <Loader2 size={12} className="animate-spin" />}
-                </span>
-                <Database size={13} className="shrink-0 text-lp-muted" />
-                <span className="shrink-0 font-medium text-lp-ink">{t(phase >= 3 ? "landing.scene.queried" : "landing.scene.querying")}</span>
-                <span className="min-w-0 truncate font-mono text-lp-muted">{s.pkg}</span>
-              </div>
-            )}
-            {said > 0 && (
-              <p
-                className="scene-card max-w-[94%] rounded-2xl rounded-bl-md bg-lp-bg-alt px-3.5 py-2.5 text-sm leading-relaxed text-lp-ink"
-                style={delay(0)}
-                aria-label={answer}
+                  {ask}
+                </p>
+              )}
+            </div>
+            {/* 调用企业数据：位置固定，时间到直接变可见 */}
+            <div
+              className={cx(
+                "scene-card flex items-center gap-2 rounded-lg border border-lp-line px-3 py-2 text-xs",
+                phase < 2 && "invisible",
+              )}
+              style={delay(0)}
+            >
+              <span
+                className={cx(
+                  "flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors",
+                  phase >= 3 ? "bg-[#10b981] text-white" : "bg-lp-accent-soft text-lp-accent",
+                )}
               >
-                {answer.slice(0, said)}
-                {said < answer.length && <span aria-hidden className="caret ml-0.5 inline-block h-3.5 w-px translate-y-0.5 bg-lp-accent" />}
+                {phase >= 3 ? <Check size={12} strokeWidth={3} /> : <Loader2 size={12} className="animate-spin" />}
+              </span>
+              <Database size={13} className="shrink-0 text-lp-muted" />
+              <span className="shrink-0 font-medium text-lp-ink">{t(phase >= 3 ? "landing.scene.queried" : "landing.scene.querying")}</span>
+              <span className="min-w-0 truncate font-mono text-lp-muted">{s.pkg}</span>
+            </div>
+            {/* 回答：占位按最长的回答定高，逐字打出的气泡覆盖在上面 */}
+            <div className="relative">
+              <p aria-hidden="true" className="invisible max-w-[94%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed">
+                {reserveAnswer}
               </p>
-            )}
+              {said > 0 && (
+                <p
+                  className="scene-card absolute top-0 left-0 max-w-[94%] rounded-2xl rounded-bl-md bg-lp-bg-alt px-3.5 py-2.5 text-sm leading-relaxed text-lp-ink"
+                  style={delay(0)}
+                  aria-label={answer}
+                >
+                  {answer.slice(0, said)}
+                  {said < answer.length && <span aria-hidden className="caret ml-0.5 inline-block h-3.5 w-px translate-y-0.5 bg-lp-accent" />}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>

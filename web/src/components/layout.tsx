@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, Link, useLocation } from "react-router";
-import { ExternalLink, LogOut, Menu as MenuGlyph, Puzzle, X } from "lucide-react";
+import { ExternalLink, LogOut, Menu as MenuGlyph, X } from "lucide-react";
+import { WhaleMark } from "./whale-mark";
 import { useStore } from "../lib/store";
 import { useAuth } from "../lib/auth";
 import { useMenuTitle, useMenus } from "../lib/menus";
@@ -76,9 +77,7 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
   return (
     <div className="flex min-h-full flex-col px-3 py-4">
       <Link to="/" className="flex items-center gap-2.5 px-3 pb-5" onClick={onNavigate}>
-        <span className="lp-mesh flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-card">
-          <Puzzle size={16} />
-        </span>
+        <WhaleMark size={30} className="shrink-0 text-brand-500" />
         <span className="leading-tight">
           <span className="block text-[15px] font-bold tracking-[-0.01em] text-neutral-900">dsh-ee</span>
           <span className="block text-xs text-neutral-500">{settings.orgName}</span>

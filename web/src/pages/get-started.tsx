@@ -45,7 +45,7 @@ export default function GetStarted() {
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-neutral-500">
             {t("getStarted.other")}{" "}
-            <PageLink page="setup" className="text-brand-700 hover:underline">
+            <PageLink page="setup" className="text-brand-700 hover:underline dark:text-brand-300">
               {t("getStarted.otherLink")}
             </PageLink>
           </p>

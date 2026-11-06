@@ -238,11 +238,11 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
           const current = !step.done && !step.optional && status.next === step.id;
           return (
             <li key={step.id} className={`onboarding-step group relative grid gap-4 border-b border-neutral-200/90 py-6 sm:grid-cols-[2.5rem_1fr] ${current ? "bg-brand-50/60 dark:bg-brand-500/10" : ""}`} style={{ animationDelay: `${120 + index * 45}ms` }}>
-              <div className="relative flex justify-center pt-1">
+              <div className="relative flex pt-1 sm:justify-center">
                 <span className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold ${step.done ? "border-brand-500 bg-brand-500 text-white" : current ? "border-brand-500 bg-card text-brand-600" : "border-neutral-300 bg-card text-neutral-400"}`}>
                   {step.done ? <Check size={14} strokeWidth={2} /> : index + 1}
                 </span>
-                {index < status.steps.length - 1 && <span className="absolute bottom-[-1.75rem] top-7 w-px bg-neutral-200" aria-hidden="true" />}
+                {index < status.steps.length - 1 && <span className="absolute bottom-[-1.75rem] top-7 hidden w-px bg-neutral-200 sm:block" aria-hidden="true" />}
               </div>
               <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
                 <div>

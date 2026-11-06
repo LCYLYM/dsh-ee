@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
-import { Puzzle } from "lucide-react";
+import { WhaleMark } from "../components/whale-mark";
 import { useAuth } from "../lib/auth";
 import { api } from "../lib/api";
 import { useApi } from "../lib/use-api";
@@ -46,9 +46,7 @@ export default function Login() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-50 px-4">
       <Link to="/" className="mb-8 flex items-center gap-2.5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-500 text-white">
-          <Puzzle size={18} />
-        </span>
+        <WhaleMark size={36} className="text-brand-500" />
         <span className="text-lg font-semibold text-neutral-900">dsh-ee</span>
       </Link>
       <form onSubmit={submit} className="w-full max-w-sm rounded-lg border border-neutral-200/80 bg-card p-6">

@@ -187,6 +187,26 @@ svg .scene-fade { animation-name: scene-fade-in; }
   -webkit-mask-image: repeating-linear-gradient(to bottom, black 0 4px, transparent 4px 8px);
 }
 
+/* 深色下的首屏点阵与斜线：浅色的 brand-50/200 在黑底上会亮成条纹，换成低透明度的品牌蓝 */
+.dark .landing-grid-bg {
+  background-image:
+    radial-gradient(circle, rgb(126 148 250 / 0.22) 1px, transparent 1px),
+    repeating-linear-gradient(115deg, transparent 0 46px, rgb(126 148 250 / 0.05) 46px 47px);
+}
+
+/* 首屏 emoji 徽章：微倾斜 + 缓慢浮动 */
+.landing-hero-badge {
+  transform: rotate(-6deg);
+  animation: hero-badge-float 5s ease-in-out infinite;
+}
+@keyframes hero-badge-float {
+  0%, 100% { transform: rotate(-6deg) translateY(0); }
+  50% { transform: rotate(-4deg) translateY(-6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero-badge { animation: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dash-flow, .caret, .status-dot, .lp-mesh, .lp-band, .lp-arc, .lp-ping { animation: none; }
   .draw-once { stroke-dashoffset: 0; animation: none; }
@@ -344,6 +364,18 @@ svg .scene-fade { animation-name: scene-fade-in; }
   --color-neutral-800: #d9e2eb;
   --color-neutral-900: #eef3f8;
   --color-neutral-950: #f6f9fc;
+  /* onboarding 用的 stone 色阶按同一调色板翻转 */
+  --color-stone-50: #0b1424;
+  --color-stone-100: #111d33;
+  --color-stone-200: #1c2a42;
+  --color-stone-300: #2a3b57;
+  --color-stone-400: #4a5d7a;
+  --color-stone-500: #8193a8;
+  --color-stone-600: #a3b3c4;
+  --color-stone-700: #c0cddb;
+  --color-stone-800: #d9e2eb;
+  --color-stone-900: #eef3f8;
+  --color-stone-950: #f6f9fc;
 }
 
 /* 刻意反色（深底浅字）的区块——终端预览、代码块、落地页的深色章节——
@@ -360,6 +392,17 @@ svg .scene-fade { animation-name: scene-fade-in; }
   --color-neutral-800: #1f3349;
   --color-neutral-900: #0a2540;
   --color-neutral-950: #061a2f;
+  --color-stone-50: #f6f9fc;
+  --color-stone-100: #edf2f7;
+  --color-stone-200: #e3e8ee;
+  --color-stone-300: #c9d2dc;
+  --color-stone-400: #9aa8b9;
+  --color-stone-500: #6b7c93;
+  --color-stone-600: #425466;
+  --color-stone-700: #34465b;
+  --color-stone-800: #1f3349;
+  --color-stone-900: #0a2540;
+  --color-stone-950: #061a2f;
 }
 
 @layer base {

@@ -128,7 +128,7 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
         )}
         <p className="text-xs text-neutral-500">
           {t("getStarted.noDsh")}{" "}
-          <PageLink page="dsh-download" className="text-brand-700 hover:underline">
+          <PageLink page="dsh-download" className="text-brand-700 hover:underline dark:text-brand-300">
             {t("getStarted.download")}
           </PageLink>
         </p>
@@ -137,7 +137,7 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
       <section className="space-y-3 border-t border-neutral-100 pt-4">
         <h3 className="text-sm font-medium text-neutral-900">{t("getStarted.step2")}</h3>
         {expired ? (
-          <div className="flex flex-wrap items-center gap-3 text-sm text-amber-800">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-amber-800 dark:text-amber-200">
             {t("getStarted.expired")}
             <Button size="sm" variant="secondary" disabled={busy} onClick={() => void issue()}>
               {t("getStarted.regenerate")}
@@ -149,7 +149,7 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
             {t("getStarted.waiting", { code: info.code, time: formatTime(info.expires_at) })}
           </div>
         ) : stage === "pending" ? (
-          <div className="space-y-3 rounded-md border border-brand-200 bg-brand-50 px-4 py-3 text-sm">
+          <div className="space-y-3 rounded-md border border-brand-200 bg-brand-50 px-4 py-3 text-sm dark:border-brand-400/40 dark:bg-brand-400/10">
             <div className="text-neutral-900">{t("getStarted.pending", { client: status?.client_name || "DSH", os: status?.client_os ?? "", ip: status?.client_ip ?? "" })}</div>
             <div className="font-mono text-lg tracking-widest text-neutral-900">{status?.user_code}</div>
             <div className="text-xs text-neutral-600">{t("getStarted.pendingHint")}</div>
@@ -168,7 +168,7 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
             {t("getStarted.approved")}
           </div>
         ) : stage === "denied" ? (
-          <div className="text-sm text-amber-800">{t("getStarted.denied", { cmd: info.login_command })}</div>
+          <div className="text-sm text-amber-800 dark:text-amber-200">{t("getStarted.denied", { cmd: info.login_command })}</div>
         ) : (
           <Done text={t("getStarted.connected", { client: status?.client_name || "DSH" })} />
         )}
@@ -203,14 +203,14 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
         </section>
       )}
 
-      {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-400/10 dark:text-red-300">{error}</div>}
     </div>
   );
 }
 
 function Done({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-2 text-sm text-emerald-700">
+    <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300">
       <Check size={16} />
       {text}
     </div>
