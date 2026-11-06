@@ -10,7 +10,7 @@ import { Badge, Button, Card, CopyBox, Field, inputCls } from "../components/ui"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { ErrorNote } from "../components/api-ui";
 import { AgentConnect } from "../components/agent-connect";
-import { DemoImportStep } from "../components/demo-import";
+import { DemoCompanyHero, DemoImportStep } from "../components/demo-import";
 
 const pageForStep: Record<string, string> = {
   ldap: "admin-settings",
@@ -185,6 +185,12 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
   const { notify, settings } = useStore();
   const { busy, run } = useAction();
   const [editing, setEditing] = useState<SetupStatus["steps"][number] | null>(null);
+  // 导入完卡片还要留着显示账号与下一步，所以一旦出现就不再收起
+  const demoPending = status.steps.some((step) => step.id === "demo" && !step.done);
+  const [demoHero, setDemoHero] = useState(demoPending);
+  useEffect(() => {
+    if (demoPending) setDemoHero(true);
+  }, [demoPending]);
   const providers = useApi(api.providers);
   const models = useApi(api.models);
   const users = useApi(api.users);
@@ -231,6 +237,8 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
         </div>
       </section>
 
+      {demoHero && <DemoCompanyHero onImported={reload} />}
+
       <AgentSetup status={status} reload={reload} />
 
       <ol className="mt-4">
@@ -253,7 +261,8 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
                     {current && <span className="text-xs font-semibold text-brand-600 dark:text-brand-300">{t("onboarding.next")}</span>}
                   </div>
                   {(step.detail || step.how) && <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">{step.id === "demo" && !step.done ? t("demo.desc") : step.done ? step.detail : step.how || step.detail}</p>}
-                  {step.id === "demo" && <DemoImportStep done={step.done} onImported={reload} />}
+                  {/* 没导入时入口在顶部的醒目卡片里；导入后这里给下一步和清除 */}
+                  {step.id === "demo" && step.done && !demoHero && <DemoImportStep done onImported={reload} />}
                 </div>
                 <div className="md:pl-4">
                   {!step.done && step.id !== "demo" && (

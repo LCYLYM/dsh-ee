@@ -22,6 +22,8 @@ type demoKBase struct {
 
 type demoUser struct {
 	Username, DisplayName, Department string
+	// 职务，只在导入结果与设定文档里出现
+	Title string
 }
 
 type demoAsset struct {
@@ -29,31 +31,6 @@ type demoAsset struct {
 	Spec                 assetSpec
 	// 连接：导入后打开的写工具
 	EnableTools []string
-}
-
-var demoUsers = []demoUser{
-	{"demo.zhang", "张晓（示例）", "销售部"},
-	{"demo.li", "李然（示例）", "财务部"},
-}
-
-var demoKBases = []demoKBase{
-	{
-		Slug: "travel-policy", Title: "差旅与报销制度（示例）",
-		Description: "出差住宿、伙食、交通标准，报销流程与票据要求。示例内容，数字是编的。",
-		Docs: []demoKDoc{
-			{Title: "差旅费管理办法", Folder: "制度", Markdown: demoTravelPolicy},
-			{Title: "报销流程与票据要求", Folder: "流程", Markdown: demoReimburseFlow},
-		},
-	},
-	{
-		Slug: "employee-handbook", Title: "员工手册（示例）",
-		Description: "入职准备、考勤休假、IT 与办公。示例内容。",
-		Docs: []demoKDoc{
-			{Title: "新员工入职指南", Folder: "入职", Markdown: demoOnboarding},
-			{Title: "考勤与休假", Folder: "制度", Markdown: demoLeave},
-			{Title: "IT 与办公环境", Folder: "办公", Markdown: demoIT},
-		},
-	},
 }
 
 func demoAssets() []demoAsset {
@@ -69,6 +46,30 @@ func demoAssets() []demoAsset {
 				OpenAPI:      demoTravelOpenAPI,
 				Auth:         &connAuth{Type: "header", Header: demoKeyHeader},
 				Instructions: "这是演示系统。提交报销单前先把单据内容给用户确认。",
+			},
+		},
+		{
+			Kind: store.KindConnection, Slug: demoCRMConn, Delivery: store.DeliveryAuto,
+			EnableTools: []string{"log_visit"},
+			Spec: assetSpec{
+				Title:        "CRM 客户系统（示例）",
+				Description:  "星河科技的客户、合同、拜访记录与续约日期，约 50 个客户。数据在内存里，重启后复原。",
+				Type:         "openapi",
+				OpenAPI:      demoCRMOpenAPI,
+				Auth:         &connAuth{Type: "header", Header: demoKeyHeader},
+				Instructions: "这是演示系统。记录拜访前先把纪要给用户确认。金额单位是元。",
+			},
+		},
+		{
+			Kind: store.KindConnection, Slug: demoITSMConn, Delivery: store.DeliveryAuto,
+			EnableTools: []string{"create_ticket"},
+			Spec: assetSpec{
+				Title:        "IT 工单系统（示例）",
+				Description:  "星河科技 IT 部的工单与常见故障分类，能新建工单。数据在内存里，重启后复原。",
+				Type:         "openapi",
+				OpenAPI:      demoITSMOpenAPI,
+				Auth:         &connAuth{Type: "header", Header: demoKeyHeader},
+				Instructions: "这是演示系统。先按 IT 排障手册帮用户自己排查，解决不了再建工单；建工单前把标题、分类、优先级给用户确认。",
 			},
 		},
 		{
@@ -231,15 +232,22 @@ const demoTravelOpenAPI = `{
     "/demo/travel/summary": {
       "get": {
         "operationId": "get_summary",
-        "summary": "本月差旅报销汇总：已报金额、单数、待审批数、部门预算与剩余预算"
+        "summary": "本月差旅报销汇总：已报金额、单数、待审批数、待处理的异常单据数、部门预算与剩余预算"
+      }
+    },
+    "/demo/travel/monthly": {
+      "get": {
+        "operationId": "monthly",
+        "summary": "近 6 个月每月的报销金额与单数（不含驳回的）"
       }
     },
     "/demo/travel/claims": {
       "get": {
         "operationId": "list_claims",
-        "summary": "报销单列表，最新的在前",
+        "summary": "报销单列表，最新的在前。flags 是系统发现的异常（超标、重复发票、缺票据等）",
         "parameters": [
-          { "name": "status", "in": "query", "required": false, "description": "按状态过滤：待审批 / 已通过 / 已驳回", "schema": { "type": "string" } }
+          { "name": "status", "in": "query", "required": false, "description": "按状态过滤：待审批 / 已通过 / 已驳回 / 待补票据，或「异常」只看有异常的", "schema": { "type": "string" } },
+          { "name": "applicant", "in": "query", "required": false, "description": "申请人姓名", "schema": { "type": "string" } }
         ]
       },
       "post": {

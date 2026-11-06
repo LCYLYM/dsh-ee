@@ -807,14 +807,29 @@ export interface DemoItem {
   error?: string;
 }
 
+export interface DemoGuideStep {
+  username: string;
+  display_name: string;
+  department: string;
+  title: string;
+  app: string;
+  app_title: string;
+  try: string;
+}
+
 export interface DemoStatus {
   items: DemoItem[];
   imported: boolean;
+  /** 还有没有可清除的示例数据 */
+  present: boolean;
+  guide: DemoGuideStep[];
 }
 
 export interface DemoImport {
   items: DemoItem[];
-  accounts: { username: string; display_name: string; department: string; password?: string }[];
+  accounts: { username: string; display_name: string; department: string; title: string; password?: string }[];
+  usage_rows: number;
+  guide: DemoGuideStep[];
 }
 
 export interface SetupStatus {
@@ -1206,6 +1221,7 @@ export const api = {
   setupStatus: () => request<SetupStatus>("GET", "/api/admin/setup-status"),
   demoStatus: () => request<DemoStatus>("GET", "/api/admin/demo"),
   importDemo: () => request<DemoImport>("POST", "/api/admin/demo"),
+  clearDemo: () => request<{ assets: number; kbases: number; users: number }>("DELETE", "/api/admin/demo"),
   welcome: () => request<{ show: boolean; dismissed: boolean; connected: boolean }>("GET", "/api/me/welcome"),
   putWelcome: (dismissed: boolean) => request<{ dismissed: boolean }>("PUT", "/api/me/welcome", { dismissed }),
   getStarted: (admin: boolean) => request<GetStarted>("POST", "/api/me/get-started", { admin }),

@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hikariming/dsh-ee/server/internal/api"
 	"github.com/hikariming/dsh-ee/server/internal/secret"
@@ -57,8 +58,8 @@ func TestDemoImport(t *testing.T) {
 			t.Fatalf("%s %s 没建成：%s %s", it.Kind, it.Slug, it.Result, it.Error)
 		}
 	}
-	if len(res.Items) != 9 || len(res.Accounts) != 2 {
-		t.Fatalf("应建 2 个库、5 项能力、2 个账号：%s", body)
+	if len(res.Items) != 25 || len(res.Accounts) != 10 {
+		t.Fatalf("应建 6 个库、7 项能力、10 个账号、2 个自己用的应用：%s", body)
 	}
 
 	// 再导一次：全部跳过，不返回密码
@@ -110,7 +111,7 @@ func TestDemoImport(t *testing.T) {
 
 	// 演示员工用返回的密码登录，接入 DSH
 	zhang := newClient(t, ts.URL)
-	code, body = zhang.do("POST", "/api/auth/login", map[string]string{"username": res.Accounts[0].Username, "password": res.Accounts[0].Password}, nil)
+	code, body = zhang.do("POST", "/api/auth/login", map[string]string{"username": res.Accounts[1].Username, "password": res.Accounts[1].Password}, nil)
 	expect(t, "演示员工登录", code, 200, body)
 	code, body = zhang.do("POST", "/api/me/npm-tokens", map[string]any{"name": "dsh", "access": "read"}, nil)
 	expect(t, "接入令牌", code, 201, body)
@@ -161,8 +162,19 @@ func TestDemoImport(t *testing.T) {
 		BudgetLeft float64 `json:"budget_left"`
 		Pending    int
 	}
-	if isErr || json.Unmarshal([]byte(text), &sum) != nil || sum.Pending != 2 || sum.Total+sum.BudgetLeft != 50000 {
+	if isErr || json.Unmarshal([]byte(text), &sum) != nil || sum.Pending < 1 || sum.Total+sum.BudgetLeft != 50000 {
 		t.Fatalf("汇总不对：%s", text)
+	}
+	text, _ = call("list_claims", map[string]any{"status": "异常"})
+	for _, want := range []string{"住宿超标", "发票号与", "缺住宿发票"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("报销单里应有异常单据「%s」：%s", want, text)
+		}
+	}
+	text, _ = call("monthly", nil)
+	var monthly struct{ Items []struct{ Amount float64 } }
+	if json.Unmarshal([]byte(text), &monthly) != nil || len(monthly.Items) != 6 || monthly.Items[5].Amount <= monthly.Items[0].Amount {
+		t.Fatalf("近 6 个月应有上涨的趋势：%s", text)
 	}
 	text, isErr = call("create_claim", map[string]any{"body": map[string]any{"applicant": "张晓", "city": "杭州", "days": 2, "amount": 1260, "reason": "客户培训"}})
 	if isErr || !strings.Contains(text, "待审批") {
@@ -171,6 +183,66 @@ func TestDemoImport(t *testing.T) {
 	text, _ = call("list_claims", map[string]any{"status": "待审批"})
 	if !strings.Contains(text, "客户培训") {
 		t.Fatalf("新提交的单子应在待审批列表里：%s", text)
+	}
+
+	// CRM 与 IT 工单
+	callOn := func(conn, tool string, args map[string]any) string {
+		r := dsh.rpc("tools/call", map[string]any{"name": conn + "__" + tool, "arguments": args})
+		out, _ := r["result"].(map[string]any)
+		if r["error"] != nil || out == nil || out["isError"] == true {
+			t.Fatalf("%s__%s：%v", conn, tool, r)
+		}
+		return out["content"].([]any)[0].(map[string]any)["text"].(string)
+	}
+	var crm struct {
+		Customers int
+		HighRisk  int `json:"high_risk"`
+	}
+	if text := callOn("demo-crm", "get_summary", nil); json.Unmarshal([]byte(text), &crm) != nil || crm.Customers != 50 || crm.HighRisk < 3 {
+		t.Fatalf("CRM 应有 50 个客户和几个高风险客户：%s", text)
+	}
+	if text := callOn("demo-crm", "list_renewals", map[string]any{"days": 60}); !strings.Contains(text, `"risk":"高"`) || !strings.Contains(text, "华东精密制造") {
+		t.Fatalf("续约提醒里应有高风险客户：%s", text)
+	}
+	if text := callOn("demo-crm", "get_customer", map[string]any{"id": "C001"}); !strings.Contains(text, "contracts") {
+		t.Fatalf("客户详情应带合同：%s", text)
+	}
+	if text := callOn("demo-itsm", "list_tickets", map[string]any{"requester": "郑小雨"}); !strings.Contains(text, "新员工电脑还没领到") {
+		t.Fatalf("新人的工单：%s", text)
+	}
+	if text := callOn("demo-itsm", "create_ticket", map[string]any{"body": map[string]any{"title": "VPN 证书过期", "requester": "赵磊", "category": "vpn"}}); !strings.Contains(text, "待处理") {
+		t.Fatalf("建工单：%s", text)
+	}
+	if text := callOn("demo-itsm", "list_categories", nil); !strings.Contains(text, "VPN 连不上") {
+		t.Fatalf("故障分类：%s", text)
+	}
+
+	// 自己用的应用：只在作者自己的 DSH 里
+	if slices.Contains(apps, "zhouhang-weekly") {
+		t.Fatal("别人自己用的应用不应出现在赵磊的 DSH 里")
+	}
+
+	// 30 天模拟使用数据：月度报告与运营数据一打开就有内容
+	code, body = admin.do("GET", "/api/admin/report/monthly?month="+time.Now().UTC().Add(8*time.Hour).Format("2006-01")+"&tz=480", nil, nil)
+	expect(t, "月度报告", code, 200, body)
+	var rep struct {
+		Report struct {
+			ActiveUsers int `json:"active_users"`
+			AppRuns     int `json:"app_runs"`
+			Questions   []struct {
+				Query  string
+				Misses int
+			}
+		}
+	}
+	_ = json.Unmarshal(body, &rep)
+	if rep.Report.ActiveUsers < 5 || rep.Report.AppRuns == 0 || len(rep.Report.Questions) == 0 {
+		t.Fatalf("模拟数据应让报告有内容：%s", body)
+	}
+	code, body = admin.do("GET", "/api/admin/stats?days=30&tz=480", nil, nil)
+	expect(t, "运营数据", code, 200, body)
+	if !strings.Contains(string(body), `"tokens":`) || strings.Contains(string(body), `"calls":0,"call_errors":0,"tokens":0,"users"`) {
+		t.Fatalf("运营数据应有模型调用：%.300s", body)
 	}
 
 	// 演示接口不认外来调用
@@ -189,4 +261,57 @@ func TestDemoImport(t *testing.T) {
 	if code != 403 {
 		t.Fatalf("员工导入示例应被拒：%d %s", code, body)
 	}
+	// ---- 一键清除：示例全删，用户自己建的一条不少；再导入和第一次一样 ----
+	code, body = admin.do("POST", "/api/admin/users", map[string]any{"username": "real.user", "password": "real-password-1", "department": "销售部"}, nil)
+	expect(t, "用户自己建的账号", code, 201, body)
+	code, body = admin.do("POST", "/api/hub", map[string]any{"kind": "prompt", "slug": "my-own-prompt", "spec": map[string]any{"title": "我的提示词", "description": "用户自己的", "body": "写日报"}}, nil)
+	expect(t, "用户自己建的提示词", code, 201, body)
+	code, body = admin.do("POST", "/api/kb", map[string]any{"slug": "my-own-kb", "title": "我的知识库", "description": "", "scope": map[string]any{"all": true}}, nil)
+	expect(t, "用户自己建的知识库", code, 201, body)
+	code, body = zhang.do("DELETE", "/api/admin/demo", nil, nil)
+	expect(t, "员工不能清除", code, 403, body)
+	code, body = admin.do("DELETE", "/api/admin/demo", nil, nil)
+	expect(t, "清除示例", code, 200, body)
+	cleared := decodeAs[struct{ Assets, KBases, Users int }](t, body)
+	if cleared.Assets != 9 || cleared.KBases != 6 || cleared.Users != 10 {
+		t.Fatalf("应删 9 项能力、6 个库、10 个账号：%s", body)
+	}
+	code, body = admin.do("GET", "/api/admin/demo", nil, nil)
+	expect(t, "清除后的状态", code, 200, body)
+	if decodeAs[struct{ Present bool }](t, body).Present {
+		t.Fatalf("清除后不应还有示例：%s", body)
+	}
+	for _, path := range []string{"/api/hub", "/api/kb", "/api/admin/users"} {
+		code, body = admin.do("GET", path, nil, nil)
+		expect(t, path, code, 200, body)
+		for _, want := range []string{"my-own-prompt", "my-own-kb", "real.user"} {
+			if (path == "/api/hub" && want == "my-own-prompt") || (path == "/api/kb" && want == "my-own-kb") || (path == "/api/admin/users" && want == "real.user") {
+				if !strings.Contains(string(body), want) {
+					t.Fatalf("用户自己的 %s 不应被删：%.300s", want, body)
+				}
+			}
+		}
+		for _, gone := range []string{"demo-crm", "travel-policy", "demo.zhou.hang", "zhouhang-weekly"} {
+			if strings.Contains(string(body), `"`+gone+`"`) {
+				t.Fatalf("清除后 %s 里不应还有 %s", path, gone)
+			}
+		}
+	}
+	code, body = admin.do("GET", "/api/admin/report/monthly?month="+time.Now().UTC().Add(8*time.Hour).Format("2006-01")+"&tz=480", nil, nil)
+	_ = json.Unmarshal(body, &rep)
+	if rep.Report.AppRuns != 0 {
+		t.Fatalf("清除后模拟数据应一起删掉：%s", body)
+	}
+	code, body = admin.do("POST", "/api/admin/demo", nil, nil)
+	expect(t, "清除后再导入", code, 200, body)
+	again2 := decodeAs[result](t, body)
+	if len(again2.Items) != 25 || len(again2.Accounts) != 10 {
+		t.Fatalf("清除后再导入应和第一次一样：%s", body)
+	}
+	for _, it := range again2.Items {
+		if it.Result != "created" {
+			t.Fatalf("清除后再导入 %s 应重新建：%s %s", it.Slug, it.Result, it.Error)
+		}
+	}
+
 }

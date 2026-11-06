@@ -188,10 +188,10 @@ func (s *Server) handleSetupStatus(w http.ResponseWriter, r *http.Request) {
 	add(setupStep{ID: "connections", Title: "企业连接", Optional: true, Done: conns > 0, Detail: fmt.Sprintf("%d 个", conns),
 		How: "可选。新建连接要上游凭据，请在网页「企业连接」里接入；接入后可用 ee_connections_admin 试连、开关工具"})
 	if _, imported := s.demoState(ctx); imported {
-		add(setupStep{ID: "demo", Title: "示例内容", Optional: true, Done: true, Detail: "已导入示例知识库、出差报销计算器、新人入职助手和两个演示员工"})
+		add(setupStep{ID: "demo", Title: "示例公司", Optional: true, Done: true, Detail: "已导入示例公司「星河科技」：6 个部门知识库、差旅 / CRM / IT 工单三个演示系统、应用、10 个演示员工和 30 天的使用数据。转正式使用前可以一键清除"})
 	} else {
-		add(setupStep{ID: "demo", Title: "示例内容", Optional: true,
-			How: "可选。一键导入两个知识库、演示差旅系统、「出差报销计算器」「新人入职助手」两个带工作台的微应用和两个演示员工，打开 DSH 就能看到每样东西怎么用。只能由超级管理员在网页部署清单里导入"})
+		add(setupStep{ID: "demo", Title: "示例公司", Optional: true,
+			How: "可选。一键导入示例公司「星河科技」：6 个部门的知识库、差旅 / CRM / IT 工单三个演示系统、带工作台的应用、10 个演示员工和 30 天的使用数据，打开 DSH 就能试。只能由超级管理员在网页部署清单里导入，试完可以一键清除"})
 	}
 
 	var st connectState

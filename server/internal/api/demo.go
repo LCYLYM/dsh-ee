@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,34 +34,22 @@ type demoTravel struct {
 }
 
 type demoClaim struct {
-	ID        string  `json:"id"`
-	Applicant string  `json:"applicant"`
-	City      string  `json:"city"`
-	Days      int     `json:"days"`
-	Amount    float64 `json:"amount"`
-	Reason    string  `json:"reason"`
-	Status    string  `json:"status"`
-	Submitted string  `json:"submitted_at"`
+	ID         string  `json:"id"`
+	Applicant  string  `json:"applicant"`
+	Department string  `json:"department"`
+	City       string  `json:"city"`
+	Days       int     `json:"days"`
+	Amount     float64 `json:"amount"`
+	// 住宿每晚（元）与发票号；Flags 是系统自动发现的异常
+	Hotel     float64  `json:"hotel"`
+	Invoice   string   `json:"invoice"`
+	Reason    string   `json:"reason"`
+	Status    string   `json:"status"`
+	Submitted string   `json:"submitted_at"`
+	Flags     []string `json:"flags"`
 }
 
 const demoBudget = 50000
-
-func (d *demoTravel) list() []demoClaim {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.claims == nil {
-		day := func(n int) string { return time.Now().AddDate(0, 0, -n).Format("2006-01-02") }
-		d.claims = []demoClaim{
-			{"BX-1001", "张晓", "上海", 3, 2860, "拜访华东区客户", "待审批", day(1)},
-			{"BX-1002", "李然", "成都", 2, 1530, "西南区财务对账", "已通过", day(4)},
-			{"BX-1003", "王磊", "北京", 4, 4210, "参加行业展会", "待审批", day(2)},
-			{"BX-1004", "陈静", "长沙", 2, 980, "供应商现场审核", "已通过", day(7)},
-			{"BX-1005", "张晓", "深圳", 3, 3650, "大客户续约谈判", "已驳回", day(9)},
-		}
-		d.next = 1006
-	}
-	return append([]demoClaim(nil), d.claims...)
-}
 
 func (d *demoTravel) add(c demoClaim) demoClaim {
 	d.list()
@@ -70,7 +57,7 @@ func (d *demoTravel) add(c demoClaim) demoClaim {
 	defer d.mu.Unlock()
 	c.ID = fmt.Sprintf("BX-%d", d.next)
 	d.next++
-	c.Status, c.Submitted = "待审批", time.Now().Format("2006-01-02")
+	c.Status, c.Submitted, c.Flags = "待审批", time.Now().Format("2006-01-02"), []string{}
 	// 演示数据只留最近 50 张，免得被反复提交撑大
 	d.claims = append([]demoClaim{c}, d.claims...)
 	if len(d.claims) > 50 {
@@ -79,20 +66,9 @@ func (d *demoTravel) add(c demoClaim) demoClaim {
 	return c
 }
 
-// demoAuthorized 核对演示连接带来的密钥：只有导入示例时生成、存进连接凭据的那个值能用。
+// demoAuthorized 核对差旅演示系统的密钥，见 demoAuthorizedFor。
 func (s *Server) demoAuthorized(w http.ResponseWriter, r *http.Request) bool {
-	got := r.Header.Get(demoKeyHeader)
-	if got != "" {
-		if a, err := s.store.GetAssetBySlug(r.Context(), demoConn); err == nil {
-			if sealed, err := s.store.AssetSecret(r.Context(), a.ID); err == nil && len(sealed) > 0 {
-				if want, err := s.box.Open(sealed); err == nil && subtle.ConstantTimeCompare(want, []byte(got)) == 1 {
-					return true
-				}
-			}
-		}
-	}
-	writeErr(w, http.StatusUnauthorized, "演示差旅系统只接受 dsh-ee 示例连接的调用")
-	return false
+	return s.demoAuthorizedFor(w, r, demoConn)
 }
 
 // GET /demo/travel/summary：本月差旅报销汇总。
@@ -101,9 +77,13 @@ func (s *Server) handleDemoSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var total float64
-	count, pending := 0, 0
+	count, pending, flagged := 0, 0, 0
+	month := time.Now().Format("2006-01")
 	for _, c := range s.demo.list() {
-		if c.Status == "已驳回" {
+		if len(c.Flags) > 0 && c.Status != "已通过" && c.Status != "已驳回" {
+			flagged++
+		}
+		if c.Status == "已驳回" || !strings.HasPrefix(c.Submitted, month) {
 			continue
 		}
 		total += c.Amount
@@ -113,7 +93,7 @@ func (s *Server) handleDemoSummary(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"month": time.Now().Format("2006-01"), "total": total, "count": count, "pending": pending,
+		"month": month, "total": total, "count": count, "pending": pending, "flagged": flagged,
 		"budget": demoBudget, "budget_left": demoBudget - total,
 	})
 }
@@ -124,9 +104,10 @@ func (s *Server) handleDemoClaims(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	who := strings.TrimSpace(r.URL.Query().Get("applicant"))
 	items := []demoClaim{}
 	for _, c := range s.demo.list() {
-		if status == "" || c.Status == status {
+		if (status == "" || c.Status == status || (status == "异常" && len(c.Flags) > 0)) && (who == "" || c.Applicant == who) {
 			items = append(items, c)
 		}
 	}
@@ -181,14 +162,19 @@ type demoAccount struct {
 	Username    string `json:"username"`
 	DisplayName string `json:"display_name"`
 	Department  string `json:"department"`
+	Title       string `json:"title"`
 	// 只在新建时返回一次
 	Password string `json:"password,omitempty"`
 }
 
-// GET /api/admin/demo：示例内容里各项现在有没有。
+// GET /api/admin/demo：示例内容里各项现在有没有，以及还有没有可清除的示例数据。
 func (s *Server) handleDemoStatus(w http.ResponseWriter, r *http.Request) {
 	items, imported := s.demoState(r.Context())
-	writeJSON(w, http.StatusOK, map[string]any{"items": items, "imported": imported})
+	present := false
+	for _, it := range items {
+		present = present || it.Result == "exists"
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items, "imported": imported, "present": present, "guide": demoGuide()})
 }
 
 // demoState 列出示例内容里各项现在有没有，全都有算已导入。
@@ -206,6 +192,9 @@ func (s *Server) demoState(ctx context.Context) ([]demoItem, bool) {
 			res.Result = "exists"
 		}
 		items = append(items, res)
+	}
+	for _, a := range demoSelfApps() {
+		items = append(items, s.demoExists(ctx, a.Kind, a.Slug, a.Spec.Title))
 	}
 	imported := true
 	for _, it := range items {
@@ -238,6 +227,9 @@ func (s *Server) handleDemoImport(w http.ResponseWriter, r *http.Request) {
 	by := currentUser(r).ID
 	items := []demoItem{}
 	add := func(it demoItem, err error) {
+		if err == nil {
+			err = s.demoRecordCreated(ctx, it)
+		}
 		if err != nil {
 			it.Result, it.Error = "failed", err.Error()
 		}
@@ -257,12 +249,28 @@ func (s *Server) handleDemoImport(w http.ResponseWriter, r *http.Request) {
 		acc, it, err := s.demoImportUser(ctx, u)
 		add(it, err)
 		if acc != nil {
+			acc.Title = u.Title
 			accounts = append(accounts, *acc)
 		}
 	}
-	s.audit(r, auditDemoImport, "demo", map[string]any{"items": len(items), "accounts": len(accounts)})
+	// 员工自己搭建的「自己用」应用，要等账号建好
+	for _, a := range demoSelfApps() {
+		it, err := s.demoImportSelfApp(ctx, a)
+		if err == nil {
+			// demoImportSelfApp 自己记过了
+			items = append(items, it)
+			continue
+		}
+		it.Result, it.Error = "failed", err.Error()
+		items = append(items, it)
+	}
+	usage, err := s.demoSimulateUsage(ctx, time.Now().UTC())
+	if err != nil {
+		s.log.Warn("写入示例的模拟使用数据失败", "err", err)
+	}
+	s.audit(r, auditDemoImport, "demo", map[string]any{"items": len(items), "accounts": len(accounts), "usage_rows": usage})
 	s.hub.notify()
-	writeJSON(w, http.StatusOK, map[string]any{"items": items, "accounts": accounts})
+	writeJSON(w, http.StatusOK, map[string]any{"items": items, "accounts": accounts, "usage_rows": usage, "guide": demoGuide()})
 }
 
 func (s *Server) demoImportKBase(ctx context.Context, d demoKBase, by int64) (demoItem, error) {

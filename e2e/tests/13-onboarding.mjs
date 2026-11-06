@@ -72,8 +72,9 @@ export default async function (t) {
     // 必做项齐了自动离开清单；管理员自己的 DSH 还没接入，先到「开始使用」，点「以后再说」进工作台
     await page.waitForURL((u) => u.pathname !== "/go");
     if (new URL(page.url()).pathname === "/get-started") await page.getByRole("button", { name: "以后再说" }).click();
-    await page.waitForURL(`${BASE}/workbench`);
-    step("全程不离开 /go，弹窗配置完成后自动离开清单进入工作台");
+    // 默认首页是「用」分组的第一项「企业应用」
+    await page.waitForURL(`${BASE}/apps`);
+    step("全程不离开 /go，弹窗配置完成后自动离开清单进入企业应用");
   } finally {
     upstream.close();
   }

@@ -66,6 +66,8 @@ type Server struct {
 	conns connClients
 	// 示例内容里演示差旅系统的内存数据
 	demo demoTravel
+	crm  demoCRM
+	itsm demoITSM
 	// 设置或模型变化后触发接入插件检查
 	connectKick chan struct{}
 	connectMu   sync.Mutex
