@@ -159,10 +159,31 @@ svg .scene-fade { animation-name: scene-fade-in; }
   50% { background-position: 100% 30%; }
   100% { background-position: 30% 100%; }
 }
-/* 斜切：下沿从左下到右上 */
-.lp-slant-bottom { clip-path: polygon(0 0, 100% 0, 100% 52%, 0 100%); }
-/* 斜切色带：上下两条边都向右上倾斜 */
-.lp-slant { clip-path: polygon(0 var(--lp-cut, 6vw), 100% 0, 100% calc(100% - var(--lp-cut, 6vw)), 0 100%); }
+/* 首屏飘带：几条渐变色带各自缓慢起伏，左侧渐隐到正文后面 */
+.lp-ribbon {
+  mask-image: linear-gradient(to right, transparent 0%, black 38%), linear-gradient(to bottom, black 55%, transparent 92%);
+  mask-composite: intersect;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 38%), linear-gradient(to bottom, black 55%, transparent 92%);
+  -webkit-mask-composite: source-in;
+}
+.lp-ribbon .lp-band { animation: lp-band 14s ease-in-out infinite alternate; transform-origin: 50% 50%; }
+.lp-ribbon .lp-band:nth-child(2) { animation-duration: 18s; animation-delay: -4s; }
+.lp-ribbon .lp-band:nth-child(3) { animation-duration: 11s; animation-delay: -7s; }
+.lp-ribbon .lp-band:nth-child(4) { animation-duration: 21s; animation-delay: -2s; }
+@keyframes lp-band {
+  from { transform: translate3d(0, 0, 0) rotate(0deg); }
+  to { transform: translate3d(-18px, 22px, 0) rotate(-1.5deg); }
+}
+.dark .lp-ribbon { opacity: 0.85; }
+
+/* 地球上的连线：光点沿弧线流向私有部署节点 */
+.lp-arc { stroke-dasharray: 3 7; animation: lp-arc 1.4s linear infinite; }
+@keyframes lp-arc { to { stroke-dashoffset: -10; } }
+.lp-ping { transform-box: fill-box; transform-origin: center; animation: lp-ping 2.4s ease-out infinite; }
+@keyframes lp-ping {
+  from { transform: scale(1); opacity: 0.7; }
+  to { transform: scale(3.2); opacity: 0; }
+}
 
 /* Stripe 式悬停箭头：平时是 ›，悬停时伸出箭杆 */
 .lp-arrow { margin-left: 0.4em; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; }
@@ -180,7 +201,7 @@ svg .scene-fade { animation-name: scene-fade-in; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dash-flow, .caret, .status-dot, .lp-mesh { animation: none; }
+  .dash-flow, .caret, .status-dot, .lp-mesh, .lp-band, .lp-arc, .lp-ping { animation: none; }
   .draw-once { stroke-dashoffset: 0; animation: none; }
   .scene-fade, .scene-card { opacity: 1; animation: none; }
 }

@@ -6,6 +6,7 @@ import { PageLink } from "../lib/menus";
 import { LangSwitch } from "../components/lang-switch";
 import { ThemeToggle } from "../components/theme-toggle";
 import { LandingHeroScene } from "../components/landing-hero-scene";
+import { Backdrop, Globe, Ribbon } from "../components/landing-graphics";
 import { cx } from "../components/ui";
 import { useTranslation } from "react-i18next";
 
@@ -287,7 +288,7 @@ function AuditFragment() {
   const { t } = useTranslation();
   const total = clientPlatforms.reduce((a, c) => a + c.count, 0);
   return (
-    <div data-ui className="overflow-hidden rounded-xl bg-white/[0.04] text-sm ring-1 ring-white/10 backdrop-blur-sm">
+    <div data-ui className="overflow-hidden rounded-xl bg-[#0a2540]/75 text-sm shadow-[0_30px_60px_-20px_rgba(0,0,0,0.5)] ring-1 ring-white/10 backdrop-blur-md dark:bg-[#050b16]/75">
       <div className="flex items-baseline justify-between px-5 pt-4 pb-2">
         <span className="font-semibold text-white">{t("landing.fragment.auditLog")}</span>
         <span className="text-xs text-[#8193a8]">{t("landing.fragment.today")}</span>
@@ -393,8 +394,8 @@ export default function Landing() {
   useReveal();
   return (
     <div className="lp relative min-h-screen overflow-x-clip">
-      {/* 首屏流动渐变，斜切下沿，铺在顶栏后面 */}
-      <div aria-hidden className="lp-mesh lp-slant-bottom absolute inset-x-0 top-0 h-[880px] sm:h-[820px] lg:h-[780px]" />
+      {/* 首屏飘带：从右上角铺进来，压在顶栏后面 */}
+      <Ribbon className="pointer-events-none absolute top-0 right-0 h-[620px] w-full opacity-35 sm:opacity-60 lg:h-[760px] lg:w-[72%] lg:opacity-100" />
 
       <header
         className={cx(
@@ -403,13 +404,13 @@ export default function Landing() {
         )}
       >
         <div className={cx(shell, "flex h-16 items-center gap-4 sm:gap-8")}>
-          <Link to="/" className={cx("flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight whitespace-nowrap", onTop ? "text-[#0a2540]" : "text-lp-ink")}>
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[#0a2540] text-white">
+          <Link to="/" className={cx("flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight whitespace-nowrap text-lp-ink")}>
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[linear-gradient(135deg,#6f88ff,#4d6bfe_50%,#8b5cf6)] text-white">
               <Puzzle size={15} />
             </span>
             dsh-ee
           </Link>
-          <nav className={cx("hidden gap-7 text-[15px] font-semibold lg:flex", onTop ? "text-[#0a2540]" : "text-lp-ink")}>
+          <nav className={cx("hidden gap-7 text-[15px] font-semibold text-lp-ink lg:flex")}>
             {(["how", "why", "workbench", "control", "deploy"] as const).map((k) => (
               <a key={k} href={`#${k}`} className="transition-opacity hover:opacity-60">
                 {t(`landing.nav.${k}`)}
@@ -417,11 +418,13 @@ export default function Landing() {
             ))}
           </nav>
           <nav className="ml-auto flex items-center gap-4">
-            <LangSwitch className={cx("hidden sm:inline-flex", onTop && "text-[#0a2540]! [&_option]:text-black [&_select]:text-[#0a2540]!")} />
-            <ThemeToggle className={onTop ? "text-[#0a2540]! hover:bg-white/30!" : undefined} />
+            <LangSwitch
+              className={cx("hidden rounded-full px-2.5 sm:inline-flex", onTop && "bg-white/70 backdrop-blur dark:bg-black/30")}
+            />
+            <ThemeToggle className={cx("rounded-full!", onTop && "bg-white/70 backdrop-blur dark:bg-black/30")} />
           </nav>
           <span className="hidden sm:block">
-            <Pill to="/go" tone={onTop ? "navy" : "accent"} className="py-1.5!">
+            <Pill to="/go" tone="navy" className="py-1.5! dark:bg-white! dark:text-[#0a2540]!">
               {t("landing.enter")}
             </Pill>
           </span>
@@ -432,26 +435,28 @@ export default function Landing() {
         {/* 首屏 */}
         <section className="relative">
           <div className={cx(shell, "relative pt-14 pb-16 sm:pt-20 lg:pt-24")}>
-            <h1 data-reveal className="max-w-4xl text-[clamp(2.75rem,7vw,5.5rem)] leading-[1.08] font-bold tracking-[-0.015em] text-[#0a2540]">
+            <h1 data-reveal className="max-w-3xl text-[clamp(2.75rem,6.6vw,5.25rem)] leading-[1.08] font-bold tracking-[-0.015em] text-lp-ink">
               {t("landing.heroLine1")}
               <br />
-              <span className="text-white">{t("landing.heroLine2")}</span>
+              <span className="bg-[linear-gradient(100deg,#4d6bfe_10%,#8b5cf6_55%,#e8618c_95%)] bg-clip-text text-transparent dark:bg-[linear-gradient(100deg,#80e9ff,#a5b8fc_45%,#f0a6ff)]">
+                {t("landing.heroLine2")}
+              </span>
             </h1>
-            <p data-reveal className="mt-7 max-w-[600px] text-lg leading-relaxed font-medium text-[#0a2540]/80" style={delay(90)}>
+            <p data-reveal className="mt-7 max-w-[560px] text-lg leading-relaxed text-lp-body" style={delay(90)}>
               {t("landing.heroDesc")}
             </p>
             <div data-reveal className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-3" style={delay(160)}>
-              <Pill to="/go" tone="navy">
+              <Pill to="/go" tone="accent">
                 {t("landing.enter")}
               </Pill>
-              <Pill href="#how" tone="ghost-dark">
+              <Pill href="#how" tone="ghost">
                 {t("landing.seeHow")}
               </Pill>
             </div>
-            <ul data-reveal className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-[#0a2540]/80" style={delay(220)}>
+            <ul data-reveal className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-lp-ink/75" style={delay(220)}>
               {controls.map(({ key, icon: Icon }) => (
                 <li key={key} className="inline-flex items-center gap-1.5">
-                  <Icon size={16} />
+                  <Icon size={16} className="text-lp-accent" />
                   {t(`landing.controls.${key}.title`)}
                 </li>
               ))}
@@ -472,7 +477,7 @@ export default function Landing() {
           </div>
         </section>
 
-        <section id="why" aria-labelledby="why-title" className="lp-slant relative scroll-mt-16 bg-lp-bg-alt py-[calc(6vw+6rem)]">
+        <section id="why" aria-labelledby="why-title" className="relative scroll-mt-16 border-y border-lp-line bg-lp-bg-alt py-28">
           <div className={shell}>
             <div className="mb-14 grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-end">
               <SectionHead id="why-title" label={t("landing.why.eyebrow")} title={t("landing.why.title")} />
@@ -515,13 +520,14 @@ export default function Landing() {
               </dl>
             </div>
             <div data-reveal style={delay(120)}>
-              <WorkbenchFragment />
+              <Backdrop>
+                <WorkbenchFragment />
+              </Backdrop>
             </div>
           </div>
         </section>
 
-        <section id="control" className="lp-slant relative scroll-mt-16 overflow-hidden bg-[#0a2540] py-[calc(6vw+6rem)] dark:bg-lp-navy">
-          <div aria-hidden className="lp-mesh absolute -top-40 -right-40 h-[520px] w-[520px] rounded-full opacity-25 blur-3xl" />
+        <section id="control" className="relative scroll-mt-16 overflow-hidden bg-[#0a2540] py-28 dark:bg-lp-navy">
           <div className={cx(shell, "relative grid grid-cols-1 gap-14 lg:grid-cols-2")}>
             <div>
               <SectionHead
@@ -545,8 +551,11 @@ export default function Landing() {
                 ))}
               </div>
             </div>
-            <div data-reveal className="lg:pt-10" style={delay(120)}>
-              <AuditFragment />
+            <div data-reveal className="relative" style={delay(120)}>
+              <Globe className="pointer-events-none mx-auto -mt-6 w-full max-w-[560px] lg:-mt-16" />
+              <div className="relative -mt-40 sm:-mt-56 lg:ml-10">
+                <AuditFragment />
+              </div>
             </div>
           </div>
         </section>
@@ -573,28 +582,30 @@ export default function Landing() {
               ))}
             </ol>
             <div data-reveal className="mt-16 grid grid-cols-1 gap-8 lg:grid-cols-[1.4fr_1fr] lg:items-center" style={delay(120)}>
-              <div className="overflow-hidden rounded-xl bg-[#0a2540] shadow-lp dark:bg-[#132c4d]">
-                <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-3" aria-hidden>
-                  <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+              <Backdrop>
+                <div className="overflow-hidden rounded-xl bg-[#0a2540] shadow-lp dark:bg-[#132c4d]">
+                  <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-3" aria-hidden>
+                    <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+                  </div>
+                  <pre className="overflow-x-auto p-6 font-mono text-sm leading-7 text-[#c4d3e3]">
+                    <code>
+                      <span className="text-[#8193a8]">{t("landing.codeServer")}</span>
+                      {"\n"}
+                      <span className="text-[#80e9ff]">docker</span> compose up <span className="text-[#ffcc80]">-d</span>
+                      {"\n\n"}
+                      <span className="text-[#8193a8]">{t("landing.codeClient")}</span>
+                      {"\n"}
+                      <span className="text-[#80e9ff]">curl</span> <span className="text-[#ffcc80]">-fsSL</span> https://dsh.acme.internal/setup.sh | <span className="text-[#80e9ff]">sh</span>
+                      {"\n\n"}
+                      <span className="text-[#8193a8]">{t("landing.codeUse")}</span>
+                      {"\n"}
+                      <span className="text-[#80e9ff]">dsh</span> plugin add <span className="text-[#6ee7b7]">@acme/skill-expense-policy</span>
+                    </code>
+                  </pre>
                 </div>
-                <pre className="overflow-x-auto p-6 font-mono text-sm leading-7 text-[#c4d3e3]">
-                  <code>
-                    <span className="text-[#8193a8]">{t("landing.codeServer")}</span>
-                    {"\n"}
-                    <span className="text-[#80e9ff]">docker</span> compose up <span className="text-[#ffcc80]">-d</span>
-                    {"\n\n"}
-                    <span className="text-[#8193a8]">{t("landing.codeClient")}</span>
-                    {"\n"}
-                    <span className="text-[#80e9ff]">curl</span> <span className="text-[#ffcc80]">-fsSL</span> https://dsh.acme.internal/setup.sh | <span className="text-[#80e9ff]">sh</span>
-                    {"\n\n"}
-                    <span className="text-[#8193a8]">{t("landing.codeUse")}</span>
-                    {"\n"}
-                    <span className="text-[#80e9ff]">dsh</span> plugin add <span className="text-[#6ee7b7]">@acme/skill-expense-policy</span>
-                  </code>
-                </pre>
-              </div>
+              </Backdrop>
               <p className="text-[15px] leading-relaxed text-lp-body">{t("landing.authNote")}</p>
             </div>
           </div>
