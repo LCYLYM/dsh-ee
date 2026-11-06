@@ -30,24 +30,6 @@
   }
 }
 
-/* 落地页流程图的流动虚线 */
-.flow-line {
-  background-image: linear-gradient(to bottom, var(--color-neutral-900) 50%, transparent 50%);
-  background-size: 2px 10px;
-  animation: flow-y 0.8s linear infinite;
-}
-@media (min-width: 64rem) {
-  .flow-line {
-    background-image: linear-gradient(to right, var(--color-neutral-900) 50%, transparent 50%);
-    background-size: 10px 2px;
-    animation-name: flow-x;
-  }
-}
-@keyframes flow-y { to { background-position: 0 10px; } }
-@keyframes flow-x { to { background-position: 10px 0; } }
-@media (prefers-reduced-motion: reduce) { .flow-line { animation: none; } }
-.flow-line-rev { animation-direction: reverse; }
-
 /* 落地页入场：脚本给 data-reveal 元素加 reveal-pending，进入视口再加 reveal-in */
 .reveal-pending {
   opacity: 0;
@@ -133,15 +115,6 @@ svg .scene-fade { animation-name: scene-fade-in; }
   --lp-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
   --lp-shadow-sm: 0 13px 27px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
-.lp .flow-line {
-  background-image: linear-gradient(to bottom, var(--lp-accent) 50%, transparent 50%);
-}
-@media (min-width: 64rem) {
-  .lp .flow-line {
-    background-image: linear-gradient(to right, var(--lp-accent) 50%, transparent 50%);
-  }
-}
-
 /* 首屏流动渐变：几团品牌蓝、青、紫、暖橙缓慢漂移 */
 .lp-mesh {
   background-color: #4d6bfe;

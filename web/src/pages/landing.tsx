@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { ArrowLeft, ArrowRight, Check, Cpu, FileSearch, Puzzle, ShieldCheck, X } from "lucide-react";
+import { Check, Cpu, FileSearch, Puzzle, ShieldCheck, X } from "lucide-react";
 import { auditLog, clientPlatforms, microApps } from "../mock/data";
 import { PageLink } from "../lib/menus";
 import { LangSwitch } from "../components/lang-switch";
 import { ThemeToggle } from "../components/theme-toggle";
 import { LandingHeroScene } from "../components/landing-hero-scene";
 import { Backdrop, Globe, Ribbon } from "../components/landing-graphics";
+import { FeatureGrid } from "../components/landing-features";
 import { cx } from "../components/ui";
 import { useTranslation } from "react-i18next";
 
@@ -125,111 +126,6 @@ function FeatureTitle({ children, dark }: { children: React.ReactNode; dark?: bo
     >
       {children}
     </h3>
-  );
-}
-
-function Arrow({ label, reverse }: { label: string; reverse?: boolean }) {
-  const Icon = reverse ? ArrowLeft : ArrowRight;
-  return (
-    <div className="flex items-center justify-center bg-lp-card lg:flex-col lg:px-2">
-      <div
-        className={cx(
-          "flex items-center gap-1 py-2 lg:py-0",
-          reverse ? "flex-col-reverse lg:flex-row-reverse" : "flex-col lg:flex-row",
-        )}
-      >
-        <span className={cx("flow-line h-8 w-0.5 lg:h-0.5 lg:w-10", reverse && "flow-line-rev")} />
-        <Icon size={15} className="rotate-90 text-lp-accent lg:rotate-0" />
-      </div>
-      <span className="ml-2 text-xs font-medium whitespace-nowrap text-lp-muted lg:mt-2 lg:ml-0">{label}</span>
-    </div>
-  );
-}
-
-function Step({ name, children }: { name: string; children: React.ReactNode }) {
-  return (
-    <div className="flex gap-3 py-3 first:pt-0 last:pb-0">
-      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-lp-accent text-white dark:text-[#0a2540]">
-        <Check size={12} strokeWidth={3} />
-      </span>
-      <div className="min-w-0">
-        <div className="text-sm font-semibold text-lp-ink">{name}</div>
-        <div className="mt-0.5 text-sm text-lp-body">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-function Diagram() {
-  const { t } = useTranslation();
-  const [i, setI] = useState(0);
-  const s = sources[i];
-  return (
-    <div className="grid grid-cols-1 overflow-hidden rounded-xl bg-lp-card shadow-lp lg:grid-cols-[1fr_auto_1.1fr_auto_1fr]">
-      <div className="bg-lp-bg-alt p-5 md:p-6">
-        <h3 className="font-semibold text-lp-ink">{t("landing.diagram.assets")}</h3>
-        <p className="mt-1 text-sm text-lp-muted">{t("landing.diagram.assetsHint")}</p>
-        <div className="mt-4 flex flex-col gap-1.5" role="radiogroup" aria-label={t("landing.diagram.pickAsset")}>
-          {sources.map((x, j) => (
-            <button
-              key={x.key}
-              type="button"
-              role="radio"
-              aria-checked={i === j}
-              onClick={() => setI(j)}
-              className={cx(
-                "rounded-md px-3.5 py-2.5 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lp-accent",
-                i === j ? "bg-lp-card shadow-lp-sm" : "hover:bg-lp-card/60",
-              )}
-            >
-              <div className={cx("text-sm font-semibold", i === j ? "text-lp-accent" : "text-lp-ink")}>{t(`landing.sources.${x.key}.title`)}</div>
-              <div className="text-xs text-lp-muted">{t(`landing.sources.${x.key}.desc`)}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <Arrow label={t("landing.diagram.package")} />
-
-      <div className="bg-lp-card p-5 md:p-6">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-lp-accent text-white dark:text-[#0a2540]">
-            <Puzzle size={14} />
-          </span>
-          <h3 className="font-semibold text-lp-ink">dsh-ee</h3>
-        </div>
-        <p className="mt-2 truncate text-sm text-lp-muted">{t(`landing.sources.${s.key}.asset`)}</p>
-        <div className="mt-4 divide-y divide-lp-line" aria-live="polite">
-          <Step name={t("landing.diagram.packaged")}>
-            <span className="font-mono text-[13px]">{s.pkg}</span>
-          </Step>
-          <Step name={t("landing.diagram.review")}>{t(`landing.sources.${s.key}.checks`)}</Step>
-          <Step name={t("landing.diagram.grant")}>{t(`landing.sources.${s.key}.scope`)}</Step>
-          <Step name={t("landing.diagram.audit")}>{t("landing.diagram.auditDesc")}</Step>
-        </div>
-      </div>
-
-      <div className="flex justify-center gap-10 bg-lp-card lg:flex-col lg:gap-6">
-        <Arrow label={t("landing.diagram.down")} />
-        <Arrow label={t("landing.diagram.up")} reverse />
-      </div>
-
-      <div className="flex flex-col bg-[#0a2540] p-5 text-white md:p-6 dark:bg-[#132c4d]">
-        <h3 className="font-semibold">{t("landing.diagram.run")}</h3>
-        <p className="mt-1 text-sm text-[#adbdcc]">{t("landing.diagram.runHint")}</p>
-        <pre className="mt-4 flex-1 overflow-x-auto rounded-md bg-black/25 px-4 py-3 font-mono text-[13px] leading-relaxed whitespace-pre-wrap text-[#c4d3e3]">
-          <code>
-            <span className="text-[#80e9ff]">$</span> dsh plugin add <span className="text-[#ffcc80]">{s.pkg}</span>
-            {"\n"}
-            <span className="text-[#6ee7b7]">✓ {t("landing.diagram.installed")}</span>
-            {"\n\n"}
-            <span className="text-white">&gt; {t(`landing.sources.${s.key}.ask`)}</span>
-            {"\n"}
-            {t(`landing.sources.${s.key}.answer`)}
-          </code>
-        </pre>
-      </div>
-    </div>
   );
 }
 
@@ -471,8 +367,8 @@ export default function Landing() {
           <Guides />
           <div className={cx(shell, "relative")}>
             <SectionHead id="how-title" label={t("landing.nav.how")} title={t("landing.howLine")} />
-            <div data-reveal className="mt-14" style={delay(160)}>
-              <Diagram />
+            <div className="mt-14">
+              <FeatureGrid />
             </div>
           </div>
         </section>
