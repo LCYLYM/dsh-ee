@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BookOpen, Boxes, Check, CheckCircle2, Database, Monitor, Puzzle } from "lucide-react";
+import { BookOpen, Boxes, Check, Database, Loader2, Monitor, Puzzle } from "lucide-react";
 import { cx } from "./ui";
 
 /**
@@ -44,6 +44,12 @@ const delay = (ms: number) => ({ "--d": `${ms}ms` }) as React.CSSProperties;
 
 const TYPE_START = 700;
 const TYPE_STEP = 45;
+/** 问题打完后：提问气泡 → 调用企业数据 → 调用完成 → 逐字回答，各段相对打字结束的时间。 */
+const ASK_AT = 250;
+const QUERY_AT = 750;
+const QUERIED_AT = 1750;
+const ANSWER_AT = 2000;
+const ANSWER_STEP = 28;
 
 function Dot({ path, reverse, dur = "1.8s" }: { path: string; reverse?: boolean; dur?: string }) {
   return (
@@ -64,6 +70,8 @@ export function LandingHeroScene({ sources }: { sources: readonly Source[] }) {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const [typed, setTyped] = useState(0);
+  const [phase, setPhase] = useState(0);
+  const [said, setSaid] = useState(0);
   const [geo, setGeo] = useState<Geo | null>(null);
 
   const wrap = useRef<HTMLDivElement>(null);
@@ -74,6 +82,7 @@ export function LandingHeroScene({ sources }: { sources: readonly Source[] }) {
 
   const s = sources[active];
   const ask = t(`landing.sources.${s.key}.ask`);
+  const answer = t(`landing.sources.${s.key}.answer`);
 
   useLayoutEffect(() => {
     const root = wrap.current;
@@ -105,7 +114,7 @@ export function LandingHeroScene({ sources }: { sources: readonly Source[] }) {
 
   useEffect(() => {
     if (reduce || paused) return;
-    const id = setInterval(() => setActive((i) => (i + 1) % sources.length), 5600);
+    const id = setInterval(() => setActive((i) => (i + 1) % sources.length), 8200);
     return () => clearInterval(id);
   }, [reduce, paused, sources.length]);
 
@@ -125,13 +134,36 @@ export function LandingHeroScene({ sources }: { sources: readonly Source[] }) {
     };
   }, [ask, reduce]);
 
+  useEffect(() => {
+    if (reduce) {
+      setPhase(3);
+      setSaid(answer.length);
+      return;
+    }
+    setPhase(0);
+    setSaid(0);
+    const sent = TYPE_START + ask.length * TYPE_STEP;
+    let id: ReturnType<typeof setInterval> | undefined;
+    const timers = [
+      setTimeout(() => setPhase(1), sent + ASK_AT),
+      setTimeout(() => setPhase(2), sent + QUERY_AT),
+      setTimeout(() => setPhase(3), sent + QUERIED_AT),
+      setTimeout(() => {
+        id = setInterval(() => setSaid((n) => (n >= answer.length ? n : n + 1)), ANSWER_STEP);
+      }, sent + ANSWER_AT),
+    ];
+    return () => {
+      timers.forEach(clearTimeout);
+      clearInterval(id);
+    };
+  }, [ask, answer, reduce]);
+
   const checks = t(`landing.sources.${s.key}.checks`).split(" · ");
   const eeSteps = [
     { name: t("landing.diagram.packaged"), value: s.pkg },
     { name: t("landing.diagram.review"), value: checks[0] },
     { name: t("landing.diagram.grant"), value: t(`landing.sources.${s.key}.scope`) },
   ];
-  const resultDelay = reduce ? 0 : TYPE_START + ask.length * TYPE_STEP;
 
   return (
     <div className="mx-auto max-w-[1160px] px-5 sm:px-8">
@@ -265,33 +297,46 @@ export function LandingHeroScene({ sources }: { sources: readonly Source[] }) {
           </div>
         </div>
 
-        {/* 4. 交付结果 */}
-        <div
-          ref={result}
-          className="scene-card rounded-xl bg-lp-card p-5 shadow-lp"
-          style={delay(600)}
-          aria-live="polite"
-        >
+        {/* 4. 交付结果：提问 → 调用企业数据 → 回答 */}
+        <div ref={result} className="scene-card flex min-h-[260px] flex-col rounded-xl bg-lp-card p-5 shadow-lp" style={delay(600)}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold tracking-wide text-lp-accent uppercase">{t("landing.scene.result")}</span>
             <span className="status-dot h-2 w-2 rounded-full bg-[#10b981]" />
           </div>
-          <div key={active} className="scene-card" style={delay(resultDelay)}>
-            <h3 className="mt-2 text-[15px] leading-snug font-semibold text-lp-ink">{t(`landing.sources.${s.key}.asset`)}</h3>
-            <p className="mt-3 rounded-md bg-lp-bg-alt px-3.5 py-3 text-sm leading-relaxed text-lp-body">
-              {t(`landing.sources.${s.key}.answer`)}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {checks.slice(0, 3).map((c) => (
-                <span key={c} className="rounded-full bg-lp-accent-soft px-2.5 py-1 text-xs font-medium text-lp-accent">
-                  {c}
+          <div key={active} className="mt-4 flex flex-col gap-3">
+            {phase >= 1 && (
+              <p
+                className="scene-card ml-auto max-w-[90%] rounded-2xl rounded-br-md bg-lp-accent px-3.5 py-2 text-sm leading-relaxed text-white dark:text-[#0a2540]"
+                style={delay(0)}
+              >
+                {ask}
+              </p>
+            )}
+            {phase >= 2 && (
+              <div className="scene-card flex items-center gap-2 rounded-lg border border-lp-line px-3 py-2 text-xs" style={delay(0)}>
+                <span
+                  className={cx(
+                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors",
+                    phase >= 3 ? "bg-[#10b981] text-white" : "bg-lp-accent-soft text-lp-accent",
+                  )}
+                >
+                  {phase >= 3 ? <Check size={12} strokeWidth={3} /> : <Loader2 size={12} className="animate-spin" />}
                 </span>
-              ))}
-            </div>
-            <div className="mt-4 flex items-center gap-2 border-t border-lp-line pt-3 text-sm font-medium text-lp-ink">
-              <CheckCircle2 size={16} className="shrink-0 text-[#10b981]" />
-              <span className="min-w-0 flex-1">{t("landing.scene.audited")}</span>
-            </div>
+                <Database size={13} className="shrink-0 text-lp-muted" />
+                <span className="shrink-0 font-medium text-lp-ink">{t(phase >= 3 ? "landing.scene.queried" : "landing.scene.querying")}</span>
+                <span className="min-w-0 truncate font-mono text-lp-muted">{s.pkg}</span>
+              </div>
+            )}
+            {said > 0 && (
+              <p
+                className="scene-card max-w-[94%] rounded-2xl rounded-bl-md bg-lp-bg-alt px-3.5 py-2.5 text-sm leading-relaxed text-lp-ink"
+                style={delay(0)}
+                aria-label={answer}
+              >
+                {answer.slice(0, said)}
+                {said < answer.length && <span aria-hidden className="caret ml-0.5 inline-block h-3.5 w-px translate-y-0.5 bg-lp-accent" />}
+              </p>
+            )}
           </div>
         </div>
       </div>
