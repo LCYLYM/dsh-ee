@@ -99,22 +99,137 @@ svg .scene-fade { animation-name: scene-fade-in; }
 @keyframes caret { 50% { opacity: 0; } }
 .status-dot { animation: onboarding-pulse 2.4s ease-in-out infinite; }
 
-/* 落地页首屏的极淡点阵与斜向网格 */
-.landing-grid-bg {
-  background-image:
-    radial-gradient(circle, var(--color-brand-200) 1px, transparent 1px),
-    repeating-linear-gradient(115deg, transparent 0 46px, var(--color-brand-50) 46px 47px);
-  background-size: 26px 26px, auto;
+/* 落地页的 Material 3 主题：以品牌蓝 #4d6bfe 为种子色的 tonal spot 配色，
+   @material/web 组件和页面里的 m3-* 工具类都读这组 token。只作用在 .m3 里，不影响后台页面。 */
+.m3 {
+  --md-sys-color-primary: #4355b9;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #dee0ff;
+  --md-sys-color-on-primary-container: #00105c;
+  --md-sys-color-secondary: #5b5d72;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #e0e1f9;
+  --md-sys-color-on-secondary-container: #181a2c;
+  --md-sys-color-tertiary: #77536d;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #ffd7f1;
+  --md-sys-color-on-tertiary-container: #2d1228;
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-surface: #fbf8ff;
+  --md-sys-color-on-surface: #1b1b21;
+  --md-sys-color-on-surface-variant: #46464f;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f5f2fa;
+  --md-sys-color-surface-container: #efedf4;
+  --md-sys-color-surface-container-high: #eae7ef;
+  --md-sys-color-surface-container-highest: #e4e1e9;
+  --md-sys-color-outline: #767680;
+  --md-sys-color-outline-variant: #c7c5d0;
+  --md-sys-color-inverse-surface: #303036;
+  --md-sys-color-inverse-on-surface: #f3f0f7;
+  --md-sys-color-inverse-primary: #bac3ff;
+  --md-sys-color-shadow: #000000;
+  /* 内网部署不拉 Google Fonts：有 Roboto 用 Roboto，中文落到系统字体 */
+  --md-ref-typeface-brand: Roboto, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --md-ref-typeface-plain: Roboto, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--md-ref-typeface-plain);
 }
-.landing-grid-fade {
-  mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+.dark .m3 {
+  --md-sys-color-primary: #bac3ff;
+  --md-sys-color-on-primary: #08218a;
+  --md-sys-color-primary-container: #293ca0;
+  --md-sys-color-on-primary-container: #dee0ff;
+  --md-sys-color-secondary: #c4c5dd;
+  --md-sys-color-on-secondary: #2d2f42;
+  --md-sys-color-secondary-container: #434659;
+  --md-sys-color-on-secondary-container: #e0e1f9;
+  --md-sys-color-tertiary: #e6bad7;
+  --md-sys-color-on-tertiary: #44263d;
+  --md-sys-color-tertiary-container: #5d3c55;
+  --md-sys-color-on-tertiary-container: #ffd7f1;
+  --md-sys-color-error: #ffb4ab;
+  --md-sys-color-surface: #121318;
+  --md-sys-color-on-surface: #e4e1e9;
+  --md-sys-color-on-surface-variant: #c7c5d0;
+  --md-sys-color-surface-container-lowest: #0d0e13;
+  --md-sys-color-surface-container-low: #1b1b21;
+  --md-sys-color-surface-container: #1f1f25;
+  --md-sys-color-surface-container-high: #2a292f;
+  --md-sys-color-surface-container-highest: #35343a;
+  --md-sys-color-outline: #90909a;
+  --md-sys-color-outline-variant: #46464f;
+  --md-sys-color-inverse-surface: #e4e1e9;
+  --md-sys-color-inverse-on-surface: #303036;
+  --md-sys-color-inverse-primary: #4355b9;
+}
+/* Tailwind preflight 的 `* { padding: 0 }` 从外部压过了按钮 :host 上的内边距，这里按组件自己的规则补回 */
+.m3 :is(md-filled-button, md-filled-tonal-button, md-outlined-button, md-text-button) {
+  padding-block: calc((var(--_container-height) - max(var(--_label-text-line-height), var(--_icon-size))) / 2);
+  padding-inline: var(--_leading-space) var(--_trailing-space);
+}
+.m3 :is(md-filled-button, md-filled-tonal-button, md-outlined-button, md-text-button)[has-icon]:not([trailing-icon]) {
+  padding-inline: var(--_with-leading-icon-leading-space) var(--_with-leading-icon-trailing-space);
+}
+.m3 :is(md-filled-button, md-filled-tonal-button, md-outlined-button, md-text-button)[has-icon][trailing-icon] {
+  padding-inline: var(--_with-trailing-icon-leading-space) var(--_with-trailing-icon-trailing-space);
+}
+.m3 .flow-line {
+  background-image: linear-gradient(to bottom, var(--md-sys-color-primary) 50%, transparent 50%);
+}
+@media (min-width: 64rem) {
+  .m3 .flow-line {
+    background-image: linear-gradient(to right, var(--md-sys-color-primary) 50%, transparent 50%);
+  }
+}
+/* M3 的大号展示字：typescale 的 display 档是定值，这里按视口缩放 */
+.m3 .m3-display {
+  font-family: var(--md-ref-typeface-brand);
+  font-weight: 400;
+  font-size: clamp(2.5rem, 6vw, 4.75rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+.m3 .m3-headline {
+  font-family: var(--md-ref-typeface-brand);
+  font-weight: 400;
+  font-size: clamp(2rem, 3.6vw, 2.875rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .dash-flow, .caret, .status-dot { animation: none; }
   .draw-once { stroke-dashoffset: 0; animation: none; }
   .scene-fade, .scene-card { opacity: 1; animation: none; }
+}
+
+/* 落地页的 m3-* 颜色工具类，值来自上面 .m3 里的 --md-sys-color-* */
+@theme inline {
+  --color-m3-primary: var(--md-sys-color-primary);
+  --color-m3-on-primary: var(--md-sys-color-on-primary);
+  --color-m3-primary-container: var(--md-sys-color-primary-container);
+  --color-m3-on-primary-container: var(--md-sys-color-on-primary-container);
+  --color-m3-secondary: var(--md-sys-color-secondary);
+  --color-m3-secondary-container: var(--md-sys-color-secondary-container);
+  --color-m3-on-secondary-container: var(--md-sys-color-on-secondary-container);
+  --color-m3-tertiary: var(--md-sys-color-tertiary);
+  --color-m3-tertiary-container: var(--md-sys-color-tertiary-container);
+  --color-m3-on-tertiary-container: var(--md-sys-color-on-tertiary-container);
+  --color-m3-surface: var(--md-sys-color-surface);
+  --color-m3-on-surface: var(--md-sys-color-on-surface);
+  --color-m3-on-surface-variant: var(--md-sys-color-on-surface-variant);
+  --color-m3-surface-lowest: var(--md-sys-color-surface-container-lowest);
+  --color-m3-surface-low: var(--md-sys-color-surface-container-low);
+  --color-m3-surface-container: var(--md-sys-color-surface-container);
+  --color-m3-surface-high: var(--md-sys-color-surface-container-high);
+  --color-m3-surface-highest: var(--md-sys-color-surface-container-highest);
+  --color-m3-outline: var(--md-sys-color-outline);
+  --color-m3-outline-variant: var(--md-sys-color-outline-variant);
+  --color-m3-inverse-surface: var(--md-sys-color-inverse-surface);
+  --color-m3-inverse-on-surface: var(--md-sys-color-inverse-on-surface);
+  --color-m3-inverse-primary: var(--md-sys-color-inverse-primary);
 }
 
 @theme inline {
