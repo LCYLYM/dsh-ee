@@ -99,6 +99,7 @@ var agentExcluded = map[string]string{
 	"GET /api/auth/oidc/callback":               "企业统一登录由人在浏览器完成",
 	"GET /api/auth/handoff":                     "浏览器打开一次性登录链接用，链接只经接入插件交给浏览器",
 	"POST /api/dsh/web-link":                    "接入插件打开网页时自己调用；链接能直接登录网页，不进模型上下文",
+	"POST /api/dsh/feedback":                    "接入插件的 👍👎 按钮自己调用；员工自己打分，不让模型替人评价",
 	"GET /api/apps/{slug}/data":                 "应用数据给网页用；模型经 /mcp 的 app__rows / app__write",
 	"GET /api/apps/{slug}/data/{table}":         "应用数据给网页用；模型经 /mcp 的 app__rows",
 	"POST /api/apps/{slug}/data/{table}":        "应用数据给网页用；模型经 /mcp 的 app__write",
