@@ -224,6 +224,16 @@ func (s *Server) routes() []route {
 		prm("PATCH /api/apps/{slug}/data/{table}/{id}", s.handleAppUpdate, rbac.PortalView),
 		prm("DELETE /api/apps/{slug}/data/{table}/{id}", s.handleAppDelete, rbac.PortalView),
 		prm("GET /api/apps/{slug}/data/{table}/export", s.handleAppExport, rbac.PortalView),
+		// 数据中台（M15）：管理沿用「管理企业连接」
+		prm("GET /api/admin/data", s.handleDataOverview, rbac.ConnectionsManage),
+		prm("POST /api/admin/data/tables", s.handleDataUpload, rbac.ConnectionsManage),
+		prm("GET /api/admin/data/tables/{name}", s.handleDataTablePreview, rbac.ConnectionsManage),
+		prm("DELETE /api/admin/data/tables/{name}", s.handleDataTableDelete, rbac.ConnectionsManage),
+		prm("POST /api/admin/data/run", s.handleDataRun, rbac.ConnectionsManage),
+		prm("POST /api/admin/data/datasets", s.handleDataSetSave, rbac.ConnectionsManage),
+		prm("PUT /api/admin/data/datasets/{slug}", s.handleDataSetSave, rbac.ConnectionsManage),
+		prm("DELETE /api/admin/data/datasets/{slug}", s.handleDataSetDelete, rbac.ConnectionsManage),
+		prm("GET /api/data/datasets", s.handleMyDataSets, rbac.PortalView),
 		// 网页版应用（M14）
 		prm("GET /api/me/apps/{slug}/web", s.handleWebApp, rbac.PortalView),
 		prm("POST /api/me/apps/{slug}/source", s.handleWebAppSource, rbac.PortalView),

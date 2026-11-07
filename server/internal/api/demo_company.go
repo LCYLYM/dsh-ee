@@ -98,6 +98,8 @@ type demoSelfApp struct {
 	Owner    string
 	Everyone bool
 	Rows     map[string][]demoRow
+	// 数据中台可用（示例数据集已导入）时加上的工作台，并开网页版
+	DataWorkbench *appWorkbench
 	demoAsset
 }
 
@@ -108,7 +110,7 @@ type demoRow struct {
 
 func demoSelfApps() []demoSelfApp {
 	return []demoSelfApp{
-		{Owner: "demo.zhou.hang", demoAsset: demoAsset{Kind: store.KindApp, Slug: "zhouhang-weekly", Delivery: store.DeliveryOptional, Spec: assetSpec{
+		{Owner: "demo.zhou.hang", DataWorkbench: demoWeeklyWorkbench(), demoAsset: demoAsset{Kind: store.KindApp, Slug: "zhouhang-weekly", Delivery: store.DeliveryOptional, Spec: assetSpec{
 			Title:       "我的客户周报",
 			Description: "周航自己做的：每周五汇总负责客户的续约进度和拜访情况，生成发给销售总监的周报。只有他自己用。",
 			Icon:        "📈",
@@ -263,6 +265,11 @@ func (s *Server) demoImportSelfApp(ctx context.Context, d demoSelfApp) (demoItem
 		return it, fmt.Errorf("找不到演示员工 %s：%w", d.Owner, err)
 	}
 	sp := d.Spec
+	if d.DataWorkbench != nil {
+		if _, err := s.store.GetDataSet(ctx, "my-customers"); err == nil {
+			sp.Workbench, sp.Web = d.DataWorkbench, true
+		}
+	}
 	if msg := validateSpec(d.Kind, &sp); msg != "" {
 		return it, errors.New(msg)
 	}
@@ -565,6 +572,8 @@ type demoClearResult struct {
 	Assets int `json:"assets"`
 	KBases int `json:"kbases"`
 	Users  int `json:"users"`
+	// 数据中台里的示例表和数据集
+	Data int `json:"data"`
 }
 
 // DELETE /api/admin/demo：把示例的知识库、连接、应用、员工和模拟统计全部删掉，用户自己建的内容不动。
@@ -647,6 +656,10 @@ func (s *Server) handleDemoClear(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		res.Users++
+	}
+	if res.Data, err = s.demoClearData(ctx, recs); err != nil {
+		s.internalErr(w, r, err)
+		return
 	}
 	for _, rec := range recs {
 		if err := s.store.DeleteDemoRecord(ctx, rec.Kind, rec.RefID); err != nil {

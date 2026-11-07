@@ -29,6 +29,14 @@ DSH_EE_DSN='dsh_ee@your_tenant:password@tcp(ob-host:2881)/dsh_ee'
 
 库不存在时 dsh-ee 会尝试创建；没有建库权限时先手工 `CREATE DATABASE dsh_ee DEFAULT CHARACTER SET utf8mb4`。
 
+### 数据中台
+
+「企业连接 → 数据中台」用一个单独的库存放上传的表。默认在主库同一个服务器上建 `<主库名>_data`（如 `dsh_ee_data`），并用主库账号自动建一个只有这个库 SELECT 权限的账号（`<库名>_reader`）来执行数据集查询，密码随机生成、加密存在设置里。
+
+- 账号没有建库或建用户的权限时：请 DBA 建好库和只读账号，填 `DSH_EE_DATA_DSN`（可写账号，用于上传）和 `DSH_EE_DATA_READ_DSN`（只读账号）；
+- 不需要这块：`DSH_EE_DATA_DSN=off`；
+- 开不起来时只影响数据中台，页面上会说明原因，其余功能照常。
+
 ### HTTPS 与访问地址
 
 dsh-ee 本身只提供 HTTP，放在企业的反向代理 / 负载均衡后面终止 TLS。代理后面需要：

@@ -593,7 +593,7 @@ export interface WorkbenchWidget {
   title?: string;
   text?: string;
   /** 写 table 是应用自带的表，和 connection / tool 二选一 */
-  source?: { connection?: string; tool?: string; table?: string; args?: Record<string, unknown> };
+  source?: { connection?: string; tool?: string; table?: string; dataset?: string; args?: Record<string, unknown> };
   field?: string;
   format?: string;
   delta_field?: string;
@@ -646,6 +646,52 @@ export interface AppField {
 export interface AppTableInfo extends AppTable {
   can_insert: boolean;
   rows?: number;
+}
+
+/** 数据中台（M15）：上传生成的表。 */
+export interface DataTable {
+  name: string;
+  title: string;
+  description: string;
+  columns: { name: string; type: "number" | "date" | "text" }[];
+  row_count: number;
+  updated_at: string;
+}
+
+export interface DataParam {
+  name: string;
+  title: string;
+  default?: string;
+  auto?: boolean;
+}
+
+/** 数据中台的数据集：带名字、可带参数的只读查询。 */
+export interface DataSet {
+  id: number;
+  slug: string;
+  title: string;
+  description: string;
+  sql: string;
+  params: DataParam[];
+  scope: Scope;
+  updated_at: string;
+}
+
+export interface DataResult {
+  columns: string[];
+  items: Record<string, unknown>[];
+  total: number;
+  truncated?: boolean;
+}
+
+export interface DataOverview {
+  enabled: boolean;
+  error: string;
+  database?: string;
+  read_error?: string;
+  tables: DataTable[];
+  datasets: DataSet[];
+  auto_params: Record<string, string>;
 }
 
 /** 网页版应用（M14）：GET /api/me/apps/{slug}/web。 */
@@ -1256,6 +1302,26 @@ export const api = {
     request<{ item: AppRow }>("PATCH", `/api/apps/${encodeURIComponent(slug)}/data/${encodeURIComponent(table)}/${id}`, { row }),
   appDeleteRow: (slug: string, table: string, id: number) =>
     request<void>("DELETE", `/api/apps/${encodeURIComponent(slug)}/data/${encodeURIComponent(table)}/${id}`),
+  dataOverview: () => request<DataOverview>("GET", "/api/admin/data"),
+  dataUpload: (f: { file: File; name: string; title: string; description?: string; mode: "create" | "replace" | "append" }) => {
+    const form = new FormData();
+    form.set("file", f.file);
+    form.set("name", f.name);
+    form.set("title", f.title);
+    form.set("description", f.description ?? "");
+    form.set("mode", f.mode);
+    return request<{ table: DataTable; added: number }>("POST", "/api/admin/data/tables", undefined, { raw: { body: form } });
+  },
+  dataTablePreview: (name: string) => request<{ table: DataTable; preview: DataResult }>("GET", `/api/admin/data/tables/${encodeURIComponent(name)}`),
+  dataTableDelete: (name: string) => request<void>("DELETE", `/api/admin/data/tables/${encodeURIComponent(name)}`),
+  dataRun: (sql: string, values: Record<string, unknown>, params: DataParam[]) =>
+    request<{ result: DataResult; params: DataParam[] }>("POST", "/api/admin/data/run", { sql, values, params }),
+  dataSetSave: (d: { slug: string; title: string; description: string; sql: string; params: DataParam[]; scope: Scope }, update: boolean) =>
+    update
+      ? request<DataSet>("PUT", `/api/admin/data/datasets/${encodeURIComponent(d.slug)}`, d)
+      : request<DataSet>("POST", "/api/admin/data/datasets", d),
+  dataSetDelete: (slug: string) => request<void>("DELETE", `/api/admin/data/datasets/${encodeURIComponent(slug)}`),
+  myDataSets: () => request<{ items: { slug: string; title: string; description: string; params: DataParam[] }[] }>("GET", "/api/data/datasets"),
   webApp: (slug: string) => request<WebApp>("GET", `/api/me/apps/${encodeURIComponent(slug)}/web`),
   webAppSource: (slug: string, pane: string, widget: number) =>
     request<{ value?: unknown; forbidden?: boolean; error?: string }>("POST", `/api/me/apps/${encodeURIComponent(slug)}/source`, { pane, widget }),

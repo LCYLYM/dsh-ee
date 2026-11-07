@@ -152,6 +152,6 @@ export default {
     clearing: "正在清除…",
     clearConfirm: "会删除示例的知识库、连接、应用、10 个演示员工和模拟的使用数据；你自己建的内容不受影响。确定清除吗？",
     cleared: "已清除：{{assets}} 项能力、{{kbases}} 个知识库、{{users}} 个演示员工",
-    kinds: { kb: "知识库", connection: "连接", skill: "技能", prompt: "提示词", app: "应用", user: "员工" },
+    kinds: { kb: "知识库", connection: "连接", skill: "技能", prompt: "提示词", app: "应用", user: "员工", data_table: "数据中台的表", data_set: "数据集" },
   },
 };

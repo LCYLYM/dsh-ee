@@ -662,6 +662,12 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		if targets := s.appToolTargets(r.Context(), v, c); len(targets) > 0 {
 			tools = append(tools, appToolDefs(targets)...)
 		}
+		if sets, err := s.visibleDataSets(r.Context(), v); err != nil {
+			s.internalErr(w, r, err)
+			return
+		} else if len(sets) > 0 {
+			tools = append(tools, dataToolDefs(sets)...)
+		}
 		for _, def := range s.agentToolList(r.Context(), pr) {
 			tools = append(tools, def)
 		}
@@ -677,6 +683,10 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		}
 		if strings.HasPrefix(p.Name, "ee_") {
 			writeRPC(w, msg.ID, s.agentCall(r, pr, p.Name, p.Arguments), nil)
+			return
+		}
+		if strings.HasPrefix(p.Name, dataConn+"__") {
+			writeRPC(w, msg.ID, s.dataCall(r.Context(), v, p.Name, p.Arguments), nil)
 			return
 		}
 		if strings.HasPrefix(p.Name, appConn+"__") {

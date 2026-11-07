@@ -618,8 +618,8 @@ func (s *Server) handleHubCreate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "标识 "+req.Slug+" 留给知识库使用")
 		return
 	}
-	if req.Slug == appConn {
-		writeErr(w, http.StatusBadRequest, "标识 "+appConn+" 留给应用数据使用")
+	if req.Slug == appConn || req.Slug == dataConn {
+		writeErr(w, http.StatusBadRequest, "标识 "+req.Slug+" 留给应用数据和数据中台使用")
 		return
 	}
 	sp, raw, ok := s.decodeSpec(w, r, req.Kind, req.Spec)

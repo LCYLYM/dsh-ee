@@ -102,6 +102,23 @@ func (s *Server) handleWebAppSource(w http.ResponseWriter, r *http.Request) {
 	args := map[string]any{}
 	_ = json.Unmarshal(src.Args, &args)
 	switch {
+	case src.Dataset != "":
+		d, err := s.findDataSet(ctx, v, src.Dataset)
+		var res any
+		if err == nil {
+			res, err = s.runDataSet(ctx, v, d, args)
+		}
+		var ae *appDataError
+		switch {
+		case errors.As(err, &ae) && ae.status == http.StatusNotFound:
+			writeJSON(w, http.StatusOK, map[string]any{"forbidden": true})
+		case errors.As(err, &ae):
+			writeJSON(w, http.StatusOK, map[string]any{"error": ae.msg})
+		case err != nil:
+			s.internalErr(w, r, err)
+		default:
+			writeJSON(w, http.StatusOK, map[string]any{"value": res})
+		}
 	case src.Table != "":
 		t, err := s.appTargetFor(ctx, v, a.Slug, src.Table)
 		if err != nil {

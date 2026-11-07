@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
 import { api } from "../../lib/api";
@@ -6,7 +6,8 @@ import { useApi } from "../../lib/use-api";
 import { assetPath, scopeSummary } from "../../lib/hub";
 import { LoadState } from "../../components/api-ui";
 import { useScopeOptions } from "../../components/scope-dialog";
-import { Badge, Button, Card, PageHeader } from "../../components/ui";
+import { Badge, Button, Card, PageHeader, Segmented } from "../../components/ui";
+import { DataHubPanel } from "../../components/data-hub";
 
 export default function AdminConnections() {
   const { t } = useTranslation();
@@ -15,6 +16,9 @@ export default function AdminConnections() {
   const info = useApi(api.connectInfo);
   const opts = useScopeOptions();
   const conns = (hub.data?.assets ?? []).filter((a) => a.kind === "connection");
+  // 「数据中台」放在这一页的第二个页签：企业共用的唯一数据源
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "data" ? "data" : "connections";
 
   return (
     <div>
@@ -22,11 +26,30 @@ export default function AdminConnections() {
         title={t("connections.title")}
         desc={t("connections.desc")}
         actions={
-          <Button onClick={() => navigate("/assets/new?kind=connection")}>
-            <Plus size={15} /> {t("connections.add")}
-          </Button>
+          tab === "connections" ? (
+            <Button onClick={() => navigate("/assets/new?kind=connection")}>
+              <Plus size={15} /> {t("connections.add")}
+            </Button>
+          ) : undefined
         }
       />
+      <div className="mb-4">
+        <Segmented
+          value={tab}
+          onChange={(v) => setParams(v === "data" ? { tab: "data" } : {}, { replace: true })}
+          options={[
+            { value: "connections", label: t("dataHub.tabConnections") },
+            { value: "data", label: t("dataHub.tabData") },
+          ]}
+        />
+      </div>
+      {tab === "data" ? <DataHubPanel /> : connectionsList()}
+    </div>
+  );
+
+  function connectionsList() {
+    return (
+      <>
       {info.data && (
         <p className="mb-4 text-sm text-neutral-600">
           {t("asset.howConnection", { server: info.data.server_name, slug: "<…>" })}
@@ -80,6 +103,7 @@ export default function AdminConnections() {
           )}
         </LoadState>
       </Card>
-    </div>
-  );
+      </>
+    );
+  }
 }

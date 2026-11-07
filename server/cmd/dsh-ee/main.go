@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/hikariming/dsh-ee/server/internal/datahub"
 	"log/slog"
 	"net/http"
 	"os"
@@ -71,6 +72,17 @@ func run(log *slog.Logger) error {
 	if err := st.FailRunningJobs(ctx); err != nil {
 		return err
 	}
+	// 数据中台：开不起来时只关掉这一块，其余照常
+	var dataHub *datahub.Hub
+	dataErr := ""
+	if cfg.DataDSN != "" {
+		if dataHub, err = api.OpenDataHub(ctx, st, box, cfg.DataDSN, cfg.DataReadDSN); err != nil {
+			log.Warn("数据中台没有开起来", "err", err)
+			dataErr = "数据中台没有开起来：" + err.Error()
+		} else if dataHub.ReadErr != "" {
+			log.Warn("数据中台的只读账号不可用，数据集暂时不能查", "reason", dataHub.ReadErr)
+		}
+	}
 	srv := api.New(st, box, api.Options{
 		CookieSecure:  cfg.CookieSecure,
 		SessionTTL:    cfg.SessionTTL,
@@ -80,6 +92,8 @@ func run(log *slog.Logger) error {
 		PublicURL:     cfg.PublicURL,
 		Addr:          cfg.Addr,
 		AdminModeUnit: cfg.AdminModeUnit,
+		DataHub:       dataHub,
+		DataHubErr:    dataErr,
 	}, log)
 
 	go sweepSessions(ctx, st, log)

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/go-sql-driver/mysql"
 	"net/url"
 	"os"
 	"strconv"
@@ -34,6 +35,10 @@ type Config struct {
 	DBWait time.Duration
 	// 管理模式「1 小时 / 8 小时」里「小时」的长度，默认 1h；只给自动化测试缩短用，生产不要设
 	AdminModeUnit time.Duration
+	// 数据中台的库（DSH_EE_DATA_DSN）。默认和主库同一个服务器、库名加 _data；设成 off 关闭。
+	DataDSN string
+	// 数据中台的只读账号（DSH_EE_DATA_READ_DSN）；不填时用 DataDSN 的账号自动建一个只有 SELECT 权限的账号。
+	DataReadDSN string
 }
 
 func Load() (*Config, error) {
@@ -49,6 +54,21 @@ func Load() (*Config, error) {
 	}
 	if c.DSN == "" {
 		return nil, errors.New("缺少 DSH_EE_DSN，例如 root:@tcp(127.0.0.1:4000)/dsh_ee")
+	}
+	c.DataReadDSN = os.Getenv("DSH_EE_DATA_READ_DSN")
+	switch v := os.Getenv("DSH_EE_DATA_DSN"); v {
+	case "off":
+	case "":
+		d, err := mysql.ParseDSN(c.DSN)
+		if err != nil {
+			return nil, fmt.Errorf("DSH_EE_DSN: %w", err)
+		}
+		if d.DBName != "" {
+			d.DBName += "_data"
+			c.DataDSN = d.FormatDSN()
+		}
+	default:
+		c.DataDSN = v
 	}
 	raw := os.Getenv("DSH_EE_SECRET_KEY")
 	if raw == "" {

@@ -79,6 +79,8 @@ type wbSource struct {
 	Args       json.RawMessage `json:"args,omitempty"`
 	// 应用自带的表（app_data.go）：和 connection / tool 二选一
 	Table string `json:"table,omitempty"`
+	// 数据中台的数据集（datahub.go）：args 是数据集的参数
+	Dataset string `json:"dataset,omitempty"`
 }
 
 type wbColumn struct {
@@ -447,7 +449,16 @@ func validateSource(src *wbSource, deps wbDeps) string {
 	if src == nil {
 		return "要指定数据源（source）"
 	}
-	src.Connection, src.Tool, src.Table = strings.TrimSpace(src.Connection), strings.TrimSpace(src.Tool), strings.TrimSpace(src.Table)
+	src.Connection, src.Tool, src.Table, src.Dataset = strings.TrimSpace(src.Connection), strings.TrimSpace(src.Tool), strings.TrimSpace(src.Table), strings.TrimSpace(src.Dataset)
+	if src.Dataset != "" {
+		if src.Connection != "" || src.Tool != "" || src.Table != "" {
+			return "数据源要么写数据集（dataset），要么写表或连接，不能同时填"
+		}
+		if !slugRe.MatchString(src.Dataset) {
+			return "数据集标识 " + src.Dataset + " 格式不对"
+		}
+		return checkSourceArgs(src)
+	}
 	if src.Table != "" {
 		if src.Connection != "" || src.Tool != "" {
 			return "数据源要么写应用自带的表（table），要么写连接和工具，不能都填"
@@ -533,6 +544,14 @@ func (s *Server) checkWorkbenchSources(ctx context.Context, wb *appWorkbench) (s
 	for pi, p := range wb.Panes {
 		for wi, w := range p.Widgets {
 			if w.Source == nil || w.Source.Connection == kbConn || w.Source.Table != "" {
+				continue
+			}
+			if w.Source.Dataset != "" {
+				if _, err := s.store.GetDataSet(ctx, w.Source.Dataset); errors.Is(err, store.ErrNotFound) {
+					return fmt.Sprintf("工作台第 %d 个窗格第 %d 个组件：数据中台里没有数据集 %s", pi+1, wi+1, w.Source.Dataset), nil
+				} else if err != nil {
+					return "", err
+				}
 				continue
 			}
 			where := fmt.Sprintf("工作台第 %d 个窗格第 %d 个组件：", pi+1, wi+1)

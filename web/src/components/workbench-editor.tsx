@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useApi } from "../lib/use-api";
 import { useTranslation } from "react-i18next";
 import { api, type AppWorkbench, type ConnectionTool, type WorkbenchWidget } from "../lib/api";
 import { Button, cx, Field } from "./ui";
@@ -72,7 +73,7 @@ function WidgetPreview({ w }: { w: WorkbenchWidget }) {
       {detail && <div className="mt-1 truncate text-xs text-neutral-500">{detail}</div>}
       {w.detail?.length ? <div className="mt-1 truncate text-xs text-neutral-500">{t("appWorkbench.detail", { fields: w.detail.map((d) => d.title).join(" · ") })}</div> : null}
       {w.empty && <div className="mt-1 truncate text-xs text-neutral-500">{t("appWorkbench.empty", { text: w.empty.text })}</div>}
-      {w.source && <div className="mt-1 font-mono text-[11px] text-neutral-400">{w.source.table ? `table / ${w.source.table}` : `${w.source.connection} / ${w.source.tool}`}</div>}
+      {w.source && <div className="mt-1 font-mono text-[11px] text-neutral-400">{w.source.dataset ? `dataset / ${w.source.dataset}` : w.source.table ? `table / ${w.source.table}` : `${w.source.connection} / ${w.source.tool}`}</div>}
     </div>
   );
 }
@@ -113,6 +114,7 @@ export function WorkbenchField({ text, onText, connections, connectionIds = [] }
   const { t } = useTranslation();
   const [preview, setPreview] = useState(false);
   const sources = useSourceTools(connectionIds);
+  const datasets = useApi(() => api.myDataSets().catch(() => ({ items: [] })));
   const parsed = parseWorkbench(text);
   return (
     <Field label={t("appWorkbench.label")} hint={t("appWorkbench.hint")}>
@@ -140,6 +142,19 @@ export function WorkbenchField({ text, onText, connections, connectionIds = [] }
               ))}
             </ul>
           )}
+        </div>
+      )}
+      {(datasets.data?.items.length ?? 0) > 0 && (
+        <div className="mt-2 text-xs text-neutral-600">
+          <div className="mb-1 font-medium">{t("appWorkbench.datasets")}</div>
+          <ul className="grid gap-0.5">
+            {datasets.data!.items.map((d) => (
+              <li key={d.slug} className="truncate">
+                <code className="font-mono">{`"source": { "dataset": "${d.slug}" }`}</code>
+                <span className="text-neutral-500"> · {d.title}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {parsed.error && <p className="mt-1 text-xs text-red-600">{parsed.error === "panes" ? t("appWorkbench.needPanes") : t("appWorkbench.badJson", { error: parsed.error })}</p>}

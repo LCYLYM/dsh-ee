@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/hikariming/dsh-ee/server/internal/datahub"
 	"io"
 	"log/slog"
 	"mime"
@@ -47,6 +48,9 @@ type Options struct {
 	FeedURL string
 	// 访问 OIDC 身份提供方的客户端；测试里可替换。
 	OIDCClient *http.Client
+	// 数据中台（datahub.go）；为空表示没开，DataHubErr 说明原因
+	DataHub    *datahub.Hub
+	DataHubErr string
 }
 
 type Server struct {

@@ -1099,6 +1099,13 @@ func appWorkbenchForDSH(slug string, wb *appWorkbench) *appWorkbench {
 	for pi := range out.Panes {
 		for wi := range out.Panes[pi].Widgets {
 			src := out.Panes[pi].Widgets[wi].Source
+			if src != nil && src.Dataset != "" {
+				params := map[string]any{}
+				_ = json.Unmarshal(src.Args, &params)
+				raw, _ := json.Marshal(map[string]any{"name": src.Dataset, "params": params})
+				out.Panes[pi].Widgets[wi].Source = &wbSource{Connection: dataConn, Tool: "dataset", Args: raw, Dataset: src.Dataset}
+				continue
+			}
 			if src == nil || src.Table == "" {
 				continue
 			}

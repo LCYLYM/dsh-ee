@@ -21,7 +21,7 @@
 | M12 | 从 DSH 打开网页免登录（一次性登录链接） | — | 是 | ✅ 代码完成，待 Mac 验证（[workbench-verify.md §7](./workbench-verify.md)） |
 | M13 | 应用自带数据：表、行可见性、`app` 工具、员工侧 `ee_app` | M4 | 是 | ✅ 代码完成，待 Mac 验证（[workbench-verify.md §8](./workbench-verify.md)） |
 | M14 | 网页版应用 `/a/<应用标识>`，与 DSH 共用渲染 | M5（共用渲染）、M12、M13 | 是 | ✅ 代码完成，待 Mac / 手机验证（[workbench-verify.md §9](./workbench-verify.md)） |
-| M15 | 数据中台最小版本：上传、数据集、系统连接 `data` | M13（`ref` 字段） | 否 | 未开始 |
+| M15 | 数据中台最小版本：上传、数据集、系统连接 `data` | M13（`ref` 字段） | 否 | ✅ 已完成（`ref` 字段与升格放 v1.1，[workbench-verify.md §10](./workbench-verify.md)） |
 | M11 | 发布：README、文档、兼容性矩阵、演示视频 | 全部 | 是 | 未开始 |
 
 M1、M2、M4、M10 互不依赖，可以并行。M12～M15 来自 2026-11-07 的补充讨论（[product-v1.md §10](./product-v1.md)），M12 不依赖任何项，可以最先做；已定都进 v1.0（M15 只做最小版本，升格与 `data__query` 放 v1.1）。
@@ -381,6 +381,22 @@ M1、M2、M4、M10 互不依赖，可以并行。M12～M15 来自 2026-11-07 的
 
 - 上传一张 Excel，一分钟内在某个应用的工作台里画出图表。
 - 写语句、超时查询、越权的表都被拒绝（Go 测试覆盖）；不配置数据中台时其余功能不受影响。
+
+### 完成情况（2026-11-07）
+
+完成（真机核对清单见 [workbench-verify.md §10](./workbench-verify.md)）。
+
+- 新包 `server/internal/datahub`：连接、自动建只读账号、建表 / 替换 / 追加、执行查询（`max_execution_time` 10 秒、最多 1000 行）、SQL 检查与 `:参数` 绑定、CSV / xlsx 解析与类型推断（xlsx 自己读 zip + XML，不引入新依赖）。
+- 说明存在主库（迁移 0017：`data_tables`、`data_sets`），数据在单独的库。API 在 `server/internal/api/datahub.go`；系统连接 `data` 的工具 `data__dataset`；工作台数据源 `{"dataset": …}`（目录里换成 `data__dataset` 调用，网页版按配置执行）；编辑器里列出员工能用的数据集。
+- 网页：「企业连接」页的「数据中台」页签（上传、预览、删除；数据集的 SQL、参数、范围、试运行）。没有新加菜单项，老部署的菜单不用迁移。
+- 部署：`DSH_EE_DATA_DSN` 默认由 `DSH_EE_DSN` 推出 `<库名>_data`，`off` 关闭；`DSH_EE_DATA_READ_DSN` 可选。开不起来时只关这一块，页面上说明原因。
+- 示例公司：「客户主数据」「人员」两张表，「客户主数据」「我负责的客户」（`:me_name`）「本部门同事」（`:me_department`）三个数据集；周航的「我的客户周报」用数据集做了工作台并开了网页版；清除时删表删数据集。
+- 和计划的差别：
+  - **只读不靠事务**：TiDB 的 `START TRANSACTION READ ONLY` 只是空实现，所以靠只读账号；建不了只读账号时可以上传，但数据集不能查，页面上给出要配的环境变量；
+  - CSV 只认 UTF-8（GBK 的提示另存为「CSV UTF-8」或直接传 .xlsx）；老的 .xls 不支持；
+  - 表本身没有可见范围：员工只能经数据集用数据，范围设在数据集上（v1.1 的 `data__query` 再给表加范围）；
+  - `ref` 字段（应用自带表引用数据集）和升格放到 v1.1，见 §10.9 第 3 项。
+- 测试：`internal/datahub` 单测；Go `TestDataHub`、`TestDemoDataHub`；e2e `22-data-hub`。
 
 ---
 

@@ -154,6 +154,6 @@ export default {
     clearing: "Clearing…",
     clearConfirm: "This deletes the demo knowledge bases, connections, apps, the 10 demo employees and the simulated usage. Content you created stays. Clear now?",
     cleared: "Cleared: {{assets}} capabilities, {{kbases}} knowledge bases, {{users}} demo employees",
-    kinds: { kb: "Knowledge base", connection: "Connection", skill: "Skill", prompt: "Prompt", app: "App", user: "Employee" },
+    kinds: { kb: "Knowledge base", connection: "Connection", skill: "Skill", prompt: "Prompt", app: "App", user: "Employee", data_table: "Data hub table", data_set: "Dataset" },
   },
 } satisfies Messages<typeof zh>;

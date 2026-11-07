@@ -253,6 +253,8 @@ func (s *Server) handleDemoImport(w http.ResponseWriter, r *http.Request) {
 			accounts = append(accounts, *acc)
 		}
 	}
+	// 数据中台的示例表和数据集（要用演示员工的名字，放在建账号之后）；没开数据中台时跳过
+	items = append(items, s.demoImportData(ctx, by, time.Now().UTC())...)
 	// 员工自己搭建的「自己用」应用，要等账号建好
 	for _, a := range demoSelfApps() {
 		it, err := s.demoImportSelfApp(ctx, a)
