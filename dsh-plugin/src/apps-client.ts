@@ -1,5 +1,5 @@
 import { createElement, useEffect, useState } from "react";
-import { appsSection, heroAppsMenu, inProgressItems, inProgressView, startText, type AppsViewActions, type MenuAnchor } from "./apps-view.js";
+import { appsSection, heroAppsMenu, inProgressItems, inProgressView, launcherPanel, startText, type AppsViewActions, type MenuAnchor } from "./apps-view.js";
 import { fillInput, openSession } from "./host-session.js";
 import { createLauncher, singleFlight } from "./app-launcher.js";
 import type { CatalogApp } from "./skills.js";
@@ -220,7 +220,7 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
     }, [menuOpen]);
-    return heroAppsMenu(createElement, state.apps, open, query, setQuery, notice, menuOpen, () => setMenuOpen(!menuOpen));
+    return launcherPanel(createElement, state.apps, open, query, setQuery, notice, menuOpen, () => setMenuOpen(!menuOpen));
   };
   const InProgress = () => {
     const state = useApps();

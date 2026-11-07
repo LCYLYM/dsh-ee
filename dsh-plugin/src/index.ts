@@ -15,6 +15,7 @@ import { AppBindings } from "./app-bindings.js";
 import { setAppSubscription } from "./app-subscription.js";
 import { exchangeWebLink } from "./web-link.js";
 import { BoardStore, ChecklistStore, insertFormRow, readKBDoc, readWidgetData, registerWorkbenchTool } from "./workbench-host.js";
+import { registerVotes } from "./votes.js";
 import type { DshContext, PluginConfig } from "./dsh.js";
 
 export const name = "dsh-ee-connect";
@@ -77,6 +78,17 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
       unbindApp: async (name) => appBindings.unbind(name),
       workbenchData: async (request) => readWidgetData(await (await skillsReady).readApps(), bridge, request),
       insertFormRow: async (request) => insertFormRow(await (await skillsReady).readApps(), bridge, request),
+      vote: async (request) => {
+        const token = await tokens.resolve();
+        if (!token) throw new Error("没有登录企业账号");
+        const r = await fetch(`${config.base}/api/dsh/feedback`, {
+          method: "POST",
+          headers: { "content-type": "application/json", Authorization: `Bearer ${token.value}` },
+          body: JSON.stringify(request),
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (!r.ok) throw new Error(`反馈失败：HTTP ${r.status}`);
+      },
       readBoard: async (request) => boards.read(String(request?.app ?? ""), String(request?.sessionId ?? "")) ?? null,
       readChecklists: async (request) => checklists.read(String(request?.app ?? ""), String(request?.sessionId ?? ""))?.lists ?? {},
       setChecklist: async (request) => {

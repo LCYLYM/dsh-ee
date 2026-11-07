@@ -297,3 +297,36 @@ export function inProgressView(createElement: (...args: any[]) => any, items: In
       createElement("span", { style: { fontSize: 11, color } }, label));
     })));
 }
+
+/** M6 首屏启动台：锚在 hero 行右端、向下铺开的卡片区；没有应用时退回原下拉。 */
+export function launcherPanel(createElement: (...args: any[]) => any, apps: CatalogApp[], onOpen: (app: CatalogApp) => void, query = "", onSearch: (query: string) => void = () => {}, notice = "", open = false, onToggle: () => void = () => {}) {
+  if (!apps.length) return null;
+  const todos = apps.reduce((n, a) => n + ((a as any).todo ?? 0), 0);
+  const cards = apps.slice(0, 8);
+  const starters = apps.flatMap((a) => (a.starters ?? []).slice(0, 1).map((s) => ({ app: a, text: s }))).slice(0, 3);
+  const card = (app: CatalogApp) => createElement("button", {
+    key: app.name, type: "button", onClick: () => onOpen(app),
+    style: { ...buttonStyle, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: 10, borderRadius: 8, border: "1px solid color-mix(in srgb, currentColor 12%, transparent)", textAlign: "left", minWidth: 0 },
+  },
+    createElement("span", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600 } },
+      appIcon(createElement, app), createElement("span", null, app.title),
+      (app as any).new ? createElement("span", { style: { fontSize: 10, padding: "0 5px", borderRadius: 99, background: "#d9770622", color: "#d97706" } }, "新") : null,
+      (app as any).todo ? createElement("span", { style: { fontSize: 10, padding: "0 5px", borderRadius: 99, background: "#2563eb22", color: "#2563eb" } }, `${(app as any).todo} 待处理`) : null),
+    createElement("span", { style: { fontSize: 11, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" } }, app.description || app.starters?.[0] || ""));
+  return createElement("div", { "data-dsh-ee-ui": "hero-apps", style: { position: "relative", display: "inline-block" } },
+    createElement("button", { type: "button", onClick: onToggle, "aria-expanded": open, "aria-haspopup": "menu", style: { ...buttonStyle, fontSize: 12, padding: "4px 7px", whiteSpace: "nowrap" } }, "企业应用"),
+    createElement("div", {
+      role: "region", "aria-label": "应用启动台",
+      style: { position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 60, width: "min(560px, calc(100vw - 48px))", padding: 12, borderRadius: 10, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 8px 30px #0003" },
+    },
+      createElement("div", { style: { fontSize: 13, marginBottom: 8, opacity: 0.85 } },
+        todos ? `需要你处理：${todos} 项（都在「工作台」里）` : "从下面挑一个应用开始，或直接说出你的问题"),
+      createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 } }, ...cards.map(card)),
+      starters.length ? createElement("div", { style: { marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 } },
+        starters.map(({ app, text }) => createElement("button", {
+          key: `${app.name}:${text}`, type: "button", onClick: () => onOpen(app),
+          title: `${app.title}：${text}`,
+          style: { ...buttonStyle, fontSize: 11, padding: "4px 9px", borderRadius: 99, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+        }, text))) : null,
+      notice ? createElement("p", { role: "status", style: { margin: "8px 0 0", fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" } }, notice) : null));
+}

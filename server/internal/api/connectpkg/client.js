@@ -27,7 +27,7 @@ __export(client_exports, {
   inject: () => inject
 });
 module.exports = __toCommonJS(client_exports);
-var import_react3 = require("react");
+var import_react4 = require("react");
 
 // node_modules/@deepseek-ai/dsh-typert-protocol/lib/index.js
 var TYPERT_OWNED_VALUE = Symbol.for("dsh.typert.owned-value");
@@ -19895,10 +19895,10 @@ function date4(params) {
 }
 
 // src/brand-view.ts
-function brandMark(createElement4, brand, props = {}) {
+function brandMark(createElement5, brand, props = {}) {
   const size = props.size ?? 32;
   if (brand.logo_url) {
-    return createElement4("img", {
+    return createElement5("img", {
       src: brand.logo_url,
       alt: brand.name,
       width: size,
@@ -19907,7 +19907,7 @@ function brandMark(createElement4, brand, props = {}) {
     });
   }
   const letter = (brand.name.trim().charAt(0) || "\u4F01").toUpperCase();
-  return createElement4("span", {
+  return createElement5("span", {
     "aria-label": brand.name,
     style: {
       width: size,
@@ -19923,8 +19923,8 @@ function brandMark(createElement4, brand, props = {}) {
     }
   }, letter);
 }
-function brandName(createElement4, brand) {
-  return createElement4("span", { "data-dsh-ee-brand": brand.revision || "neutral" }, brand.name);
+function brandName(createElement5, brand) {
+  return createElement5("span", { "data-dsh-ee-brand": brand.revision || "neutral" }, brand.name);
 }
 
 // src/status-view.ts
@@ -19959,19 +19959,19 @@ function adminRemaining(me, now = Date.now()) {
   if (minutes >= 60) return `\u8FD8\u5269 ${Math.floor(minutes / 60)} \u5C0F\u65F6 ${minutes % 60} \u5206\u949F`;
   return `\u8FD8\u5269 ${minutes} \u5206\u949F`;
 }
-function button(createElement4, label, onClick, busy = false) {
-  return createElement4("button", {
+function button(createElement5, label, onClick, busy = false) {
+  return createElement5("button", {
     type: "button",
     onClick,
     disabled: busy,
     style: { padding: "6px 10px", border: "1px solid currentColor", borderRadius: 6, background: "transparent", color: "inherit", cursor: busy ? "wait" : "pointer", opacity: busy ? 0.55 : 1 }
   }, label);
 }
-function section(createElement4, title, ...children) {
-  return createElement4(
+function section(createElement5, title, ...children) {
+  return createElement5(
     "section",
     { style: { marginTop: 18, paddingTop: 14, borderTop: "1px solid color-mix(in srgb, currentColor 14%, transparent)" } },
-    createElement4("h3", { style: { margin: "0 0 10px", fontSize: 13 } }, title),
+    createElement5("h3", { style: { margin: "0 0 10px", fontSize: 13 } }, title),
     ...children
   );
 }
@@ -19987,18 +19987,18 @@ function failureText(failure2) {
       return "\u672A\u767B\u5F55\u6216\u8FDE\u63A5\u4E0D\u53EF\u7528\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55\u3002";
   }
 }
-function enterprisePanel(createElement4, org, state, actions, AppsPanel) {
+function enterprisePanel(createElement5, org, state, actions, AppsPanel) {
   const { data, failed, failure: failure2, busy, notice, doctor } = state;
   const me = data?.me;
   const quota = effectiveQuota(data?.usage);
-  const children = [createElement4("h2", { key: "title", style: { margin: "0 0 16px", fontSize: 16 } }, org)];
+  const children = [createElement5("h2", { key: "title", style: { margin: "0 0 16px", fontSize: 16 } }, org)];
   if (!data || !me) {
-    children.push(createElement4("p", { key: "state", style: { lineHeight: 1.6 } }, failed ? failureText(failure2) : "\u6B63\u5728\u8BFB\u53D6\u4F01\u4E1A\u8D26\u53F7\u2026"));
-    if (failed) children.push(createElement4(
+    children.push(createElement5("p", { key: "state", style: { lineHeight: 1.6 } }, failed ? failureText(failure2) : "\u6B63\u5728\u8BFB\u53D6\u4F01\u4E1A\u8D26\u53F7\u2026"));
+    if (failed) children.push(createElement5(
       "div",
       { key: "actions", style: { display: "flex", gap: 8 } },
-      button(createElement4, busy ? "\u6B63\u5728\u53D1\u8D77\u767B\u5F55\u2026" : "\u767B\u5F55", actions.login, busy),
-      button(createElement4, "\u5237\u65B0", actions.refresh, busy)
+      button(createElement5, busy ? "\u6B63\u5728\u53D1\u8D77\u767B\u5F55\u2026" : "\u767B\u5F55", actions.login, busy),
+      button(createElement5, "\u5237\u65B0", actions.refresh, busy)
     ));
   } else {
     const rows = [
@@ -20007,73 +20007,73 @@ function enterprisePanel(createElement4, org, state, actions, AppsPanel) {
       ["\u4EE4\u724C\u6709\u6548\u671F", me.expires_at ? `${me.expires_at.slice(0, 10)} \u5230\u671F` : "\u957F\u671F\u6709\u6548"],
       ["\u7BA1\u7406\u6A21\u5F0F", adminRemaining(me)]
     ];
-    children.push(createElement4(
+    children.push(createElement5(
       "dl",
       { key: "account", style: { margin: 0, display: "grid", gridTemplateColumns: "80px 1fr", gap: "12px 8px" } },
       ...rows.flatMap(([label, value]) => [
-        createElement4("dt", { key: `${label}-label`, style: { opacity: 0.65 } }, label),
-        createElement4("dd", { key: `${label}-value`, style: { margin: 0 } }, value)
+        createElement5("dt", { key: `${label}-label`, style: { opacity: 0.65 } }, label),
+        createElement5("dd", { key: `${label}-value`, style: { margin: 0 } }, value)
       ])
     ));
-    if (AppsPanel) children.push(createElement4(AppsPanel, { key: "apps" }));
+    if (AppsPanel) children.push(createElement5(AppsPanel, { key: "apps" }));
     children.push(section(
-      createElement4,
+      createElement5,
       "\u672C\u6708\u989D\u5EA6",
-      quota === void 0 ? "\u989D\u5EA6\u4FE1\u606F\u4E0D\u53EF\u7528" : quota === null ? "\u4E0D\u9650\u989D" : createElement4(
+      quota === void 0 ? "\u989D\u5EA6\u4FE1\u606F\u4E0D\u53EF\u7528" : quota === null ? "\u4E0D\u9650\u989D" : createElement5(
         "div",
         {},
-        createElement4(
+        createElement5(
           "div",
           { style: { display: "flex", justifyContent: "space-between", marginBottom: 7 } },
-          createElement4("span", {}, `${formatTokens(quota.used)} / ${formatTokens(quota.limit)}`),
-          createElement4("span", { style: { color: quota.usedRatio >= 0.9 ? "#d97706" : "inherit" } }, `\u5269\u4F59 ${quota.remainingPercent}%`)
+          createElement5("span", {}, `${formatTokens(quota.used)} / ${formatTokens(quota.limit)}`),
+          createElement5("span", { style: { color: quota.usedRatio >= 0.9 ? "#d97706" : "inherit" } }, `\u5269\u4F59 ${quota.remainingPercent}%`)
         ),
-        createElement4(
+        createElement5(
           "div",
           { role: "progressbar", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(quota.usedRatio * 100), style: { height: 6, borderRadius: 3, overflow: "hidden", background: "color-mix(in srgb, currentColor 12%, transparent)" } },
-          createElement4("div", { style: { width: `${quota.usedRatio * 100}%`, height: "100%", background: quota.usedRatio >= 0.9 ? "#d97706" : "#2563eb" } })
+          createElement5("div", { style: { width: `${quota.usedRatio * 100}%`, height: "100%", background: quota.usedRatio >= 0.9 ? "#d97706" : "#2563eb" } })
         )
       )
     ));
     children.push(section(
-      createElement4,
+      createElement5,
       "\u4F01\u4E1A\u6A21\u578B",
-      createElement4("div", {}, `\u9ED8\u8BA4\uFF1A${data.default_model || "\u672A\u8BBE\u7F6E"}`),
-      createElement4("div", { style: { marginTop: 6, opacity: 0.75, lineHeight: 1.5 } }, data.models.length ? data.models.join("\u3001") : "\u6CA1\u6709\u53EF\u7528\u6A21\u578B\u6216\u6A21\u578B\u5217\u8868\u4E0D\u53EF\u7528")
+      createElement5("div", {}, `\u9ED8\u8BA4\uFF1A${data.default_model || "\u672A\u8BBE\u7F6E"}`),
+      createElement5("div", { style: { marginTop: 6, opacity: 0.75, lineHeight: 1.5 } }, data.models.length ? data.models.join("\u3001") : "\u6CA1\u6709\u53EF\u7528\u6A21\u578B\u6216\u6A21\u578B\u5217\u8868\u4E0D\u53EF\u7528")
     ));
     children.push(section(
-      createElement4,
+      createElement5,
       "\u63A5\u5165\u72B6\u6001",
-      createElement4("div", { style: { lineHeight: 1.6 } }, `\u63D2\u4EF6 ${data.version}${data.latest_version && data.latest_version !== data.version ? ` \xB7 \u65B0\u7248\u672C ${data.latest_version}` : " \xB7 \u5DF2\u662F\u6700\u65B0"}`),
-      createElement4(
+      createElement5("div", { style: { lineHeight: 1.6 } }, `\u63D2\u4EF6 ${data.version}${data.latest_version && data.latest_version !== data.version ? ` \xB7 \u65B0\u7248\u672C ${data.latest_version}` : " \xB7 \u5DF2\u662F\u6700\u65B0"}`),
+      createElement5(
         "div",
         { style: { display: "flex", gap: 8, marginTop: 10 } },
-        button(createElement4, busy ? "\u8BCA\u65AD\u4E2D\u2026" : "\u8BCA\u65AD", actions.doctor, busy),
-        button(createElement4, "\u5237\u65B0", actions.refresh, busy)
+        button(createElement5, busy ? "\u8BCA\u65AD\u4E2D\u2026" : "\u8BCA\u65AD", actions.doctor, busy),
+        button(createElement5, "\u5237\u65B0", actions.refresh, busy)
       )
     ));
   }
-  if (notice) children.push(createElement4("p", { key: "notice", role: "status", style: { lineHeight: 1.6, overflowWrap: "anywhere" } }, notice));
+  if (notice) children.push(createElement5("p", { key: "notice", role: "status", style: { lineHeight: 1.6, overflowWrap: "anywhere" } }, notice));
   if (doctor) children.push(section(
-    createElement4,
+    createElement5,
     `\u8BCA\u65AD\u7ED3\u679C\uFF1A${doctor.summary}`,
-    createElement4(
+    createElement5(
       "ul",
       { style: { margin: 0, paddingLeft: 18, lineHeight: 1.6 } },
-      ...doctor.checks.map((check2) => createElement4("li", { key: check2.id, style: { color: check2.status === "ok" ? "inherit" : check2.status === "warn" ? "#d97706" : "#d92d20" } }, `${check2.title}${check2.fix ? `\uFF1B${check2.fix}` : ""}`))
+      ...doctor.checks.map((check2) => createElement5("li", { key: check2.id, style: { color: check2.status === "ok" ? "inherit" : check2.status === "warn" ? "#d97706" : "#d92d20" } }, `${check2.title}${check2.fix ? `\uFF1B${check2.fix}` : ""}`))
     )
   ));
-  return createElement4("main", {
+  return createElement5("main", {
     "data-dsh-ee-ui": "panel",
     "data-dsh-ee-state": data ? "connected" : failed ? "disconnected" : "loading",
     style: { padding: 16, color: "inherit", fontSize: 13 }
   }, ...children);
 }
-function enterpriseHeader(createElement4, data, failed, onClick) {
+function enterpriseHeader(createElement5, data, failed, onClick) {
   const me = data?.me;
   const quota = effectiveQuota(data?.usage);
   const label = !me ? failed ? "\u4F01\u4E1A \xB7 \u672A\u767B\u5F55" : "\u4F01\u4E1A \xB7 \u68C0\u67E5\u4E2D" : me.admin_live ? `\u7BA1\u7406\u6A21\u5F0F \xB7 ${adminRemaining(me)}` : quota ? `\u4F01\u4E1A\u6A21\u578B \xB7 \u5269\u4F59 ${quota.remainingPercent}%` : `\u4F01\u4E1A\u6A21\u578B \xB7 ${me.username}`;
-  return createElement4("button", {
+  return createElement5("button", {
     type: "button",
     onClick,
     "data-dsh-ee-ui": "header",
@@ -20105,14 +20105,14 @@ var import_react = require("react");
 
 // src/apps-view.ts
 var buttonStyle = { border: 0, background: "transparent", color: "inherit", cursor: "pointer", padding: 0, textAlign: "left" };
-function appIcon(createElement4, app) {
-  return createElement4("span", {
+function appIcon(createElement5, app) {
+  return createElement5("span", {
     "aria-hidden": true,
     style: { width: 30, height: 30, flex: "0 0 30px", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "color-mix(in srgb, currentColor 10%, transparent)", fontSize: 16 }
   }, app.icon || Array.from(app.title)[0] || "?");
 }
-function appTile(createElement4, app, onOpen) {
-  return createElement4(
+function appTile(createElement5, app, onOpen) {
+  return createElement5(
     "button",
     {
       type: "button",
@@ -20120,16 +20120,16 @@ function appTile(createElement4, app, onOpen) {
       title: app.description,
       style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, minWidth: 0, flex: 1, padding: "5px 0" }
     },
-    appIcon(createElement4, app),
-    createElement4("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title)
+    appIcon(createElement5, app),
+    createElement5("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title)
   );
 }
-function starterItems(createElement4, app, actions, close) {
+function starterItems(createElement5, app, actions, close) {
   const starters = (app.starters ?? []).filter(Boolean).slice(0, 6);
   if (!starters.length || !actions.startWith) return [];
   return [
-    createElement4("div", { key: "starters-title", style: { padding: "7px 7px 3px", fontSize: 11, opacity: 0.6, borderTop: "1px solid color-mix(in srgb, currentColor 12%, transparent)", marginTop: 4 } }, "\u4ECE\u793A\u4F8B\u95EE\u9898\u5F00\u59CB"),
-    ...starters.map((starter, index) => createElement4("button", {
+    createElement5("div", { key: "starters-title", style: { padding: "7px 7px 3px", fontSize: 11, opacity: 0.6, borderTop: "1px solid color-mix(in srgb, currentColor 12%, transparent)", marginTop: 4 } }, "\u4ECE\u793A\u4F8B\u95EE\u9898\u5F00\u59CB"),
+    ...starters.map((starter, index) => createElement5("button", {
       key: `starter-${index}`,
       type: "button",
       title: starter,
@@ -20141,9 +20141,9 @@ function starterItems(createElement4, app, actions, close) {
     }, starter))
   ];
 }
-function disableItem(createElement4, app, actions, confirming, close) {
+function disableItem(createElement5, app, actions, confirming, close) {
   if (app.delivery !== "optional" || !actions.disable) return null;
-  return createElement4("button", {
+  return createElement5("button", {
     type: "button",
     style: { ...buttonStyle, display: "block", width: "100%", padding: 7, color: confirming ? "#b91c1c" : "inherit" },
     onClick: () => {
@@ -20152,15 +20152,15 @@ function disableItem(createElement4, app, actions, confirming, close) {
     }
   }, confirming ? "\u786E\u8BA4\u505C\u7528" : "\u505C\u7528");
 }
-function appMenu(createElement4, app, actions, confirming = false, open2 = false, anchor2) {
+function appMenu(createElement5, app, actions, confirming = false, open2 = false, anchor2) {
   const close = () => actions.closeLayers?.() ?? actions.toggleMenu?.(app.name);
-  const item = (key, label, run) => createElement4("button", { key, type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => {
+  const item = (key, label, run) => createElement5("button", { key, type: "button", style: { ...buttonStyle, display: "block", width: "100%", padding: 7 }, onClick: () => {
     close();
     run();
   } }, label);
   const layer = open2 ? [
-    createElement4("div", { key: "backdrop", "data-dsh-ee-ui": "app-menu-backdrop", onClick: close, style: { position: "fixed", inset: 0, zIndex: 80 } }),
-    createElement4(
+    createElement5("div", { key: "backdrop", "data-dsh-ee-ui": "app-menu-backdrop", onClick: close, style: { position: "fixed", inset: 0, zIndex: 80 } }),
+    createElement5(
       "div",
       {
         key: "menu",
@@ -20189,14 +20189,14 @@ function appMenu(createElement4, app, actions, confirming = false, open2 = false
       item("fill", "\u586B\u8FDB\u8F93\u5165\u6846", () => actions.fill(app)),
       item("web", "\u5728\u7F51\u9875\u67E5\u770B", () => actions.web(app)),
       item("unbind", "\u89E3\u9664\u7ED1\u5B9A", () => actions.unbind(app)),
-      disableItem(createElement4, app, actions, confirming, close),
-      ...starterItems(createElement4, app, actions, close)
+      disableItem(createElement5, app, actions, confirming, close),
+      ...starterItems(createElement5, app, actions, close)
     )
   ] : null;
-  return createElement4(
+  return createElement5(
     "div",
     { style: { position: "relative", flex: "0 0 auto" } },
-    createElement4("button", {
+    createElement5("button", {
       type: "button",
       "aria-label": `${app.title}\u66F4\u591A\u64CD\u4F5C`,
       "aria-expanded": open2,
@@ -20211,54 +20211,54 @@ function appMenu(createElement4, app, actions, confirming = false, open2 = false
   );
 }
 var statusViewOf = (status) => status === "need" ? { label: "\u5F85\u4F60\u51B3\u5B9A", color: "#d97706" } : status === "busy" ? { label: "\u5DE5\u4F5C\u4E2D", color: "#2563eb" } : status === "done" ? { label: "\u672C\u8F6E\u7ED3\u675F", color: "#737373" } : void 0;
-function appRow(createElement4, app, actions, status, confirming = false, menuOpen = false, anchor2) {
+function appRow(createElement5, app, actions, status, confirming = false, menuOpen = false, anchor2) {
   const statusView = statusViewOf(status);
-  return createElement4(
+  return createElement5(
     "div",
     { key: app.name, "data-dsh-ee-app": app.name, style: { display: "flex", alignItems: "center", gap: 4 } },
-    statusView ? createElement4("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
-    appTile(createElement4, app, () => actions.open(app)),
-    app.missing?.length ? createElement4("span", { title: `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528") : null,
-    appMenu(createElement4, app, actions, confirming, menuOpen, anchor2)
+    statusView ? createElement5("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
+    appTile(createElement5, app, () => actions.open(app)),
+    app.missing?.length ? createElement5("span", { title: `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528") : null,
+    appMenu(createElement5, app, actions, confirming, menuOpen, anchor2)
   );
 }
-function availableGroup(createElement4, state, actions) {
+function availableGroup(createElement5, state, actions) {
   const available = state.available ?? [];
   if (!available.length || !actions.enable) return null;
-  return createElement4(
+  return createElement5(
     "div",
     { "data-dsh-ee-ui": "available-apps", style: { marginTop: 8, borderTop: "1px solid color-mix(in srgb, currentColor 10%, transparent)", paddingTop: 6 } },
-    createElement4(
+    createElement5(
       "button",
       { type: "button", onClick: () => actions.toggleAvailable?.(), "aria-expanded": !!state.availableOpen, style: { ...buttonStyle, opacity: 0.75, fontSize: 12 } },
       `${state.availableOpen ? "\u25BE" : "\u25B8"} \u53EF\u542F\u7528\uFF08${available.length}\uFF09`
     ),
-    state.availableOpen ? createElement4("div", { style: { display: "grid", gap: 4, marginTop: 5 } }, ...available.map((app) => createElement4(
+    state.availableOpen ? createElement5("div", { style: { display: "grid", gap: 4, marginTop: 5 } }, ...available.map((app) => createElement5(
       "div",
       {
         key: app.name,
         "data-dsh-ee-available": app.name,
         style: { display: "flex", alignItems: "center", gap: 8 }
       },
-      appIcon(createElement4, app),
-      createElement4(
+      appIcon(createElement5, app),
+      createElement5(
         "span",
         { style: { flex: 1, minWidth: 0 } },
-        createElement4("span", { style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
-        app.description ? createElement4("span", { style: { display: "block", fontSize: 11, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: app.description }, app.description) : null
+        createElement5("span", { style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
+        app.description ? createElement5("span", { style: { display: "block", fontSize: 11, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: app.description }, app.description) : null
       ),
-      createElement4("button", { type: "button", onClick: () => actions.enable(app), style: { ...buttonStyle, border: "1px solid currentColor", borderRadius: 6, padding: "2px 8px", fontSize: 12, flex: "0 0 auto" } }, "\u542F\u7528")
+      createElement5("button", { type: "button", onClick: () => actions.enable(app), style: { ...buttonStyle, border: "1px solid currentColor", borderRadius: 6, padding: "2px 8px", fontSize: 12, flex: "0 0 auto" } }, "\u542F\u7528")
     ))) : null
   );
 }
 var matchesQuery = (app, query) => !query || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(query);
-function galleryRow(createElement4, app, actions, status, confirming = false, menuOpen = false, anchor2) {
+function galleryRow(createElement5, app, actions, status, confirming = false, menuOpen = false, anchor2) {
   const statusView = statusViewOf(status);
-  return createElement4(
+  return createElement5(
     "div",
     { key: app.name, "data-dsh-ee-app": app.name, style: { display: "flex", alignItems: "center", gap: 6 } },
-    statusView ? createElement4("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
-    createElement4(
+    statusView ? createElement5("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
+    createElement5(
       "button",
       {
         type: "button",
@@ -20269,25 +20269,25 @@ function galleryRow(createElement4, app, actions, status, confirming = false, me
         title: app.description,
         style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, minWidth: 0, flex: 1, padding: "5px 0" }
       },
-      appIcon(createElement4, app),
-      createElement4(
+      appIcon(createElement5, app),
+      createElement5(
         "span",
         { style: { minWidth: 0, flex: 1 } },
-        createElement4("span", { style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
-        app.description ? createElement4("span", { style: { display: "block", fontSize: 11, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.description) : null
+        createElement5("span", { style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
+        app.description ? createElement5("span", { style: { display: "block", fontSize: 11, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.description) : null
       )
     ),
-    app.missing?.length ? createElement4("span", { title: `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528") : null,
-    appMenu(createElement4, app, actions, confirming, menuOpen, anchor2)
+    app.missing?.length ? createElement5("span", { title: `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528") : null,
+    appMenu(createElement5, app, actions, confirming, menuOpen, anchor2)
   );
 }
-function appsGallery(createElement4, state, actions, filtered) {
+function appsGallery(createElement5, state, actions, filtered) {
   if (!state.galleryOpen) return null;
   const close = () => actions.closeLayers?.() ?? actions.toggleGallery?.();
-  return createElement4(
+  return createElement5(
     "div",
     { "data-dsh-ee-ui": "apps-gallery", onClick: close, style: { position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } },
-    createElement4(
+    createElement5(
       "div",
       {
         role: "dialog",
@@ -20296,36 +20296,36 @@ function appsGallery(createElement4, state, actions, filtered) {
         onClick: (event) => event?.stopPropagation?.(),
         style: { width: "min(460px, calc(100vw - 32px))", maxHeight: "min(600px, calc(100vh - 48px))", display: "flex", flexDirection: "column", borderRadius: 10, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 12px 40px #0005", padding: "12px 14px", fontSize: 13 }
       },
-      createElement4(
+      createElement5(
         "div",
         { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } },
-        createElement4("strong", { style: { fontSize: 14, flex: 1 } }, `\u4F01\u4E1A\u5E94\u7528\uFF08${state.apps.length}\uFF09`),
-        createElement4("button", { type: "button", "aria-label": "\u5173\u95ED", onClick: close, style: { ...buttonStyle, fontSize: 15, padding: "2px 6px", opacity: 0.7 } }, "\u2715")
+        createElement5("strong", { style: { fontSize: 14, flex: 1 } }, `\u4F01\u4E1A\u5E94\u7528\uFF08${state.apps.length}\uFF09`),
+        createElement5("button", { type: "button", "aria-label": "\u5173\u95ED", onClick: close, style: { ...buttonStyle, fontSize: 15, padding: "2px 6px", opacity: 0.7 } }, "\u2715")
       ),
-      createElement4("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 4, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }),
-      createElement4(
+      createElement5("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 4, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }),
+      createElement5(
         "div",
         { style: { overflowY: "auto", display: "grid", gap: 2, marginTop: 6, flex: 1, minHeight: 0 } },
-        filtered.length ? filtered.map((app) => galleryRow(createElement4, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name, state.menuFor === app.name, state.menuAnchor)) : createElement4("div", { style: { padding: "14px 4px", opacity: 0.6 } }, "\u6CA1\u6709\u5339\u914D\u7684\u5E94\u7528")
+        filtered.length ? filtered.map((app) => galleryRow(createElement5, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name, state.menuFor === app.name, state.menuAnchor)) : createElement5("div", { style: { padding: "14px 4px", opacity: 0.6 } }, "\u6CA1\u6709\u5339\u914D\u7684\u5E94\u7528")
       ),
-      availableGroup(createElement4, state, actions)
+      availableGroup(createElement5, state, actions)
     )
   );
 }
-function appsSection(createElement4, state, actions) {
+function appsSection(createElement5, state, actions) {
   if (!state.loggedIn) {
-    return createElement4(
+    return createElement5(
       "section",
       { "data-dsh-ee-ui": "apps", style: { padding: "10px 12px", fontSize: 13 } },
-      createElement4("div", { style: { marginBottom: 8 } }, "\u767B\u5F55\u540E\u67E5\u770B\u4F01\u4E1A\u5E94\u7528"),
-      createElement4("button", { type: "button", onClick: actions.login, style: { ...buttonStyle, border: "1px solid currentColor", borderRadius: 6, padding: "5px 10px" } }, "\u767B\u5F55")
+      createElement5("div", { style: { marginBottom: 8 } }, "\u767B\u5F55\u540E\u67E5\u770B\u4F01\u4E1A\u5E94\u7528"),
+      createElement5("button", { type: "button", onClick: actions.login, style: { ...buttonStyle, border: "1px solid currentColor", borderRadius: 6, padding: "5px 10px" } }, "\u767B\u5F55")
     );
   }
   if (!state.apps.length && !(state.available ?? []).length) return null;
   const query = state.query?.trim().toLowerCase() ?? "";
   const filtered = state.apps.filter((app) => matchesQuery(app, query));
   const shown = filtered.slice(0, 6);
-  const header2 = createElement4(
+  const header2 = createElement5(
     "button",
     {
       type: "button",
@@ -20334,63 +20334,22 @@ function appsSection(createElement4, state, actions) {
       title: state.collapsed ? "\u5C55\u5F00\u4F01\u4E1A\u5E94\u7528" : "\u6536\u8D77\u4F01\u4E1A\u5E94\u7528",
       style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "2px 0", margin: "0 0 5px", fontSize: 13, fontWeight: 600 }
     },
-    createElement4("span", { "aria-hidden": true, style: { fontSize: 10, opacity: 0.7 } }, state.collapsed ? "\u25B8" : "\u25BE"),
+    createElement5("span", { "aria-hidden": true, style: { fontSize: 10, opacity: 0.7 } }, state.collapsed ? "\u25B8" : "\u25BE"),
     "\u4F01\u4E1A\u5E94\u7528",
-    state.collapsed ? createElement4("span", { style: { fontSize: 12, fontWeight: 400, opacity: 0.6 } }, `\uFF08${state.apps.length}\uFF09`) : null
+    state.collapsed ? createElement5("span", { style: { fontSize: 12, fontWeight: 400, opacity: 0.6 } }, `\uFF08${state.apps.length}\uFF09`) : null
   );
-  return createElement4(
+  return createElement5(
     "section",
     { "data-dsh-ee-ui": "apps", style: { padding: "10px 12px", fontSize: 13 } },
     header2,
     state.collapsed ? null : [
-      state.apps.length > 8 ? createElement4("input", { key: "search", "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }) : null,
-      createElement4("div", { key: "list", style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement4, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name, state.menuFor === app.name, state.menuAnchor))),
-      createElement4("button", { key: "all", type: "button", onClick: () => actions.toggleGallery?.(), style: { ...buttonStyle, marginTop: 7, opacity: 0.7 } }, `\u67E5\u770B\u5168\u90E8\uFF08${state.apps.length}\uFF09`),
-      availableGroup(createElement4, state, actions),
-      state.notice ? createElement4("p", { key: "notice", role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null
+      state.apps.length > 8 ? createElement5("input", { key: "search", "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }) : null,
+      createElement5("div", { key: "list", style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement5, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name, state.menuFor === app.name, state.menuAnchor))),
+      createElement5("button", { key: "all", type: "button", onClick: () => actions.toggleGallery?.(), style: { ...buttonStyle, marginTop: 7, opacity: 0.7 } }, `\u67E5\u770B\u5168\u90E8\uFF08${state.apps.length}\uFF09`),
+      availableGroup(createElement5, state, actions),
+      state.notice ? createElement5("p", { key: "notice", role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null
     ],
-    appsGallery(createElement4, state, actions, filtered)
-  );
-}
-function heroAppsMenu(createElement4, apps, onOpen, query = "", onSearch = () => {
-}, notice = "", open2 = false, onToggle = () => {
-}) {
-  if (!apps.length) return null;
-  const normalized = query.trim().toLowerCase();
-  const shown = apps.filter((app) => matchesQuery(app, normalized)).slice(0, 8);
-  return createElement4(
-    "div",
-    { "data-dsh-ee-ui": "hero-apps", style: { position: "relative", display: "inline-block" } },
-    createElement4("button", { type: "button", onClick: onToggle, "aria-expanded": open2, "aria-haspopup": "menu", style: { ...buttonStyle, fontSize: 12, padding: "4px 7px", whiteSpace: "nowrap" } }, "\u4F01\u4E1A\u5E94\u7528"),
-    open2 ? [
-      createElement4("div", { key: "backdrop", "data-dsh-ee-ui": "hero-apps-backdrop", onClick: onToggle, style: { position: "fixed", inset: 0, zIndex: 70 } }),
-      createElement4(
-        "div",
-        {
-          key: "menu",
-          role: "menu",
-          style: { position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 80, width: 280, maxHeight: "min(420px, calc(100vh - 96px))", overflowY: "auto", padding: 8, borderRadius: 8, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 8px 30px #0003" }
-        },
-        apps.length > 8 ? createElement4("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: query, onChange: (event) => onSearch(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid #8886", background: "transparent", color: "inherit" } }) : null,
-        createElement4("div", { style: { display: "grid", gap: 4 } }, ...shown.map((app) => createElement4(
-          "button",
-          {
-            key: app.name,
-            type: "button",
-            onClick: () => onOpen(app),
-            style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, padding: 7, borderRadius: 6, width: "100%" }
-          },
-          appIcon(createElement4, app),
-          createElement4(
-            "span",
-            { style: { minWidth: 0 } },
-            createElement4("span", { style: { display: "block", fontSize: 13 } }, app.title),
-            createElement4("span", { style: { display: "block", fontSize: 11, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.starters[0] || app.description)
-          )
-        ))),
-        notice ? createElement4("p", { role: "status", style: { margin: "7px 4px 0", fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" } }, notice) : null
-      )
-    ] : null
+    appsGallery(createElement5, state, actions, filtered)
   );
 }
 function startText(app, starter) {
@@ -20407,16 +20366,16 @@ function inProgressItems(apps, bindings, statusOf) {
   }
   return items.sort((a, b) => a.status === b.status ? 0 : a.status === "need" ? -1 : 1);
 }
-function inProgressView(createElement4, items, onOpen) {
+function inProgressView(createElement5, items, onOpen) {
   if (!items.length) return null;
-  return createElement4(
+  return createElement5(
     "section",
     { "data-dsh-ee-ui": "in-progress", style: { padding: "10px 12px", fontSize: 13 } },
-    createElement4("h2", { style: { margin: "0 0 7px", fontSize: 13 } }, "\u8FDB\u884C\u4E2D"),
-    createElement4("div", { style: { display: "grid", gap: 2 } }, ...items.map((item) => {
+    createElement5("h2", { style: { margin: "0 0 7px", fontSize: 13 } }, "\u8FDB\u884C\u4E2D"),
+    createElement5("div", { style: { display: "grid", gap: 2 } }, ...items.map((item) => {
       const label = item.status === "need" ? "\u5F85\u4F60\u51B3\u5B9A" : "\u5DE5\u4F5C\u4E2D";
       const color = item.status === "need" ? "#d97706" : "#2563eb";
-      return createElement4(
+      return createElement5(
         "button",
         {
           key: item.app.name,
@@ -20425,12 +20384,69 @@ function inProgressView(createElement4, items, onOpen) {
           title: `${item.app.title}\uFF1A${label}`,
           style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, padding: "5px 0", width: "100%" }
         },
-        createElement4("span", { "aria-label": label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: color } }),
-        appIcon(createElement4, item.app),
-        createElement4("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, item.app.title),
-        createElement4("span", { style: { fontSize: 11, color } }, label)
+        createElement5("span", { "aria-label": label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: color } }),
+        appIcon(createElement5, item.app),
+        createElement5("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, item.app.title),
+        createElement5("span", { style: { fontSize: 11, color } }, label)
       );
     }))
+  );
+}
+function launcherPanel(createElement5, apps, onOpen, query = "", onSearch = () => {
+}, notice = "", open2 = false, onToggle = () => {
+}) {
+  if (!apps.length) return null;
+  const todos = apps.reduce((n, a) => n + (a.todo ?? 0), 0);
+  const cards = apps.slice(0, 8);
+  const starters = apps.flatMap((a) => (a.starters ?? []).slice(0, 1).map((s) => ({ app: a, text: s }))).slice(0, 3);
+  const card2 = (app) => createElement5(
+    "button",
+    {
+      key: app.name,
+      type: "button",
+      onClick: () => onOpen(app),
+      style: { ...buttonStyle, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: 10, borderRadius: 8, border: "1px solid color-mix(in srgb, currentColor 12%, transparent)", textAlign: "left", minWidth: 0 }
+    },
+    createElement5(
+      "span",
+      { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600 } },
+      appIcon(createElement5, app),
+      createElement5("span", null, app.title),
+      app.new ? createElement5("span", { style: { fontSize: 10, padding: "0 5px", borderRadius: 99, background: "#d9770622", color: "#d97706" } }, "\u65B0") : null,
+      app.todo ? createElement5("span", { style: { fontSize: 10, padding: "0 5px", borderRadius: 99, background: "#2563eb22", color: "#2563eb" } }, `${app.todo} \u5F85\u5904\u7406`) : null
+    ),
+    createElement5("span", { style: { fontSize: 11, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" } }, app.description || app.starters?.[0] || "")
+  );
+  return createElement5(
+    "div",
+    { "data-dsh-ee-ui": "hero-apps", style: { position: "relative", display: "inline-block" } },
+    createElement5("button", { type: "button", onClick: onToggle, "aria-expanded": open2, "aria-haspopup": "menu", style: { ...buttonStyle, fontSize: 12, padding: "4px 7px", whiteSpace: "nowrap" } }, "\u4F01\u4E1A\u5E94\u7528"),
+    createElement5(
+      "div",
+      {
+        role: "region",
+        "aria-label": "\u5E94\u7528\u542F\u52A8\u53F0",
+        style: { position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 60, width: "min(560px, calc(100vw - 48px))", padding: 12, borderRadius: 10, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 8px 30px #0003" }
+      },
+      createElement5(
+        "div",
+        { style: { fontSize: 13, marginBottom: 8, opacity: 0.85 } },
+        todos ? `\u9700\u8981\u4F60\u5904\u7406\uFF1A${todos} \u9879\uFF08\u90FD\u5728\u300C\u5DE5\u4F5C\u53F0\u300D\u91CC\uFF09` : "\u4ECE\u4E0B\u9762\u6311\u4E00\u4E2A\u5E94\u7528\u5F00\u59CB\uFF0C\u6216\u76F4\u63A5\u8BF4\u51FA\u4F60\u7684\u95EE\u9898"
+      ),
+      createElement5("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 } }, ...cards.map(card2)),
+      starters.length ? createElement5(
+        "div",
+        { style: { marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 } },
+        starters.map(({ app, text }) => createElement5("button", {
+          key: `${app.name}:${text}`,
+          type: "button",
+          onClick: () => onOpen(app),
+          title: `${app.title}\uFF1A${text}`,
+          style: { ...buttonStyle, fontSize: 11, padding: "4px 9px", borderRadius: 99, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
+        }, text))
+      ) : null,
+      notice ? createElement5("p", { role: "status", style: { margin: "8px 0 0", fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" } }, notice) : null
+    )
   );
 }
 
@@ -20956,7 +20972,7 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
     }, [menuOpen]);
-    return heroAppsMenu(import_react.createElement, state.apps, open2, query, setQuery, notice, menuOpen, () => setMenuOpen(!menuOpen));
+    return launcherPanel(import_react.createElement, state.apps, open2, query, setQuery, notice, menuOpen, () => setMenuOpen(!menuOpen));
   };
   const InProgress = () => {
     const state = useApps();
@@ -21965,11 +21981,48 @@ function registerWorkbench(ctx, deps) {
   };
 }
 
+// src/votes.ts
+var import_react3 = require("react");
+function registerVotes(ctx, remote) {
+  if (!ctx?.slots?.inject) return;
+  const buttonStyle3 = { border: 0, background: "transparent", cursor: "pointer", fontSize: 13, padding: "1px 4px", opacity: 0.65 };
+  const VoteButtons = (props) => {
+    const messageId = String(props?.messageId ?? props?.message_id ?? props?.node?.id ?? props?.id ?? "");
+    const [voted, setVoted] = (0, import_react3.useState)(0);
+    const mark = async (value) => {
+      if (voted) return;
+      const sessionId = currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
+      let note = "";
+      if (value < 0 && typeof window !== "undefined" && typeof window.prompt === "function") {
+        note = window.prompt("\u8FD9\u6B21\u56DE\u7B54\u54EA\u91CC\u6CA1\u5E2E\u4E0A\u5FD9\uFF1F\uFF08\u53EF\u7559\u7A7A\uFF0C\u4F1A\u6309\u95EE\u9898\u805A\u5408\u7ED9\u5E94\u7528\u4F5C\u8005\uFF09") ?? "";
+      }
+      let app = "";
+      try {
+        const bindings = await remote.appBindings();
+        app = Object.entries(bindings ?? {}).find(([, b]) => b?.sessionId === sessionId)?.[0] ?? "";
+      } catch {
+      }
+      await remote.vote({ app, session: sessionId, message: messageId, vote: value, note }).catch(() => void 0);
+      setVoted(value);
+    };
+    return (0, import_react3.createElement)(
+      "span",
+      { "data-dsh-ee-ui": "votes", style: { display: "inline-flex", gap: 2 } },
+      (0, import_react3.createElement)("button", { type: "button", title: "\u6709\u5E2E\u52A9", "aria-label": "\u6709\u5E2E\u52A9", disabled: voted !== 0, style: { ...buttonStyle3, opacity: voted === 1 ? 1 : buttonStyle3.opacity }, onClick: () => void mark(1) }, "\u{1F44D}"),
+      (0, import_react3.createElement)("button", { type: "button", title: "\u6CA1\u5E2E\u4E0A\u5FD9", "aria-label": "\u6CA1\u5E2E\u4E0A\u5FD9", disabled: voted !== 0, style: { ...buttonStyle3, opacity: voted === -1 ? 1 : buttonStyle3.opacity }, onClick: () => void mark(-1) }, "\u{1F44E}")
+    );
+  };
+  try {
+    ctx.slots.inject("conversation.chat.assistant-actions", () => ctx.slots.register({ name: "conversation.chat.assistant-actions", id: "dsh-ee-vote", order: 100, label: "\u8BC4\u4EF7\u8FD9\u6B21\u56DE\u7B54" }, VoteButtons));
+  } catch {
+  }
+}
+
 // src/settings-view.ts
 var settingsSectionId = "dsh-ee";
 var muted2 = { opacity: 0.65 };
-function button3(createElement4, label, onClick, disabled, primary = false) {
-  return createElement4("button", {
+function button3(createElement5, label, onClick, disabled, primary = false) {
+  return createElement5("button", {
     type: "button",
     onClick,
     disabled,
@@ -21985,22 +22038,22 @@ function button3(createElement4, label, onClick, disabled, primary = false) {
     }
   }, label);
 }
-function serverSettingsView(createElement4, state, actions) {
+function serverSettingsView(createElement5, state, actions) {
   const { settings, draft, busy, test, notice, error: error62 } = state;
   const children = [
-    createElement4("h2", { key: "title", style: { margin: "0 0 6px", fontSize: 16 } }, "dsh-ee \u8FDE\u63A5"),
-    createElement4(
+    createElement5("h2", { key: "title", style: { margin: "0 0 6px", fontSize: 16 } }, "dsh-ee \u8FDE\u63A5"),
+    createElement5(
       "p",
       { key: "desc", style: { margin: "0 0 18px", lineHeight: 1.6, ...muted2 } },
       "\u63A5\u5165\u63D2\u4EF6\u901A\u8FC7\u8FD9\u4E2A\u5730\u5740\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7\u3001\u540C\u6B65\u4F01\u4E1A\u6280\u80FD\u548C\u5FAE\u5E94\u7528\u3001\u8C03\u7528\u4F01\u4E1A\u6A21\u578B\u3002\u8FDE\u4E0D\u4E0A\u65F6\uFF0C\u5148\u5728\u6D4F\u89C8\u5668\u91CC\u6253\u5F00 dsh-ee \u7F51\u9875\uFF0C\u628A\u80FD\u6253\u5F00\u7684\u5730\u5740\u586B\u5728\u8FD9\u91CC\u3002"
     )
   ];
   if (!settings) {
-    children.push(createElement4("p", { key: "loading" }, error62 || "\u6B63\u5728\u8BFB\u53D6\u2026"));
-    return createElement4("div", { "data-dsh-ee-settings": "loading", style: { maxWidth: 640 } }, ...children);
+    children.push(createElement5("p", { key: "loading" }, error62 || "\u6B63\u5728\u8BFB\u53D6\u2026"));
+    return createElement5("div", { "data-dsh-ee-settings": "loading", style: { maxWidth: 640 } }, ...children);
   }
-  children.push(createElement4("label", { key: "label", htmlFor: "dsh-ee-base", style: { display: "block", marginBottom: 6, fontWeight: 500 } }, "dsh-ee \u5730\u5740"));
-  children.push(createElement4("input", {
+  children.push(createElement5("label", { key: "label", htmlFor: "dsh-ee-base", style: { display: "block", marginBottom: 6, fontWeight: 500 } }, "dsh-ee \u5730\u5740"));
+  children.push(createElement5("input", {
     key: "input",
     id: "dsh-ee-base",
     type: "url",
@@ -22013,58 +22066,58 @@ function serverSettingsView(createElement4, state, actions) {
     },
     style: { width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 6, border: "1px solid color-mix(in srgb, currentColor 30%, transparent)", background: "transparent", color: "inherit", font: "inherit" }
   }));
-  children.push(createElement4(
+  children.push(createElement5(
     "p",
     { key: "packaged", style: { margin: "6px 0 0", fontSize: 12, lineHeight: 1.6, ...muted2 } },
     settings.overridden ? `\u63D2\u4EF6\u5305\u91CC\u7684\u5730\u5740\u662F ${settings.packaged}\uFF0C\u4F60\u6539\u6210\u4E86\u73B0\u5728\u8FD9\u4E2A\u3002` : `\u8FD9\u662F\u7BA1\u7406\u5458\u53D1\u5E03\u63A5\u5165\u63D2\u4EF6\u65F6\u5199\u8FDB\u53BB\u7684\u5730\u5740\u3002`
   ));
   const changed = draft.trim().replace(/\/+$/, "") !== settings.base;
-  children.push(createElement4(
+  children.push(createElement5(
     "div",
     { key: "actions", style: { display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" } },
-    button3(createElement4, busy === "test" ? "\u6B63\u5728\u6D4B\u8BD5\u2026" : "\u6D4B\u8BD5\u8FDE\u63A5", actions.test, !!busy),
-    button3(createElement4, busy === "save" ? "\u6B63\u5728\u4FDD\u5B58\u2026" : "\u4FDD\u5B58", actions.save, !!busy || !changed, true),
-    settings.overridden ? button3(createElement4, "\u6062\u590D\u63D2\u4EF6\u5305\u91CC\u7684\u5730\u5740", actions.reset, !!busy) : null
+    button3(createElement5, busy === "test" ? "\u6B63\u5728\u6D4B\u8BD5\u2026" : "\u6D4B\u8BD5\u8FDE\u63A5", actions.test, !!busy),
+    button3(createElement5, busy === "save" ? "\u6B63\u5728\u4FDD\u5B58\u2026" : "\u4FDD\u5B58", actions.save, !!busy || !changed, true),
+    settings.overridden ? button3(createElement5, "\u6062\u590D\u63D2\u4EF6\u5305\u91CC\u7684\u5730\u5740", actions.reset, !!busy) : null
   ));
   if (test) {
-    children.push(createElement4(
+    children.push(createElement5(
       "ul",
       { key: "checks", "data-dsh-ee-test": test.ok ? "ok" : "fail", style: { listStyle: "none", padding: 0, margin: "16px 0 0", display: "grid", gap: 8 } },
-      ...test.checks.map((check2) => createElement4(
+      ...test.checks.map((check2) => createElement5(
         "li",
         { key: check2.id, style: { display: "flex", gap: 8, lineHeight: 1.5 } },
-        createElement4("span", { style: { color: check2.ok ? "#16a34a" : "#d92d20", fontWeight: 600 } }, check2.ok ? "\u2713" : "\u2715"),
-        createElement4("span", {}, check2.title, check2.detail ? createElement4("span", { style: { display: "block", fontSize: 12, ...muted2 } }, check2.detail) : null)
+        createElement5("span", { style: { color: check2.ok ? "#16a34a" : "#d92d20", fontWeight: 600 } }, check2.ok ? "\u2713" : "\u2715"),
+        createElement5("span", {}, check2.title, check2.detail ? createElement5("span", { style: { display: "block", fontSize: 12, ...muted2 } }, check2.detail) : null)
       ))
     ));
   }
-  if (notice) children.push(createElement4("p", { key: "notice", style: { marginTop: 14, lineHeight: 1.6 } }, notice));
-  if (error62) children.push(createElement4("p", { key: "error", style: { marginTop: 14, color: "#d92d20", lineHeight: 1.6 } }, error62));
-  children.push(createElement4(
+  if (notice) children.push(createElement5("p", { key: "notice", style: { marginTop: 14, lineHeight: 1.6 } }, notice));
+  if (error62) children.push(createElement5("p", { key: "error", style: { marginTop: 14, color: "#d92d20", lineHeight: 1.6 } }, error62));
+  children.push(createElement5(
     "div",
     { key: "plugin", "data-dsh-ee-settings": "plugin-update", style: { marginTop: 20, paddingTop: 16, borderTop: "1px solid color-mix(in srgb, currentColor 14%, transparent)" } },
-    createElement4(
+    createElement5(
       "div",
       { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } },
-      createElement4("span", { style: { fontWeight: 500 } }, "\u63A5\u5165\u63D2\u4EF6"),
-      createElement4("span", { style: { fontSize: 12, ...muted2 } }, `\u5F53\u524D\u7248\u672C ${settings.version}`),
-      button3(createElement4, busy === "update" ? "\u6B63\u5728\u66F4\u65B0\u2026" : "\u66F4\u65B0\u5230\u6700\u65B0\u7248", actions.update, !!busy)
+      createElement5("span", { style: { fontWeight: 500 } }, "\u63A5\u5165\u63D2\u4EF6"),
+      createElement5("span", { style: { fontSize: 12, ...muted2 } }, `\u5F53\u524D\u7248\u672C ${settings.version}`),
+      button3(createElement5, busy === "update" ? "\u6B63\u5728\u66F4\u65B0\u2026" : "\u66F4\u65B0\u5230\u6700\u65B0\u7248", actions.update, !!busy)
     ),
-    state.update ? createElement4("p", { "data-dsh-ee-update": state.update.ok ? "ok" : "fail", style: { margin: "8px 0 0", fontSize: 12, lineHeight: 1.6, color: state.update.ok ? "inherit" : "#d92d20" } }, state.update.message) : null,
-    createElement4("p", { style: { margin: "6px 0 0", fontSize: 12, lineHeight: 1.6, ...muted2 } }, "\u66F4\u65B0\u5230\u4F01\u4E1A\u7AEF\u5DF2\u53D1\u5E03\u7684\u6700\u65B0\u7248\uFF1B\u88C5\u597D\u540E\u9700\u8981\u91CD\u542F DSH \u624D\u751F\u6548\u3002")
+    state.update ? createElement5("p", { "data-dsh-ee-update": state.update.ok ? "ok" : "fail", style: { margin: "8px 0 0", fontSize: 12, lineHeight: 1.6, color: state.update.ok ? "inherit" : "#d92d20" } }, state.update.message) : null,
+    createElement5("p", { style: { margin: "6px 0 0", fontSize: 12, lineHeight: 1.6, ...muted2 } }, "\u66F4\u65B0\u5230\u4F01\u4E1A\u7AEF\u5DF2\u53D1\u5E03\u7684\u6700\u65B0\u7248\uFF1B\u88C5\u597D\u540E\u9700\u8981\u91CD\u542F DSH \u624D\u751F\u6548\u3002")
   ));
-  children.push(createElement4(
+  children.push(createElement5(
     "p",
     { key: "hint", style: { marginTop: 22, fontSize: 12, lineHeight: 1.6, ...muted2 } },
     `\u6539\u5730\u5740\u53EA\u5F71\u54CD\u8FD9\u53F0\u7535\u8111\u3002\u5982\u679C\u5927\u5BB6\u90FD\u8FDE\u4E0D\u4E0A\uFF0C\u8BF7\u7BA1\u7406\u5458\u5728 dsh-ee \u7F51\u9875\u7684\u7CFB\u7EDF\u8BBE\u7F6E\u91CC\u586B\u5199\u300C\u8BBF\u95EE\u5730\u5740\u300D\uFF0C\u518D\u91CD\u65B0\u53D1\u5E03\u63A5\u5165\u63D2\u4EF6\u3002`
   ));
-  return createElement4("div", { "data-dsh-ee-settings": "ready", style: { maxWidth: 640 } }, ...children);
+  return createElement5("div", { "data-dsh-ee-settings": "ready", style: { maxWidth: 640 } }, ...children);
 }
 function registerServerSettings(ctx, deps) {
-  const { createElement: createElement4, useState: useState4, useEffect: useEffect4, remote, unwrapRemote: unwrapRemote2 } = deps;
+  const { createElement: createElement5, useState: useState5, useEffect: useEffect4, remote, unwrapRemote: unwrapRemote2 } = deps;
   const message = (error62) => error62 instanceof Error ? error62.message : String(error62);
   const Section = () => {
-    const [state, setState] = useState4({ draft: "" });
+    const [state, setState] = useState5({ draft: "" });
     const patch = (next) => setState((prev) => ({ ...prev, ...next }));
     useEffect4(() => {
       void (async () => {
@@ -22108,7 +22161,7 @@ function registerServerSettings(ctx, deps) {
         patch({ busy: void 0 });
       }
     };
-    return serverSettingsView(createElement4, state, {
+    return serverSettingsView(createElement5, state, {
       setDraft: (draft) => patch({ draft, test: void 0 }),
       test: () => void test(),
       save: () => void save(state.draft),
@@ -22152,7 +22205,8 @@ var clientRemote = createTypertRemoteInfo({
     "dshEE/saveServer": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/updatePlugin": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/webLink": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
-    "dshEE/insertFormRow": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }
+    "dshEE/insertFormRow": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/vote": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }
   }
 }, external_exports);
 var TAKEOVER = String("__DSH_EE_BRAND_TAKEOVER__") === "true";
@@ -22191,8 +22245,8 @@ function createOverviewStore(remote) {
     }
   };
   const use = () => {
-    const [local, setLocal] = (0, import_react3.useState)(snapshot);
-    (0, import_react3.useEffect)(() => {
+    const [local, setLocal] = (0, import_react4.useState)(snapshot);
+    (0, import_react4.useEffect)(() => {
       const listener = () => setLocal(snapshot);
       listeners.add(listener);
       listener();
@@ -22210,12 +22264,13 @@ async function apply(ctx) {
   ctx.inject(["remote.dshEE"], async (remoteCtx) => {
     const remote = remoteCtx.remote.dshEE;
     const overview = createOverviewStore(remote);
-    registerServerSettings(ctx, { createElement: import_react3.createElement, useState: import_react3.useState, useEffect: import_react3.useEffect, remote, unwrapRemote, label: "dsh-ee", onSaved: () => void overview.refresh() });
+    registerServerSettings(ctx, { createElement: import_react4.createElement, useState: import_react4.useState, useEffect: import_react4.useEffect, remote, unwrapRemote, label: "dsh-ee", onSaved: () => void overview.refresh() });
     const useOverview = (_remote) => overview.use();
     const apps = registerApps(ctx, remote, useOverview, unwrapRemote);
     const { AppsPanel } = apps;
     const workbench = registerWorkbench(ctx, { remote, unwrapRemote, appsNow: apps.appsNow, appsLoaded: apps.appsLoaded, loadApps: apps.loadApps, subscribeApps: apps.subscribeApps });
     apps.setWorkbenchOpener(workbench.openWorkbench);
+    registerVotes(ctx, remote);
     let brand;
     try {
       brand = unwrapRemote(await Promise.race([
@@ -22228,8 +22283,8 @@ async function apply(ctx) {
     const org = brand?.name || "\u4F01\u4E1A";
     const EnterprisePanel = () => {
       const state = useOverview(remote);
-      const [notice, setNotice] = (0, import_react3.useState)("");
-      const [doctor, setDoctor] = (0, import_react3.useState)(void 0);
+      const [notice, setNotice] = (0, import_react4.useState)("");
+      const [doctor, setDoctor] = (0, import_react4.useState)(void 0);
       const login = async () => {
         state.setBusy(true);
         try {
@@ -22262,7 +22317,7 @@ async function apply(ctx) {
         setDoctor(void 0);
         void state.refresh();
       };
-      return enterprisePanel(import_react3.createElement, org, { ...state, notice, doctor }, { login: () => void login(), refresh, doctor: () => void diagnose() }, AppsPanel);
+      return enterprisePanel(import_react4.createElement, org, { ...state, notice, doctor }, { login: () => void login(), refresh, doctor: () => void diagnose() }, AppsPanel);
     };
     const EnterpriseHeader = () => {
       const state = useOverview(remote);
@@ -22270,14 +22325,14 @@ async function apply(ctx) {
         ctx.sidebarRight.openTab("dsh-ee-enterprise");
         if (state.failed) void remote.login().catch(() => void 0);
       };
-      return enterpriseHeader(import_react3.createElement, state.data, state.failed, onClick);
+      return enterpriseHeader(import_react4.createElement, state.data, state.failed, onClick);
     };
     registerEnterpriseStatus(ctx, org, EnterprisePanel, EnterpriseHeader);
     if (!TAKEOVER) return;
     if (!brand || brand.enabled === false) brand = { enabled: false, name: org, logo_url: "", revision: "" };
     brand = { ...brand, name: org };
-    const EnterpriseBrandMark = (props) => brandMark(import_react3.createElement, brand, props);
-    const EnterpriseBrandName = () => brandName(import_react3.createElement, brand);
+    const EnterpriseBrandMark = (props) => brandMark(import_react4.createElement, brand, props);
+    const EnterpriseBrandName = () => brandName(import_react4.createElement, brand);
     ctx.slots.inject("sidebar.brand.mark", () => ctx.slots.inject("sidebar.brand.name", () => ctx.slots.inject("conversation.hero.brand.mark", function* () {
       yield ctx.slots.register({ name: "sidebar.brand.mark" }, EnterpriseBrandMark);
       yield ctx.slots.register({ name: "sidebar.brand.name" }, EnterpriseBrandName);

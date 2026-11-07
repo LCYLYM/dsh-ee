@@ -6,6 +6,7 @@ import type { EnterpriseOverview, OverviewFailure } from "./overview.js";
 import { enterpriseHeader, enterprisePanel, enterpriseTabId, registerEnterpriseStatus, type DoctorViewData } from "./status-view.js";
 import { registerApps } from "./apps-client.js";
 import { registerWorkbench } from "./workbench-client.js";
+import { registerVotes } from "./votes.js";
 import { registerServerSettings } from "./settings-view.js";
 
 export const inject = ["slots", "remote", "sidebarRightTabs", "sidebarRight", "sessions", "conversation", "workspaces"];
@@ -40,6 +41,7 @@ const clientRemote = createTypertRemoteInfo({
     "dshEE/updatePlugin": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/webLink": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/insertFormRow": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
+    "dshEE/vote": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
   },
 }, z);
 
@@ -116,6 +118,7 @@ export async function apply(ctx: any): Promise<void> {
     const { AppsPanel } = apps;
     const workbench = registerWorkbench(ctx, { remote, unwrapRemote, appsNow: apps.appsNow, appsLoaded: apps.appsLoaded, loadApps: apps.loadApps, subscribeApps: apps.subscribeApps });
     apps.setWorkbenchOpener(workbench.openWorkbench);
+    registerVotes(ctx, remote);
     let brand: BrandViewData;
     try {
       brand = unwrapRemote(await Promise.race([

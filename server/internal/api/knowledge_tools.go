@@ -292,6 +292,13 @@ func (s *Server) kbSearchTool(ctx context.Context, v viewer, bases []*store.KBas
 	out := map[string]any{"hits": hits, "term_hits": res.TermHits, "total": res.Total}
 	if res.Total == 0 {
 		out["note"] = "没有命中。换同义词、拆短关键词再搜，或用 kb__browse 看目录；换过几轮还是没有，就如实告诉用户知识库里没有找到。"
+		kb := ""
+		if len(picked) == 1 {
+			kb = picked[0].Slug
+		}
+		if err := s.store.RecordUnanswered(context.WithoutCancel(ctx), 0, kb, "kb_empty", a.Query); err != nil {
+			s.log.Warn("记录检索为空失败", "err", err)
+		}
 	} else if res.Truncated {
 		out["note"] = fmt.Sprintf("一共命中 %d 段，只返回了前 %d 段", res.Total, len(hits))
 	}

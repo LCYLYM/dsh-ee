@@ -818,6 +818,8 @@ export interface AssetDetail {
   tools?: ConnectionTool[];
   calls?: ConnectionCall[];
   server_name?: string;
+  feedback?: { up: number; down: number; up_30d: number };
+  questions?: { id: number; signal: string; question: string; count: number; last_at: string }[];
 }
 
 export interface PluginPolicy {

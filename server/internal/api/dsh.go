@@ -121,6 +121,10 @@ type dshApp struct {
 	Web bool `json:"web,omitempty"`
 	// 「它能帮你做什么」的三个要点
 	Highlights []string `json:"highlights,omitempty"`
+	// 最近 14 天上线（启动台显示「新」）
+	New bool `json:"new,omitempty"`
+	// 勾选上首页的组件数（启动台的「需要你处理」）
+	Todo int `json:"todo,omitempty"`
 }
 
 type dshPlugin struct {
@@ -301,6 +305,13 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	if err != nil {
 		return nil, err
 	}
+	if app, skill, body := workbenchHomeApp(c, c.base); app != nil {
+		c.Apps = slices.DeleteFunc(c.Apps, func(a dshApp) bool { return a.Name == workbenchHomeName })
+		c.Skills = slices.DeleteFunc(c.Skills, func(k dshSkill) bool { return k.Name == workbenchHomeName })
+		c.Apps = append([]dshApp{*app}, c.Apps...)
+		c.Skills = append(c.Skills, *skill)
+		c.system[workbenchHomeName] = body
+	}
 	if app, skill, body := kbQAApp(set, c.ServerName, c.base, c.kbases); app != nil {
 		c.Skills = slices.DeleteFunc(c.Skills, func(k dshSkill) bool { return k.Name == kbQAName })
 		c.Apps = slices.DeleteFunc(c.Apps, func(a dshApp) bool { return a.Name == kbQAName })
@@ -449,7 +460,18 @@ func appEntry(a *store.Asset, sp *assetSpec, version int, u *store.User) dshApp 
 	if starters == nil {
 		starters = []string{}
 	}
-	return dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Delivery: a.Delivery, Version: version, AssetID: a.ID, Workbench: appWorkbenchForDSH(a.Slug, sp.Workbench, u), Web: webEnabled(sp), Highlights: sp.Highlights}
+	wb := appWorkbenchForDSH(a.Slug, sp.Workbench, u)
+	todo := 0
+	if wb != nil {
+		for _, p := range wb.Panes {
+			for _, w := range p.Widgets {
+				if w.Home {
+					todo++
+				}
+			}
+		}
+	}
+	return dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Delivery: a.Delivery, Version: version, AssetID: a.ID, Workbench: wb, Web: webEnabled(sp), Highlights: sp.Highlights, New: a.CreatedAt.After(time.Now().AddDate(0, 0, -homeNewDays)), Todo: todo}
 }
 
 // POST / DELETE /api/dsh/apps/{name}/subscription：员工在 DSH 里启用或停用「自选」微应用。
@@ -671,6 +693,7 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		} else if len(sets) > 0 {
 			tools = append(tools, dataToolDefs(sets)...)
 		}
+		tools = append(tools, homeToolDefs()...)
 		for _, def := range s.agentToolList(r.Context(), pr) {
 			tools = append(tools, def)
 		}
@@ -694,6 +717,15 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		}
 		if strings.HasPrefix(p.Name, appConn+"__") {
 			writeRPC(w, msg.ID, s.appCall(r, v, pr, p.Name, p.Arguments), nil)
+			return
+		}
+		if strings.HasPrefix(p.Name, homeConn+"__") {
+			c, err := s.userCatalog(r.Context(), v)
+			if err != nil {
+				s.internalErr(w, r, err)
+				return
+			}
+			writeRPC(w, msg.ID, s.homeCall(r.Context(), v, c, p.Name), nil)
 			return
 		}
 		if strings.HasPrefix(p.Name, kbConn+"__") {

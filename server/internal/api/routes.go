@@ -216,6 +216,7 @@ func (s *Server) routes() []route {
 		prm("POST /api/admin/connect/publish", s.handlePublishConnect, rbac.SettingsManage),
 		pub("GET /api/dsh/whoami", s.handleDshWhoami),
 		pub("POST /api/dsh/web-link", s.handleDshWebLink),
+		pub("POST /api/dsh/feedback", s.handleDshFeedback),
 
 		// 应用自带数据（M13）：网页用；DSH 里的模型走 /mcp 上的 app__ 工具
 		prm("GET /api/apps/{slug}/data", s.handleAppTables, rbac.PortalView),

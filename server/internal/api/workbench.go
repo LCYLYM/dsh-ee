@@ -54,6 +54,8 @@ type wbWidget struct {
 	Items     []wbCheckItem `json:"items,omitempty"`
 	ItemField string        `json:"item_field,omitempty"`
 	IDField   string        `json:"id_field,omitempty"`
+	// home：这个组件显示在 DSH 首屏的「需要你处理」和「工作台」系统应用里（只读数据源组件，每应用最多 2 个）
+	Home bool `json:"home,omitempty"`
 	// 有数据源的组件取到空数据时显示的一句说明和一个建议操作
 	Empty *wbEmpty `json:"empty,omitempty"`
 	// form：字段与提交

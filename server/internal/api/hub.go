@@ -172,6 +172,9 @@ func validateSpec(kind string, sp *assetSpec) string {
 			if msg := validateWorkbench(sp.Workbench, sp.Connections, sp.Tables); msg != "" {
 				return msg
 			}
+			if msg := checkHomeWidgets(sp.Workbench); msg != "" {
+				return msg
+			}
 		}
 		if sp.Web && !webEnabled(sp) {
 			return "开放网页版需要工作台里至少有一个业务面板（panel）"
@@ -533,6 +536,7 @@ func (s *Server) handleHubDetail(w http.ResponseWriter, r *http.Request) {
 			resp["calls"] = calls
 		}
 	}
+	s.feedbackExtras(r, resp, a)
 	writeJSON(w, http.StatusOK, resp)
 }
 

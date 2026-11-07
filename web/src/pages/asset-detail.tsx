@@ -470,10 +470,27 @@ function AssetDetail() {
                 {a.secret_hint && <Info label={t("connections.secret")}>{t("asset.secretHint", { hint: a.secret_hint })}</Info>}
               </>
             )}
+            {d.feedback && (
+              <Info label={t("asset.feedback")}>{t("asset.feedbackValue", { up: d.feedback.up, down: d.feedback.down, up30d: d.feedback.up_30d })}</Info>
+            )}
             <Info label={t("asset.updated")}>{formatTime(a.updated_at)}</Info>
           </dl>
         </Card>
       </div>
+
+      {(d.questions?.length ?? 0) > 0 && (
+        <Card className="p-5">
+          <h3 className="mb-3 text-sm font-semibold text-neutral-900">{t("asset.questions")}</h3>
+          <ul className="space-y-2 text-sm text-neutral-700">
+            {d.questions!.map((q) => (
+              <li key={q.id} className="flex items-baseline gap-2">
+                <span className="min-w-0 flex-1 truncate" title={q.question}>{q.question}</span>
+                <span className="shrink-0 text-xs text-neutral-500">{t("asset.questionCount", { count: q.count })}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <ScopeDialog
         open={scopeOpen}

@@ -999,17 +999,25 @@ func (s *Server) appCall(r *http.Request, v viewer, p *Principal, name string, r
 			return mcp.TextResult("参数不对："+err.Error(), true)
 		}
 	}
+	var t *appTarget
 	fail := func(err error) json.RawMessage {
 		var ae *appDataError
 		if errors.As(err, &ae) {
+			var assetID int64
+			if t != nil && t.asset != nil {
+				assetID = t.asset.ID
+			}
+			if rerr := s.store.RecordUnanswered(context.WithoutCancel(ctx), assetID, "", "tool_error", ae.msg); rerr != nil {
+				s.log.Warn("记录工具报错失败", "err", rerr)
+			}
 			return mcp.TextResult(ae.msg, true)
 		}
 		s.log.Error("应用数据工具出错", "tool", name, "err", err)
 		return mcp.TextResult("服务器内部错误", true)
 	}
-	t, err := s.appTargetFor(ctx, v, strings.TrimSpace(args.App), strings.TrimSpace(args.Table))
-	if err != nil {
-		return fail(err)
+	t, terr := s.appTargetFor(ctx, v, strings.TrimSpace(args.App), strings.TrimSpace(args.Table))
+	if terr != nil {
+		return fail(terr)
 	}
 	switch name {
 	case appConn + "__rows":
