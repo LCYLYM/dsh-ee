@@ -53,6 +53,8 @@ type assetSpec struct {
 	Template bool `json:"template,omitempty"`
 	// 微应用：自带的数据表（app_data.go）
 	Tables []appTable `json:"tables,omitempty"`
+	// 微应用：网页版，能用的人可以在 /a/<标识> 打开工作台（app_web.go）
+	Web bool `json:"web,omitempty"`
 
 	// 连接：mcp（上游 MCP 服务地址）或 openapi（接口根地址 + 文档）
 	Type         string    `json:"type,omitempty"`
@@ -101,7 +103,7 @@ func validateSpec(kind string, sp *assetSpec) string {
 			sp.ModelInvocable, sp.WhenToUse = nil, ""
 		}
 		sp.Persona, sp.Starters, sp.Skills, sp.Connections, sp.Plugins, sp.Knowledge = "", nil, nil, nil, nil, nil
-		sp.Icon, sp.Launch, sp.Workbench, sp.Template, sp.Tables = "", "", nil, false, nil
+		sp.Icon, sp.Launch, sp.Workbench, sp.Template, sp.Tables, sp.Web = "", "", nil, false, nil, false
 		sp.Type, sp.URL, sp.Auth, sp.OpenAPI, sp.Instructions = "", "", nil, "", ""
 	case store.KindApp:
 		sp.Persona = strings.TrimSpace(sp.Persona)
@@ -162,6 +164,9 @@ func validateSpec(kind string, sp *assetSpec) string {
 			if msg := validateWorkbench(sp.Workbench, sp.Connections, sp.Tables); msg != "" {
 				return msg
 			}
+		}
+		if sp.Web && !webEnabled(sp) {
+			return "开放网页版需要工作台里至少有一个业务面板（panel）"
 		}
 		sp.Body, sp.WhenToUse, sp.ModelInvocable = "", "", nil
 		sp.Type, sp.URL, sp.Auth, sp.OpenAPI, sp.Instructions = "", "", nil, "", ""

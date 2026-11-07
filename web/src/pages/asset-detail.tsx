@@ -328,6 +328,15 @@ function AssetDetail() {
                 </ul>
                 {!a.spec.skills?.length && !a.spec.connections?.length && !a.spec.plugins?.length && <p className="text-sm text-neutral-600">{t("asset.noDeps")}</p>}
               </Card>
+              {a.live_version > 0 && a.spec.workbench && (
+                <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+                  <div>
+                    <h2 className="font-medium text-neutral-900">{t("appWeb.toggle")}</h2>
+                    <p className="mt-1 text-sm text-neutral-600">{a.spec.web ? `/a/${a.slug}` : t("appWeb.previewOnly")}</p>
+                  </div>
+                  <Link to={`/a/${a.slug}`} className="text-sm font-medium text-brand-600 hover:underline">{t("appWeb.open")} →</Link>
+                </Card>
+              )}
               {(a.spec.tables?.length ?? 0) > 0 && a.live_version > 0 && <AppDataPanel slug={a.slug} />}
             </>
           )}

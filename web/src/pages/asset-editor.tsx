@@ -257,6 +257,7 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
           launch: spec.launch,
           workbench: parseWorkbench(wbText).value,
           tables: parseTables(tablesText).value,
+          web: !!spec.web,
           skills: spec.skills,
           connections: spec.connections,
           plugins: spec.plugins,
@@ -386,6 +387,7 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
               <ToggleRow label={t("selfScope.template")} desc={t("selfScope.templateDesc")} checked={!!spec.template} onChange={(v) => set({ template: v })} />
             )}
             <TablesField text={tablesText} onText={setTablesText} />
+            <ToggleRow label={t("appWeb.toggle")} desc={t("appWeb.toggleDesc")} checked={!!spec.web} onChange={(v) => set({ web: v })} />
             <WorkbenchField
               text={wbText}
               onText={setWbText}

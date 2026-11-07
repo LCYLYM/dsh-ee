@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Download, Trash2 } from "lucide-react";
+import { Download, Pencil, Trash2 } from "lucide-react";
 import { api, formatTime, type AppField, type AppRow, type AppTable, type AppTableInfo } from "../lib/api";
 import { useAction, useApi } from "../lib/use-api";
 import { useConfirm } from "../lib/confirm";
@@ -91,6 +91,8 @@ function TableData({ slug, table, admin, onChanged }: { slug: string; table: App
   const [q, setQ] = useState("");
   const rows = useApi(() => api.appRows(slug, table.name, { q, limit: 100 }));
   const [draft, setDraft] = useState<Record<string, string>>({});
+  // 正在编辑的行；为空时下面的表单是「新增一行」
+  const [editing, setEditing] = useState<AppRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { busy, run } = useAction();
   const fields = table.fields.filter((f) => !f.hidden);
@@ -102,13 +104,30 @@ function TableData({ slug, table, admin, onChanged }: { slug: string; table: App
   const add = async (e: FormEvent) => {
     e.preventDefault();
     const row: Record<string, unknown> = {};
-    for (const f of editable) if (draft[f.name] !== undefined && draft[f.name] !== "") row[f.name] = draft[f.name];
-    const res = await run(() => api.appInsertRow(slug, table.name, row));
+    for (const f of editable) {
+      const v = draft[f.name];
+      if (editing) {
+        // 编辑：清空的字段写成空
+        if (v !== undefined) row[f.name] = v === "" ? null : v;
+      } else if (v !== undefined && v !== "") row[f.name] = v;
+    }
+    const res = await run<unknown>(() => (editing ? api.appUpdateRow(slug, table.name, editing.id, row) : api.appInsertRow(slug, table.name, row)));
     if (!res.ok) return setError(res.error);
     setError(null);
     setDraft({});
+    setEditing(null);
     rows.reload();
     onChanged();
+  };
+  const startEdit = (r: AppRow) => {
+    const next: Record<string, string> = {};
+    for (const f of editable) {
+      const v = r[f.name];
+      next[f.name] = v === null || v === undefined ? "" : f.kind === "bool" ? (v ? "是" : "否") : String(v);
+    }
+    setDraft(next);
+    setEditing(r);
+    setError(null);
   };
   const remove = async (r: AppRow) => {
     if (!(await confirm({ kind: "delete", description: t("appData.deleteConfirm", { id: r.id }) }))) return;
@@ -138,9 +157,9 @@ function TableData({ slug, table, admin, onChanged }: { slug: string; table: App
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-neutral-200 text-left text-xs text-neutral-500">
-                    {fields.map((f) => <th key={f.name} className="px-2 py-1.5 font-medium">{f.title}</th>)}
-                    {ownerColumn && <th className="px-2 py-1.5 font-medium">{t("appData.owner")}</th>}
-                    <th className="px-2 py-1.5 font-medium">{t("appData.createdAt")}</th>
+                    {fields.map((f) => <th key={f.name} className="px-2 py-1.5 font-medium whitespace-nowrap">{f.title}</th>)}
+                    {ownerColumn && <th className="px-2 py-1.5 font-medium whitespace-nowrap">{t("appData.owner")}</th>}
+                    <th className="px-2 py-1.5 font-medium whitespace-nowrap">{t("appData.createdAt")}</th>
                     <th />
                   </tr>
                 </thead>
@@ -148,7 +167,7 @@ function TableData({ slug, table, admin, onChanged }: { slug: string; table: App
                   {rows.data.items.map((r) => (
                     <tr key={r.id} className="border-b border-neutral-100">
                       {fields.map((f) => (
-                        <td key={f.name} className="px-2 py-1.5">
+                        <td key={f.name} className="px-2 py-1.5 whitespace-nowrap">
                           {cell(f, r[f.name])}
                           {f.kind === "user" && r.mine && <Badge tone="brand">{t("appData.mine")}</Badge>}
                         </td>
@@ -156,12 +175,19 @@ function TableData({ slug, table, admin, onChanged }: { slug: string; table: App
                       {ownerColumn ? (
                         <td className="px-2 py-1.5 text-neutral-600">{r.owner}{r.mine && <Badge tone="brand">{t("appData.mine")}</Badge>}</td>
                       ) : null}
-                      <td className="px-2 py-1.5 text-neutral-500">{formatTime(r.created_at)}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap text-neutral-500">{formatTime(r.created_at)}</td>
                       <td className="px-2 py-1.5 text-right">
                         {canDelete(r) && (
-                          <button type="button" aria-label={t("appData.delete")} className="text-neutral-400 hover:text-red-600" disabled={busy} onClick={() => void remove(r)}>
-                            <Trash2 size={14} />
-                          </button>
+                          <span className="inline-flex gap-2">
+                            {editable.length > 0 && (
+                              <button type="button" aria-label={t("appData.edit")} className="text-neutral-400 hover:text-brand-600" disabled={busy} onClick={() => startEdit(r)}>
+                                <Pencil size={14} />
+                              </button>
+                            )}
+                            <button type="button" aria-label={t("appData.delete")} className="text-neutral-400 hover:text-red-600" disabled={busy} onClick={() => void remove(r)}>
+                              <Trash2 size={14} />
+                            </button>
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -172,8 +198,9 @@ function TableData({ slug, table, admin, onChanged }: { slug: string; table: App
             </div>
           ))}
         </LoadState>
-        {table.can_insert && editable.length > 0 && (
-          <form onSubmit={add} className="grid gap-3 rounded-md border border-dashed border-neutral-300 p-3 sm:grid-cols-2">
+        {(table.can_insert || editing) && editable.length > 0 && (
+          <form onSubmit={add} className={cx("grid gap-3 rounded-md border border-dashed p-3 sm:grid-cols-2", editing ? "border-brand-300 bg-brand-50/40" : "border-neutral-300")}>
+            {editing && <p className="text-sm font-medium text-neutral-800 sm:col-span-2">{t("appData.editing", { id: editing.id })}</p>}
             {editable.map((f) => (
               <label key={f.name} className="block text-sm">
                 <span className="mb-1 block text-neutral-700">{f.title}{f.required && " *"}</span>
@@ -181,7 +208,8 @@ function TableData({ slug, table, admin, onChanged }: { slug: string; table: App
               </label>
             ))}
             <div className="sm:col-span-2 flex items-center gap-3">
-              <Button type="submit" disabled={busy}>{t("appData.add")}</Button>
+              <Button type="submit" disabled={busy}>{editing ? t("appData.save") : t("appData.add")}</Button>
+              {editing && <Button type="button" variant="secondary" onClick={() => { setEditing(null); setDraft({}); setError(null); }}>{t("appData.cancel")}</Button>}
               {error && <span role="alert" className="text-sm text-red-600">{error}</span>}
             </div>
           </form>

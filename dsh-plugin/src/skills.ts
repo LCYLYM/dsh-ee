@@ -16,6 +16,8 @@ export interface CatalogApp {
   missing?: string[];
   asset_id?: number;
   web_url?: string;
+  /** 开放了网页版：在网页查看时打开 /a/<名字>，而不是能力详情 */
+  web?: boolean;
   /** 右侧栏业务工作台；旧服务端没有这个字段 */
   workbench?: AppWorkbench;
 }
@@ -102,11 +104,11 @@ export async function registerSkills(ctx: DshContext, config: PluginConfig, http
     },
     readApps: async () => {
       await refresh();
-      return (catalog.apps ?? []).map((app: CatalogApp) => ({ ...app, web_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : undefined }));
+      return (catalog.apps ?? []).map((app: CatalogApp) => ({ ...app, web_url: appWebUrl(config.base, app) }));
     },
     readAvailableApps: async () => {
       await refresh();
-      return (catalog.available_apps ?? []).map((app: CatalogApp) => ({ ...app, web_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : undefined }));
+      return (catalog.available_apps ?? []).map((app: CatalogApp) => ({ ...app, web_url: appWebUrl(config.base, app) }));
     },
     refreshNow: async () => {
       if (await refresh()) {
@@ -115,4 +117,10 @@ export async function registerSkills(ctx: DshContext, config: PluginConfig, http
       }
     },
   };
+}
+
+/** 应用在 dsh-ee 网页上的地址：开放了网页版的打开网页版，其余打开能力详情。 */
+export function appWebUrl(base: string, app: Pick<CatalogApp, "name" | "asset_id" | "web">): string | undefined {
+  if (app.web) return `${base}/a/${encodeURIComponent(app.name)}`;
+  return app.asset_id ? `${base}/assets/${app.asset_id}` : undefined;
 }

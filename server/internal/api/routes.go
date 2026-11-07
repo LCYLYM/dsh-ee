@@ -224,6 +224,9 @@ func (s *Server) routes() []route {
 		prm("PATCH /api/apps/{slug}/data/{table}/{id}", s.handleAppUpdate, rbac.PortalView),
 		prm("DELETE /api/apps/{slug}/data/{table}/{id}", s.handleAppDelete, rbac.PortalView),
 		prm("GET /api/apps/{slug}/data/{table}/export", s.handleAppExport, rbac.PortalView),
+		// 网页版应用（M14）
+		prm("GET /api/me/apps/{slug}/web", s.handleWebApp, rbac.PortalView),
+		prm("POST /api/me/apps/{slug}/source", s.handleWebAppSource, rbac.PortalView),
 		pub("GET /api/dsh/catalog", s.handleDshCatalog),
 		pub("GET /api/dsh/brand/logo", s.handleBrandLogo),
 		prm("PUT /api/admin/brand/logo", s.handleUploadBrandLogo, rbac.SettingsManage),

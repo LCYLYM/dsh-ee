@@ -78,6 +78,9 @@ function AppCard({ a, bySlug, busy, onToggle }: { a: HubAsset; bySlug: Map<strin
       <div className="mt-auto flex items-center justify-between gap-2 border-t border-neutral-100 pt-3 text-xs text-neutral-600 dark:border-neutral-700/60">
         <span className="min-w-0 truncate">{t("apps.meta", { owner: a.owner_name || a.owner || "—", department: a.department || "—", uses: a.uses })}</span>
         <div className="flex shrink-0 items-center gap-2">
+          {a.spec.web && a.available && (
+            <Link to={`/a/${a.slug}`} className="font-medium text-brand-600 hover:underline">{t("appWeb.short")}</Link>
+          )}
           {a.available && a.delivery === "optional" && (
             <Button size="sm" variant={a.subscribed ? "secondary" : "primary"} disabled={busy} onClick={() => onToggle(a)}>
               {a.subscribed ? t("hub.disable") : t("hub.enable")}

@@ -648,6 +648,20 @@ export interface AppTableInfo extends AppTable {
   rows?: number;
 }
 
+/** 网页版应用（M14）：GET /api/me/apps/{slug}/web。 */
+export interface WebApp {
+  slug: string;
+  asset_id: number;
+  title: string;
+  description: string;
+  icon?: string;
+  starters: string[];
+  workbench?: AppWorkbench | null;
+  tables: boolean;
+  web: boolean;
+  admin: boolean;
+}
+
 /** 表里的一行：字段值加上系统字段。 */
 export type AppRow = Record<string, unknown> & { id: number; owner: string; mine: boolean; created_at: string; updated_at: string };
 
@@ -664,6 +678,8 @@ export interface AssetSpec {
   workbench?: AppWorkbench;
   /** 微应用：自带的数据表 */
   tables?: AppTable[];
+  /** 微应用：开放网页版（/a/<标识>） */
+  web?: boolean;
   /** 微应用：样板，出现在「造 → 从样板复制」里（管理员设）。 */
   template?: boolean;
   knowledge?: string[];
@@ -1240,6 +1256,9 @@ export const api = {
     request<{ item: AppRow }>("PATCH", `/api/apps/${encodeURIComponent(slug)}/data/${encodeURIComponent(table)}/${id}`, { row }),
   appDeleteRow: (slug: string, table: string, id: number) =>
     request<void>("DELETE", `/api/apps/${encodeURIComponent(slug)}/data/${encodeURIComponent(table)}/${id}`),
+  webApp: (slug: string) => request<WebApp>("GET", `/api/me/apps/${encodeURIComponent(slug)}/web`),
+  webAppSource: (slug: string, pane: string, widget: number) =>
+    request<{ value?: unknown; forbidden?: boolean; error?: string }>("POST", `/api/me/apps/${encodeURIComponent(slug)}/source`, { pane, widget }),
   appExportUrl: (slug: string, table: string) => `/api/apps/${encodeURIComponent(slug)}/data/${encodeURIComponent(table)}/export`,
   createAsset: (a: AssetCreate) =>
     request<{ asset: HubAsset; status: PluginStatus; tools?: number; sync_error?: string }>("POST", "/api/hub", a),

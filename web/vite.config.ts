@@ -9,8 +9,14 @@ const proxy = { "/api": backend, "/v1": backend, "/npm": backend, "/index": back
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
+  // @workbench：接入插件里的工作台渲染（纯函数），网页版应用与 DSH 共用一套
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@workbench": fileURLToPath(new URL("../dsh-plugin/src", import.meta.url)),
+    },
+  },
   // 监听所有网卡，允许局域网 / 外部 IP 访问原型
-  server: { host: "0.0.0.0", port: 5188, strictPort: true, allowedHosts: true, proxy },
+  server: { host: "0.0.0.0", port: 5188, strictPort: true, allowedHosts: true, proxy, fs: { allow: [".."] } },
   preview: { host: "0.0.0.0", port: 5188, strictPort: true, allowedHosts: true, proxy },
 });

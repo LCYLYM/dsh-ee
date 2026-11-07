@@ -87,6 +87,7 @@ var specSchema = map[string]any{
 		"knowledge":       map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 		"tables":          map[string]any{"type": "array", "items": map[string]any{"type": "object"}},
 		"workbench":       map[string]any{"type": "object", "description": "{panes: [{id, type: panel, title, widgets: [...]}]}，组件类型 metric / table / chart / checklist / form / actions / markdown / heading / board"},
+		"web":             map[string]any{"type": "boolean", "description": "开放网页版：能用的人可以在浏览器（含手机）里打开 /a/<标识> 使用工作台，没有 AI"},
 	},
 }
 

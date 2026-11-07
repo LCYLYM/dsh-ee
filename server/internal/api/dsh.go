@@ -117,6 +117,8 @@ type dshApp struct {
 	Missing []string `json:"missing,omitempty"`
 	// 右侧栏业务工作台；没有配置就不带。员工没权限的数据源由插件显示「无权限」，这里不删
 	Workbench *appWorkbench `json:"workbench,omitempty"`
+	// 开放了网页版（/a/<标识>）
+	Web bool `json:"web,omitempty"`
 }
 
 type dshPlugin struct {
@@ -444,7 +446,7 @@ func appEntry(a *store.Asset, sp *assetSpec, version int) dshApp {
 	if starters == nil {
 		starters = []string{}
 	}
-	return dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Delivery: a.Delivery, Version: version, AssetID: a.ID, Workbench: appWorkbenchForDSH(a.Slug, sp.Workbench)}
+	return dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Delivery: a.Delivery, Version: version, AssetID: a.ID, Workbench: appWorkbenchForDSH(a.Slug, sp.Workbench), Web: webEnabled(sp)}
 }
 
 // POST / DELETE /api/dsh/apps/{name}/subscription：员工在 DSH 里启用或停用「自选」微应用。

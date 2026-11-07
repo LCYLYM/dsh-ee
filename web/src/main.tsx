@@ -20,6 +20,7 @@ import Account from "./pages/account";
 import PluginDetail from "./pages/plugin-detail";
 import AssetDetail from "./pages/asset-detail";
 import AssetEditor from "./pages/asset-editor";
+import AppWebPage from "./pages/app-web";
 import KnowledgeBase from "./pages/knowledge-base";
 import KnowledgeDoc from "./pages/knowledge-doc";
 import DevicePage from "./pages/device";
@@ -120,6 +121,14 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <Report />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="a/:slug"
+        element={
+          <RequireAuth>
+            <AppWebPage />
           </RequireAuth>
         }
       />

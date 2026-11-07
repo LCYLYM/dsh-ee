@@ -105,6 +105,8 @@ var agentExcluded = map[string]string{
 	"PATCH /api/apps/{slug}/data/{table}/{id}":  "应用数据给网页用；模型经 /mcp 的 app__write",
 	"DELETE /api/apps/{slug}/data/{table}/{id}": "应用数据给网页用；模型经 /mcp 的 app__write（删除要确认）",
 	"GET /api/apps/{slug}/data/{table}/export":  "导出 CSV 是给人下载的文件",
+	"GET /api/me/apps/{slug}/web":               "网页版应用给浏览器用；DSH 里的工作台走接入插件",
+	"POST /api/me/apps/{slug}/source":           "网页版应用取数；模型直接调对应的连接、知识库或 app__ 工具",
 	"GET /api/admin/auth/oidc":                  "统一登录配置含 client secret 的设置，由管理员在网页上改",
 	"PUT /api/admin/auth/oidc":                  "统一登录配置含 client secret，由管理员在网页上改",
 	"POST /api/admin/auth/oidc/test":            "统一登录配置由管理员在网页上试连",

@@ -34,6 +34,13 @@ export interface PanelHandlers {
   toggleRow?: (index: number, row: number) => void;
   /** 无权限时「去申请」的链接（dsh-ee 网页上这个连接的页面） */
   requestHref?: (connection: string) => string | undefined;
+  /** 网页版：没有 AI，发给 AI 的按钮标成「↗」，点了到 DSH 里继续 */
+  viaDSH?: boolean;
+}
+
+/** 按钮文字：网页版里发给 AI 的按钮后面加「↗」（提交到表的表单不算）。 */
+function actionLabel(handlers: PanelHandlers, action: WorkbenchAction): string {
+  return handlers.viaDSH && !action.table ? `${action.label} ↗` : action.label;
 }
 
 const muted = { opacity: 0.65, fontSize: 12 };
@@ -105,7 +112,7 @@ export function emptyView(h: H, index: number, widget: WorkbenchWidget, handlers
   const key = `${index}:empty`;
   return h("div", { "data-state": "empty", style: { display: "grid", gap: 6, justifyItems: "start", fontSize: 12 } },
     h("span", { style: { opacity: 0.7 } }, widget.empty?.text || fallback),
-    action ? button(h, action.label, () => handlers.send(key, action, {}), handlers.sending.has(key), key) : null);
+    action ? button(h, actionLabel(handlers, action), () => handlers.send(key, action, {}), handlers.sending.has(key), key) : null);
 }
 
 export function metricView(h: H, widget: WorkbenchWidget, state: WidgetState | undefined, refresh: () => void, handlers?: PanelHandlers, index = 0) {
@@ -147,7 +154,7 @@ export function tableView(h: H, index: number, widget: WorkbenchWidget, state: W
             actions.length ? h("td", { key: "actions", style: { padding: "4px 6px", whiteSpace: "nowrap" }, onClick: (event: any) => event?.stopPropagation?.() },
               ...actions.map((action, a) => {
                 const key = `${index}:row:${r}:${a}`;
-                return button(h, action.label, () => handlers.send(key, action, { row }), handlers.sending.has(key), key);
+                return button(h, actionLabel(handlers, action), () => handlers.send(key, action, { row }), handlers.sending.has(key), key);
               })) : null);
           if (!expanded) return [line];
           return [line, h("tr", { key: `${r}:detail` }, h("td", { colSpan: span, style: { padding: "6px 8px 10px 24px", borderBottom: "1px solid color-mix(in srgb, currentColor 8%, transparent)" } },
@@ -304,7 +311,7 @@ export function formView(h: H, index: number, widget: WorkbenchWidget, handlers:
         h("span", null, field.label, field.required ? h("span", { style: { color: "#b45309" } }, " *") : null),
         input(field)))),
     handlers.formError(index) ? h("div", { role: "alert", style: { color: "#b45309", fontSize: 12, marginTop: 6 } }, handlers.formError(index)) : null,
-    h("div", { style: { marginTop: 8 } }, button(h, widget.submit?.label || "提交", submit, handlers.sending.has(key))));
+    h("div", { style: { marginTop: 8 } }, button(h, widget.submit ? actionLabel(handlers, widget.submit) || "提交" : "提交", submit, handlers.sending.has(key))));
 }
 
 export function actionsView(h: H, index: number, widget: WorkbenchWidget, handlers: PanelHandlers) {
@@ -313,7 +320,7 @@ export function actionsView(h: H, index: number, widget: WorkbenchWidget, handle
     h("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
       ...(widget.actions ?? []).map((action, a) => {
         const key = `${index}:action:${a}`;
-        return button(h, action.label, () => handlers.send(key, action, {}), handlers.sending.has(key), key);
+        return button(h, actionLabel(handlers, action), () => handlers.send(key, action, {}), handlers.sending.has(key), key);
       })));
 }
 

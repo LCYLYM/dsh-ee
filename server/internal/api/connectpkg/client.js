@@ -21176,6 +21176,9 @@ async function openWorkbench(ctx, app, sessionId, force = false) {
 }
 
 // src/workbench-view.ts
+function actionLabel(handlers, action) {
+  return handlers.viaDSH && !action.table ? `${action.label} \u2197` : action.label;
+}
 var muted = { opacity: 0.65, fontSize: 12 };
 var card = { border: "1px solid color-mix(in srgb, currentColor 14%, transparent)", borderRadius: 10, padding: "10px 12px", background: "color-mix(in srgb, currentColor 2%, transparent)" };
 var buttonStyle2 = { border: "1px solid color-mix(in srgb, currentColor 25%, transparent)", borderRadius: 6, background: "transparent", color: "inherit", cursor: "pointer", padding: "3px 9px", fontSize: 12 };
@@ -21244,7 +21247,7 @@ function emptyView(h, index, widget, handlers, fallback = "\u6682\u65E0\u6570\u6
     "div",
     { "data-state": "empty", style: { display: "grid", gap: 6, justifyItems: "start", fontSize: 12 } },
     h("span", { style: { opacity: 0.7 } }, widget.empty?.text || fallback),
-    action ? button2(h, action.label, () => handlers.send(key, action, {}), handlers.sending.has(key), key) : null
+    action ? button2(h, actionLabel(handlers, action), () => handlers.send(key, action, {}), handlers.sending.has(key), key) : null
   );
 }
 function metricView(h, widget, state, refresh, handlers, index = 0) {
@@ -21302,7 +21305,7 @@ function tableView(h, index, widget, state, handlers) {
               { key: "actions", style: { padding: "4px 6px", whiteSpace: "nowrap" }, onClick: (event) => event?.stopPropagation?.() },
               ...actions.map((action, a) => {
                 const key = `${index}:row:${r}:${a}`;
-                return button2(h, action.label, () => handlers.send(key, action, { row }), handlers.sending.has(key), key);
+                return button2(h, actionLabel(handlers, action), () => handlers.send(key, action, { row }), handlers.sending.has(key), key);
               })
             ) : null
           );
@@ -21500,7 +21503,7 @@ function formView(h, index, widget, handlers) {
       ))
     ),
     handlers.formError(index) ? h("div", { role: "alert", style: { color: "#b45309", fontSize: 12, marginTop: 6 } }, handlers.formError(index)) : null,
-    h("div", { style: { marginTop: 8 } }, button2(h, widget.submit?.label || "\u63D0\u4EA4", submit, handlers.sending.has(key)))
+    h("div", { style: { marginTop: 8 } }, button2(h, widget.submit ? actionLabel(handlers, widget.submit) || "\u63D0\u4EA4" : "\u63D0\u4EA4", submit, handlers.sending.has(key)))
   );
 }
 function actionsView(h, index, widget, handlers) {
@@ -21513,7 +21516,7 @@ function actionsView(h, index, widget, handlers) {
       { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
       ...(widget.actions ?? []).map((action, a) => {
         const key = `${index}:action:${a}`;
-        return button2(h, action.label, () => handlers.send(key, action, {}), handlers.sending.has(key), key);
+        return button2(h, actionLabel(handlers, action), () => handlers.send(key, action, {}), handlers.sending.has(key), key);
       })
     )
   );

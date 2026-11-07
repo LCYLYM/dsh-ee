@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { registerSkills } from "../src/skills.js";
+import { appWebUrl, registerSkills } from "../src/skills.js";
 import { normalizeConfig } from "../src/config.js";
 
 test("skills provider registers even when dsh-ee is unreachable at startup", async () => {
@@ -34,4 +34,11 @@ test("skills provider registers even when dsh-ee is unreachable at startup", asy
   assert.equal(listed[0]?.name, "expense", "恢复联网后应能列出技能");
   assert.deepEqual(await skills.readApps(), [], "旧服务端没有 apps 字段时返回空数组");
   provider.abort();
+});
+
+test("在网页查看：开了网页版的打开 /a/名字，其余打开能力详情", () => {
+  const base = "https://ee.example.com";
+  assert.equal(appWebUrl(base, { name: "team-outing", asset_id: 7, web: true }), `${base}/a/team-outing`);
+  assert.equal(appWebUrl(base, { name: "travel", asset_id: 3 }), `${base}/assets/3`);
+  assert.equal(appWebUrl(base, { name: "x" }), undefined);
 });

@@ -464,11 +464,11 @@ async function registerSkills(ctx, config, http) {
     },
     readApps: async () => {
       await refresh();
-      return (catalog.apps ?? []).map((app) => ({ ...app, web_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : void 0 }));
+      return (catalog.apps ?? []).map((app) => ({ ...app, web_url: appWebUrl(config.base, app) }));
     },
     readAvailableApps: async () => {
       await refresh();
-      return (catalog.available_apps ?? []).map((app) => ({ ...app, web_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : void 0 }));
+      return (catalog.available_apps ?? []).map((app) => ({ ...app, web_url: appWebUrl(config.base, app) }));
     },
     refreshNow: async () => {
       if (await refresh()) {
@@ -477,6 +477,10 @@ async function registerSkills(ctx, config, http) {
       }
     }
   };
+}
+function appWebUrl(base, app) {
+  if (app.web) return `${base}/a/${encodeURIComponent(app.name)}`;
+  return app.asset_id ? `${base}/assets/${app.asset_id}` : void 0;
 }
 
 // src/bridge.ts
