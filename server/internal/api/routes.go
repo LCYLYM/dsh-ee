@@ -216,6 +216,14 @@ func (s *Server) routes() []route {
 		prm("POST /api/admin/connect/publish", s.handlePublishConnect, rbac.SettingsManage),
 		pub("GET /api/dsh/whoami", s.handleDshWhoami),
 		pub("POST /api/dsh/web-link", s.handleDshWebLink),
+
+		// 应用自带数据（M13）：网页用；DSH 里的模型走 /mcp 上的 app__ 工具
+		prm("GET /api/apps/{slug}/data", s.handleAppTables, rbac.PortalView),
+		prm("GET /api/apps/{slug}/data/{table}", s.handleAppRows, rbac.PortalView),
+		prm("POST /api/apps/{slug}/data/{table}", s.handleAppInsert, rbac.PortalView),
+		prm("PATCH /api/apps/{slug}/data/{table}/{id}", s.handleAppUpdate, rbac.PortalView),
+		prm("DELETE /api/apps/{slug}/data/{table}/{id}", s.handleAppDelete, rbac.PortalView),
+		prm("GET /api/apps/{slug}/data/{table}/export", s.handleAppExport, rbac.PortalView),
 		pub("GET /api/dsh/catalog", s.handleDshCatalog),
 		pub("GET /api/dsh/brand/logo", s.handleBrandLogo),
 		prm("PUT /api/admin/brand/logo", s.handleUploadBrandLogo, rbac.SettingsManage),

@@ -296,6 +296,7 @@ func notFound(err error) bool { return errors.Is(err, store.ErrNotFound) }
 func (s *Server) RunBackground(ctx context.Context) {
 	go s.runLDAPSync(ctx)
 	go s.runElevationExpiry(ctx)
+	go s.runAppRowPurge(ctx)
 	go s.runDshReleases(ctx)
 	if s.registry == nil {
 		return

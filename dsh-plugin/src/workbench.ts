@@ -3,7 +3,10 @@
 
 export interface WorkbenchAction {
   label: string;
+  /** 发给 AI 的话；表单提交到表（table）时可以不填 */
   prompt: string;
+  /** 表单提交到应用自带的表：直接插入一行，不经过 AI */
+  table?: string;
 }
 
 export interface WorkbenchField {
@@ -24,7 +27,8 @@ export interface WorkbenchWidget {
   type: "metric" | "table" | "chart" | "checklist" | "form" | "actions" | "markdown" | "heading" | "board" | "kb_scope";
   title?: string;
   text?: string;
-  source?: { connection: string; tool: string; args?: Record<string, unknown> };
+  /** table：应用自带的表；目录里已经由服务端换成 app__rows 调用 */
+  source?: { connection: string; tool: string; args?: Record<string, unknown>; table?: string };
   field?: string;
   format?: string;
   /** metric：相比上期的变化比例（0.12 显示为 ↑12%） */

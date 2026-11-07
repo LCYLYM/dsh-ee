@@ -420,7 +420,7 @@ func (s *Server) handleDshSkill(w http.ResponseWriter, r *http.Request) {
 	}
 	content := sp.Body
 	if a.Kind == store.KindApp {
-		content = appContent(sp, c)
+		content = appContent(sp, c) + appTablesContent(a.Slug, sp.Tables)
 	}
 	if err := s.store.RecordAssetUsage(context.WithoutCancel(r.Context()), a.ID, v.user.ID); err != nil {
 		s.log.Warn("记录能力使用失败", "err", err)
@@ -444,7 +444,7 @@ func appEntry(a *store.Asset, sp *assetSpec, version int) dshApp {
 	if starters == nil {
 		starters = []string{}
 	}
-	return dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Delivery: a.Delivery, Version: version, AssetID: a.ID, Workbench: sp.Workbench}
+	return dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Delivery: a.Delivery, Version: version, AssetID: a.ID, Workbench: appWorkbenchForDSH(a.Slug, sp.Workbench)}
 }
 
 // POST / DELETE /api/dsh/apps/{name}/subscription：员工在 DSH 里启用或停用「自选」微应用。
@@ -657,6 +657,9 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		if len(c.kbases) > 0 {
 			tools = append(tools, kbToolDefs()...)
 		}
+		if targets := s.appToolTargets(r.Context(), v, c); len(targets) > 0 {
+			tools = append(tools, appToolDefs(targets)...)
+		}
 		for _, def := range s.agentToolList(r.Context(), pr) {
 			tools = append(tools, def)
 		}
@@ -672,6 +675,10 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		}
 		if strings.HasPrefix(p.Name, "ee_") {
 			writeRPC(w, msg.ID, s.agentCall(r, pr, p.Name, p.Arguments), nil)
+			return
+		}
+		if strings.HasPrefix(p.Name, appConn+"__") {
+			writeRPC(w, msg.ID, s.appCall(r, v, pr, p.Name, p.Arguments), nil)
 			return
 		}
 		if strings.HasPrefix(p.Name, kbConn+"__") {

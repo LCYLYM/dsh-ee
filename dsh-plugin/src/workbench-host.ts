@@ -46,6 +46,24 @@ export async function readWidgetData(apps: CatalogApp[], tools: ToolCaller, requ
   }
 }
 
+/** 表单提交到应用自带的表：按目录里的配置找到表单，经 app__write 插入一行（服务端校验字段、记审计）。 */
+export async function insertFormRow(apps: CatalogApp[], tools: ToolCaller, request: WidgetRequest & { values?: Record<string, unknown> }): Promise<{ ok: true } | { error: string }> {
+  const widget = findWidget(apps, request);
+  const table = widget?.type === "form" ? widget.submit?.table : undefined;
+  if (!table) return { error: "这个表单没有配置提交到表" };
+  const allowed = new Set((widget!.fields ?? []).map((field) => field.name));
+  const row: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(request.values ?? {})) {
+    if (allowed.has(key) && value !== "" && value !== undefined) row[key] = value;
+  }
+  try {
+    toolValue(await tools.callTool("app__write", { action: "insert", app: request.app, table, rows: [row] }));
+    return { ok: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 /** 知识库工具在网关上的名字（kb__<工具>） */
 export const kbTool = (name: string) => `kb__${name}`;
 

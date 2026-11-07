@@ -51,6 +51,8 @@ type assetSpec struct {
 	Workbench *appWorkbench `json:"workbench,omitempty"`
 	// 微应用：样板，出现在「造 → 从样板复制」里（只有管理员能设）
 	Template bool `json:"template,omitempty"`
+	// 微应用：自带的数据表（app_data.go）
+	Tables []appTable `json:"tables,omitempty"`
 
 	// 连接：mcp（上游 MCP 服务地址）或 openapi（接口根地址 + 文档）
 	Type         string    `json:"type,omitempty"`
@@ -99,7 +101,7 @@ func validateSpec(kind string, sp *assetSpec) string {
 			sp.ModelInvocable, sp.WhenToUse = nil, ""
 		}
 		sp.Persona, sp.Starters, sp.Skills, sp.Connections, sp.Plugins, sp.Knowledge = "", nil, nil, nil, nil, nil
-		sp.Icon, sp.Launch, sp.Workbench, sp.Template = "", "", nil, false
+		sp.Icon, sp.Launch, sp.Workbench, sp.Template, sp.Tables = "", "", nil, false, nil
 		sp.Type, sp.URL, sp.Auth, sp.OpenAPI, sp.Instructions = "", "", nil, "", ""
 	case store.KindApp:
 		sp.Persona = strings.TrimSpace(sp.Persona)
@@ -153,8 +155,11 @@ func validateSpec(kind string, sp *assetSpec) string {
 		if sp.Knowledge, msg = clean(sp.Knowledge, 20, slugRe.MatchString, "知识库"); msg != "" {
 			return msg
 		}
+		if msg := validateTables(sp.Tables); msg != "" {
+			return "数据表" + msg
+		}
 		if sp.Workbench != nil {
-			if msg := validateWorkbench(sp.Workbench, sp.Connections); msg != "" {
+			if msg := validateWorkbench(sp.Workbench, sp.Connections, sp.Tables); msg != "" {
 				return msg
 			}
 		}
@@ -608,6 +613,10 @@ func (s *Server) handleHubCreate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "标识 "+req.Slug+" 留给知识库使用")
 		return
 	}
+	if req.Slug == appConn {
+		writeErr(w, http.StatusBadRequest, "标识 "+appConn+" 留给应用数据使用")
+		return
+	}
 	sp, raw, ok := s.decodeSpec(w, r, req.Kind, req.Spec)
 	if !ok {
 		return
@@ -729,6 +738,15 @@ func (s *Server) handleHubNewVersion(w http.ResponseWriter, r *http.Request) {
 	sp, raw, ok := s.decodeSpec(w, r, a.Kind, req.Spec)
 	if !ok {
 		return
+	}
+	if a.Kind == store.KindApp && a.LiveVersion > 0 {
+		if msg, err := s.checkAppTablesChange(r.Context(), a, sp); err != nil {
+			s.internalErr(w, r, err)
+			return
+		} else if msg != "" {
+			writeErr(w, http.StatusBadRequest, msg)
+			return
+		}
 	}
 	status, err := s.initialStatus(r, a.Kind, a.Scope)
 	if err != nil {
@@ -911,6 +929,12 @@ func (s *Server) handleHubDelete(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.DeleteAsset(r.Context(), a.ID); err != nil {
 		s.internalErr(w, r, err)
 		return
+	}
+	if a.Kind == store.KindApp {
+		// 应用自带的数据保留 30 天再清掉
+		if err := s.store.DeleteAssetAppRows(r.Context(), a.ID); err != nil {
+			s.log.Warn("标记删除应用数据失败", "err", err)
+		}
 	}
 	s.dropConnClient(a.ID)
 	s.audit(r, auditAssetDelete, a.Kind+":"+a.Slug, map[string]any{"id": a.ID})

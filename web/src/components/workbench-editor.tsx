@@ -72,7 +72,7 @@ function WidgetPreview({ w }: { w: WorkbenchWidget }) {
       {detail && <div className="mt-1 truncate text-xs text-neutral-500">{detail}</div>}
       {w.detail?.length ? <div className="mt-1 truncate text-xs text-neutral-500">{t("appWorkbench.detail", { fields: w.detail.map((d) => d.title).join(" · ") })}</div> : null}
       {w.empty && <div className="mt-1 truncate text-xs text-neutral-500">{t("appWorkbench.empty", { text: w.empty.text })}</div>}
-      {w.source && <div className="mt-1 font-mono text-[11px] text-neutral-400">{w.source.connection} / {w.source.tool}</div>}
+      {w.source && <div className="mt-1 font-mono text-[11px] text-neutral-400">{w.source.table ? `table / ${w.source.table}` : `${w.source.connection} / ${w.source.tool}`}</div>}
     </div>
   );
 }

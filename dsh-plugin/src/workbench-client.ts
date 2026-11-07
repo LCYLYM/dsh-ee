@@ -177,13 +177,34 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
     const scopeIndex = (pane.widgets ?? []).findIndex((widget) => widget.type === "kb_scope");
     const scopeState = scopeIndex >= 0 ? data[scopeIndex] : undefined;
     const bases: KBaseItem[] = scopeState?.status === "ready" && Array.isArray(scopeState.value?.items) ? scopeState.value.items : [];
-    const send = (key: string, action: WorkbenchAction, values: { row?: any; form?: Record<string, any> }) => {
+    const sendPrompt = (key: string, action: WorkbenchAction, values: { row?: any; form?: Record<string, any> }) => {
       sendText(key, fillPrompt(action.prompt, { ...values, scope: { kbs: scopeText(bases, selectedKBs) } }), action.label, () => {
         if (values.form) {
           const index = Number(key.split(":")[0]);
           setForms((current) => ({ ...current, [index]: {} }));
         }
       });
+    };
+    // 表单提交到应用自带的表：直接插入一行，刷新读这张表的组件；配置了 prompt 的再发给 AI
+    const saveToTable = (key: string, action: WorkbenchAction, form: Record<string, any>) => {
+      const index = Number(key.split(":")[0]);
+      if (sending.has(key)) return;
+      setFormError(index, "");
+      Promise.resolve(remote.insertFormRow?.({ app: app.name, pane: pane.id, widget: index, values: form }))
+        .then((raw: any) => {
+          const result = unwrapRemote(raw);
+          if (!result?.ok) return setFormError(index, result?.error || "没有保存，请把接入插件更新到最新版本");
+          setForms((current) => ({ ...current, [index]: {} }));
+          setNotice(`已保存：${action.label}`);
+          (pane.widgets ?? []).forEach((widget, i) => { if (widget.source?.table === action.table) void load(i); });
+          if (action.prompt) sendPrompt(key, action, { form });
+        })
+        .catch(() => setFormError(index, "没有保存，请检查网络后重试"));
+    };
+    const setFormError = (index: number, error: string) => setFormErrors((current) => ({ ...current, [index]: error }));
+    const send = (key: string, action: WorkbenchAction, values: { row?: any; form?: Record<string, any> }) => {
+      if (action.table && values.form) return saveToTable(key, action, values.form);
+      sendPrompt(key, action, values);
     };
     const docPane = app.workbench?.panes.find((item) => item.type === "kb_doc");
     const handlers: PanelHandlers = {

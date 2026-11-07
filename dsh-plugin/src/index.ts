@@ -14,7 +14,7 @@ import { uploadPackage } from "./upload.js";
 import { AppBindings } from "./app-bindings.js";
 import { setAppSubscription } from "./app-subscription.js";
 import { exchangeWebLink } from "./web-link.js";
-import { BoardStore, ChecklistStore, readKBDoc, readWidgetData, registerWorkbenchTool } from "./workbench-host.js";
+import { BoardStore, ChecklistStore, insertFormRow, readKBDoc, readWidgetData, registerWorkbenchTool } from "./workbench-host.js";
 import type { DshContext, PluginConfig } from "./dsh.js";
 
 export const name = "dsh-ee-connect";
@@ -76,6 +76,7 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
       },
       unbindApp: async (name) => appBindings.unbind(name),
       workbenchData: async (request) => readWidgetData(await (await skillsReady).readApps(), bridge, request),
+      insertFormRow: async (request) => insertFormRow(await (await skillsReady).readApps(), bridge, request),
       readBoard: async (request) => boards.read(String(request?.app ?? ""), String(request?.sessionId ?? "")) ?? null,
       readChecklists: async (request) => checklists.read(String(request?.app ?? ""), String(request?.sessionId ?? ""))?.lists ?? {},
       setChecklist: async (request) => {

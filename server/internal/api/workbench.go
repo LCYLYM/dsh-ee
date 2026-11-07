@@ -74,9 +74,11 @@ type wbEmpty struct {
 }
 
 type wbSource struct {
-	Connection string          `json:"connection"`
-	Tool       string          `json:"tool"`
+	Connection string          `json:"connection,omitempty"`
+	Tool       string          `json:"tool,omitempty"`
 	Args       json.RawMessage `json:"args,omitempty"`
+	// 应用自带的表（app_data.go）：和 connection / tool 二选一
+	Table string `json:"table,omitempty"`
 }
 
 type wbColumn struct {
@@ -88,7 +90,9 @@ type wbColumn struct {
 // wbAction 是面板上的一个按钮：点了把 Prompt（替换占位符后）作为普通消息发给 AI。
 type wbAction struct {
 	Label  string `json:"label"`
-	Prompt string `json:"prompt"`
+	Prompt string `json:"prompt,omitempty"`
+	// 表单提交到应用自带的表：直接插入一行，不经过 AI（prompt 可选，填了插入后再发给 AI）
+	Table string `json:"table,omitempty"`
 }
 
 type wbField struct {
@@ -111,7 +115,9 @@ var (
 
 // validateWorkbench 只检查结构；数据源是不是只读工具要查库，见 checkWorkbenchSources。
 // connections 是这个微应用依赖的连接，数据源只能来自它们。
-func validateWorkbench(wb *appWorkbench, connections []string) string {
+// tables 是应用自带的表，数据源和表单可以用它们。
+func validateWorkbench(wb *appWorkbench, connections []string, tables []appTable) string {
+	deps := wbDeps{connections: connections, tables: tables}
 	if len(wb.Panes) == 0 {
 		return "工作台至少要有一个窗格"
 	}
@@ -152,7 +158,7 @@ func validateWorkbench(wb *appWorkbench, connections []string) string {
 				return where + "：业务面板最多 12 个组件"
 			}
 			for j := range p.Widgets {
-				if msg := validateWidget(&p.Widgets[j], connections); msg != "" {
+				if msg := validateWidget(&p.Widgets[j], deps); msg != "" {
 					return fmt.Sprintf("%s第 %d 个组件：%s", where, j+1, msg)
 				}
 			}
@@ -163,7 +169,7 @@ func validateWorkbench(wb *appWorkbench, connections []string) string {
 	return ""
 }
 
-func validateWidget(w *wbWidget, connections []string) string {
+func validateWidget(w *wbWidget, deps wbDeps) string {
 	w.Title = strings.TrimSpace(w.Title)
 	if !limitRunes(w.Title, 40) {
 		return "标题最多 40 个字"
@@ -172,7 +178,7 @@ func validateWidget(w *wbWidget, connections []string) string {
 	switch w.Type {
 	case "metric":
 		keepSource, keepField = true, true
-		if msg := validateSource(w.Source, connections); msg != "" {
+		if msg := validateSource(w.Source, deps); msg != "" {
 			return msg
 		}
 		if !wbPathRe.MatchString(w.Field) {
@@ -186,7 +192,7 @@ func validateWidget(w *wbWidget, connections []string) string {
 		}
 	case "table":
 		keepSource, keepRows = true, true
-		if msg := validateSource(w.Source, connections); msg != "" {
+		if msg := validateSource(w.Source, deps); msg != "" {
 			return msg
 		}
 		if w.Rows != "" && !wbPathRe.MatchString(w.Rows) {
@@ -224,6 +230,16 @@ func validateWidget(w *wbWidget, connections []string) string {
 		}
 	case "form":
 		keepForm = true
+		var target *appTable
+		if w.Submit != nil && strings.TrimSpace(w.Submit.Table) != "" {
+			w.Submit.Table = strings.TrimSpace(w.Submit.Table)
+			if target = findTable(deps.tables, w.Submit.Table); target == nil {
+				return "提交到的表 " + w.Submit.Table + " 不在这个应用的数据表里"
+			}
+			if len(w.Fields) == 0 {
+				w.Fields = formFieldsOf(target)
+			}
+		}
 		if len(w.Fields) == 0 || len(w.Fields) > 12 {
 			return "表单要有 1～12 个字段"
 		}
@@ -261,6 +277,14 @@ func validateWidget(w *wbWidget, connections []string) string {
 		if w.Submit == nil {
 			return "表单要有提交按钮（submit）"
 		}
+		if target != nil {
+			for _, f := range w.Fields {
+				tf := target.field(f.Name)
+				if tf == nil || tf.Hidden || tf.Kind == "user" {
+					return "表单字段 " + f.Name + " 不是表「" + target.Title + "」里能填的字段"
+				}
+			}
+		}
 		if msg := validateAction(w.Submit, "form", names); msg != "" {
 			return "提交按钮：" + msg
 		}
@@ -276,7 +300,7 @@ func validateWidget(w *wbWidget, connections []string) string {
 		}
 	case "chart":
 		keepSource, keepRows = true, true
-		if msg := validateSource(w.Source, connections); msg != "" {
+		if msg := validateSource(w.Source, deps); msg != "" {
 			return msg
 		}
 		if !slices.Contains(wbChartKinds, w.Chart) {
@@ -303,7 +327,7 @@ func validateWidget(w *wbWidget, connections []string) string {
 			if len(w.Items) > 0 {
 				return "清单的条目要么写在配置里（items），要么从数据源取，不能都填"
 			}
-			if msg := validateSource(w.Source, connections); msg != "" {
+			if msg := validateSource(w.Source, deps); msg != "" {
 				return msg
 			}
 			if w.Rows != "" && !wbPathRe.MatchString(w.Rows) {
@@ -419,21 +443,40 @@ func validateColumns(cols []wbColumn, what string) string {
 	return ""
 }
 
-func validateSource(src *wbSource, connections []string) string {
+func validateSource(src *wbSource, deps wbDeps) string {
 	if src == nil {
 		return "要指定数据源（source）"
 	}
-	src.Connection, src.Tool = strings.TrimSpace(src.Connection), strings.TrimSpace(src.Tool)
+	src.Connection, src.Tool, src.Table = strings.TrimSpace(src.Connection), strings.TrimSpace(src.Tool), strings.TrimSpace(src.Table)
+	if src.Table != "" {
+		if src.Connection != "" || src.Tool != "" {
+			return "数据源要么写应用自带的表（table），要么写连接和工具，不能都填"
+		}
+		if findTable(deps.tables, src.Table) == nil {
+			return "数据源的表 " + src.Table + " 不在这个应用的数据表里"
+		}
+		return checkSourceArgs(src)
+	}
 	if src.Connection == kbConn {
 		if !slices.Contains(kbWorkbenchTools, src.Tool) {
 			return "知识库数据源的工具只能是 " + strings.Join(kbWorkbenchTools, " / ")
 		}
-	} else if !slices.Contains(connections, src.Connection) {
+	} else if !slices.Contains(deps.connections, src.Connection) {
 		return "数据源的连接 " + src.Connection + " 不在这个微应用的依赖连接里"
 	}
 	if src.Tool == "" {
 		return "数据源要指定工具"
 	}
+	return checkSourceArgs(src)
+}
+
+// wbDeps 是工作台能引用的东西：依赖的连接与应用自带的表。
+type wbDeps struct {
+	connections []string
+	tables      []appTable
+}
+
+func checkSourceArgs(src *wbSource) string {
 	if len(src.Args) > 0 {
 		var obj map[string]any
 		if json.Unmarshal(src.Args, &obj) != nil || obj == nil {
@@ -454,7 +497,10 @@ func validateAction(a *wbAction, scope string, formFields map[string]bool) strin
 	if a.Label == "" || !limitRunes(a.Label, 20) {
 		return "按钮文字必填，最多 20 个字"
 	}
-	if a.Prompt == "" || !limitRunes(a.Prompt, 1000) {
+	if a.Table != "" && scope != "form" {
+		return "只有表单的提交按钮能写到表里（table）"
+	}
+	if !limitRunes(a.Prompt, 1000) || (a.Prompt == "" && a.Table == "") {
 		return "发给 AI 的话必填，最多 1000 个字"
 	}
 	rest := wbPlaceholderRe.ReplaceAllStringFunc(a.Prompt, func(m string) string { return "" })
@@ -486,7 +532,7 @@ func (s *Server) checkWorkbenchSources(ctx context.Context, wb *appWorkbench) (s
 	tools := map[string]map[string]*store.ConnectionTool{}
 	for pi, p := range wb.Panes {
 		for wi, w := range p.Widgets {
-			if w.Source == nil || w.Source.Connection == kbConn {
+			if w.Source == nil || w.Source.Connection == kbConn || w.Source.Table != "" {
 				continue
 			}
 			where := fmt.Sprintf("工作台第 %d 个窗格第 %d 个组件：", pi+1, wi+1)
@@ -564,6 +610,13 @@ func workbenchContent(wb *appWorkbench) string {
 		fmt.Fprintf(&b, "- 「%s」：%s\n", p.Title, strings.Join(parts, "、"))
 	}
 	b.WriteString("\n用户在面板上点按钮或提交表单时，会以普通消息的形式发给你，内容里带着那一行或那张表单的数据。照常处理，需要改业务数据时用企业系统的工具。\n")
+	for _, p := range wb.Panes {
+		for _, w := range p.Widgets {
+			if w.Type == "form" && w.Submit != nil && w.Submit.Table != "" {
+				fmt.Fprintf(&b, "\n表单「%s」提交后直接存进这个应用的表 `%s`，不经过你；用户问起时用 app__rows 查。\n", w.Title, w.Submit.Table)
+			}
+		}
+	}
 	if board {
 		b.WriteString("\n处理完一件事以后，用 `ee_workbench` 工具（action 为 `board`）把结果写到 AI 看板上：用简短的文字、清单或表格概括本轮结论，不要重复整段对话。看板只显示最新一次写入的内容。\n")
 	}
@@ -578,6 +631,8 @@ func workbenchContent(wb *appWorkbench) string {
 				fmt.Fprintf(&b, "`%s` %s", it.ID, it.Text)
 			}
 			b.WriteString("。")
+		} else if c.Source.Table != "" {
+			fmt.Fprintf(&b, "条目来自这个应用的表 `%s`（用 app__rows 查），编号是每一项的 `%s` 字段。", c.Source.Table, firstNonEmpty(c.IDField, c.ItemField))
 		} else {
 			fmt.Fprintf(&b, "条目来自 `%s__%s`，编号是每一项的 `%s` 字段。", c.Source.Connection, c.Source.Tool, firstNonEmpty(c.IDField, c.ItemField))
 		}
@@ -622,4 +677,29 @@ func firstNonEmpty(xs ...string) string {
 		}
 	}
 	return ""
+}
+
+// formFieldsOf 按表定义生成表单字段（表单提交到表、又没写字段时用）：最多 12 个能填的字段。
+func formFieldsOf(t *appTable) []wbField {
+	var out []wbField
+	for _, f := range t.Fields {
+		if f.Hidden || f.Kind == "user" || len(out) == 12 {
+			continue
+		}
+		kind := f.Kind
+		var options []string
+		switch f.Kind {
+		case "money":
+			kind = "number"
+		case "select":
+			options = append(options, f.Options...)
+			if len(options) > 20 {
+				options = options[:20]
+			}
+		case "bool":
+			kind, options = "select", []string{"是", "否"}
+		}
+		out = append(out, wbField{Name: f.Name, Label: f.Title, Kind: kind, Required: f.Required, Options: options})
+	}
+	return out
 }

@@ -21824,13 +21824,33 @@ function registerWorkbench(ctx, deps) {
     const scopeIndex = (pane.widgets ?? []).findIndex((widget) => widget.type === "kb_scope");
     const scopeState = scopeIndex >= 0 ? data[scopeIndex] : void 0;
     const bases = scopeState?.status === "ready" && Array.isArray(scopeState.value?.items) ? scopeState.value.items : [];
-    const send = (key, action, values) => {
+    const sendPrompt = (key, action, values) => {
       sendText(key, fillPrompt(action.prompt, { ...values, scope: { kbs: scopeText(bases, selectedKBs) } }), action.label, () => {
         if (values.form) {
           const index = Number(key.split(":")[0]);
           setForms((current) => ({ ...current, [index]: {} }));
         }
       });
+    };
+    const saveToTable = (key, action, form) => {
+      const index = Number(key.split(":")[0]);
+      if (sending.has(key)) return;
+      setFormError(index, "");
+      Promise.resolve(remote.insertFormRow?.({ app: app.name, pane: pane.id, widget: index, values: form })).then((raw) => {
+        const result = unwrapRemote2(raw);
+        if (!result?.ok) return setFormError(index, result?.error || "\u6CA1\u6709\u4FDD\u5B58\uFF0C\u8BF7\u628A\u63A5\u5165\u63D2\u4EF6\u66F4\u65B0\u5230\u6700\u65B0\u7248\u672C");
+        setForms((current) => ({ ...current, [index]: {} }));
+        setNotice(`\u5DF2\u4FDD\u5B58\uFF1A${action.label}`);
+        (pane.widgets ?? []).forEach((widget, i) => {
+          if (widget.source?.table === action.table) void load(i);
+        });
+        if (action.prompt) sendPrompt(key, action, { form });
+      }).catch(() => setFormError(index, "\u6CA1\u6709\u4FDD\u5B58\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u540E\u91CD\u8BD5"));
+    };
+    const setFormError = (index, error62) => setFormErrors((current) => ({ ...current, [index]: error62 }));
+    const send = (key, action, values) => {
+      if (action.table && values.form) return saveToTable(key, action, values.form);
+      sendPrompt(key, action, values);
     };
     const docPane = app.workbench?.panes.find((item) => item.type === "kb_doc");
     const handlers = {

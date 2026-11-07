@@ -63,6 +63,10 @@ func (s *Store) PurgeUser(ctx context.Context, userID int64) error {
 			return err
 		}
 	}
+	// 他在各个应用里填的数据
+	if _, err := tx.ExecContext(ctx, "DELETE FROM app_rows WHERE owner_id = ?", userID); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM users WHERE id = ?", userID); err != nil {
 		return err
 	}

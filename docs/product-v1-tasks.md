@@ -19,7 +19,7 @@
 | M9 | `/ee-save`：把对话沉淀成能力 | M4 | 是 | 未开始 |
 | M10 | 收尾功能：OIDC、月度 AI 落地报告 | — | 否 | ✅ 已完成（2026-11-07） |
 | M12 | 从 DSH 打开网页免登录（一次性登录链接） | — | 是 | ✅ 代码完成，待 Mac 验证（[workbench-verify.md §7](./workbench-verify.md)） |
-| M13 | 应用自带数据：表、行可见性、`app` 工具、员工侧 `ee_app` | M4 | 是 | 未开始 |
+| M13 | 应用自带数据：表、行可见性、`app` 工具、员工侧 `ee_app` | M4 | 是 | ✅ 代码完成，待 Mac 验证（[workbench-verify.md §8](./workbench-verify.md)） |
 | M14 | 网页版应用 `/a/<应用标识>`，与 DSH 共用渲染 | M5（共用渲染）、M12、M13 | 是 | 未开始 |
 | M15 | 数据中台最小版本：上传、数据集、系统连接 `data` | M13（`ref` 字段） | 否 | 未开始 |
 | M11 | 发布：README、文档、兼容性矩阵、演示视频 | 全部 | 是 | 未开始 |
@@ -308,6 +308,23 @@ M1、M2、M4、M10 互不依赖，可以并行。M12～M15 来自 2026-11-07 的
 
 - 在 DSH 里一句话让 AI 做出一个报名应用，立刻能填、能看统计；另一个员工按 `own` 模式只看到自己的行（e2e + 真实 DSH 场景）。
 - 改字段不丢数据；超过行数上限给出明确提示；删除应用后 30 天内能恢复（Go 测试覆盖）。
+
+### 完成情况（2026-11-07）
+
+代码完成，等 Mac 真机验证（清单见 [workbench-verify.md §8](./workbench-verify.md)）。
+
+- 服务端：`server/internal/api/app_data.go`，存储 `store/app_rows.go`（迁移 0016）。网页接口 `/api/apps/{slug}/data[/{table}[/{id}|/export]]`；DSH 里是 `/mcp` 上的 `app__rows`（只读，支持筛选、搜索、排序、`group_by` 计数）和 `app__write`（insert / update / delete）。能用这个应用的人就能用它的数据，不要求在 DSH 里启用；作者和有「管理能力」权限的人看全部、改任何行。
+- 工作台：服务端在给 DSH 的目录里把 `{"table": …}` 换成 `app__rows` 调用，插件取数逻辑不用改；表单 `submit.table` 由插件经 `app__write` 插入，成功后刷新读这张表的组件；`submit` 没写 `fields` 时按表生成（money → number，bool → 是 / 否）。
+- 删除：网页上确认框；模型那边复用 Agent 的确认码（先拿预览、带 `confirm` 再执行），插件按 `_meta` 弹审批框。行和应用都是软删除，每天清一次超过 30 天的。
+- 和计划的差别：
+  - **没有单独的 `ee_app` 工具**：Agent 工具是按路由一一对应的，`POST /api/hub` 已经是 `ee_hub.create`。改为给它加 `for_me`（范围只有本人 → 免审核、马上能用），并把 `tables`、`workbench`、`connections`、`knowledge`、`icon` 写进参数说明。效果一样，少一个工具。
+  - **行数上限还不能调**：固定每个应用 1 万行、每行 16 KB。
+  - **删除后的恢复还没有界面**：数据保留 30 天，但目前只能在数据库里把 `deleted_at` 清空。
+  - **DSH 工作台里还不能直接编辑行**：表格只显示，改和删交给 AI（会确认）；网页的应用详情里能新增和删除。行内编辑放到 M14 的网页版一起做。
+  - 「各自填写」的表，统计（`group_by`）也只算员工自己能看到的行，不会把别人的数据按组漏出来；组织者（作者）看到全部。
+  - 新人入职清单改成自带表放到 M3 重做样板时一起做；示例公司先加了「团建报名」（各自填写 + 作者发布两张表，不是计划里写的 `shared`，更贴近报名场景）。
+- 踩到的坑：TiDB 里「按 JSON 值排序 + 第二个排序键 + LIMIT」会排错（没有值的行跑到最前），所以按字段类型先转换（数字 `CAST … AS DOUBLE`，其余转成文字）再排，没有值的行总在最后。
+- 测试：Go `TestAppData`、`TestAgentTools`（`for_me`）、`TestDemoImport`；插件 `insertFormRow`；e2e `20-app-data`。
 
 ---
 

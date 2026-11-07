@@ -14,6 +14,7 @@ import { Combobox } from "../components/pickers";
 import { Badge, Button, Card, cx, Field, inputBase, inputCls, PageHeader, PasswordInput, Segmented, ToggleRow } from "../components/ui";
 import { PageLink } from "../lib/menus";
 import { parseWorkbench, WorkbenchField, workbenchText } from "../components/workbench-editor";
+import { parseTables, TablesField, tablesText as tablesToText } from "../components/app-data";
 
 const KINDS: AssetKind[] = ["skill", "prompt", "app", "connection"];
 const textareaCls = "w-full rounded-md border border-neutral-300 bg-card px-3 py-2 text-sm outline-none placeholder:text-neutral-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
@@ -187,6 +188,7 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
   const [spec, setSpec] = useState<AssetSpec>(() => emptySpec(kind));
   // 工作台在编辑框里是 JSON 文字，提交时再解析
   const [wbText, setWbText] = useState("");
+  const [tablesText, setTablesText] = useState("");
   const [slug, setSlug] = useState("");
   // 员工新建默认「自己用」：保存就能在自己的 DSH 里打开，想分享再改范围
   const [scope, setScope] = useState<Scope>(() => (!canManage && user && kind !== "connection" ? selfScope(user.id) : allScope()));
@@ -203,15 +205,18 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
       const a = existing.data.asset;
       setSpec({ ...emptySpec(a.kind), ...a.spec });
       setWbText(workbenchText(a.spec.workbench));
+      setTablesText(tablesToText(a.spec.tables));
       setSlug(a.slug);
     } else if (source.data) {
       const a = source.data.asset;
       setSpec({ ...emptySpec("app"), ...a.spec, title: t("selfScope.copyOf", { title: a.spec.title }).slice(0, 64), template: false });
       setWbText(workbenchText(a.spec.workbench));
+      setTablesText(tablesToText(a.spec.tables));
       setSlug(`${a.slug}-copy`.slice(0, 48));
     } else if (!editing && !fromId) {
       setSpec({ ...emptySpec(kind), ...(kind === "app" && kbSlug ? { knowledge: [kbSlug] } : {}) });
       setWbText("");
+      setTablesText("");
     }
   }, [existing.data, source.data, editing, fromId, kind, kbSlug, t]);
 
@@ -251,6 +256,7 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
           icon: spec.icon,
           launch: spec.launch,
           workbench: parseWorkbench(wbText).value,
+          tables: parseTables(tablesText).value,
           skills: spec.skills,
           connections: spec.connections,
           plugins: spec.plugins,
@@ -379,6 +385,7 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
             {can("plugins.manage") && (
               <ToggleRow label={t("selfScope.template")} desc={t("selfScope.templateDesc")} checked={!!spec.template} onChange={(v) => set({ template: v })} />
             )}
+            <TablesField text={tablesText} onText={setTablesText} />
             <WorkbenchField
               text={wbText}
               onText={setWbText}

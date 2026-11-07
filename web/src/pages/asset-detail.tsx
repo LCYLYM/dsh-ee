@@ -11,6 +11,7 @@ import { assetPath, assetState, dshHow, KIND_ICONS, scopeSummary } from "../lib/
 import { useLabels } from "../lib/labels";
 import { pluginPath } from "../components/plugin-card";
 import { LoadState, ErrorNote } from "../components/api-ui";
+import { AppDataPanel } from "../components/app-data";
 import { ScopeDialog, useScopeOptions } from "../components/scope-dialog";
 import { Badge, Button, Card, CardHeader, cx, inputCls, Toggle } from "../components/ui";
 import { statusBadge } from "../components/status";
@@ -327,6 +328,7 @@ function AssetDetail() {
                 </ul>
                 {!a.spec.skills?.length && !a.spec.connections?.length && !a.spec.plugins?.length && <p className="text-sm text-neutral-600">{t("asset.noDeps")}</p>}
               </Card>
+              {(a.spec.tables?.length ?? 0) > 0 && a.live_version > 0 && <AppDataPanel slug={a.slug} />}
             </>
           )}
 

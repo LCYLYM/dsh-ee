@@ -64,8 +64,13 @@ var pLimit = agentParam{Name: "limit", Type: "integer", Desc: "最多返回几�
 
 // 技能、提示词、微应用的内容。服务端会按类型再校验一遍。
 var specSchema = map[string]any{
-	"type":        "object",
-	"description": "内容。skill/prompt：title、description、body（Markdown 正文）必填，skill 可加 when_to_use；app：title、description、persona 必填，可加 starters、skills、plugins",
+	"type": "object",
+	"description": "内容。skill/prompt：title、description、body（Markdown 正文）必填，skill 可加 when_to_use；" +
+		"app：title、description、persona 必填，可加 icon（一个 emoji）、starters、skills、plugins、connections、knowledge、" +
+		"tables（自带数据表）和 workbench（右侧工作台）。表：{name, title, visibility: own 各自填写 | shared 共同维护 | author 作者发布, " +
+		"fields: [{name, title, kind: text|number|money|date|select|bool|user, options, required}]}。" +
+		"工作台的数据源可以写 {\"table\": 表名}（统计写 {\"table\": 表名, \"args\": {\"group_by\": 字段}}，返回 items 里的 count），" +
+		"表单的 submit 写 {\"label\": …, \"table\": 表名} 直接插入一行（不写 fields 就按表生成）。",
 	"properties": map[string]any{
 		"title":           map[string]any{"type": "string"},
 		"description":     map[string]any{"type": "string", "description": "一两句话，DSH 靠它判断什么时候用"},
@@ -76,6 +81,12 @@ var specSchema = map[string]any{
 		"starters":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 		"skills":          map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 		"plugins":         map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+		"icon":            map[string]any{"type": "string"},
+		"launch":          map[string]any{"type": "string", "enum": []string{"new", "resume"}},
+		"connections":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+		"knowledge":       map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+		"tables":          map[string]any{"type": "array", "items": map[string]any{"type": "object"}},
+		"workbench":       map[string]any{"type": "object", "description": "{panes: [{id, type: panel, title, widgets: [...]}]}，组件类型 metric / table / chart / checklist / form / actions / markdown / heading / board"},
 	},
 }
 
@@ -257,12 +268,25 @@ var agentSpecs = map[string]*agentSpec{
 		Params: []agentParam{{Name: "id", Type: "integer", Required: true, In: "path"}},
 	},
 	"POST /api/hub": {
-		Tool: "ee_hub", Action: "create", Summary: "把写好的技能、提示词或微应用提交到能力中心（按设置可能先审核）", En: "Share a capability to the hub", Effect: effWrite,
+		Tool: "ee_hub", Action: "create", Summary: "把写好的技能、提示词或微应用提交到能力中心（按设置可能先审核）；for_me 做成「自己用」，不用审核、马上能用", En: "Create a capability", Effect: effWrite,
 		Params: []agentParam{
 			{Name: "kind", Type: "string", Required: true, Enum: []string{"skill", "prompt", "app"}},
 			{Name: "slug", Type: "string", Required: true, Desc: "标识，小写字母数字和连字符，如 expense-policy，也是 /命令名"},
 			{Name: "category", Type: "string"},
 			{Name: "spec", Required: true, Schema: specSchema},
+			{Name: "for_me", Type: "boolean", In: "local", Desc: "只给我自己用：不用审核，保存后马上出现在我的 DSH 里；想分享给同事再到网页上改可用范围"},
+		},
+		Body: func(_ context.Context, _ *Server, p *Principal, args map[string]any) (map[string]any, error) {
+			out := map[string]any{}
+			for _, k := range []string{"kind", "slug", "category", "spec"} {
+				if v, ok := args[k]; ok {
+					out[k] = v
+				}
+			}
+			if mine, _ := args["for_me"].(bool); mine {
+				out["scope"] = map[string]any{"all": false, "departments": []string{}, "roles": []int64{}, "users": []int64{p.User.ID}}
+			}
+			return out, nil
 		},
 	},
 	"POST /api/hub/{id}/versions": {

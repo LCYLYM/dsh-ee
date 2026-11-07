@@ -58,7 +58,7 @@ func TestDemoImport(t *testing.T) {
 			t.Fatalf("%s %s 没建成：%s %s", it.Kind, it.Slug, it.Result, it.Error)
 		}
 	}
-	if len(res.Items) != 25 || len(res.Accounts) != 10 {
+	if len(res.Items) != 26 || len(res.Accounts) != 10 {
 		t.Fatalf("应建 6 个库、7 项能力、10 个账号、2 个自己用的应用：%s", body)
 	}
 
@@ -222,6 +222,20 @@ func TestDemoImport(t *testing.T) {
 		t.Fatal("别人自己用的应用不应出现在赵磊的 DSH 里")
 	}
 
+	// 自带数据的应用：吴敏分享给全公司的团建报名，孙悦只看到自己的报名
+	if !slices.Contains(apps, "team-outing") {
+		t.Fatalf("团建报名应出现在全员的 DSH 里：%v", apps)
+	}
+	if out, isErr, text := dsh.appCall("rows", map[string]any{"app": "team-outing", "table": "signups"}); isErr || out["total"] != float64(1) || !strings.Contains(text, "不吃辣") {
+		t.Fatalf("孙悦应只看到自己的 1 条报名：%s", text)
+	}
+	if out, isErr, text := dsh.appCall("rows", map[string]any{"app": "team-outing", "table": "notes"}); isErr || out["total"] != float64(2) {
+		t.Fatalf("公告全员可读：%s", text)
+	}
+	if _, isErr, _ := dsh.appCall("write", map[string]any{"action": "insert", "app": "team-outing", "table": "signups", "rows": []map[string]any{{"session": "周六上午 · 徒步", "people": 1}}}); isErr {
+		t.Fatal("孙悦应能再报一场")
+	}
+
 	// 30 天模拟使用数据：月度报告与运营数据一打开就有内容
 	code, body = admin.do("GET", "/api/admin/report/monthly?month="+time.Now().UTC().Add(8*time.Hour).Format("2006-01")+"&tz=480", nil, nil)
 	expect(t, "月度报告", code, 200, body)
@@ -273,8 +287,8 @@ func TestDemoImport(t *testing.T) {
 	code, body = admin.do("DELETE", "/api/admin/demo", nil, nil)
 	expect(t, "清除示例", code, 200, body)
 	cleared := decodeAs[struct{ Assets, KBases, Users int }](t, body)
-	if cleared.Assets != 9 || cleared.KBases != 6 || cleared.Users != 10 {
-		t.Fatalf("应删 9 项能力、6 个库、10 个账号：%s", body)
+	if cleared.Assets != 10 || cleared.KBases != 6 || cleared.Users != 10 {
+		t.Fatalf("应删 10 项能力、6 个库、10 个账号：%s", body)
 	}
 	code, body = admin.do("GET", "/api/admin/demo", nil, nil)
 	expect(t, "清除后的状态", code, 200, body)
@@ -302,10 +316,14 @@ func TestDemoImport(t *testing.T) {
 	if rep.Report.AppRuns != 0 {
 		t.Fatalf("清除后模拟数据应一起删掉：%s", body)
 	}
+	var leftRows int
+	if err := st.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM app_rows").Scan(&leftRows); err != nil || leftRows != 0 {
+		t.Fatalf("清除后示例应用的数据应一起删掉：%d %v", leftRows, err)
+	}
 	code, body = admin.do("POST", "/api/admin/demo", nil, nil)
 	expect(t, "清除后再导入", code, 200, body)
 	again2 := decodeAs[result](t, body)
-	if len(again2.Items) != 25 || len(again2.Accounts) != 10 {
+	if len(again2.Items) != 26 || len(again2.Accounts) != 10 {
 		t.Fatalf("清除后再导入应和第一次一样：%s", body)
 	}
 	for _, it := range again2.Items {

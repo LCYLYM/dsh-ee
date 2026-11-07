@@ -240,6 +240,20 @@ func TestAgentTools(t *testing.T) {
 		if !strings.Contains(string(body), "weekly-brief") {
 			t.Fatalf("审核队列里应有：%s", body)
 		}
+		// for_me：一句话做一个「自己用」的应用，带数据表，不用审核、马上能写数据
+		res = a.ok("ee_hub", map[string]any{"action": "create", "kind": "app", "slug": "my-outing", "for_me": true, "spec": map[string]any{
+			"title": "我的团建报名", "description": "收集报名", "persona": "你是报名助手。", "icon": "🏕",
+			"tables": []map[string]any{{"name": "signups", "title": "报名", "fields": []map[string]any{{"name": "session", "title": "场次", "kind": "select", "options": []string{"上午", "下午"}, "required": true}}}},
+			"workbench": map[string]any{"panes": []map[string]any{{"id": "main", "type": "panel", "title": "报名", "widgets": []map[string]any{
+				{"type": "form", "title": "报名", "submit": map[string]any{"label": "提交", "table": "signups"}},
+			}}}},
+		}})
+		if res["status"] != "published" {
+			t.Fatalf("for_me 应免审核直接上线：%v", res)
+		}
+		if out := a.ok("app__write", map[string]any{"action": "insert", "app": "my-outing", "table": "signups", "rows": []map[string]any{{"session": "上午"}}}); out["inserted"] != float64(1) {
+			t.Fatalf("自己用的应用马上能写数据：%v", out)
+		}
 		if text := a.fail("ee_hub", map[string]any{"action": "create", "kind": "skill", "slug": "dsh-ee-guide", "spec": map[string]any{"title": "x", "description": "x", "body": "x"}}); !strings.Contains(text, "dsh-ee-") {
 			t.Fatalf("系统技能前缀应被保留：%s", text)
 		}

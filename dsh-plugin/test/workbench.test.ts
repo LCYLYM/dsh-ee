@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { appsSection } from "../src/apps-view.js";
 import type { CatalogApp } from "../src/skills.js";
 import { checkBoardBlocks, checkForm, fillPrompt, formatValue, getPath, parseWorkbenchAddress, tableRows, toolValue, workbenchAddress, type AppWorkbench, type WorkbenchPane } from "../src/workbench.js";
-import { BoardStore, readWidgetData, runWorkbenchTool } from "../src/workbench-host.js";
+import { BoardStore, insertFormRow, readWidgetData, runWorkbenchTool } from "../src/workbench-host.js";
 import { boardView, missingPaneView, panelView, type PanelHandlers } from "../src/workbench-view.js";
 import { openWorkbench, waitMounted, workbenchOpenIn } from "../src/workbench-open.js";
 
@@ -353,4 +353,20 @@ test("ee_workbench 更新清单：按标题找清单、只认配置里的编号�
   assert.deepEqual(checklists.read("onboarding", "s1")?.lists["main:4"], ["badge"]);
   assert.throws(() => checklists.update("onboarding", "s1", "../x", ["a"], []), /清单编号不合法/);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("表单提交到应用自带的表：只带表单里的字段，经 app__write 插入；没配表或出错给原因", async () => {
+  const app = {
+    name: "outing", title: "团建报名", description: "", starters: [], launch: "new", delivery: "auto", version: 1,
+    workbench: { panes: [{ id: "main", type: "panel", title: "报名", widgets: [
+      { type: "form", title: "报名", fields: [{ name: "session", label: "场次", kind: "select", options: ["上午"] }, { name: "diet", label: "忌口", kind: "text" }], submit: { label: "报名", prompt: "", table: "signups" } },
+      { type: "form", title: "问 AI", fields: [{ name: "q", label: "问题", kind: "text" }], submit: { label: "问", prompt: "{{form.q}}" } },
+    ] }] },
+  } as unknown as CatalogApp;
+  const ok = fakeTools({ app__write: { readOnly: false, result: { content: [{ type: "text", text: "{\"inserted\":1}" }] } } });
+  assert.deepEqual(await insertFormRow([app], ok, { app: "outing", pane: "main", widget: 0, values: { session: "上午", diet: "", owner: "冒名" } }), { ok: true });
+  assert.deepEqual(ok.calls, [{ name: "app__write", args: { action: "insert", app: "outing", table: "signups", rows: [{ session: "上午" }] } }]);
+  assert.deepEqual(await insertFormRow([app], ok, { app: "outing", pane: "main", widget: 1, values: { q: "x" } }), { error: "这个表单没有配置提交到表" });
+  const bad = fakeTools({ app__write: { readOnly: false, result: { isError: true, content: [{ type: "text", text: "字段「场次」必填" }] } } });
+  assert.deepEqual(await insertFormRow([app], bad, { app: "outing", pane: "main", widget: 0, values: {} }), { error: "字段「场次」必填" });
 });

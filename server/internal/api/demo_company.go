@@ -92,10 +92,18 @@ var demoKBases = []demoKBase{
 	},
 }
 
-// demoSelfApp 是某个演示员工自己搭建、「自己用」的应用（范围只有他本人，免审核）。
+// demoSelfApp 是某个演示员工自己搭建的应用：默认「自己用」（范围只有他本人，免审核）；
+// Everyone 的是他做好、已经分享给全公司的。Rows 是导入时预置的数据（表名 → 谁填的 + 内容）。
 type demoSelfApp struct {
-	Owner string
+	Owner    string
+	Everyone bool
+	Rows     map[string][]demoRow
 	demoAsset
+}
+
+type demoRow struct {
+	By   string
+	Data map[string]any
 }
 
 func demoSelfApps() []demoSelfApp {
@@ -108,6 +116,7 @@ func demoSelfApps() []demoSelfApp {
 			Starters:    []string{"写这周的客户周报", "我负责的客户里哪些续约风险高？"},
 			Connections: []string{demoCRMConn},
 		}}},
+		demoOutingApp(),
 		{Owner: "demo.sun.yue", demoAsset: demoAsset{Kind: store.KindApp, Slug: "sunyue-review", Delivery: store.DeliveryOptional, Spec: assetSpec{
 			Title:       "代码评审清单",
 			Description: "孙悦自己做的：按研发规范检查合并请求，列出必须改和建议改的地方。只有她自己用。",
@@ -260,17 +269,100 @@ func (s *Server) demoImportSelfApp(ctx context.Context, d demoSelfApp) (demoItem
 	raw, _ := json.Marshal(sp)
 	a := &store.Asset{Kind: d.Kind, Slug: d.Slug, Title: sp.Title, Description: sp.Description, Category: demoCategory,
 		OwnerID: &owner.ID, Scope: store.Scope{Users: []int64{owner.ID}}, Delivery: store.DeliveryOptional}
+	if d.Everyone {
+		a.Scope, a.Delivery = store.Scope{All: true}, store.DeliveryAuto
+	}
 	if err := s.store.CreateAsset(ctx, a, raw, store.StatusPublished, owner.ID); err != nil {
 		if errors.Is(err, store.ErrDuplicate) {
 			return it, nil
 		}
 		return it, err
 	}
-	if err := s.store.Subscribe(ctx, owner.ID, a.ID); err != nil {
+	if !d.Everyone {
+		if err := s.store.Subscribe(ctx, owner.ID, a.ID); err != nil {
+			return it, err
+		}
+	}
+	if err := s.store.RecordDemo(ctx, "asset", a.ID, a.Slug); err != nil {
 		return it, err
 	}
 	it.Result = "created"
-	return it, s.store.RecordDemo(ctx, "asset", a.ID, a.Slug)
+	return it, s.demoSeedRows(ctx, a, &sp, d.Rows)
+}
+
+// demoSeedRows 按演示员工写入应用的预置数据（字段照常校验，user 字段填成那位员工）。
+func (s *Server) demoSeedRows(ctx context.Context, a *store.Asset, sp *assetSpec, rows map[string][]demoRow) error {
+	for name, list := range rows {
+		t := findTable(sp.Tables, name)
+		if t == nil {
+			return fmt.Errorf("示例应用 %s 没有表 %s", a.Slug, name)
+		}
+		for _, r := range list {
+			u, err := s.store.GetUserByUsername(ctx, r.By)
+			if err != nil {
+				return fmt.Errorf("找不到演示员工 %s：%w", r.By, err)
+			}
+			clean, msg := cleanRow(t, r.Data, true, u)
+			if msg != "" {
+				return fmt.Errorf("示例数据不合法：%s", msg)
+			}
+			b, _ := json.Marshal(clean)
+			if _, err := s.store.InsertAppRows(ctx, a.ID, t.Name, u.ID, [][]byte{b}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// demoOutingApp 是人力资源部吴敏做好、分享给全公司的「团建报名」：演示应用自带数据。
+func demoOutingApp() demoSelfApp {
+	morning, afternoon := "周六上午 · 徒步", "周六下午 · 烧烤"
+	return demoSelfApp{Owner: "demo.wu.min", Everyone: true, demoAsset: demoAsset{Kind: store.KindApp, Slug: "team-outing", Delivery: store.DeliveryAuto, Spec: assetSpec{
+		Title:       "团建报名",
+		Description: "人力资源部吴敏发起的 11 月团建报名：选场次、填人数和忌口。每人只看到自己的报名，组织者看到全部；AI 可以帮你报名、改报名、查报名情况。",
+		Icon:        "🏕",
+		Persona: "你是星河科技 11 月团建的报名助手，组织者是人力资源部的吴敏。员工想报名时，问清场次（" + morning + " / " + afternoon + "）、同行人数和忌口，" +
+			"把要写的内容复述一遍、得到确认后再用 app__write 写进报名表；想改报名时先用 app__rows 查出他自己的那一行再改。" +
+			"组织者问报名情况时，用 app__rows 的 group_by 按场次统计人数，再列出有忌口的人。集合时间、地点以「公告」表为准，不要自己编。",
+		Starters: []string{"帮我报名周六下午的烧烤，我不吃辣", "我报了哪一场？帮我改成上午", "现在各场次报了多少人？"},
+		Tables: []appTable{
+			{Name: "signups", Title: "报名", Visibility: "own", Fields: []appField{
+				{Name: "who", Title: "姓名", Kind: "user"},
+				{Name: "session", Title: "场次", Kind: "select", Options: []string{morning, afternoon}, Required: true},
+				{Name: "people", Title: "人数（含本人）", Kind: "number", Required: true},
+				{Name: "diet", Title: "忌口", Kind: "text"},
+			}},
+			{Name: "notes", Title: "公告", Visibility: "author", Fields: []appField{
+				{Name: "title", Title: "标题", Kind: "text", Required: true},
+				{Name: "content", Title: "内容", Kind: "text", Required: true},
+			}},
+		},
+		Workbench: &appWorkbench{Panes: []wbPane{{ID: "main", Type: "panel", Title: "团建报名", Widgets: []wbWidget{
+			{Type: "heading", Title: "公告"},
+			{Type: "table", Title: "活动安排", Source: &wbSource{Table: "notes"}, Rows: "items", Columns: []wbColumn{{Field: "title", Title: "事项"}, {Field: "content", Title: "说明"}}},
+			{Type: "heading", Title: "报名"},
+			{Type: "form", Title: "我要报名", Submit: &wbAction{Label: "报名", Table: "signups"}},
+			{Type: "table", Title: "我的报名", Source: &wbSource{Table: "signups"}, Rows: "items",
+				Columns:    []wbColumn{{Field: "session", Title: "场次"}, {Field: "people", Title: "人数"}, {Field: "diet", Title: "忌口"}},
+				RowActions: []wbAction{{Label: "改报名", Prompt: "我想修改第 {{row.id}} 条报名（{{row.session}}，{{row.people}} 人）"}},
+				Empty:      &wbEmpty{Text: "你还没有报名", Action: &wbAction{Label: "让 AI 帮我报名", Prompt: "帮我报名这次团建"}}},
+			{Type: "chart", Title: "按场次统计（组织者看全部）", Chart: "pie", Source: &wbSource{Table: "signups", Args: json.RawMessage(`{"group_by":"session"}`)}, Rows: "items", X: "session", Y: []wbColumn{{Field: "count", Title: "报名数"}}},
+		}}}},
+	}}, Rows: map[string][]demoRow{
+		"notes": {
+			{By: "demo.wu.min", Data: map[string]any{"title": "集合", "content": "周六 8:30 公司楼下集合，徒步组请穿运动鞋、带水。"}},
+			{By: "demo.wu.min", Data: map[string]any{"title": "烧烤", "content": "周六 14:00 滨江公园烧烤区，人数以周四中午 12 点前的报名为准。"}},
+		},
+		"signups": {
+			{By: "demo.zhao.lei", Data: map[string]any{"session": morning, "people": 1}},
+			{By: "demo.sun.yue", Data: map[string]any{"session": afternoon, "people": 2, "diet": "不吃辣"}},
+			{By: "demo.lin.na", Data: map[string]any{"session": afternoon, "people": 1, "diet": "素食"}},
+			{By: "demo.zhou.hang", Data: map[string]any{"session": morning, "people": 1}},
+			{By: "demo.he.jing", Data: map[string]any{"session": afternoon, "people": 3, "diet": "海鲜过敏"}},
+			{By: "demo.liu.yang", Data: map[string]any{"session": morning, "people": 1}},
+		},
+	}}
 }
 
 // ---- 30 天模拟使用数据 ----
@@ -523,6 +615,10 @@ func (s *Server) handleDemoClear(w http.ResponseWriter, r *http.Request) {
 	// 先删应用再删连接：顺序不影响结果，只是让审计日志读起来顺
 	for id := range targets["asset"] {
 		if err := s.store.PurgeAssetActivity(ctx, id); err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		if err := s.store.PurgeAssetAppRows(ctx, id); err != nil {
 			s.internalErr(w, r, err)
 			return
 		}

@@ -584,13 +584,16 @@ export interface Scope {
 export interface WorkbenchAction {
   label: string;
   prompt: string;
+  /** 表单提交到应用自带的表：直接插入一行，不经过 AI */
+  table?: string;
 }
 
 export interface WorkbenchWidget {
   type: "metric" | "table" | "chart" | "checklist" | "form" | "actions" | "markdown" | "heading" | "board" | "kb_scope";
   title?: string;
   text?: string;
-  source?: { connection: string; tool: string; args?: Record<string, unknown> };
+  /** 写 table 是应用自带的表，和 connection / tool 二选一 */
+  source?: { connection?: string; tool?: string; table?: string; args?: Record<string, unknown> };
   field?: string;
   format?: string;
   delta_field?: string;
@@ -622,6 +625,32 @@ export interface AppWorkbench {
   panes: WorkbenchPane[];
 }
 
+/** 应用自带的数据表（M13）。own：各自填写；shared：共同维护；author：作者发布。 */
+export interface AppTable {
+  name: string;
+  title: string;
+  visibility?: "own" | "shared" | "author";
+  fields: AppField[];
+}
+
+export interface AppField {
+  name: string;
+  title: string;
+  kind: "text" | "number" | "money" | "date" | "select" | "bool" | "user";
+  options?: string[];
+  required?: boolean;
+  hidden?: boolean;
+}
+
+/** GET /api/apps/{slug}/data 里的一张表。rows 只有作者和管理员能看到。 */
+export interface AppTableInfo extends AppTable {
+  can_insert: boolean;
+  rows?: number;
+}
+
+/** 表里的一行：字段值加上系统字段。 */
+export type AppRow = Record<string, unknown> & { id: number; owner: string; mine: boolean; created_at: string; updated_at: string };
+
 export interface AssetSpec {
   title: string;
   description: string;
@@ -633,6 +662,8 @@ export interface AssetSpec {
   icon?: string;
   launch?: "new" | "resume";
   workbench?: AppWorkbench;
+  /** 微应用：自带的数据表 */
+  tables?: AppTable[];
   /** 微应用：样板，出现在「造 → 从样板复制」里（管理员设）。 */
   template?: boolean;
   knowledge?: string[];
@@ -1195,6 +1226,21 @@ export const api = {
 
   hub: () => request<{ assets: HubAsset[]; plugin_policies: Record<string, PluginPolicy> }>("GET", "/api/hub"),
   hubAsset: (id: number) => request<AssetDetail>("GET", `/api/hub/${id}`),
+  appTables: (slug: string) => request<{ tables: AppTableInfo[]; admin: boolean; row_limit: number }>("GET", `/api/apps/${encodeURIComponent(slug)}/data`),
+  appRows: (slug: string, table: string, params: { q?: string; limit?: number; offset?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.q) q.set("q", params.q);
+    if (params.limit) q.set("limit", String(params.limit));
+    if (params.offset) q.set("offset", String(params.offset));
+    return request<{ total: number; items: AppRow[] }>("GET", `/api/apps/${encodeURIComponent(slug)}/data/${encodeURIComponent(table)}?${q}`);
+  },
+  appInsertRow: (slug: string, table: string, row: Record<string, unknown>) =>
+    request<{ items: AppRow[] }>("POST", `/api/apps/${encodeURIComponent(slug)}/data/${encodeURIComponent(table)}`, { row }),
+  appUpdateRow: (slug: string, table: string, id: number, row: Record<string, unknown>) =>
+    request<{ item: AppRow }>("PATCH", `/api/apps/${encodeURIComponent(slug)}/data/${encodeURIComponent(table)}/${id}`, { row }),
+  appDeleteRow: (slug: string, table: string, id: number) =>
+    request<void>("DELETE", `/api/apps/${encodeURIComponent(slug)}/data/${encodeURIComponent(table)}/${id}`),
+  appExportUrl: (slug: string, table: string) => `/api/apps/${encodeURIComponent(slug)}/data/${encodeURIComponent(table)}/export`,
   createAsset: (a: AssetCreate) =>
     request<{ asset: HubAsset; status: PluginStatus; tools?: number; sync_error?: string }>("POST", "/api/hub", a),
   newAssetVersion: (id: number, spec: AssetSpec, secret?: string) =>

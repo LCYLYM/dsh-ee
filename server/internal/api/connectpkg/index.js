@@ -2852,8 +2852,8 @@ function validateName(subject, value) {
 }
 
 // src/brand.ts
-var _webLink_dec, _updatePlugin_dec, _saveServer_dec, _testServer_dec, _serverSettings_dec, _doctor_dec, _login_dec, _overview_dec, _kbDoc_dec, _setChecklist_dec, _checklists_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
-var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _checklists_dec = [Remote], _setChecklist_dec = [Remote], _kbDoc_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _serverSettings_dec = [Remote], _testServer_dec = [Remote], _saveServer_dec = [Remote], _updatePlugin_dec = [Remote], _webLink_dec = [Remote], _a) {
+var _insertFormRow_dec, _webLink_dec, _updatePlugin_dec, _saveServer_dec, _testServer_dec, _serverSettings_dec, _doctor_dec, _login_dec, _overview_dec, _kbDoc_dec, _setChecklist_dec, _checklists_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
+var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _checklists_dec = [Remote], _setChecklist_dec = [Remote], _kbDoc_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _serverSettings_dec = [Remote], _testServer_dec = [Remote], _saveServer_dec = [Remote], _updatePlugin_dec = [Remote], _webLink_dec = [Remote], _insertFormRow_dec = [Remote], _a) {
   constructor(ctx, actions) {
     super(ctx, "dshEE");
     this.actions = actions;
@@ -2922,6 +2922,9 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
   async webLink(request) {
     return this.actions.webLink(request ?? {});
   }
+  async insertFormRow(request) {
+    return this.actions.insertFormRow(request);
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "brand", _brand_dec, DshEEClientService);
@@ -2945,6 +2948,7 @@ __decorateElement(_init, 1, "testServer", _testServer_dec, DshEEClientService);
 __decorateElement(_init, 1, "saveServer", _saveServer_dec, DshEEClientService);
 __decorateElement(_init, 1, "updatePlugin", _updatePlugin_dec, DshEEClientService);
 __decorateElement(_init, 1, "webLink", _webLink_dec, DshEEClientService);
+__decorateElement(_init, 1, "insertFormRow", _insertFormRow_dec, DshEEClientService);
 __decoratorMetadata(_init, DshEEClientService);
 function registerBrand(ctx, actions) {
   return new DshEEClientService(ctx, actions);
@@ -3342,6 +3346,22 @@ async function readWidgetData(apps, tools, request) {
     return { error: error instanceof Error ? error.message : String(error) };
   }
 }
+async function insertFormRow(apps, tools, request) {
+  const widget = findWidget(apps, request);
+  const table = widget?.type === "form" ? widget.submit?.table : void 0;
+  if (!table) return { error: "\u8FD9\u4E2A\u8868\u5355\u6CA1\u6709\u914D\u7F6E\u63D0\u4EA4\u5230\u8868" };
+  const allowed = new Set((widget.fields ?? []).map((field) => field.name));
+  const row = {};
+  for (const [key, value] of Object.entries(request.values ?? {})) {
+    if (allowed.has(key) && value !== "" && value !== void 0) row[key] = value;
+  }
+  try {
+    toolValue(await tools.callTool("app__write", { action: "insert", app: request.app, table, rows: [row] }));
+    return { ok: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
 var kbTool = (name2) => `kb__${name2}`;
 async function readKBDoc(tools, request) {
   const name2 = kbTool("read");
@@ -3615,6 +3635,7 @@ function apply(ctx, input) {
       },
       unbindApp: async (name2) => appBindings.unbind(name2),
       workbenchData: async (request) => readWidgetData(await (await skillsReady).readApps(), bridge, request),
+      insertFormRow: async (request) => insertFormRow(await (await skillsReady).readApps(), bridge, request),
       readBoard: async (request) => boards.read(String(request?.app ?? ""), String(request?.sessionId ?? "")) ?? null,
       readChecklists: async (request) => checklists.read(String(request?.app ?? ""), String(request?.sessionId ?? ""))?.lists ?? {},
       setChecklist: async (request) => {
