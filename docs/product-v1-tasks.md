@@ -9,7 +9,7 @@
 | 里程碑 | 内容 | 依赖 | 需要 Mac 真机验证 | 状态 |
 |---|---|---|---|---|
 | M1 | 示例公司「星河科技」与一键导入 / 清除 | — | 否 | ✅ 已完成（2026-11-07） |
-| M2 | 工作台组件升级 | — | 是 | ✅ 代码完成，待 Mac 验证（[workbench-verify.md §6](./workbench-verify.md)） |
+| M2 | 工作台组件升级 | — | 是 | ✅ 已验证（2026-11-07，真实 dsh web 全项通过；Desktop 与暗色目视待补，[workbench-verify.md §6](./workbench-verify.md)） |
 | M3 | 第一批 4 个样板应用 | M1、M2 | 是 | 未开始 |
 | M4 | 导航按「用 / 造 / 管」重组，「自己用」免审核 | — | 否 | ✅ 已完成（2026-11-07） |
 | M5 | 应用编辑器：从样板复制、实时预览、原料一键生成、导入导出 | M2、M4 | 否 | 未开始（「从样板复制」的最小版本已随 M4 上线） |
@@ -88,7 +88,7 @@ M1、M2、M4、M10 互不依赖，可以并行。
 
 ### 完成情况（2026-11-07）
 
-代码完成，等 Mac 真机验证（清单见 [workbench-verify.md §6](./workbench-verify.md)）。
+代码完成并已在真实 `dsh web` 验证（`e2e/dsh/scenarios/run-m2.mjs`，覆盖下表 M2-1～M2-9 的等价检查，见 [workbench-verify.md §6](./workbench-verify.md)）；Desktop 客户端与暗色主题的目视核对待补。
 
 - 新组件：`chart`（line / bar / pie，SVG 自己画）、`checklist`（配置条目或只读工具取；勾选按会话存在本机；AI 用 `ee_workbench` 的 `action: "checklist"` 更新）、`heading`（分组标题）、`table.detail`（详情卡）、`metric.delta_field` 与 `compact` 格式、`empty`（空状态的说明与建议操作）。
 - 四种状态：骨架屏、空状态、无权限（链接到 dsh-ee 的 `/connections/<标识>`，M7 做好后那里就是申请入口）、出错（原因 + 重试），所有带数据源的组件都有。

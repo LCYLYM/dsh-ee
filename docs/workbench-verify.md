@@ -93,6 +93,8 @@
 
 新增 `chart`（折线 / 柱状 / 饼图，SVG 自己画）、`checklist`（配置的条目或只读工具取，勾选按会话存在 `$DSH_HOME/dsh-ee/checklists/`，AI 用 `ee_workbench` 的 `action: "checklist"` 更新）、`heading`（分组标题），`table` 的 `detail`（点一行展开详情卡），`metric` 的 `delta_field` 与 `compact` 格式，以及所有带数据源的组件的四种状态：骨架屏、空状态（`empty.text` + `empty.action`）、无权限（链接到 dsh-ee 的 `/connections/<标识>`）、出错（原因 + 重试）。配置示例见网页编辑器的「插入示例」。
 
+**验证结果（2026-11-07，Mac）**：`e2e/dsh/scenarios/run-m2.mjs` 在真实 `dsh web`（headless Chrome）里通过，覆盖 M2-1～M2-9 的等价检查：分组标题、指标（金额格式 + 变化值）、折线与饼图（SVG + `<title>` 悬停）、详情卡展开 / 收起、清单勾选刷新后按会话恢复、AI 经 `ee_workbench` 勾选与取消、受限连接显示「无权限」+「去申请权限 ↗」、上游 500 显示「取数失败」+「重试」、空数据源显示空状态 + 建议按钮。截图在 `e2e/shots/workbench-m2/`。注意：本机装了 DSH Desktop 时 `setup.sh` 只走 Desktop 分支，跑 scenarios（含 `test:m2`）前要先退出并临时挪开 `/Applications/DeepSeek Harness.app`。Desktop 客户端与暗色主题的目视核对仍待做（渲染层已由参考图与单测覆盖）。
+
 **参考图**：每种组件的每种状态，用插件里真实的渲染函数画出来（不是 DSH 里的截图）：
 
 - 亮色：[images/workbench-states/workbench-light.png](images/workbench-states/workbench-light.png)
