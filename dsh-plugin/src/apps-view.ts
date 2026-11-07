@@ -36,6 +36,8 @@ export interface AppsViewActions {
   open: (app: CatalogApp) => void;
   fill: (app: CatalogApp) => void;
   web: (app: CatalogApp) => void;
+  /** 打开网页上的应用详情：看缺哪些权限、一键申请 */
+  details?: (app: CatalogApp) => void;
   newSession: (app: CatalogApp) => void;
   openWorkbench?: (app: CatalogApp) => void;
   /** 启用一个自选微应用 */
@@ -135,6 +137,19 @@ function appMenu(createElement: (...args: any[]) => any, app: CatalogApp, action
     layer);
 }
 
+/** 「部分能力不可用」：能打开网页详情时是按钮，点开看缺什么、一键申请。 */
+function missingBadge(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions) {
+  if (!app.missing?.length) return null;
+  const style = { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" };
+  const title = `不可用：${app.missing.join("、")}`;
+  if (!actions.details || !app.detail_url) return createElement("span", { title, style }, "部分能力不可用");
+  return createElement("button", {
+    type: "button", "data-dsh-ee-missing": app.name, title: `${title}。点击查看并申请`,
+    onClick: (event: any) => { event?.stopPropagation?.(); actions.closeLayers?.(); actions.details!(app); },
+    style: { ...buttonStyle, ...style, padding: 0, textDecoration: "underline" },
+  }, "部分能力不可用 · 申请");
+}
+
 const statusViewOf = (status?: AppSessionStatus) => status === "need" ? { label: "待你决定", color: "#d97706" } : status === "busy" ? { label: "工作中", color: "#2563eb" } : status === "done" ? { label: "本轮结束", color: "#737373" } : undefined;
 
 function appRow(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions, status?: AppSessionStatus, confirming = false, menuOpen = false, anchor?: MenuAnchor) {
@@ -142,7 +157,7 @@ function appRow(createElement: (...args: any[]) => any, app: CatalogApp, actions
   return createElement("div", { key: app.name, "data-dsh-ee-app": app.name, style: { display: "flex", alignItems: "center", gap: 4 } },
     statusView ? createElement("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
     appTile(createElement, app, () => actions.open(app)),
-    app.missing?.length ? createElement("span", { title: `不可用：${app.missing.join("、")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "部分能力不可用") : null,
+    missingBadge(createElement, app, actions),
     appMenu(createElement, app, actions, confirming, menuOpen, anchor));
 }
 
@@ -177,7 +192,7 @@ function galleryRow(createElement: (...args: any[]) => any, app: CatalogApp, act
       createElement("span", { style: { minWidth: 0, flex: 1 } },
         createElement("span", { style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
         app.description ? createElement("span", { style: { display: "block", fontSize: 11, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.description) : null)),
-    app.missing?.length ? createElement("span", { title: `不可用：${app.missing.join("、")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "部分能力不可用") : null,
+    missingBadge(createElement, app, actions),
     appMenu(createElement, app, actions, confirming, menuOpen, anchor));
 }
 

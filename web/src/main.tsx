@@ -21,6 +21,7 @@ import PluginDetail from "./pages/plugin-detail";
 import AssetDetail from "./pages/asset-detail";
 import AssetEditor from "./pages/asset-editor";
 import AppWebPage from "./pages/app-web";
+import AccessRequestPage from "./pages/access-request";
 import KnowledgeBase from "./pages/knowledge-base";
 import KnowledgeDoc from "./pages/knowledge-doc";
 import DevicePage from "./pages/device";
@@ -65,17 +66,24 @@ function Start() {
 }
 
 /**
- * /connections/<标识>：DSH 工作台里「无权限 → 去申请」的链接只知道连接的标识，
- * 这里换成连接的详情页（上面有申请使用的入口）。
+ * /connections/<标识>?app=<应用>：DSH 工作台里「无权限 → 去申请」的链接只知道连接的标识。
+ * 能看到这个连接就去详情页；看不到（正是没权限的时候）就去申请页。
+ * 知识库数据源（kb）没有具体的库：去应用详情的「依赖与权限」，那里列出缺哪个库。
  */
 function ConnectionBySlug() {
-  const { slug } = useParams();
+  const { slug = "" } = useParams();
+  const [params] = useSearchParams();
+  const app = params.get("app") ?? "";
   const hub = useApi(api.hub);
   const { t } = useTranslation();
   if (hub.loading && !hub.data) return <Status title={t("common.loading")} />;
+  if (slug === "kb") {
+    const a = hub.data?.assets.find((x) => x.kind === "app" && x.slug === app);
+    return <Navigate to={a ? `/assets/${a.id}` : "/knowledge"} replace />;
+  }
   const a = hub.data?.assets.find((x) => x.kind === "connection" && x.slug === slug);
-  if (!a) return <Status title={t("shell.notFound")}>{t("shell.notFoundHint")}</Status>;
-  return <Navigate to={`/assets/${a.id}`} replace />;
+  if (a?.available) return <Navigate to={`/assets/${a.id}`} replace />;
+  return <Navigate to={`/request?${new URLSearchParams({ kind: "connection", slug, ...(app ? { app } : {}) })}`} replace />;
 }
 
 function NotFound() {
@@ -157,6 +165,7 @@ function AppRoutes() {
         <Route path="assets/:id" element={<AssetDetail />} />
         <Route path="assets/:id/edit" element={<AssetEditor />} />
         <Route path="connections/:slug" element={<ConnectionBySlug />} />
+        <Route path="request" element={<AccessRequestPage />} />
         <Route path="knowledge/docs/:id" element={<KnowledgeDoc />} />
         <Route path="knowledge/:id" element={<KnowledgeBase />} />
         {!pages.some((m) => m.path === "/market") && <Route path="market" element={<LegacyHub />} />}

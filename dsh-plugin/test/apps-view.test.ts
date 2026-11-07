@@ -153,3 +153,34 @@ test("只有自选的应用能停用，要点两次", () => {
   buttons[0].props.onClick();
   assert.deepEqual(calls, ["app-1:false", "app-1:true"]);
 });
+
+test("缺权限的应用：能打开网页详情时「部分能力不可用」是按钮，点了去详情页申请", () => {
+  const missing = { ...app(1), missing: ["crm"], detail_url: "https://ee.example.com/assets/7" };
+  const find = (node: any, pred: (n: any) => boolean): any => {
+    if (!node || typeof node !== "object") return undefined;
+    if (Array.isArray(node)) {
+      for (const c of node) {
+        const hit = find(c, pred);
+        if (hit) return hit;
+      }
+      return undefined;
+    }
+    if (pred(node)) return node;
+    for (const c of node.children ?? []) {
+      const hit = find(c, pred);
+      if (hit) return hit;
+    }
+    return undefined;
+  };
+  const opened: string[] = [];
+  const view = appsSection(createElement, { apps: [missing], loggedIn: true }, { ...actions, details: (a: CatalogApp) => opened.push(a.detail_url!) });
+  const button = find(view, (n) => n.props?.["data-dsh-ee-missing"] === "app-1");
+  assert.equal(button?.type, "button");
+  assert.match(JSON.stringify(button.children), /申请/);
+  button.props.onClick({ stopPropagation() {} });
+  assert.deepEqual(opened, ["https://ee.example.com/assets/7"]);
+  // 旧的宿主 / 没有详情地址：仍是提示文字
+  const plain = appsSection(createElement, { apps: [{ ...missing, detail_url: undefined }], loggedIn: true }, actions);
+  assert.equal(find(plain, (n) => n.props?.["data-dsh-ee-missing"]), undefined);
+  assert.match(JSON.stringify(plain), /部分能力不可用/);
+});

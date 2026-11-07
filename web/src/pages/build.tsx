@@ -8,6 +8,7 @@ import { useStore } from "../lib/store";
 import { useApi } from "../lib/use-api";
 import { assetPath, buildState, KIND_ICONS, scopeSummary, type BuildState } from "../lib/hub";
 import { PageLink, useMenus } from "../lib/menus";
+import { ImportAppButton } from "../components/app-import";
 import { LoadState } from "../components/api-ui";
 import { ScopeDialog, useScopeOptions } from "../components/scope-dialog";
 import { Badge, Button, Card, PageHeader, Segmented } from "../components/ui";
@@ -109,6 +110,7 @@ export default function Build() {
         actions={
           can("registry.publish") && (
             <>
+              <ImportAppButton onDone={hub.reload} />
               <Button variant="secondary" onClick={() => navigate(pathOf("templates"))}>
                 <Copy size={15} /> {t("build.fromTemplate")}
               </Button>

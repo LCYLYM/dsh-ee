@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"time"
 )
 
@@ -40,60 +39,6 @@ func (s *Store) DeleteExpiredAgentConfirms(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 	return res.RowsAffected()
-}
-
-// ---- 企业连接申请 ----
-
-type ConnectionRequest struct {
-	ID        int64     `json:"id"`
-	UserID    int64     `json:"user_id"`
-	AssetID   int64     `json:"asset_id"`
-	Slug      string    `json:"slug"`
-	Title     string    `json:"title"`
-	Reason    string    `json:"reason"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-// CreateConnectionRequest 登记申请；同一人对同一连接已有待处理的申请时返回它，不重复建。
-func (s *Store) CreateConnectionRequest(ctx context.Context, userID, assetID int64, reason string) (id int64, existed bool, err error) {
-	err = s.db.QueryRowContext(ctx,
-		"SELECT id FROM connection_requests WHERE user_id = ? AND asset_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1",
-		userID, assetID).Scan(&id)
-	if err == nil {
-		return id, true, nil
-	}
-	if err != sql.ErrNoRows {
-		return 0, false, err
-	}
-	res, err := s.db.ExecContext(ctx,
-		"INSERT INTO connection_requests (user_id, asset_id, reason, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
-		userID, assetID, truncateRunes(reason, 500), now())
-	if err != nil {
-		return 0, false, err
-	}
-	id, err = res.LastInsertId()
-	return id, false, err
-}
-
-func (s *Store) UserConnectionRequests(ctx context.Context, userID int64, limit int) ([]*ConnectionRequest, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT r.id, r.user_id, r.asset_id, a.slug, a.title, r.reason, r.status, r.created_at
-		 FROM connection_requests r JOIN assets a ON a.id = r.asset_id
-		 WHERE r.user_id = ? ORDER BY r.id DESC LIMIT ?`, userID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := []*ConnectionRequest{}
-	for rows.Next() {
-		var c ConnectionRequest
-		if err := rows.Scan(&c.ID, &c.UserID, &c.AssetID, &c.Slug, &c.Title, &c.Reason, &c.Status, &c.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, &c)
-	}
-	return out, rows.Err()
 }
 
 // ---- 我的使用记录 ----
@@ -231,73 +176,7 @@ func (s *Store) UserConnectionCalls(ctx context.Context, userID int64, limit int
 	return out, rows.Err()
 }
 
-// ---- 管理员处理连接申请与巡检 ----
-
-type PendingConnectionRequest struct {
-	ID         int64     `json:"id"`
-	UserID     int64     `json:"user_id"`
-	Username   string    `json:"username"`
-	Department string    `json:"department"`
-	AssetID    int64     `json:"asset_id"`
-	Slug       string    `json:"slug"`
-	Title      string    `json:"title"`
-	Reason     string    `json:"reason"`
-	CreatedAt  time.Time `json:"created_at"`
-}
-
-func (s *Store) PendingConnectionRequests(ctx context.Context, limit int) ([]*PendingConnectionRequest, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT r.id, r.user_id, u.username, u.department, r.asset_id, a.slug, a.title, r.reason, r.created_at
-		 FROM connection_requests r JOIN users u ON u.id = r.user_id JOIN assets a ON a.id = r.asset_id
-		 WHERE r.status = 'pending' ORDER BY r.id LIMIT ?`, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := []*PendingConnectionRequest{}
-	for rows.Next() {
-		var c PendingConnectionRequest
-		if err := rows.Scan(&c.ID, &c.UserID, &c.Username, &c.Department, &c.AssetID, &c.Slug, &c.Title, &c.Reason, &c.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, &c)
-	}
-	return out, rows.Err()
-}
-
-func (s *Store) CountPendingConnectionRequests(ctx context.Context) (int, error) {
-	var n int
-	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM connection_requests WHERE status = 'pending'").Scan(&n)
-	return n, err
-}
-
-// GetPendingConnectionRequest 取一条待处理的申请；不存在或已处理返回 ErrNotFound。
-func (s *Store) GetPendingConnectionRequest(ctx context.Context, id int64) (*PendingConnectionRequest, error) {
-	all, err := s.PendingConnectionRequests(ctx, 1000)
-	if err != nil {
-		return nil, err
-	}
-	for _, c := range all {
-		if c.ID == id {
-			return c, nil
-		}
-	}
-	return nil, ErrNotFound
-}
-
-// ResolveConnectionRequest 把待处理的申请标为已通过 / 已驳回；已处理过的返回 ErrNotFound（并发处理只有一次成功）。
-func (s *Store) ResolveConnectionRequest(ctx context.Context, id int64, status string, by int64) error {
-	res, err := s.db.ExecContext(ctx,
-		"UPDATE connection_requests SET status = ?, handled_by = ?, handled_at = ? WHERE id = ? AND status = 'pending'",
-		status, by, now(), id)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
-	return nil
-}
+// ---- 巡检 ----
 
 type ConnectionHealth struct {
 	Slug   string `json:"slug"`

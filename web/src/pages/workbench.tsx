@@ -11,6 +11,7 @@ import { pluginPath } from "../components/plugin-card";
 import { Badge, Button, Card, CardHeader, PluginIcon, Stat, StatStrip } from "../components/ui";
 import { HoverArrow, Ribbon } from "../components/landing-graphics";
 import { BuildStateBadge } from "./build";
+import { AccessRequestsCard } from "../components/access-requests";
 import { PageLink } from "../lib/menus";
 import { useTranslation } from "react-i18next";
 
@@ -97,6 +98,8 @@ export default function Workbench() {
           hint={hub.data ? t("workbench.contributionsReach", { count: built.reduce((n, a) => n + a.users, 0) }) : hub.error ? t("workbench.unavailable") : t("workbench.reading")}
         />
       </StatStrip>
+
+      <AccessRequestsCard className="mt-4" />
 
       <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Card>

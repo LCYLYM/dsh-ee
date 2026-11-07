@@ -146,10 +146,16 @@ func (s *Server) handleMyConnections(w http.ResponseWriter, r *http.Request) {
 		}
 		mine = append(mine, c)
 	}
-	reqs, err := s.store.UserConnectionRequests(ctx, v.user.ID, 20)
+	all, err := s.store.UserAccessRequests(ctx, v.user.ID, 50)
 	if err != nil {
 		s.internalErr(w, r, err)
 		return
+	}
+	reqs := []*store.AccessRequest{}
+	for _, q := range all {
+		if q.Kind == store.RequestConnection && len(reqs) < 20 {
+			reqs = append(reqs, q)
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"connections": mine, "requestable": requestable, "requests": reqs, "server_name": s.mcpServerName(r)})
 }
@@ -191,7 +197,7 @@ func (s *Server) handleCreateConnectionRequest(w http.ResponseWriter, r *http.Re
 		writeErr(w, http.StatusBadRequest, "你已经可以使用这个连接了，不需要申请")
 		return
 	}
-	id, existed, err := s.store.CreateConnectionRequest(ctx, v.user.ID, target.ID, req.Reason)
+	id, existed, err := s.store.CreateAccessRequest(ctx, v.user.ID, store.RequestConnection, target.ID, 0, req.Reason)
 	if err != nil {
 		s.internalErr(w, r, err)
 		return

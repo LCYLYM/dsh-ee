@@ -1,4 +1,4 @@
-import { useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
+import { useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
 import { Check, Copy, Eye, EyeOff, Star } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Tip } from "@/components/tip";
@@ -47,8 +47,12 @@ export function Badge({ tone = "slate", children }: { tone?: keyof typeof tones;
   );
 }
 
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cx("rounded-lg border border-neutral-200/70 bg-card shadow-card", className)}>{children}</div>;
+export function Card({ className, children, ...rest }: { className?: string; children: ReactNode } & Omit<HTMLAttributes<HTMLDivElement>, "className" | "children">) {
+  return (
+    <div {...rest} className={cx("rounded-lg border border-neutral-200/70 bg-card shadow-card", className)}>
+      {children}
+    </div>
+  );
 }
 
 export function Toggle({

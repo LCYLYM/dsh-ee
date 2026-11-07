@@ -20,6 +20,8 @@ import getStarted from "./get-started";
 import knowledge from "./knowledge";
 import build from "./build";
 import sso from "./sso";
+import requests from "./requests";
+import studio from "./studio";
 
 /** 中文文案（源语言）。按页面分模块，这里合并成一棵树。 */
 export default {
@@ -45,4 +47,6 @@ export default {
   ...getStarted,
   ...build,
   ...sso,
+  ...requests,
+  ...studio,
 };

@@ -222,7 +222,7 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
       expandedRow: (index) => expanded[index],
       toggleRow: (index, row) => setExpanded((current) => ({ ...current, [index]: current[index] === row ? undefined : row })),
       // 无权限时「去申请」：dsh-ee 网页上这个连接的页面（有申请入口）
-      requestHref: (connection) => (docBase ? `${docBase}/connections/${encodeURIComponent(connection)}` : undefined),
+      requestHref: (connection) => (docBase ? `${docBase}/connections/${encodeURIComponent(connection)}?app=${encodeURIComponent(app.name)}` : undefined),
       openCitation: docPane ? (citation: Citation) => {
         docTargets.set(app.name, { doc: citation.doc, version: citation.version, from: citation.from, to: citation.to, quote: citation.quote, title: citation.title });
         try {

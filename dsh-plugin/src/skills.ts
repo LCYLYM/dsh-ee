@@ -16,6 +16,8 @@ export interface CatalogApp {
   missing?: string[];
   asset_id?: number;
   web_url?: string;
+  /** 网页上的应用详情（依赖与权限、一键申请） */
+  detail_url?: string;
   /** 开放了网页版：在网页查看时打开 /a/<名字>，而不是能力详情 */
   web?: boolean;
   /** 右侧栏业务工作台；旧服务端没有这个字段 */
@@ -104,11 +106,11 @@ export async function registerSkills(ctx: DshContext, config: PluginConfig, http
     },
     readApps: async () => {
       await refresh();
-      return (catalog.apps ?? []).map((app: CatalogApp) => ({ ...app, web_url: appWebUrl(config.base, app) }));
+      return (catalog.apps ?? []).map((app: CatalogApp) => ({ ...app, web_url: appWebUrl(config.base, app), detail_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : undefined }));
     },
     readAvailableApps: async () => {
       await refresh();
-      return (catalog.available_apps ?? []).map((app: CatalogApp) => ({ ...app, web_url: appWebUrl(config.base, app) }));
+      return (catalog.available_apps ?? []).map((app: CatalogApp) => ({ ...app, web_url: appWebUrl(config.base, app), detail_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : undefined }));
     },
     refreshNow: async () => {
       if (await refresh()) {

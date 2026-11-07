@@ -151,6 +151,7 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     unbind: (app) => { void remote.unbindApp({ name: app.name }).then((result: any) => { const bindings = unwrapRemote(result); update({ bindings }); setNotice("已解除绑定"); }).catch(() => setNotice("解除绑定失败，请稍后重试。")); },
     fill: (app) => { void fill(app).then(setNotice); },
     web,
+    details: (app) => { if (app.detail_url) void openWeb(app.detail_url); },
     search: () => {},
   });
 

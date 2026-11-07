@@ -20210,6 +20210,23 @@ function appMenu(createElement5, app, actions, confirming = false, open2 = false
     layer
   );
 }
+function missingBadge(createElement5, app, actions) {
+  if (!app.missing?.length) return null;
+  const style = { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" };
+  const title = `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`;
+  if (!actions.details || !app.detail_url) return createElement5("span", { title, style }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528");
+  return createElement5("button", {
+    type: "button",
+    "data-dsh-ee-missing": app.name,
+    title: `${title}\u3002\u70B9\u51FB\u67E5\u770B\u5E76\u7533\u8BF7`,
+    onClick: (event) => {
+      event?.stopPropagation?.();
+      actions.closeLayers?.();
+      actions.details(app);
+    },
+    style: { ...buttonStyle, ...style, padding: 0, textDecoration: "underline" }
+  }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528 \xB7 \u7533\u8BF7");
+}
 var statusViewOf = (status) => status === "need" ? { label: "\u5F85\u4F60\u51B3\u5B9A", color: "#d97706" } : status === "busy" ? { label: "\u5DE5\u4F5C\u4E2D", color: "#2563eb" } : status === "done" ? { label: "\u672C\u8F6E\u7ED3\u675F", color: "#737373" } : void 0;
 function appRow(createElement5, app, actions, status, confirming = false, menuOpen = false, anchor2) {
   const statusView = statusViewOf(status);
@@ -20218,7 +20235,7 @@ function appRow(createElement5, app, actions, status, confirming = false, menuOp
     { key: app.name, "data-dsh-ee-app": app.name, style: { display: "flex", alignItems: "center", gap: 4 } },
     statusView ? createElement5("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
     appTile(createElement5, app, () => actions.open(app)),
-    app.missing?.length ? createElement5("span", { title: `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528") : null,
+    missingBadge(createElement5, app, actions),
     appMenu(createElement5, app, actions, confirming, menuOpen, anchor2)
   );
 }
@@ -20277,7 +20294,7 @@ function galleryRow(createElement5, app, actions, status, confirming = false, me
         app.description ? createElement5("span", { style: { display: "block", fontSize: 11, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.description) : null
       )
     ),
-    app.missing?.length ? createElement5("span", { title: `\u4E0D\u53EF\u7528\uFF1A${app.missing.join("\u3001")}`, style: { fontSize: 11, color: "#d97706", whiteSpace: "nowrap" } }, "\u90E8\u5206\u80FD\u529B\u4E0D\u53EF\u7528") : null,
+    missingBadge(createElement5, app, actions),
     appMenu(createElement5, app, actions, confirming, menuOpen, anchor2)
   );
 }
@@ -20883,6 +20900,9 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
       void fill(app).then(setNotice);
     },
     web,
+    details: (app) => {
+      if (app.detail_url) void openWeb(app.detail_url);
+    },
     search: () => {
     }
   });
@@ -21887,7 +21907,7 @@ function registerWorkbench(ctx, deps) {
       expandedRow: (index) => expanded[index],
       toggleRow: (index, row) => setExpanded((current) => ({ ...current, [index]: current[index] === row ? void 0 : row })),
       // 无权限时「去申请」：dsh-ee 网页上这个连接的页面（有申请入口）
-      requestHref: (connection) => docBase ? `${docBase}/connections/${encodeURIComponent(connection)}` : void 0,
+      requestHref: (connection) => docBase ? `${docBase}/connections/${encodeURIComponent(connection)}?app=${encodeURIComponent(app.name)}` : void 0,
       openCitation: docPane ? (citation) => {
         docTargets.set(app.name, { doc: citation.doc, version: citation.version, from: citation.from, to: citation.to, quote: citation.quote, title: citation.title });
         try {

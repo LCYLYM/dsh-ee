@@ -519,11 +519,11 @@ async function registerSkills(ctx, config, http) {
     },
     readApps: async () => {
       await refresh();
-      return (catalog.apps ?? []).map((app) => ({ ...app, web_url: appWebUrl(config.base, app) }));
+      return (catalog.apps ?? []).map((app) => ({ ...app, web_url: appWebUrl(config.base, app), detail_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : void 0 }));
     },
     readAvailableApps: async () => {
       await refresh();
-      return (catalog.available_apps ?? []).map((app) => ({ ...app, web_url: appWebUrl(config.base, app) }));
+      return (catalog.available_apps ?? []).map((app) => ({ ...app, web_url: appWebUrl(config.base, app), detail_url: app.asset_id ? `${config.base}/assets/${app.asset_id}` : void 0 }));
     },
     refreshNow: async () => {
       if (await refresh()) {

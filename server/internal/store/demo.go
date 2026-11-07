@@ -75,12 +75,14 @@ func (s *Store) PurgeUser(ctx context.Context, userID int64) error {
 
 // PurgeAssetActivity 删除一项能力的使用记录与申请（删除示例能力时一起清掉，统计页不留孤儿数据）。
 func (s *Store) PurgeAssetActivity(ctx context.Context, assetID int64) error {
-	for _, table := range []string{"asset_usage", "connection_calls", "connection_requests"} {
+	for _, table := range []string{"asset_usage", "connection_calls"} {
 		if _, err := s.db.ExecContext(ctx, "DELETE FROM "+table+" WHERE asset_id = ?", assetID); err != nil {
 			return err
 		}
 	}
-	return nil
+	// 申请表里 asset_id 也可能是知识库的 id，按类型区分；为这个应用提的申请一起删
+	_, err := s.db.ExecContext(ctx, "DELETE FROM connection_requests WHERE (asset_id = ? AND kind <> 'knowledge') OR app_id = ?", assetID, assetID)
+	return err
 }
 
 // ---- 模拟使用数据：批量写入 ----

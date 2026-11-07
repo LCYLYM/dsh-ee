@@ -299,7 +299,7 @@ func (s *Server) handleAttention(w http.ResponseWriter, r *http.Request) {
 		add(attentionItem{ID: "review_scopes", Title: "申请扩大可用范围的能力", Count: len(scoped), Detail: firstN(scoped, 5), How: "ee_review.queue_assets 的 scopes，再用 decide_scope 通过或驳回"})
 	}
 	if a.Has(rbac.ConnectionsManage) {
-		n, err := s.store.CountPendingConnectionRequests(ctx)
+		n, err := s.store.CountPendingAccessRequests(ctx, store.RequestConnection)
 		if err != nil {
 			s.internalErr(w, r, err)
 			return
@@ -533,9 +533,9 @@ func (s *Server) handleInspectAsset(w http.ResponseWriter, r *http.Request) {
 
 // ---- 连接申请的处理 ----
 
-// GET /api/admin/connection-requests
+// GET /api/admin/connection-requests：待处理的连接申请（技能、知识库的申请在 /api/me/access-requests 里）。
 func (s *Server) handleListConnectionRequests(w http.ResponseWriter, r *http.Request) {
-	reqs, err := s.store.PendingConnectionRequests(r.Context(), 100)
+	reqs, err := s.store.PendingAccessRequests(r.Context(), 100, store.RequestConnection)
 	if err != nil {
 		s.internalErr(w, r, err)
 		return
@@ -546,59 +546,7 @@ func (s *Server) handleListConnectionRequests(w http.ResponseWriter, r *http.Req
 // POST /api/admin/connection-requests/{id}：{decision: approve|reject, note}。
 // 通过 = 把申请人加进这个连接的可用范围（范围本来是全员就不用动）；驳回只关闭申请。
 func (s *Server) handleResolveConnectionRequest(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r)
-	if !ok {
-		return
-	}
-	var req struct {
-		Decision string `json:"decision"`
-		Note     string `json:"note"`
-	}
-	if !readJSON(w, r, &req) {
-		return
-	}
-	if req.Decision != "approve" && req.Decision != "reject" {
-		writeErr(w, http.StatusBadRequest, "decision 只能是 approve 或 reject")
-		return
-	}
-	pr, err := s.store.GetPendingConnectionRequest(r.Context(), id)
-	if notFound(err) {
-		writeErr(w, http.StatusNotFound, "申请不存在或已经处理过")
-		return
-	}
-	if err != nil {
-		s.internalErr(w, r, err)
-		return
-	}
-	asset, err := s.store.GetAsset(r.Context(), pr.AssetID)
-	if err != nil {
-		s.internalErr(w, r, err)
-		return
-	}
-	status := "rejected"
-	if req.Decision == "approve" {
-		status = "approved"
-		if !asset.Scope.All && !slices.Contains(asset.Scope.Users, pr.UserID) {
-			sc := asset.Scope
-			sc.Users = append(append([]int64{}, sc.Users...), pr.UserID)
-			sc = sc.Normalize()
-			if err := s.store.UpdateAsset(r.Context(), asset.ID, store.AssetPatch{Scope: &sc}); err != nil {
-				s.internalErr(w, r, err)
-				return
-			}
-		}
-	}
-	if err := s.store.ResolveConnectionRequest(r.Context(), id, status, currentUser(r).ID); err != nil {
-		if notFound(err) {
-			writeErr(w, http.StatusConflict, "这条申请刚被别人处理了")
-			return
-		}
-		s.internalErr(w, r, err)
-		return
-	}
-	s.audit(r, "connection.request_"+req.Decision, pr.Slug, map[string]any{"id": id, "user": pr.Username, "note": truncate(req.Note, 500)})
-	s.hub.notify()
-	writeJSON(w, http.StatusOK, map[string]any{"status": status, "user": pr.Username, "connection": pr.Slug})
+	s.resolveAccessRequest(w, r, store.RequestConnection)
 }
 
 func mustJSON(v any) []byte {

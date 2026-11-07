@@ -15,6 +15,7 @@ import { Badge, Button, Card, cx, Field, inputBase, inputCls, PageHeader, Passwo
 import { PageLink } from "../lib/menus";
 import { parseWorkbench, WorkbenchField, workbenchText } from "../components/workbench-editor";
 import { parseTables, TablesField, tablesText as tablesToText } from "../components/app-data";
+import { LivePreview } from "../components/live-preview";
 
 const KINDS: AssetKind[] = ["skill", "prompt", "app", "connection"];
 const textareaCls = "w-full rounded-md border border-neutral-300 bg-card px-3 py-2 text-sm outline-none placeholder:text-neutral-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
@@ -159,10 +160,10 @@ function ConnectionFields({ spec, set, secret, setSecret, secretHint }: { spec: 
 export default function AssetEditorRoute({ forceKind }: { forceKind?: AssetKind }) {
   const { id } = useParams();
   const [params] = useSearchParams();
-  return <AssetEditor key={`${id ?? "new"}:${forceKind ?? params.get("kind") ?? ""}:${params.get("from") ?? ""}`} forceKind={forceKind} />;
+  return <AssetEditor key={`${id ?? "new"}:${forceKind ?? params.get("kind") ?? ""}:${params.get("from") ?? ""}:${params.get("knowledge") ?? ""}:${params.get("connection") ?? ""}`} forceKind={forceKind} />;
 }
 
-/** 「造 → 新建应用」：固定为应用的编辑器；?from=<id> 从样板复制，?knowledge=<库> 带上知识库。 */
+/** 「造 → 新建应用」：固定为应用的编辑器；?from=<id> 从样板复制，?knowledge=<库>、?connection=<连接> 先生成一份草稿。 */
 export function AppNew() {
   return <AssetEditorRoute forceKind="app" />;
 }
@@ -177,12 +178,19 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
   const editing = id !== undefined;
   const fromId = !editing ? Number(params.get("from")) || 0 : 0;
   const kbSlug = params.get("knowledge");
+  const connSlug = params.get("connection");
   const existing = useApi(() => (editing ? api.hubAsset(Number(id)) : Promise.resolve(null)));
   const source = useApi(() => (fromId ? api.hubAsset(fromId) : Promise.resolve(null)));
+  // 原料一键生成草稿（M5）：失败时退回到只带上知识库
+  const draft = useApi(() =>
+    !editing && !fromId && (kbSlug || connSlug)
+      ? api.appDraft(kbSlug ? "knowledge" : "connection", (kbSlug || connSlug)!).catch(() => null)
+      : Promise.resolve(null),
+  );
   const hub = useApi(api.hub);
   const kb = useApi(api.knowledge);
   const opts = useScopeOptions();
-  const queryKind = (forceKind ?? (fromId ? "app" : params.get("kind"))) as AssetKind;
+  const queryKind = (forceKind ?? (fromId || kbSlug || connSlug ? "app" : params.get("kind"))) as AssetKind;
   const kind: AssetKind = existing.data?.asset.kind ?? (KINDS.includes(queryKind) ? queryKind : "skill");
   const canManage = kind === "connection" ? can("connections.manage") : can("plugins.manage");
   const [spec, setSpec] = useState<AssetSpec>(() => emptySpec(kind));
@@ -213,12 +221,17 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
       setWbText(workbenchText(a.spec.workbench));
       setTablesText(tablesToText(a.spec.tables));
       setSlug(`${a.slug}-copy`.slice(0, 48));
+    } else if (draft.data) {
+      setSpec({ ...emptySpec("app"), ...draft.data.spec });
+      setWbText(workbenchText(draft.data.spec.workbench));
+      setTablesText("");
+      setSlug(draft.data.slug);
     } else if (!editing && !fromId) {
       setSpec({ ...emptySpec(kind), ...(kind === "app" && kbSlug ? { knowledge: [kbSlug] } : {}) });
       setWbText("");
       setTablesText("");
     }
-  }, [existing.data, source.data, editing, fromId, kind, kbSlug, t]);
+  }, [existing.data, source.data, draft.data, editing, fromId, kind, kbSlug, t]);
 
   const set = (p: Partial<AssetSpec>) => setSpec((s) => ({ ...s, ...p }));
   const assets = hub.data?.assets ?? [];
@@ -232,6 +245,9 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
   }
   if (fromId && !source.data) {
     return <LoadState loading={source.loading} error={source.error} onRetry={source.reload}>{null}</LoadState>;
+  }
+  if ((kbSlug || connSlug) && !editing && !fromId && draft.loading) {
+    return <LoadState loading error={null} onRetry={draft.reload}>{null}</LoadState>;
   }
   const Icon = KIND_ICONS[kind];
   const title = editing
@@ -319,12 +335,19 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
   );
 
   return (
-    <div className="max-w-3xl">
+    <div className={kind === "app" ? "max-w-[1400px]" : "max-w-3xl"}>
       <PageLink page={kind === "app" ? "build" : "materials"} className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
         <ArrowLeft size={14} /> {t("asset.back")}
       </PageLink>
       <PageHeader title={title} desc={t(`hub.tabHints.${kind}`)} actions={<Icon size={28} strokeWidth={1.4} className="text-neutral-400" />} />
+      {(draft.data?.notes.length ?? 0) > 0 && (
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="font-medium">{t("studio.draftNotes")}</div>
+          <ul className="mt-1 list-disc pl-5">{draft.data!.notes.map((n) => <li key={n}>{n}</li>)}</ul>
+        </div>
+      )}
 
+      <div className={kind === "app" ? "grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)]" : ""}>
       <div className="space-y-4">
         <Section>
           <Field label={t("editor.slug")} hint={kind === "connection" ? t("editor.connSlugHint") : t("editor.slugHint")}>
@@ -466,6 +489,12 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
             {t("common.cancel")}
           </Button>
         </div>
+      </div>
+      {kind === "app" && (
+        <aside className="lg:sticky lg:top-4">
+          <LivePreview text={wbText} app={editing ? slug : ""} title={spec.title} icon={spec.icon} />
+        </aside>
+      )}
       </div>
     </div>
   );

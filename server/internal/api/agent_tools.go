@@ -383,6 +383,18 @@ var agentSpecs = map[string]*agentSpec{
 			{Name: "reason", Type: "string", Required: true, Desc: "用途"},
 		},
 	},
+	"GET /api/me/access-requests": {
+		Tool: "ee_connections", Action: "requests", Summary: "我提交的权限申请（连接、技能、知识库）和状态，以及待我审批的", Effect: effRead,
+	},
+	"POST /api/me/access-requests": {
+		Tool: "ee_connections", Action: "request_for_app", Summary: "为了用某个应用，申请它缺的连接、技能或知识库（审批人是对应的维护者或管理员）", En: "Request access to a connection, skill or knowledge base", Effect: effWrite,
+		Params: []agentParam{
+			{Name: "kind", Type: "string", Required: true, Enum: []string{"connection", "skill", "knowledge"}},
+			{Name: "slug", Type: "string", Required: true, Desc: "连接、技能或知识库的标识"},
+			{Name: "app", Type: "string", Desc: "为了哪个应用（应用标识）；写了可以不填用途"},
+			{Name: "reason", Type: "string", Desc: "用途"},
+		},
+	},
 
 	// ---- ee_records ----
 	"GET /api/me/calls/model": {

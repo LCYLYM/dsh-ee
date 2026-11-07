@@ -995,12 +995,12 @@ func adminSpecs() map[string]*agentSpec {
 			Tool: "ee_connections_admin", Action: "resolve", Summary: "通过或驳回一条连接申请；通过会把申请人加进该连接的可用范围", En: "Resolve a connection request", Effect: dg,
 			Params: []agentParam{pID, {Name: "decision", Type: "string", Required: true, Enum: []string{"approve", "reject"}}, {Name: "note", Type: "string"}},
 			Preview: func(ctx context.Context, s *Server, _ *Principal, args map[string]any) (string, error) {
-				pr, err := s.store.GetPendingConnectionRequest(ctx, argID(args))
-				if err != nil {
+				pr, err := s.store.GetPendingAccessRequest(ctx, argID(args))
+				if err != nil || pr.Kind != store.RequestConnection {
 					return "", fmt.Errorf("没有待处理的申请 #%d，先用 requests 查看", argID(args))
 				}
 				if args["decision"] == "approve" {
-					return fmt.Sprintf("将通过 %s（%s）对连接「%s」的申请（理由：%s）：他会被加进该连接的可用范围，之后能用其中他的角色允许的工具。", pr.Username, pr.Department, pr.Title, pr.Reason), nil
+					return fmt.Sprintf("将通过 %s（%s）对连接「%s」的申请（理由：%s）：申请人会被加进该连接的可用范围，之后能用其中其角色允许的工具。", pr.Username, pr.Department, pr.Title, pr.Reason), nil
 				}
 				return fmt.Sprintf("将驳回 %s 对连接「%s」的申请（理由：%s）。", pr.Username, pr.Title, pr.Reason), nil
 			},

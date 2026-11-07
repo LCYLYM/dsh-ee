@@ -238,7 +238,12 @@ func (s *Server) handleKBDetail(w http.ResponseWriter, r *http.Request) {
 	for i, d := range docs {
 		out[i] = docItem{KDoc: d, UpdatedByName: users.name(d.UpdatedBy)}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"kb": kbItemOf(v, b), "docs": out})
+	used, err := s.appsUsing(r.Context(), v, store.RequestKnowledge, b.Slug)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"kb": kbItemOf(v, b), "docs": out, "used_by": used})
 }
 
 type kbPatchReq struct {

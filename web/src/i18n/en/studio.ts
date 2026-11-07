@@ -1,0 +1,35 @@
+import type zh from "../zh/studio";
+import type { Messages } from "../types";
+
+export default {
+  studio: {
+    previewTitle: "Live preview",
+    previewHint: "Data is fetched as you and looks the same as in the DSH sidebar and on the web. Buttons don't really talk to the AI or write data here.",
+    refresh: "Refresh data",
+    untitled: "Untitled app",
+    noWorkbench: "No workbench yet. Insert the sample under “Workbench” on the left, or copy a template.",
+    webPane: "In DSH this pane opens a web page:",
+    docPane: "Cited knowledge base documents open in this pane.",
+    previewSend: "In DSH, this button sends the following to the AI:",
+    previewInsert: "In DSH and on the web this form writes straight to the “{{table}}” table; the preview doesn't write.",
+    draftNotes: "A draft was prepared from the source. Check before saving:",
+    copyAsMine: "Copy as my app",
+    makeAppFromConn: "Build an app with this connection",
+    makeAppFromKB: "Build a Q&A app from this base",
+    export: "Export",
+    exportApp: "Export app file",
+    exportWithDocs: "Export with knowledge base documents",
+    usedBy: "Used by these apps ({{count}})",
+    usedByEmpty: "No app uses it yet.",
+    import: "Import app",
+    importBadFile: "That file isn't JSON. Pick an app file exported from dsh-ee.",
+    importFailed: "Import failed",
+    importDone: "Imported as /{{slug}}",
+    importDesc: "Only you can use it for now. Share it once its dependencies are in place.",
+    importResult: { created: "Created", reused: "Reused", missing: "Missing", skipped: "Skipped" },
+    importNoDeps: "This app has no dependencies.",
+    importRemoved: "{{count}} workbench widgets used a missing connection or dataset and were removed. Import the original file again once they exist.",
+    close: "Close",
+    openImported: "Open it",
+  },
+} satisfies Messages<typeof zh>;

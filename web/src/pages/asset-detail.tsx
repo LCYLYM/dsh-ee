@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, MoreHorizontal, RefreshCw, Terminal } from "lucide-react";
+import { ArrowLeft, Download, MoreHorizontal, RefreshCw, Terminal } from "lucide-react";
 import { api, formatTime, type ConnectionTool, type HubAsset } from "../lib/api";
 import { useAction, useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
@@ -12,10 +12,12 @@ import { useLabels } from "../lib/labels";
 import { pluginPath } from "../components/plugin-card";
 import { LoadState, ErrorNote } from "../components/api-ui";
 import { AppDataPanel } from "../components/app-data";
+import { AppDepsCard } from "../components/access-requests";
+import { UsedByCard } from "../components/used-by";
 import { ScopeDialog, useScopeOptions } from "../components/scope-dialog";
 import { Badge, Button, Card, CardHeader, cx, inputCls, Toggle } from "../components/ui";
 import { statusBadge } from "../components/status";
-import { PageLink } from "../lib/menus";
+import { PageLink, useMenus } from "../lib/menus";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 
@@ -133,7 +135,8 @@ function AssetDetail() {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const { notify } = useStore();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  const { pathOf } = useMenus();
   const detail = useApi(() => api.hubAsset(Number(id)));
   const hub = useApi(api.hub);
   const opts = useScopeOptions();
@@ -222,6 +225,35 @@ function AssetDetail() {
             <Button variant={a.subscribed ? "secondary" : "primary"} disabled={busy} onClick={toggleSub}>
               {a.subscribed ? t("hub.disable") : t("hub.enable")}
             </Button>
+          )}
+          {a.kind === "app" && can("registry.publish") && (
+            <Button variant="secondary" onClick={() => navigate(`${pathOf("app-new")}?from=${a.id}`)}>
+              {t("studio.copyAsMine")}
+            </Button>
+          )}
+          {a.kind === "connection" && a.available && can("registry.publish") && (
+            <Button variant="secondary" onClick={() => navigate(`${pathOf("app-new")}?connection=${encodeURIComponent(a.slug)}`)}>
+              {t("studio.makeAppFromConn")}
+            </Button>
+          )}
+          {a.kind === "app" && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary">
+                  <Download size={15} /> {t("studio.export")}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <a href={api.appFileUrl(a.id, false)} download>{t("studio.exportApp")}</a>
+                </DropdownMenuItem>
+                {(a.spec.knowledge?.length ?? 0) > 0 && (
+                  <DropdownMenuItem asChild>
+                    <a href={api.appFileUrl(a.id, true)} download>{t("studio.exportWithDocs")}</a>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {canEdit && (
             <Button variant="secondary" onClick={() => navigate(editPath)}>
@@ -320,22 +352,26 @@ function AssetDetail() {
                   </>
                 )}
               </Card>
-              <Card className="p-5">
-                <h2 className="mb-3 font-medium text-neutral-900">{t("asset.dependsOn")}</h2>
-                <ul className="space-y-2">
-                  {depList(a.spec.skills, "skill")}
-                  {depList(a.spec.connections, "connection")}
-                  {(a.spec.plugins ?? []).map((p) => (
-                    <li key={p} className="flex items-center gap-2 text-sm">
-                      <Badge>{t("hub.tabs.plugin")}</Badge>
-                      <Link to={pluginPath(p)} className="font-mono text-neutral-900 hover:underline">
-                        {p}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-                {!a.spec.skills?.length && !a.spec.connections?.length && !a.spec.plugins?.length && <p className="text-sm text-neutral-600">{t("asset.noDeps")}</p>}
-              </Card>
+              {d.deps ? (
+                <AppDepsCard app={{ slug: a.slug, title: a.spec.title }} deps={d.deps} onChanged={() => { detail.reload(); hub.reload(); }} />
+              ) : (
+                <Card className="p-5">
+                  <h2 className="mb-3 font-medium text-neutral-900">{t("asset.dependsOn")}</h2>
+                  <ul className="space-y-2">
+                    {depList(a.spec.skills, "skill")}
+                    {depList(a.spec.connections, "connection")}
+                    {(a.spec.plugins ?? []).map((p) => (
+                      <li key={p} className="flex items-center gap-2 text-sm">
+                        <Badge>{t("hub.tabs.plugin")}</Badge>
+                        <Link to={pluginPath(p)} className="font-mono text-neutral-900 hover:underline">
+                          {p}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                  {!a.spec.skills?.length && !a.spec.connections?.length && !a.spec.plugins?.length && <p className="text-sm text-neutral-600">{t("asset.noDeps")}</p>}
+                </Card>
+              )}
               {a.live_version > 0 && a.spec.workbench && (
                 <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
                   <div>
@@ -433,6 +469,8 @@ function AssetDetail() {
               )}
             </Card>
           )}
+
+          {d.used_by && <UsedByCard apps={d.used_by} />}
 
           {d.versions && (
             <Card>

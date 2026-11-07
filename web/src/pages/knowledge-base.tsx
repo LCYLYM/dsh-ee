@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, FilePlus, MoreHorizontal, Upload } from "lucide-react";
+import { ArrowLeft, FilePlus, MoreHorizontal, Sparkles, Upload } from "lucide-react";
 import { api, formatTime, type KBase, type KBMaintainers, type KBSearchResult, type KBUploadResult, type Scope } from "../lib/api";
 import { useAction, useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
@@ -15,6 +15,9 @@ import { Badge, Button, Card, cx, Field, inputBase, inputCls, Segmented, Toggle 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { kdocPath, QueryTable } from "./knowledge";
+import { UsedByCard } from "../components/used-by";
+import { useAuth } from "../lib/auth";
+import { useMenus } from "../lib/menus";
 
 type Tab = "docs" | "search" | "queries";
 type Mode = "any" | "all" | "phrase" | "regex";
@@ -346,6 +349,8 @@ export default function KnowledgeBase() {
   const confirm = useConfirm();
   const { notify } = useStore();
   const opts = useScopeOptions();
+  const { can } = useAuth();
+  const { pathOf } = useMenus();
   const detail = useApi(() => api.kb(Number(id)));
   const [tab, setTab] = useState<Tab>("docs");
   const [folder, setFolder] = useState<string | null>(null);
@@ -391,6 +396,12 @@ export default function KnowledgeBase() {
                   </div>
                 </dl>
               </div>
+              <div className="flex gap-2">
+              {kb.readable && can("registry.publish") && (
+                <Button variant="secondary" onClick={() => navigate(`${pathOf("app-new")}?knowledge=${encodeURIComponent(kb.slug)}`)}>
+                  <Sparkles size={15} /> {t("studio.makeAppFromKB")}
+                </Button>
+              )}
               {kb.can_edit && (
                 <div className="flex gap-2">
                   <Button onClick={() => setDialog("upload")}>
@@ -432,6 +443,7 @@ export default function KnowledgeBase() {
                   </DropdownMenu>
                 </div>
               )}
+              </div>
             </div>
             <div className="mb-4">
               <Segmented
@@ -494,6 +506,11 @@ export default function KnowledgeBase() {
               {tab === "search" && <SearchTab kb={kb} />}
               {tab === "queries" && kb.can_edit && <QueriesTab kb={kb} />}
             </Card>
+            {detail.data?.used_by && (
+              <div className="mt-4">
+                <UsedByCard apps={detail.data.used_by} />
+              </div>
+            )}
             <UploadDialog kb={kb} open={dialog === "upload"} onOpenChange={(v) => setDialog(v ? "upload" : null)} onDone={detail.reload} />
             <NewDocDialog kb={kb} open={dialog === "new"} onOpenChange={(v) => setDialog(v ? "new" : null)} onCreated={(doc) => navigate(kdocPath(doc))} />
             <InfoDialog kb={kb} open={dialog === "info"} onOpenChange={(v) => setDialog(v ? "info" : null)} onSaved={detail.reload} />

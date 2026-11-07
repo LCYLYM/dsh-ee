@@ -263,6 +263,9 @@ func (s *Store) DeleteKBase(ctx context.Context, id int64) error {
 	if _, err := tx.ExecContext(ctx, "DELETE FROM kb_docs WHERE base_id = ?", id); err != nil {
 		return err
 	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM connection_requests WHERE kind = 'knowledge' AND asset_id = ? AND status = 'pending'", id); err != nil {
+		return err
+	}
 	res, err := tx.ExecContext(ctx, "DELETE FROM kb_bases WHERE id = ?", id)
 	if err != nil {
 		return err

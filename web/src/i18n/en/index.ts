@@ -22,6 +22,8 @@ import getStarted from "./get-started";
 import knowledge from "./knowledge";
 import build from "./build";
 import sso from "./sso";
+import requests from "./requests";
+import studio from "./studio";
 
 export default {
   ...common,
@@ -46,4 +48,6 @@ export default {
   ...getStarted,
   ...build,
   ...sso,
+  ...requests,
+  ...studio,
 } satisfies Messages<typeof zh>;

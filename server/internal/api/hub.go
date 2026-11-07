@@ -536,6 +536,22 @@ func (s *Server) handleHubDetail(w http.ResponseWriter, r *http.Request) {
 			resp["calls"] = calls
 		}
 	}
+	if a.Kind == store.KindSkill || a.Kind == store.KindConnection {
+		used, err := s.appsUsing(r.Context(), v, a.Kind, a.Slug)
+		if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		resp["used_by"] = used
+	}
+	if a.Kind == store.KindApp {
+		deps, err := s.appDeps(r.Context(), v, item.Spec)
+		if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		resp["deps"] = deps
+	}
 	s.feedbackExtras(r, resp, a)
 	writeJSON(w, http.StatusOK, resp)
 }

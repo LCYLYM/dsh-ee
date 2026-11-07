@@ -812,8 +812,69 @@ export interface ConnectionCall {
   created_at: string;
 }
 
+/** 应用依赖的一项与当前员工的状态（M7）。 */
+export interface AppDep {
+  kind: "skill" | "connection" | "knowledge" | "plugin";
+  slug: string;
+  title: string;
+  id?: number;
+  status: "ok" | "off" | "missing" | "partial" | "gone";
+  tools?: number;
+  tools_total?: number;
+  request?: AccessRequest;
+}
+
+/** 一条权限申请：连接、技能或知识库。 */
+export interface AccessRequest {
+  id: number;
+  kind: "connection" | "skill" | "knowledge";
+  user_id: number;
+  username: string;
+  user_name: string;
+  department: string;
+  asset_id: number;
+  slug: string;
+  title: string;
+  app_id: number;
+  app_slug: string;
+  app_title: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  note: string;
+  handled_at: string | null;
+  created_at: string;
+}
+
+export interface AccessTarget {
+  kind: AccessRequest["kind"];
+  slug: string;
+  title: string;
+  description: string;
+  allowed: boolean;
+  id?: number;
+  request?: AccessRequest;
+  app?: { slug: string; title: string };
+}
+
+/** 用到某项原料的应用（M5）。 */
+export interface UsedByApp {
+  id: number;
+  slug: string;
+  title: string;
+  icon?: string;
+}
+
+/** 导入应用文件的报告：每项依赖是新建、沿用还是缺少。 */
+export interface ImportReport {
+  asset: { id: number; slug: string };
+  report: { kind: string; slug: string; title?: string; result: "created" | "reused" | "missing" | "skipped"; note?: string }[];
+  removed_widgets: number;
+}
+
 export interface AssetDetail {
   asset: HubAsset;
+  deps?: AppDep[];
+  used_by?: UsedByApp[];
   versions?: AssetVersion[];
   tools?: ConnectionTool[];
   calls?: ConnectionCall[];
@@ -1256,7 +1317,7 @@ export const api = {
 
   knowledge: () => request<{ items: KBase[]; can_manage: boolean; formats: string[]; qa: KBQASettings }>("GET", "/api/kb"),
   createKB: (b: { slug: string; title: string; description: string; scope?: Scope; maintainers?: KBMaintainers }) => request<KBase>("POST", "/api/kb", b),
-  kb: (id: number) => request<{ kb: KBase; docs: KDoc[] }>("GET", `/api/kb/${id}`),
+  kb: (id: number) => request<{ kb: KBase; docs: KDoc[]; used_by?: UsedByApp[] }>("GET", `/api/kb/${id}`),
   patchKB: (id: number, p: Partial<{ title: string; description: string; scope: Scope; maintainers: KBMaintainers }>) => request<KBase>("PATCH", `/api/kb/${id}`, p),
   deleteKB: (id: number) => request<void>("DELETE", `/api/kb/${id}`),
   saveKBSettings: (s: KBQASettings) => request<KBQASettings>("PUT", "/api/kb/settings", s),
@@ -1341,6 +1402,19 @@ export const api = {
   patchAsset: (id: number, p: Partial<{ category: string; scope: Scope; delivery: Delivery; status: "active" | "unpublished"; note: string }>) =>
     request<HubAsset>("PATCH", `/api/hub/${id}`, p),
   deleteAsset: (id: number) => request<void>("DELETE", `/api/hub/${id}`),
+  workbenchPreview: (app: string, source: unknown) =>
+    request<{ value?: unknown; forbidden?: boolean; error?: string; note?: string }>("POST", "/api/me/workbench-preview", { app, source }),
+  appDraft: (from: "knowledge" | "connection", slug: string) =>
+    request<{ slug: string; spec: AssetSpec; notes: string[] }>("POST", "/api/me/app-drafts", { from, slug }),
+  appFileUrl: (id: number, docs: boolean) => `/api/hub/${id}/export${docs ? "?docs=1" : ""}`,
+  importApp: (file: unknown, slug?: string) => request<ImportReport>("POST", "/api/hub/import", { file, ...(slug ? { slug } : {}) }),
+  accessTarget: (kind: string, slug: string, app?: string) =>
+    request<AccessTarget>("GET", `/api/me/access-target?${new URLSearchParams({ kind, slug, ...(app ? { app } : {}) })}`),
+  myAccessRequests: () => request<{ mine: AccessRequest[]; to_review: AccessRequest[] }>("GET", "/api/me/access-requests"),
+  requestAccess: (r: { kind: string; slug: string; app?: string; reason?: string }) =>
+    request<{ id: number; status: string; already_pending: boolean; title: string }>("POST", "/api/me/access-requests", r),
+  resolveAccess: (id: number, decision: "approve" | "reject", note = "") =>
+    request<{ status: string }>("POST", `/api/me/access-requests/${id}`, { decision, note }),
   subscribe: (id: number) => request<void>("POST", `/api/hub/${id}/subscription`),
   unsubscribe: (id: number) => request<void>("DELETE", `/api/hub/${id}/subscription`),
   hubReviewQueue: () => request<{ items: AssetReviewItem[] }>("GET", "/api/admin/hub/review").then((r) => r.items),

@@ -98,8 +98,19 @@ func (s *Server) handleWebAppSource(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "这个应用的工作台里没有这个组件")
 		return
 	}
-	src := widget.Source
-	src.Args = fillMe(src.Args, v.user)
+	out, err := s.runSource(ctx, v, a.Slug, widget.Source)
+	if err != nil {
+		s.writeAppErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// runSource 以员工本人的身份执行一个组件的数据源（只读工具、知识库、数据集、应用自带的表），
+// 返回 {value} / {forbidden: true} / {error}，和 DSH 里插件的取数结果一样。
+// appSlug 是自带的表所属的应用；表找不到时返回 appDataError（调用方决定怎么回）。
+func (s *Server) runSource(ctx context.Context, v viewer, appSlug string, src *wbSource) (map[string]any, error) {
+	src = &wbSource{Connection: src.Connection, Tool: src.Tool, Args: fillMe(src.Args, v.user), Table: src.Table, Dataset: src.Dataset}
 	args := map[string]any{}
 	_ = json.Unmarshal(src.Args, &args)
 	switch {
@@ -112,19 +123,17 @@ func (s *Server) handleWebAppSource(w http.ResponseWriter, r *http.Request) {
 		var ae *appDataError
 		switch {
 		case errors.As(err, &ae) && ae.status == http.StatusNotFound:
-			writeJSON(w, http.StatusOK, map[string]any{"forbidden": true})
+			return map[string]any{"forbidden": true}, nil
 		case errors.As(err, &ae):
-			writeJSON(w, http.StatusOK, map[string]any{"error": ae.msg})
+			return map[string]any{"error": ae.msg}, nil
 		case err != nil:
-			s.internalErr(w, r, err)
-		default:
-			writeJSON(w, http.StatusOK, map[string]any{"value": res})
+			return nil, err
 		}
+		return map[string]any{"value": res}, nil
 	case src.Table != "":
-		t, err := s.appTargetFor(ctx, v, a.Slug, src.Table)
+		t, err := s.appTargetFor(ctx, v, appSlug, src.Table)
 		if err != nil {
-			s.writeAppErr(w, r, err)
-			return
+			return nil, err
 		}
 		var lr appListReq
 		raw, _ := json.Marshal(args)
@@ -133,29 +142,24 @@ func (s *Server) handleWebAppSource(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			var ae *appDataError
 			if errors.As(err, &ae) {
-				writeJSON(w, http.StatusOK, map[string]any{"error": ae.msg})
-				return
+				return map[string]any{"error": ae.msg}, nil
 			}
-			s.internalErr(w, r, err)
-			return
+			return nil, err
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"value": out})
+		return map[string]any{"value": out}, nil
 	case src.Connection == kbConn:
 		bases, err := s.readableKBases(ctx, v)
 		if err != nil {
-			s.internalErr(w, r, err)
-			return
+			return nil, err
 		}
 		if len(bases) == 0 {
-			writeJSON(w, http.StatusOK, map[string]any{"forbidden": true})
-			return
+			return map[string]any{"forbidden": true}, nil
 		}
-		writeJSON(w, http.StatusOK, toolOutcome(s.kbCall(ctx, v, bases, mcpToolName(kbConn, src.Tool), src.Args)))
+		return toolOutcome(s.kbCall(ctx, v, bases, mcpToolName(kbConn, src.Tool), src.Args)), nil
 	default:
 		c, err := s.userCatalog(ctx, v)
 		if err != nil {
-			s.internalErr(w, r, err)
-			return
+			return nil, err
 		}
 		for _, cn := range c.conns {
 			if cn.asset.Slug != src.Connection {
@@ -167,14 +171,12 @@ func (s *Server) handleWebAppSource(w http.ResponseWriter, r *http.Request) {
 				}
 				// 面板只能触发只读工具：保存时校验过，这里按当前工具设置再查一次
 				if !t.ReadOnly {
-					writeJSON(w, http.StatusOK, map[string]any{"error": "这个数据源不是只读工具，面板不能用它取数"})
-					return
+					return map[string]any{"error": "这个数据源不是只读工具，面板不能用它取数"}, nil
 				}
-				writeJSON(w, http.StatusOK, toolOutcome(s.callConnectionTool(ctx, cn.asset, t, v.user.ID, src.Args)))
-				return
+				return toolOutcome(s.callConnectionTool(ctx, cn.asset, t, v.user.ID, src.Args)), nil
 			}
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"forbidden": true})
+		return map[string]any{"forbidden": true}, nil
 	}
 }
 
