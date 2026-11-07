@@ -20618,6 +20618,34 @@ function singleFlight(fn) {
   };
 }
 
+// src/web-link.ts
+function createWebOpener(remote, unwrapRemote2, open2 = (url2) => {
+  window.open(url2, "_blank", "noopener,noreferrer");
+}) {
+  return async (url2) => {
+    let target = url2;
+    try {
+      if (typeof remote?.webLink === "function") {
+        const value = unwrapRemote2(await remote.webLink({ url: url2 }));
+        if (typeof value === "string" && value) target = value;
+      }
+    } catch {
+    }
+    open2(target);
+  };
+}
+function interceptWebLinks(base, openWeb) {
+  return (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const anchor2 = event.target?.closest?.("a[href]");
+    const href = anchor2?.getAttribute?.("href");
+    const prefix = base();
+    if (!href || !prefix || anchor2.getAttribute("target") !== "_blank" || !href.startsWith(`${prefix}/`)) return;
+    event.preventDefault();
+    openWeb(href);
+  };
+}
+
 // src/session-status.ts
 function createSessionSnapshotAdapter() {
   const previousRunning = /* @__PURE__ */ new Map();
@@ -20780,8 +20808,9 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     await launcher.launchNew(app);
   };
   const openWithFallback = (app, launch) => launcher.run(() => launch(app), () => fill(app));
+  const openWeb = createWebOpener(remote, unwrapRemote2);
   const web = (app) => {
-    if (app.web_url) window.open(app.web_url, "_blank", "noopener,noreferrer");
+    if (app.web_url) void openWeb(app.web_url);
   };
   const useActions = (setNotice, launch, setConfirmDisable = () => {
   }) => ({
@@ -21682,6 +21711,7 @@ function registerWorkbench(ctx, deps) {
     docBase = unwrapRemote2(value)?.base ?? docBase;
   }, () => void 0);
   void loadDocBase();
+  const onLinkClick = interceptWebLinks(() => docBase, createWebOpener(remote, unwrapRemote2));
   const titleOf = (address) => {
     const parsed = parseWorkbenchAddress(address);
     const pane = deps.appsNow().find((app) => app.name === parsed?.app)?.workbench?.panes.find((item) => item.id === parsed?.pane);
@@ -21829,7 +21859,7 @@ function registerWorkbench(ctx, deps) {
       // 没有原文窗格（默认）：出处是链接，点开在 dsh-ee 网页上看
       citationHref: docPane ? void 0 : (citation) => kbDocUrl(docBase, citation)
     };
-    return panelView(import_react2.createElement, pane, { data, board, notice }, handlers);
+    return (0, import_react2.createElement)("div", { onClickCapture: onLinkClick, style: { display: "contents" } }, panelView(import_react2.createElement, pane, { data, board, notice }, handlers));
   };
   const DocPane = ({ app }) => {
     const [target, setTarget] = (0, import_react2.useState)(docTargets.get(app.name));

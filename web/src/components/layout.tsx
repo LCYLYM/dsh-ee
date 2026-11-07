@@ -151,6 +151,8 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
 /** 工作台与管理后台共用的外壳：左侧导航，窄屏收起为顶栏 + 抽屉。 */
 export function AppLayout() {
   const { settings } = useStore();
+  const { user } = useAuth();
+  const { search } = useLocation();
   const [open, setOpen] = useState(false);
   const { t } = useTranslation();
   const { pathname } = useLocation();
@@ -185,6 +187,14 @@ export function AppLayout() {
 
       <div className="min-w-0 flex-1">
         <main className="mx-auto max-w-[1240px] px-4 py-6 sm:px-8 lg:py-8">
+          {user?.limited && (
+            <div role="status" className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm text-neutral-800">
+              <span>{t(user.reauth ? "shell.limited.admin" : "shell.limited.employee")}</span>
+              <Link className="font-medium text-brand-600 underline-offset-2 hover:underline" to={`/login?reauth=1&next=${encodeURIComponent(pathname + search)}`}>
+                {t("shell.limited.action")}
+              </Link>
+            </div>
+          )}
           <Outlet />
         </main>
         <footer className="mx-auto max-w-[1240px] px-4 pb-8 text-xs text-neutral-500 sm:px-8">

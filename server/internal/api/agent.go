@@ -97,6 +97,8 @@ var agentExcluded = map[string]string{
 	"GET /api/auth/methods":                    "登录页用",
 	"GET /api/auth/oidc/start":                 "企业统一登录由人在浏览器完成",
 	"GET /api/auth/oidc/callback":              "企业统一登录由人在浏览器完成",
+	"GET /api/auth/handoff":                    "浏览器打开一次性登录链接用，链接只经接入插件交给浏览器",
+	"POST /api/dsh/web-link":                   "接入插件打开网页时自己调用；链接能直接登录网页，不进模型上下文",
 	"GET /api/admin/auth/oidc":                 "统一登录配置含 client secret 的设置，由管理员在网页上改",
 	"PUT /api/admin/auth/oidc":                 "统一登录配置含 client secret，由管理员在网页上改",
 	"POST /api/admin/auth/oidc/test":           "统一登录配置由管理员在网页上试连",

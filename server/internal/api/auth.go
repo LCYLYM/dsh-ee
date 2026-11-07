@@ -240,6 +240,9 @@ type meResponse struct {
 	*store.User
 	IsSuper     bool     `json:"is_super"`
 	Permissions []string `json:"permissions"`
+	// Limited：从 DSH 直接打开的网页会话，只带员工权限；Reauth：账号本身有管理权限，输入密码登录后可用
+	Limited bool `json:"limited,omitempty"`
+	Reauth  bool `json:"reauth,omitempty"`
 }
 
 // mePayload 组装「当前用户 + 角色 + 有效权限」，登录与 /api/auth/me 共用。
@@ -272,6 +275,15 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.internalErr(w, r, err)
 		return
+	}
+	if sessionLimited(r) {
+		payload.Limited = true
+		full, err := s.store.UserAccess(r.Context(), currentUser(r).ID)
+		if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		payload.Reauth = rbac.HasAdminPerms(full)
 	}
 	writeJSON(w, http.StatusOK, payload)
 }
@@ -322,7 +334,7 @@ func (s *Server) requireUser(next http.Handler) http.Handler {
 			writeErr(w, http.StatusUnauthorized, "请先登录")
 			return
 		}
-		u, err := s.store.SessionUser(r.Context(), secret.Hash(c.Value))
+		u, limited, err := s.store.SessionInfo(r.Context(), secret.Hash(c.Value))
 		if notFound(err) {
 			writeErr(w, http.StatusUnauthorized, "登录已过期，请重新登录")
 			return
@@ -335,6 +347,10 @@ func (s *Server) requireUser(next http.Handler) http.Handler {
 		a, err := s.store.UserAccess(r.Context(), u.ID)
 		if err != nil {
 			s.internalErr(w, r, err)
+			return
+		}
+		if limited {
+			next.ServeHTTP(w, r.WithContext(withLimitedUser(r.Context(), u, a)))
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(withUser(r.Context(), u, a)))

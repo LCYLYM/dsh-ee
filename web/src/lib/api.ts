@@ -36,6 +36,10 @@ export interface User {
 export interface Me extends User {
   is_super: boolean;
   permissions: string[];
+  /** 从 DSH 直接打开的网页会话：只带员工权限，「我的令牌」和管理功能要输入密码登录 */
+  limited?: boolean;
+  /** 账号本身有管理权限，输入密码登录后可用 */
+  reauth?: boolean;
 }
 
 export interface Role {

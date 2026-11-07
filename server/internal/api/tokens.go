@@ -201,6 +201,9 @@ func (s *Server) createToken(w http.ResponseWriter, r *http.Request, owner *stor
 }
 
 func (s *Server) handleCreateMyToken(w http.ResponseWriter, r *http.Request) {
+	if !s.requireFullSession(w, r) {
+		return
+	}
 	settings, err := s.appSettings(r.Context())
 	if err != nil {
 		s.internalErr(w, r, err)

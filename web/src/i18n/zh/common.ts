@@ -28,6 +28,11 @@ export default {
     no: "否",
   },
   shell: {
+    limited: {
+      employee: "你是从 DSH 直接打开的网页，已自动登录。「我的令牌」等涉及账号安全的功能需要输入密码登录。",
+      admin: "你是从 DSH 直接打开的网页，已自动登录，但只有员工权限。要用管理功能，请输入密码登录。",
+      action: "输入密码登录",
+    },
     language: "语言",
     theme: {
       label: "主题：{{mode}}",

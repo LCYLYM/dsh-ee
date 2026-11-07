@@ -270,19 +270,36 @@ func (s *Store) SetUserQuota(ctx context.Context, id int64, q UserQuotaPatch) er
 // ---- 会话 ----
 
 func (s *Store) CreateSession(ctx context.Context, tokenHash string, userID int64, ttl time.Duration) error {
+	return s.createSession(ctx, tokenHash, userID, ttl, false)
+}
+
+// CreateLimitedSession 建一个只带员工权限的会话（从 DSH 凭设备令牌打开网页时用）。
+func (s *Store) CreateLimitedSession(ctx context.Context, tokenHash string, userID int64, ttl time.Duration) error {
+	return s.createSession(ctx, tokenHash, userID, ttl, true)
+}
+
+func (s *Store) createSession(ctx context.Context, tokenHash string, userID int64, ttl time.Duration, limited bool) error {
 	t := now()
 	_, err := s.db.ExecContext(ctx,
-		"INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
-		tokenHash, userID, t.Add(ttl), t)
+		"INSERT INTO sessions (token_hash, user_id, expires_at, created_at, limited) VALUES (?, ?, ?, ?, ?)",
+		tokenHash, userID, t.Add(ttl), t, limited)
 	return err
 }
 
 // SessionUser 返回未过期会话对应的、未被禁用的人类账号；机器人只能用令牌访问。
 func (s *Store) SessionUser(ctx context.Context, tokenHash string) (*User, error) {
-	return scanUser(s.db.QueryRowContext(ctx,
-		`SELECT `+userColumns("u.")+`
+	u, _, err := s.SessionInfo(ctx, tokenHash)
+	return u, err
+}
+
+// SessionInfo 同 SessionUser，并返回会话是否只带员工权限。
+func (s *Store) SessionInfo(ctx context.Context, tokenHash string) (*User, bool, error) {
+	var limited bool
+	u, err := scanUser(s.db.QueryRowContext(ctx,
+		`SELECT `+userColumns("u.")+`, s.limited
 		 FROM sessions s JOIN users u ON u.id = s.user_id
-		 WHERE s.token_hash = ? AND s.expires_at > ? AND u.disabled = 0 AND u.account_type = 'human'`, tokenHash, now()))
+		 WHERE s.token_hash = ? AND s.expires_at > ? AND u.disabled = 0 AND u.account_type = 'human'`, tokenHash, now()), &limited)
+	return u, limited, err
 }
 
 func (s *Store) DeleteSession(ctx context.Context, tokenHash string) error {

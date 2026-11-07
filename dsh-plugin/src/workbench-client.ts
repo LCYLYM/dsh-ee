@@ -5,6 +5,7 @@ import { currentSessionOf, sendToSession } from "./host-session.js";
 import type { CatalogApp } from "./skills.js";
 import { checklistKey, docWindow, fillPrompt, kbDocUrl, parseWorkbenchAddress, scopeText, workbenchAddress, workbenchScheme, type Board, type Citation, type KBaseItem, type WorkbenchAction, type WorkbenchPane } from "./workbench.js";
 import { openWorkbench } from "./workbench-open.js";
+import { createWebOpener, interceptWebLinks } from "./web-link.js";
 import { kbDocView, missingPaneView, panelView, type DocTarget, type PanelHandlers, type WidgetState } from "./workbench-view.js";
 
 export const workbenchTabId = "__DSH_EE_PACKAGE__/workbench";
@@ -50,6 +51,8 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
   let docBase = "";
   const loadDocBase = () => Promise.resolve(remote.serverSettings?.()).then((value: any) => { docBase = unwrapRemote(value)?.base ?? docBase; }, () => undefined);
   void loadDocBase();
+  // 面板里指向 dsh-ee 网页的链接（看原文、去申请权限）走免登录链接
+  const onLinkClick = interceptWebLinks(() => docBase, createWebOpener(remote, unwrapRemote));
   const titleOf = (address: string) => {
     const parsed = parseWorkbenchAddress(address);
     const pane = deps.appsNow().find((app) => app.name === parsed?.app)?.workbench?.panes.find((item) => item.id === parsed?.pane);
@@ -210,7 +213,7 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
       // 没有原文窗格（默认）：出处是链接，点开在 dsh-ee 网页上看
       citationHref: docPane ? undefined : (citation: Citation) => kbDocUrl(docBase, citation),
     };
-    return panelView(createElement, pane, { data, board, notice }, handlers);
+    return createElement("div", { onClickCapture: onLinkClick, style: { display: "contents" } }, panelView(createElement, pane, { data, board, notice }, handlers));
   };
 
   const DocPane = ({ app }: { app: CatalogApp }) => {

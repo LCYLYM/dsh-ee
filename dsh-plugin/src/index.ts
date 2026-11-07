@@ -13,6 +13,7 @@ import { updateConnect } from "./connect-update.js";
 import { uploadPackage } from "./upload.js";
 import { AppBindings } from "./app-bindings.js";
 import { setAppSubscription } from "./app-subscription.js";
+import { exchangeWebLink } from "./web-link.js";
 import { BoardStore, ChecklistStore, readKBDoc, readWidgetData, registerWorkbenchTool } from "./workbench-host.js";
 import type { DshContext, PluginConfig } from "./dsh.js";
 
@@ -92,6 +93,7 @@ export function apply(ctx: DshContext, input: Partial<PluginConfig>): void {
       testServer: (request) => server.test(request?.base),
       saveServer: (request) => server.save(request?.base),
       updatePlugin: () => updateConnect(ctx, config, http),
+      webLink: (request) => exchangeWebLink(config.base, http, String(request?.url ?? "")),
     });
     const disposeWorkbenchTool = registerWorkbenchTool(ctx, {
       boards,

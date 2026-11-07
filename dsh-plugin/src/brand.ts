@@ -21,6 +21,7 @@ export interface ClientServiceActions {
   testServer: (request: { base?: string }) => Promise<any>;
   saveServer: (request: { base?: string | null }) => Promise<any>;
   updatePlugin: () => Promise<any>;
+  webLink: (request: { url?: string }) => Promise<string>;
 }
 
 export class DshEEClientService extends TypertRemoteService {
@@ -126,6 +127,11 @@ export class DshEEClientService extends TypertRemoteService {
   @Remote
   async updatePlugin(): Promise<any> {
     return this.actions.updatePlugin();
+  }
+
+  @Remote
+  async webLink(request: { url?: string }): Promise<string> {
+    return this.actions.webLink(request ?? {});
   }
 }
 

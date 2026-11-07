@@ -4,6 +4,7 @@ import { fillInput, openSession } from "./host-session.js";
 import { createLauncher, singleFlight } from "./app-launcher.js";
 import type { CatalogApp } from "./skills.js";
 import type { AppBindingMap } from "./app-bindings.js";
+import { createWebOpener } from "./web-link.js";
 import { applicationStatus, createSessionSnapshotAdapter, visibleAppStatus } from "./session-status.js";
 
 interface AppsSnapshot {
@@ -110,8 +111,9 @@ export function registerApps(ctx: any, remote: any, useOverview: () => any, unwr
     await launcher.launchNew(app);
   };
   const openWithFallback = (app: CatalogApp, launch: (app: CatalogApp) => Promise<void>) => launcher.run(() => launch(app), () => fill(app));
+  const openWeb = createWebOpener(remote, unwrapRemote);
   const web = (app: CatalogApp) => {
-    if (app.web_url) window.open(app.web_url, "_blank", "noopener,noreferrer");
+    if (app.web_url) void openWeb(app.web_url);
   };
 
   const useActions = (setNotice: (notice: string) => void, launch: (app: CatalogApp) => Promise<void>, setConfirmDisable: (name: string) => void = () => {}): AppsViewActions => ({

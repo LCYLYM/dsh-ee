@@ -134,6 +134,9 @@ func setupPrompts(set *store.AppSettings, info connectInfo, base, code string, a
 
 // POST /api/me/get-started {admin}：生成接入码与提示词。admin=true 需要系统设置权限。
 func (s *Server) handleCreateSetupCode(w http.ResponseWriter, r *http.Request) {
+	if !s.requireFullSession(w, r) {
+		return
+	}
 	var req struct {
 		Admin bool `json:"admin"`
 	}

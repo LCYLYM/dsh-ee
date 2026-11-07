@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
 import { WhaleMark } from "../components/whale-mark";
 import { useAuth } from "../lib/auth";
@@ -29,8 +29,14 @@ export default function Login() {
   const sso = methods.data?.oidc ?? null;
   // 企业统一登录失败时，回调把原因放在 oidc_error 里带回来
   const ssoError = params.get("oidc_error");
+  // 从 DSH 自动登录的会话只带员工权限：带 reauth=1 进来时照常显示登录表单
+  const reauth = params.get("reauth") === "1" && !!user?.limited;
+  const handoffExpired = params.get("handoff") === "expired";
+  useEffect(() => {
+    if (reauth && user) setUsername((current) => current || user.username);
+  }, [reauth, user]);
 
-  if (!loading && user) return <Navigate to={next} replace />;
+  if (!loading && user && !reauth) return <Navigate to={next} replace />;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -55,6 +61,11 @@ export default function Login() {
       <form onSubmit={submit} className="w-full max-w-sm rounded-lg border border-neutral-200/80 bg-card p-6">
         <h1 className="text-xl font-semibold text-neutral-900">{t("login.title")}</h1>
         <p className="mt-1 text-sm text-neutral-600">{ldap ? t("login.ldapHint") : t("login.subtitle")}</p>
+        {(reauth || handoffExpired) && (
+          <p role="status" className="mt-4 rounded-md bg-brand-50 px-3 py-2 text-sm text-neutral-800">
+            {t(reauth ? "login.reauth" : "login.handoffExpired")}
+          </p>
+        )}
         {sso && (
           <>
             <a

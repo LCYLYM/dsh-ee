@@ -227,6 +227,9 @@ func (s *Server) handleDeviceInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDeviceApprove(w http.ResponseWriter, r *http.Request) {
+	if !s.requireFullSession(w, r) {
+		return
+	}
 	d, err := s.store.DeviceByUserCode(r.Context(), r.PathValue("user_code"))
 	if err != nil || d.Status != "pending" || d.ExpiresAt.Before(time.Now()) {
 		writeErr(w, http.StatusBadRequest, "确认码不存在、已处理或已过期")

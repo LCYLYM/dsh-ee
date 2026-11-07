@@ -196,6 +196,9 @@ type createMyKeyReq struct {
 }
 
 func (s *Server) handleCreateMyKey(w http.ResponseWriter, r *http.Request) {
+	if !s.requireFullSession(w, r) {
+		return
+	}
 	var req createMyKeyReq
 	if !readJSON(w, r, &req) {
 		return

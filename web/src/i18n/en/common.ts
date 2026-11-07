@@ -30,6 +30,11 @@ export default {
     no: "No",
   },
   shell: {
+    limited: {
+      employee: "You opened this page from DSH and were signed in automatically. Account-security features such as My tokens need your password.",
+      admin: "You opened this page from DSH and were signed in automatically with employee access only. Sign in with your password to use admin features.",
+      action: "Sign in with password",
+    },
     language: "Language",
     theme: {
       label: "Theme: {{mode}}",

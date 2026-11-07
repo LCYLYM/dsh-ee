@@ -80,7 +80,7 @@ func (s *Server) npmAuth(r *http.Request) (*npmCaller, error) {
 		return caller, nil
 	}
 	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
-		u, err := s.store.SessionUser(r.Context(), secret.Hash(c.Value))
+		u, limited, err := s.store.SessionInfo(r.Context(), secret.Hash(c.Value))
 		if notFound(err) {
 			return nil, nil
 		}
@@ -90,6 +90,9 @@ func (s *Server) npmAuth(r *http.Request) (*npmCaller, error) {
 		a, err := s.store.UserAccess(r.Context(), u.ID)
 		if err != nil {
 			return nil, err
+		}
+		if limited {
+			a = limitedAccess(a)
 		}
 		return &npmCaller{user: u, access: a}, nil
 	}

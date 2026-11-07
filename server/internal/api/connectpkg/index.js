@@ -2852,8 +2852,8 @@ function validateName(subject, value) {
 }
 
 // src/brand.ts
-var _updatePlugin_dec, _saveServer_dec, _testServer_dec, _serverSettings_dec, _doctor_dec, _login_dec, _overview_dec, _kbDoc_dec, _setChecklist_dec, _checklists_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
-var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _checklists_dec = [Remote], _setChecklist_dec = [Remote], _kbDoc_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _serverSettings_dec = [Remote], _testServer_dec = [Remote], _saveServer_dec = [Remote], _updatePlugin_dec = [Remote], _a) {
+var _webLink_dec, _updatePlugin_dec, _saveServer_dec, _testServer_dec, _serverSettings_dec, _doctor_dec, _login_dec, _overview_dec, _kbDoc_dec, _setChecklist_dec, _checklists_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
+var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _checklists_dec = [Remote], _setChecklist_dec = [Remote], _kbDoc_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _serverSettings_dec = [Remote], _testServer_dec = [Remote], _saveServer_dec = [Remote], _updatePlugin_dec = [Remote], _webLink_dec = [Remote], _a) {
   constructor(ctx, actions) {
     super(ctx, "dshEE");
     this.actions = actions;
@@ -2919,6 +2919,9 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
   async updatePlugin() {
     return this.actions.updatePlugin();
   }
+  async webLink(request) {
+    return this.actions.webLink(request ?? {});
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "brand", _brand_dec, DshEEClientService);
@@ -2941,6 +2944,7 @@ __decorateElement(_init, 1, "serverSettings", _serverSettings_dec, DshEEClientSe
 __decorateElement(_init, 1, "testServer", _testServer_dec, DshEEClientService);
 __decorateElement(_init, 1, "saveServer", _saveServer_dec, DshEEClientService);
 __decorateElement(_init, 1, "updatePlugin", _updatePlugin_dec, DshEEClientService);
+__decorateElement(_init, 1, "webLink", _webLink_dec, DshEEClientService);
 __decoratorMetadata(_init, DshEEClientService);
 function registerBrand(ctx, actions) {
   return new DshEEClientService(ctx, actions);
@@ -3239,6 +3243,21 @@ async function setAppSubscription(http, name2, enabled) {
   } catch {
   }
   return { ok: false, error };
+}
+
+// src/web-link.ts
+async function exchangeWebLink(base, http, url) {
+  if (!base || typeof url !== "string" || !url.startsWith(`${base}/`)) return url;
+  const next = url.slice(base.length);
+  if (next.startsWith("/api/")) return url;
+  try {
+    const response = await http.fetch("/api/dsh/web-link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ next }) }, 1e4);
+    if (!response.ok) return url;
+    const value = await response.json();
+    return typeof value?.url === "string" && /^https?:\/\//.test(value.url) ? value.url : url;
+  } catch {
+    return url;
+  }
 }
 
 // src/workbench-host.ts
@@ -3612,7 +3631,8 @@ function apply(ctx, input) {
       serverSettings: async () => server.read(),
       testServer: (request) => server.test(request?.base),
       saveServer: (request) => server.save(request?.base),
-      updatePlugin: () => updateConnect(ctx, config, http)
+      updatePlugin: () => updateConnect(ctx, config, http),
+      webLink: (request) => exchangeWebLink(config.base, http, String(request?.url ?? ""))
     });
     const disposeWorkbenchTool = registerWorkbenchTool(ctx, {
       boards,

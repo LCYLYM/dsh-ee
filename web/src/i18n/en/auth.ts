@@ -12,6 +12,8 @@ export default {
     forgot: "Forgot your password? Ask an administrator to reset it.",
     ldapHint: "You can sign in with your company domain account (same as your computer password).",
     ldapForgot: "Recover your domain password in the company's account system; for a local account, ask an administrator.",
+    reauth: "You were signed in automatically from DSH with employee access only. Sign in with your password to use everything.",
+    handoffExpired: "The sign-in link from DSH has expired (it works once, within one minute). Please sign in to continue.",
   },
   account: {
     title: "Account",

@@ -710,6 +710,9 @@ type createNpmTokenReq struct {
 const maxNpmTokensPerUser = 20
 
 func (s *Server) handleCreateMyNpmToken(w http.ResponseWriter, r *http.Request) {
+	if !s.requireFullSession(w, r) {
+		return
+	}
 	var req createNpmTokenReq
 	if !readJSON(w, r, &req) {
 		return

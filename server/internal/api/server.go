@@ -91,6 +91,7 @@ type Server struct {
 	oidcOnce   sync.Once
 	oidcClient *oidc.Client
 	oidcStates oidcStates
+	webLinks   webLinks
 }
 
 func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Server {
@@ -260,10 +261,22 @@ type ctxKey struct{}
 type principal struct {
 	user   *store.User
 	access *rbac.Access
+	// 会话是从 DSH 凭设备令牌换来的，只带员工权限（见 web_link.go）
+	limited bool
 }
 
 func withUser(ctx context.Context, u *store.User, a *rbac.Access) context.Context {
-	return context.WithValue(ctx, ctxKey{}, principal{u, a})
+	return context.WithValue(ctx, ctxKey{}, principal{user: u, access: a})
+}
+
+func withLimitedUser(ctx context.Context, u *store.User, a *rbac.Access) context.Context {
+	return context.WithValue(ctx, ctxKey{}, principal{user: u, access: limitedAccess(a), limited: true})
+}
+
+// sessionLimited 表示当前网页会话是从 DSH 打开的，只带员工权限。
+func sessionLimited(r *http.Request) bool {
+	p, _ := r.Context().Value(ctxKey{}).(principal)
+	return p.limited
 }
 
 func currentUser(r *http.Request) *store.User {
