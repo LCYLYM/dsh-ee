@@ -1089,7 +1089,7 @@ func (s *Server) appCall(r *http.Request, v viewer, p *Principal, name string, r
 // ---- 工作台 ----
 
 // appWorkbenchForDSH 把工作台里的 {"table": …} 数据源换成 app__rows 调用，接入插件按普通只读工具取数。
-func appWorkbenchForDSH(slug string, wb *appWorkbench) *appWorkbench {
+func appWorkbenchForDSH(slug string, wb *appWorkbench, u *store.User) *appWorkbench {
 	if wb == nil {
 		return nil
 	}
@@ -1099,6 +1099,9 @@ func appWorkbenchForDSH(slug string, wb *appWorkbench) *appWorkbench {
 	for pi := range out.Panes {
 		for wi := range out.Panes[pi].Widgets {
 			src := out.Panes[pi].Widgets[wi].Source
+			if src != nil && u != nil {
+				src.Args = fillMe(src.Args, u)
+			}
 			if src != nil && src.Dataset != "" {
 				params := map[string]any{}
 				_ = json.Unmarshal(src.Args, &params)

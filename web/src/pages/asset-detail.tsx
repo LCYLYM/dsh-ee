@@ -298,6 +298,14 @@ function AssetDetail() {
 
           {a.kind === "app" && (
             <>
+              {(a.spec.highlights?.length ?? 0) > 0 && (
+                <Card className="p-5">
+                  <h2 className="mb-3 font-medium text-neutral-900">{t("asset.highlights")}</h2>
+                  <ul className="list-disc space-y-1 pl-5 text-sm text-neutral-700">
+                    {a.spec.highlights!.map((h) => <li key={h}>{h}</li>)}
+                  </ul>
+                </Card>
+              )}
               <Card className="p-5">
                 <h2 className="mb-3 font-medium text-neutral-900">{t("asset.persona")}</h2>
                 <Body text={a.spec.persona} />

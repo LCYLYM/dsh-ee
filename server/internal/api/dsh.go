@@ -119,6 +119,8 @@ type dshApp struct {
 	Workbench *appWorkbench `json:"workbench,omitempty"`
 	// 开放了网页版（/a/<标识>）
 	Web bool `json:"web,omitempty"`
+	// 「它能帮你做什么」的三个要点
+	Highlights []string `json:"highlights,omitempty"`
 }
 
 type dshPlugin struct {
@@ -207,7 +209,7 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 		case store.KindPrompt, store.KindApp:
 			c.Skills = append(c.Skills, dshSkill{Name: a.Slug, Title: sp.Title, Kind: a.Kind, Description: sp.Description, ModelInvocable: false, UserInvocable: true, Version: lv.Version})
 			if a.Kind == store.KindApp {
-				c.Apps = append(c.Apps, appEntry(a, sp, lv.Version))
+				c.Apps = append(c.Apps, appEntry(a, sp, lv.Version, v.user))
 			}
 		case store.KindConnection:
 			c.conns = append(c.conns, &dshConn{asset: a, version: lv.Version, spec: sp})
@@ -221,7 +223,7 @@ func (s *Server) userCatalog(ctx context.Context, v viewer) (*dshCatalog, error)
 	for _, a := range offered {
 		if lv := live[a.ID]; lv != nil {
 			sp := parseSpec(lv.Spec)
-			app := appEntry(a, sp, lv.Version)
+			app := appEntry(a, sp, lv.Version, v.user)
 			app.Missing = missingAppCapabilities(sp, c)
 			c.AvailableApps = append(c.AvailableApps, app)
 		}
@@ -422,7 +424,7 @@ func (s *Server) handleDshSkill(w http.ResponseWriter, r *http.Request) {
 	}
 	content := sp.Body
 	if a.Kind == store.KindApp {
-		content = appContent(sp, c) + appTablesContent(a.Slug, sp.Tables)
+		content = appContent(sp, c) + appTablesContent(a.Slug, sp.Tables) + currentUserContent(v.user)
 	}
 	if err := s.store.RecordAssetUsage(context.WithoutCancel(r.Context()), a.ID, v.user.ID); err != nil {
 		s.log.Warn("记录能力使用失败", "err", err)
@@ -437,7 +439,8 @@ func (s *Server) handleDshSkill(w http.ResponseWriter, r *http.Request) {
 }
 
 // appEntry 是目录里一个微应用的展示信息。
-func appEntry(a *store.Asset, sp *assetSpec, version int) dshApp {
+// u 是当前员工：工作台数据源参数里的 {{me.name}} 等按他填。
+func appEntry(a *store.Asset, sp *assetSpec, version int, u *store.User) dshApp {
 	launch := sp.Launch
 	if launch == "" {
 		launch = "new"
@@ -446,7 +449,7 @@ func appEntry(a *store.Asset, sp *assetSpec, version int) dshApp {
 	if starters == nil {
 		starters = []string{}
 	}
-	return dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Delivery: a.Delivery, Version: version, AssetID: a.ID, Workbench: appWorkbenchForDSH(a.Slug, sp.Workbench), Web: webEnabled(sp)}
+	return dshApp{Name: a.Slug, Title: sp.Title, Description: sp.Description, Icon: sp.Icon, Starters: starters, Launch: launch, Delivery: a.Delivery, Version: version, AssetID: a.ID, Workbench: appWorkbenchForDSH(a.Slug, sp.Workbench, u), Web: webEnabled(sp), Highlights: sp.Highlights}
 }
 
 // POST / DELETE /api/dsh/apps/{name}/subscription：员工在 DSH 里启用或停用「自选」微应用。
@@ -794,4 +797,16 @@ func (s *Server) handleMCPStream(w http.ResponseWriter, r *http.Request) {
 		}
 		flusher.Flush()
 	}
+}
+
+// currentUserContent 是应用指令末尾的「当前员工」：人设里说「按当前员工的姓名查」「申请人填当前员工」时用得上。
+func currentUserContent(u *store.User) string {
+	if u == nil {
+		return ""
+	}
+	dept := u.Department
+	if dept == "" {
+		dept = "未填"
+	}
+	return fmt.Sprintf("\n\n## 当前员工\n\n姓名：%s（用户名 %s），部门：%s。查「我的 …」、填申请人 / 报修人 / 拜访人时用这个名字，不要再问用户是谁。\n", displayOf(u), u.Username, dept)
 }

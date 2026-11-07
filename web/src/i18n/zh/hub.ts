@@ -44,6 +44,7 @@ export default {
     connectBannerLink: "去接入",
   },
   asset: {
+    highlights: "它能帮你做什么",
     back: "返回能力中心",
     notFound: "这项能力不存在，或不在你的可用范围内。",
     version: "v{{n}}",
@@ -216,6 +217,8 @@ export default {
     empty: "没有数据时：{{text}}",
   },
   editor: {
+    highlights: "它能帮你做什么（每行一条，最多 3 条）",
+    highlightsHint: "显示在应用详情和网页版顶部，让同事一眼看懂这个应用。",
     newSkill: "写一个技能",
     newPrompt: "写一个提示词",
     newApp: "新建应用",

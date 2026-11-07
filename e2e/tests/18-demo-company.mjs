@@ -29,7 +29,7 @@ export default async function (t) {
   const emp = await newPage(t);
   await login(emp, m[1], m[2]);
   await emp.goto(`${BASE}/apps`);
-  await emp.getByText("出差报销计算器").first().waitFor();
+  await emp.getByText("出差报销助手").first().waitFor();
   await emp.goto(`${BASE}/build`);
   const row = emp.locator("li", { hasText: "我的客户周报" });
   await row.getByText("自己用", { exact: true }).waitFor();

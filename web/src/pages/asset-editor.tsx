@@ -253,6 +253,7 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
           ...base,
           persona: spec.persona,
           starters: (spec.starters ?? []).filter(Boolean),
+          highlights: (spec.highlights ?? []).map((x) => x.trim()).filter(Boolean),
           icon: spec.icon,
           launch: spec.launch,
           workbench: parseWorkbench(wbText).value,
@@ -375,6 +376,9 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
             </Field>
             <Field label={t("editor.starters")}>
               <textarea className={cx(textareaCls, "h-24")} value={(spec.starters ?? []).join("\n")} onChange={(e) => set({ starters: e.target.value.split("\n") })} />
+            </Field>
+            <Field label={t("editor.highlights")} hint={t("editor.highlightsHint")}>
+              <textarea className={cx(textareaCls, "h-20")} value={(spec.highlights ?? []).join("\n")} onChange={(e) => set({ highlights: e.target.value.split("\n").slice(0, 3) })} />
             </Field>
             <MultiPick label={t("editor.skills")} values={spec.skills ?? []} options={skillOptions} onChange={(v) => set({ skills: v })} />
             <MultiPick label={t("editor.knowledge")} values={spec.knowledge ?? []} options={kbOptions} onChange={(v) => set({ knowledge: v })} />

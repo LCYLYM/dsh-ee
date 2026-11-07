@@ -72,6 +72,11 @@ function AppWeb({ app }: { app: WebApp }) {
       <main className="mx-auto max-w-3xl px-4 py-4">
         {!app.web && <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{t("appWeb.previewOnly")}</p>}
         {app.description && tab === tabs[0]?.id && <p className="mb-3 text-sm text-neutral-600">{app.description}</p>}
+        {(app.highlights?.length ?? 0) > 0 && tab === tabs[0]?.id && (
+          <ul className="mb-3 grid gap-1 text-sm text-neutral-700">
+            {app.highlights!.map((h) => <li key={h} className="flex gap-2"><span className="text-brand-500">✓</span>{h}</li>)}
+          </ul>
+        )}
         {/* 网页的类型里 source.connection 是可选的（表数据源没有），接口返回的就是插件渲染认的那份配置 */}
         {pane ? <WebPane key={pane.id} app={app} pane={pane as unknown as WorkbenchPane} /> : tab === "@data" ? <AppDataPanel slug={app.slug} /> : <Card className="p-8 text-center text-sm text-neutral-500">{t("appWeb.noPanel")}</Card>}
       </main>

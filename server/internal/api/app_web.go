@@ -61,7 +61,7 @@ func (s *Server) handleWebApp(w http.ResponseWriter, r *http.Request) {
 		starters = []string{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"slug": a.Slug, "asset_id": a.ID, "title": sp.Title, "description": sp.Description, "icon": sp.Icon, "starters": starters,
+		"slug": a.Slug, "asset_id": a.ID, "title": sp.Title, "description": sp.Description, "icon": sp.Icon, "starters": starters, "highlights": sp.Highlights,
 		"workbench": sp.Workbench, "tables": len(sp.Tables) > 0, "web": sp.Web, "admin": admin,
 	})
 }
@@ -99,6 +99,7 @@ func (s *Server) handleWebAppSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	src := widget.Source
+	src.Args = fillMe(src.Args, v.user)
 	args := map[string]any{}
 	_ = json.Unmarshal(src.Args, &args)
 	switch {

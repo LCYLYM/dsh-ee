@@ -422,13 +422,13 @@ type demoPersona struct {
 var demoPersonas = map[string]demoPersona{
 	"demo.zhao.lei":     {0.8, []string{"meeting-minutes"}, nil, []string{"eng-handbook"}, 10},
 	"demo.sun.yue":      {0.9, []string{"sunyue-review", "meeting-minutes"}, nil, []string{"eng-handbook", "it-helpdesk"}, 18},
-	"demo.zheng.xiaoyu": {0.95, []string{"onboarding-buddy"}, []struct{ conn, tool string }{{demoITSMConn, "list_tickets"}}, []string{"employee-handbook", "it-helpdesk", "eng-handbook"}, 8},
-	"demo.lin.na":       {0.85, []string{"travel-expense", "meeting-minutes"}, []struct{ conn, tool string }{{demoCRMConn, "get_summary"}, {demoCRMConn, "list_renewals"}}, []string{"product-docs"}, 9},
-	"demo.zhou.hang":    {0.95, []string{"travel-expense", "zhouhang-weekly"}, []struct{ conn, tool string }{{demoCRMConn, "list_customers"}, {demoCRMConn, "get_customer"}, {demoConn, "list_claims"}}, []string{"product-docs", "travel-policy"}, 14},
+	"demo.zheng.xiaoyu": {0.95, []string{"onboarding-buddy", "it-service-desk"}, []struct{ conn, tool string }{{demoITSMConn, "list_tickets"}}, []string{"employee-handbook", "it-helpdesk", "eng-handbook"}, 8},
+	"demo.lin.na":       {0.85, []string{"travel-expense", "customer-brief", "meeting-minutes"}, []struct{ conn, tool string }{{demoCRMConn, "get_summary"}, {demoCRMConn, "list_renewals"}}, []string{"product-docs"}, 9},
+	"demo.zhou.hang":    {0.95, []string{"travel-expense", "customer-brief", "zhouhang-weekly"}, []struct{ conn, tool string }{{demoCRMConn, "list_customers"}, {demoCRMConn, "get_customer"}, {demoConn, "list_claims"}}, []string{"product-docs", "travel-policy"}, 14},
 	"demo.he.jing":      {0.7, []string{"travel-expense"}, []struct{ conn, tool string }{{demoConn, "get_summary"}, {demoConn, "list_claims"}}, []string{"travel-policy"}, 6},
 	"demo.chen.yi":      {0.75, []string{"travel-expense"}, []struct{ conn, tool string }{{demoConn, "list_claims"}}, []string{"travel-policy"}, 7},
 	"demo.wu.min":       {0.6, []string{"onboarding-buddy", "meeting-minutes"}, nil, []string{"employee-handbook"}, 5},
-	"demo.liu.yang":     {0.7, nil, []struct{ conn, tool string }{{demoITSMConn, "list_tickets"}, {demoITSMConn, "get_summary"}, {demoITSMConn, "list_categories"}}, []string{"it-helpdesk"}, 6},
+	"demo.liu.yang":     {0.7, []string{"it-service-desk"}, []struct{ conn, tool string }{{demoITSMConn, "list_tickets"}, {demoITSMConn, "get_summary"}, {demoITSMConn, "list_categories"}}, []string{"it-helpdesk"}, 6},
 	"demo.xu.nuo":       {0.5, nil, nil, []string{"legal-guide"}, 4},
 }
 
@@ -693,9 +693,10 @@ func demoGuide() []demoGuideStep {
 		return demoGuideStep{Username: u.Username, DisplayName: u.DisplayName, Department: u.Department, Title: u.Title, App: app, AppTitle: appTitle, Try: try}
 	}
 	return []demoGuideStep{
-		step("demo.zhou.hang", "travel-expense", "出差报销计算器", "去上海出差 3 天，住宿每晚 650，能报多少？"),
-		step("demo.zheng.xiaoyu", "onboarding-buddy", "新人入职助手", "入职第一天要带什么材料？"),
-		step("demo.he.jing", "travel-expense", "出差报销计算器", "帮我看看待审批的报销单有没有超标"),
+		step("demo.zhou.hang", "customer-brief", "客户拜访简报", "给华东精密制造生成一份拜访简报"),
+		step("demo.zheng.xiaoyu", "onboarding-buddy", "新人入职助手", "我第一周要做什么？"),
+		step("demo.chen.yi", "travel-expense", "出差报销助手", "去上海出差 3 天，住宿每晚 650，坐高铁二等座来回 1100，能报多少？"),
+		step("demo.liu.yang", "it-service-desk", "IT 服务台", "VPN 连不上，提示证书错误"),
 	}
 }
 

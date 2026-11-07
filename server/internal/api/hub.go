@@ -55,6 +55,8 @@ type assetSpec struct {
 	Tables []appTable `json:"tables,omitempty"`
 	// 微应用：网页版，能用的人可以在 /a/<标识> 打开工作台（app_web.go）
 	Web bool `json:"web,omitempty"`
+	// 微应用：「它能帮你做什么」的要点，最多 3 条
+	Highlights []string `json:"highlights,omitempty"`
 
 	// 连接：mcp（上游 MCP 服务地址）或 openapi（接口根地址 + 文档）
 	Type         string    `json:"type,omitempty"`
@@ -103,7 +105,7 @@ func validateSpec(kind string, sp *assetSpec) string {
 			sp.ModelInvocable, sp.WhenToUse = nil, ""
 		}
 		sp.Persona, sp.Starters, sp.Skills, sp.Connections, sp.Plugins, sp.Knowledge = "", nil, nil, nil, nil, nil
-		sp.Icon, sp.Launch, sp.Workbench, sp.Template, sp.Tables, sp.Web = "", "", nil, false, nil, false
+		sp.Icon, sp.Launch, sp.Workbench, sp.Template, sp.Tables, sp.Web, sp.Highlights = "", "", nil, false, nil, false, nil
 		sp.Type, sp.URL, sp.Auth, sp.OpenAPI, sp.Instructions = "", "", nil, "", ""
 	case store.KindApp:
 		sp.Persona = strings.TrimSpace(sp.Persona)
@@ -144,6 +146,12 @@ func validateSpec(kind string, sp *assetSpec) string {
 		var msg string
 		if sp.Starters, msg = clean(sp.Starters, 6, func(s string) bool { return limitRunes(s, 200) }, "示例问题"); msg != "" {
 			return msg
+		}
+		if sp.Highlights, msg = clean(sp.Highlights, 3, func(s string) bool { return limitRunes(s, 60) }, "要点"); msg != "" {
+			return msg
+		}
+		if len(sp.Highlights) == 0 {
+			sp.Highlights = nil
 		}
 		if sp.Skills, msg = clean(sp.Skills, 20, slugRe.MatchString, "技能"); msg != "" {
 			return msg

@@ -150,7 +150,7 @@ export function tableView(h: H, index: number, widget: WorkbenchWidget, state: W
           const expanded = open === r;
           const line = h("tr", { key: r, style: { cursor: detail.length ? "pointer" : "default", background: expanded ? "color-mix(in srgb, currentColor 5%, transparent)" : "transparent" }, onClick: detail.length ? () => handlers.toggleRow?.(index, r) : undefined },
             detail.length ? h("td", { key: "toggle", style: { padding: "4px 2px", opacity: 0.6 } }, h("button", { type: "button", "aria-expanded": expanded, "aria-label": expanded ? "收起详情" : "展开详情", onClick: (event: any) => { event?.stopPropagation?.(); handlers.toggleRow?.(index, r); }, style: { ...buttonStyle, border: 0, padding: 0 } }, expanded ? "▾" : "▸")) : null,
-            ...columns.map((column, c) => h("td", { key: c, style: { padding: "4px 6px", borderBottom: "1px solid color-mix(in srgb, currentColor 8%, transparent)", fontVariantNumeric: "tabular-nums" } }, formatValue(getPath(row, column.field), column.format))),
+            ...columns.map((column, c) => h("td", { key: c, style: { padding: "4px 6px", borderBottom: "1px solid color-mix(in srgb, currentColor 8%, transparent)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis" }, title: String(formatValue(getPath(row, column.field), column.format) ?? "") }, formatValue(getPath(row, column.field), column.format))),
             actions.length ? h("td", { key: "actions", style: { padding: "4px 6px", whiteSpace: "nowrap" }, onClick: (event: any) => event?.stopPropagation?.() },
               ...actions.map((action, a) => {
                 const key = `${index}:row:${r}:${a}`;

@@ -46,6 +46,7 @@ export default {
     connectBannerLink: "Set up",
   },
   asset: {
+    highlights: "What it does for you",
     back: "Back to the hub",
     notFound: "This capability doesn't exist or isn't available to you.",
     version: "v{{n}}",
@@ -218,6 +219,8 @@ export default {
     empty: "When empty: {{text}}",
   },
   editor: {
+    highlights: "What it does for you (one per line, up to 3)",
+    highlightsHint: "Shown on the app page and at the top of the web version so colleagues get it at a glance.",
     newSkill: "Write a skill",
     newPrompt: "Write a prompt",
     newApp: "New app",

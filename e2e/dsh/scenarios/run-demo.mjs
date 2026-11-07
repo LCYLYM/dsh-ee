@@ -1,6 +1,6 @@
 // 示例内容与 DSH 设置里的「dsh-ee」页，在真实 DSH 里验证：
 //   S1 设置面板里有 dsh-ee 页，显示当前地址；测试连接三项都通过；填错地址测试会报连不上
-//   S2 导入示例后，员工 DSH 侧栏有「出差报销计算器」，打开后工作台取到演示差旅系统的数据
+//   S2 导入示例后，员工 DSH 侧栏有「出差报销助手」，打开后工作台取到演示差旅系统的数据
 //   S3 在工作台表单里填出差信息点「按制度计算」，发给 AI 的话带着表单内容
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
@@ -73,7 +73,7 @@ async function main() {
 
     // S1：设置 → dsh-ee
     const side = page.locator('section[data-dsh-ee-ui="apps"]')
-    await side.getByRole('button', { name: '出差报销计算器', exact: true }).waitFor({ timeout: 60_000 })
+    await side.getByRole('button', { name: '出差报销助手', exact: true }).waitFor({ timeout: 60_000 })
     // DSH Web 把设置收在侧栏底部的「More」菜单里
     const settingsButton = page.getByRole('button', { name: /^Settings$|^设置$/ }).or(page.getByRole('menuitem', { name: /^Settings$|^设置$/ })).first()
     if (!(await settingsButton.isVisible())) {
@@ -101,13 +101,14 @@ async function main() {
     await page.keyboard.press('Escape')
     save('demo-s1', { status: 'pass', base: server.base, ok: okText.split('\n'), fail: failText.split('\n') })
 
-    // S2：打开出差报销计算器，工作台取数
+    // S2：打开出差报销助手，工作台取数
     fake.script('/travel-expense', [textResponse('你好，我是差旅报销助手。')])
-    await side.getByRole('button', { name: '出差报销计算器', exact: true }).click()
+    await side.getByRole('button', { name: '出差报销助手', exact: true }).click()
     await modelRequest(fake, '/travel-expense')
-    await page.getByText('BX-1001', { exact: true }).first().waitFor({ timeout: 30_000 })
+    // 「我的报销单」按当前员工取，场景员工没有报销单，显示空状态
+    await page.getByText('你还没有报销单', { exact: true }).first().waitFor({ timeout: 30_000 })
     const body = await page.locator('body').innerText()
-    for (const want of ['本月已报', '部门剩余预算', '出差报销计算器', '计算结果', '报销单']) assert.ok(body.includes(want), `工作台上应有「${want}」`)
+    for (const want of ['本月已报', '部门剩余预算', '出差报销计算器', '计算结果', '我的报销单']) assert.ok(body.includes(want), `工作台上应有「${want}」`)
     assert.equal(await page.getByText('制度原文', { exact: true }).count(), 0, '原文不再单独开一栏')
     await page.screenshot({ path: path.join(shots, 'travel-workbench.png'), fullPage: true })
     save('demo-s2', { status: 'pass', claimsVisible: true })

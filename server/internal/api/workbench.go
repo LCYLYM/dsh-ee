@@ -493,6 +493,9 @@ func checkSourceArgs(src *wbSource) string {
 		if json.Unmarshal(src.Args, &obj) != nil || obj == nil {
 			return "数据源的参数（args）必须是 JSON 对象"
 		}
+		if bad := wbMeRe.ReplaceAllString(string(src.Args), ""); strings.Contains(bad, "{{") {
+			return "数据源的参数里只能用 {{me.name}}、{{me.department}}、{{me.username}} 这几个占位符"
+		}
 		b, _ := json.Marshal(obj)
 		if len(b) > 4<<10 {
 			return "数据源的参数不能超过 4 KB"
@@ -720,5 +723,45 @@ func formFieldsOf(t *appTable) []wbField {
 		}
 		out = append(out, wbField{Name: f.Name, Label: f.Title, Kind: kind, Required: f.Required, Options: options})
 	}
+	return out
+}
+
+// wbMeRe 是数据源参数里的「当前员工」占位符：按打开工作台的员工填（姓名、部门、用户名）。
+var wbMeRe = regexp.MustCompile(`\{\{\s*me\.(name|department|username)\s*\}\}`)
+
+// fillMe 把数据源参数（JSON 对象）里字符串值中的 {{me.*}} 换成当前员工的信息。
+func fillMe(args json.RawMessage, u *store.User) json.RawMessage {
+	if len(args) == 0 || u == nil || !wbMeRe.Match(args) {
+		return args
+	}
+	var obj map[string]any
+	if json.Unmarshal(args, &obj) != nil {
+		return args
+	}
+	var walk func(v any) any
+	walk = func(v any) any {
+		switch x := v.(type) {
+		case string:
+			return wbMeRe.ReplaceAllStringFunc(x, func(m string) string {
+				switch wbMeRe.FindStringSubmatch(m)[1] {
+				case "name":
+					return displayOf(u)
+				case "department":
+					return u.Department
+				}
+				return u.Username
+			})
+		case map[string]any:
+			for k, e := range x {
+				x[k] = walk(e)
+			}
+		case []any:
+			for i, e := range x {
+				x[i] = walk(e)
+			}
+		}
+		return v
+	}
+	out, _ := json.Marshal(walk(obj))
 	return out
 }

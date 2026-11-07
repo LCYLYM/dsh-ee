@@ -58,7 +58,7 @@ func TestDemoImport(t *testing.T) {
 			t.Fatalf("%s %s 没建成：%s %s", it.Kind, it.Slug, it.Result, it.Error)
 		}
 	}
-	if len(res.Items) != 26 || len(res.Accounts) != 10 {
+	if len(res.Items) != 28 || len(res.Accounts) != 10 {
 		t.Fatalf("应建 6 个库、7 项能力、10 个账号、2 个自己用的应用：%s", body)
 	}
 
@@ -287,8 +287,8 @@ func TestDemoImport(t *testing.T) {
 	code, body = admin.do("DELETE", "/api/admin/demo", nil, nil)
 	expect(t, "清除示例", code, 200, body)
 	cleared := decodeAs[struct{ Assets, KBases, Users int }](t, body)
-	if cleared.Assets != 10 || cleared.KBases != 6 || cleared.Users != 10 {
-		t.Fatalf("应删 10 项能力、6 个库、10 个账号：%s", body)
+	if cleared.Assets != 12 || cleared.KBases != 6 || cleared.Users != 10 {
+		t.Fatalf("应删 12 项能力、6 个库、10 个账号：%s", body)
 	}
 	code, body = admin.do("GET", "/api/admin/demo", nil, nil)
 	expect(t, "清除后的状态", code, 200, body)
@@ -323,7 +323,7 @@ func TestDemoImport(t *testing.T) {
 	code, body = admin.do("POST", "/api/admin/demo", nil, nil)
 	expect(t, "清除后再导入", code, 200, body)
 	again2 := decodeAs[result](t, body)
-	if len(again2.Items) != 26 || len(again2.Accounts) != 10 {
+	if len(again2.Items) != 28 || len(again2.Accounts) != 10 {
 		t.Fatalf("清除后再导入应和第一次一样：%s", body)
 	}
 	for _, it := range again2.Items {

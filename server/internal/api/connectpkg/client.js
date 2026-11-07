@@ -21299,7 +21299,7 @@ function tableView(h, index, widget, state, handlers) {
               event?.stopPropagation?.();
               handlers.toggleRow?.(index, r);
             }, style: { ...buttonStyle2, border: 0, padding: 0 } }, expanded ? "\u25BE" : "\u25B8")) : null,
-            ...columns.map((column, c) => h("td", { key: c, style: { padding: "4px 6px", borderBottom: "1px solid color-mix(in srgb, currentColor 8%, transparent)", fontVariantNumeric: "tabular-nums" } }, formatValue(getPath(row, column.field), column.format))),
+            ...columns.map((column, c) => h("td", { key: c, style: { padding: "4px 6px", borderBottom: "1px solid color-mix(in srgb, currentColor 8%, transparent)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis" }, title: String(formatValue(getPath(row, column.field), column.format) ?? "") }, formatValue(getPath(row, column.field), column.format))),
             actions.length ? h(
               "td",
               { key: "actions", style: { padding: "4px 6px", whiteSpace: "nowrap" }, onClick: (event) => event?.stopPropagation?.() },

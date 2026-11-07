@@ -35,7 +35,7 @@ type demoAsset struct {
 
 func demoAssets() []demoAsset {
 	invocable := true
-	return []demoAsset{
+	return append([]demoAsset{
 		{
 			Kind: store.KindConnection, Slug: demoConn, Delivery: store.DeliveryAuto,
 			EnableTools: []string{"create_claim"},
@@ -90,98 +90,8 @@ func demoAssets() []demoAsset {
 				Body:        demoWeeklyPrompt,
 			},
 		},
-		{
-			Kind: store.KindApp, Slug: "travel-expense", Delivery: store.DeliveryAuto,
-			Spec: assetSpec{
-				Title:       "出差报销计算器",
-				Description: "填出差城市、天数和花费，按差旅制度算出能报多少、哪里超标，带制度出处；还能看报销单、一键提交。",
-				Icon:        "🧳",
-				Persona:     demoTravelPersona,
-				Starters:    []string{"去上海出差 3 天，住宿每晚 650，能报多少？", "一线城市住宿标准是多少？", "帮我看看待审批的报销单有没有超标"},
-				Connections: []string{demoConn},
-				Knowledge:   []string{"travel-policy"},
-				Launch:      "resume",
-				Workbench:   demoTravelWorkbench(),
-			},
-		},
-		{
-			Kind: store.KindApp, Slug: "onboarding-buddy", Delivery: store.DeliveryAuto,
-			Spec: assetSpec{
-				Title:       "新人入职助手",
-				Description: "回答入职、考勤、休假、IT 账号的问题，答案带员工手册出处；帮新人列第一周的待办。",
-				Icon:        "🧭",
-				Persona:     demoOnboardingPersona,
-				Starters:    []string{"入职第一天要带什么材料？", "年假怎么算？", "怎么连公司 VPN？"},
-				Skills:      []string{"meeting-minutes"},
-				Knowledge:   []string{"employee-handbook"},
-				Workbench:   demoOnboardingWorkbench(),
-			},
-		},
-	}
+	}, demoSampleApps()...)
 }
-
-func demoTravelWorkbench() *appWorkbench {
-	return &appWorkbench{Panes: []wbPane{
-		{ID: "calc", Type: "panel", Title: "报销计算", Widgets: []wbWidget{
-			{Type: "markdown", Title: "怎么用", Text: "填下面的表单点「按制度计算」，AI 会查《差旅费管理办法》逐项算出可报金额，结果和出处写在「计算结果」里，点出处能看制度原文。算好后可以让 AI 直接提交报销单（提交前会弹出审批卡让你确认）。"},
-			{Type: "metric", Title: "本月已报", Source: &wbSource{Connection: demoConn, Tool: "get_summary"}, Field: "total", Format: "money"},
-			{Type: "metric", Title: "待审批", Source: &wbSource{Connection: demoConn, Tool: "get_summary"}, Field: "pending", Format: "number"},
-			{Type: "metric", Title: "部门剩余预算", Source: &wbSource{Connection: demoConn, Tool: "get_summary"}, Field: "budget_left", Format: "money"},
-			{Type: "form", Title: "出差报销计算器", Fields: []wbField{
-				{Name: "city", Label: "出差城市", Kind: "select", Required: true, Options: []string{"北京", "上海", "广州", "深圳", "杭州", "南京", "成都", "武汉", "西安", "长沙", "其他城市"}},
-				{Name: "days", Label: "出差天数", Kind: "number", Required: true},
-				{Name: "hotel", Label: "住宿每晚（元）", Kind: "number", Required: true},
-				{Name: "transport", Label: "往返交通", Kind: "select", Required: true, Options: []string{"高铁二等座", "高铁一等座", "飞机经济舱", "自驾", "其他"}},
-				{Name: "fare", Label: "交通费合计（元）", Kind: "number"},
-				{Name: "level", Label: "职级", Kind: "select", Required: true, Options: []string{"普通员工", "经理及以上"}},
-			}, Submit: &wbAction{Label: "按制度计算", Prompt: "按《差旅费管理办法》帮我算一笔出差报销：城市 {{form.city}}，出差 {{form.days}} 天，住宿每晚 {{form.hotel}} 元，往返交通 {{form.transport}} 共 {{form.fare}} 元，职级 {{form.level}}。逐项列出住宿、伙食补助、市内交通补助、往返交通的标准、可报金额和超标自理部分，最后给出合计，每项标制度出处。"}},
-			{Type: "board", Title: "计算结果"},
-			{Type: "table", Title: "报销单", Source: &wbSource{Connection: demoConn, Tool: "list_claims"}, Rows: "items",
-				Columns:    []wbColumn{{Field: "id", Title: "单号"}, {Field: "applicant", Title: "申请人"}, {Field: "city", Title: "城市"}, {Field: "days", Title: "天数"}, {Field: "amount", Title: "金额", Format: "money"}, {Field: "status", Title: "状态"}},
-				RowActions: []wbAction{{Label: "让 AI 核对", Prompt: "核对报销单 {{row.id}}（{{row.applicant}}，{{row.city}} {{row.days}} 天，金额 {{row.amount}} 元，事由「{{row.reason}}」）是否符合差旅制度，指出可能超标或缺票据的地方，带出处。"}}},
-			{Type: "actions", Title: "快捷操作", Actions: []wbAction{
-				{Label: "提交刚才的报销", Prompt: "把刚才算好的这笔出差按可报金额提交一张报销单（用差旅系统的提交报销单工具）。提交前先把申请人、城市、天数、金额、事由列给我确认。"},
-				{Label: "各城市住宿标准", Prompt: "列出差旅制度里各类城市的住宿标准和伙食补助，做成一张表，带出处。"},
-				{Label: "报销要哪些票据", Prompt: "出差回来报销要准备哪些票据、多久之内交、谁审批？带出处。"},
-			}},
-		}},
-	}}
-}
-
-func demoOnboardingWorkbench() *appWorkbench {
-	return &appWorkbench{Panes: []wbPane{
-		{ID: "home", Type: "panel", Title: "入职助手", Widgets: []wbWidget{
-			{Type: "markdown", Title: "欢迎", Text: "欢迎加入！这里的回答都来自《员工手册》，点答案里的出处能看原文。不知道问什么，可以先点下面的按钮。"},
-			{Type: "actions", Title: "新人常问", Actions: []wbAction{
-				{Label: "第一周做什么", Prompt: "按员工手册，给我列一份入职第一周的待办清单（第一天、第一周分开），每项带出处。"},
-				{Label: "年假怎么算", Prompt: "年假怎么算、怎么请、能不能跨年？带出处。"},
-				{Label: "账号和 VPN", Prompt: "入职后要开通哪些账号，怎么连公司 VPN、装 DSH？带出处。"},
-			}},
-			{Type: "form", Title: "问问手册", Fields: []wbField{{Name: "q", Label: "问题", Kind: "text", Required: true}},
-				Submit: &wbAction{Label: "问", Prompt: "在员工手册里查：{{form.q}}"}},
-			{Type: "board", Title: "答案与出处"},
-			{Type: "table", Title: "常用文档", Source: &wbSource{Connection: kbConn, Tool: "popular"}, Rows: "items",
-				Columns:    []wbColumn{{Field: "title", Title: "文档"}, {Field: "kb_title", Title: "知识库"}},
-				RowActions: []wbAction{{Label: "讲了什么", Prompt: "用几句话总结文档「{{row.title}}」（文档编号 {{row.doc}}）讲了什么，带出处。"}}},
-		}},
-	}}
-}
-
-const demoTravelPersona = `你是公司的差旅报销助手，帮员工按《差旅费管理办法》算出差能报多少钱、核对报销单、提交报销单。
-
-工作方式：
-- 计算时逐项列出：住宿（按城市类别和职级的上限 × 晚数）、伙食补助（按天）、市内交通补助（按天）、往返交通（按规定的舱位等级）。实际花费超过标准的部分写明「超标自理」。
-- 每一项的标准都要从知识库原文里查，标出处，不要凭印象。
-- 结果用表格写：项目、标准、实际、可报、自理。最后给出合计。
-- 用户要提交报销单时，先把申请人、城市、天数、金额、事由列出来让用户确认，再调用差旅系统的提交报销单工具。申请人不知道时问用户。
-- 这是演示环境，数据是编的；不要编造制度里没有的规定。`
-
-const demoOnboardingPersona = `你是新员工的入职助手，语气友好、简洁。回答入职准备、考勤休假、IT 账号和办公环境的问题。
-
-工作方式：
-- 只依据《员工手册》知识库里的内容回答，标出处；手册里没有的，直接说没有，建议去问 HR（hr@example.com）或 IT 服务台（分机 8000）。
-- 用户要清单时，用复选框列表，按时间顺序排。
-- 用户贴了会议记录想整理时，可以用「会议纪要整理」技能。`
 
 const demoMinutesSkill = `# 会议纪要整理
 

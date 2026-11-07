@@ -702,6 +702,7 @@ export interface WebApp {
   description: string;
   icon?: string;
   starters: string[];
+  highlights?: string[] | null;
   workbench?: AppWorkbench | null;
   tables: boolean;
   web: boolean;
@@ -726,6 +727,8 @@ export interface AssetSpec {
   tables?: AppTable[];
   /** 微应用：开放网页版（/a/<标识>） */
   web?: boolean;
+  /** 微应用：「它能帮你做什么」的要点，最多 3 条 */
+  highlights?: string[];
   /** 微应用：样板，出现在「造 → 从样板复制」里（管理员设）。 */
   template?: boolean;
   knowledge?: string[];
