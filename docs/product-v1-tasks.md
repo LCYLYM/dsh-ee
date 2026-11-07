@@ -18,10 +18,10 @@
 | M8 | 反馈：👍👎、使用数据、答不上来的问题 | M3 | 是 | 未开始 |
 | M9 | `/ee-save`：把对话沉淀成能力 | M4 | 是 | 未开始 |
 | M10 | 收尾功能：OIDC、月度 AI 落地报告 | — | 否 | ✅ 已完成（2026-11-07） |
-| M12 | 从 DSH 打开网页免登录（一次性登录链接） | — | 是 | ✅ 代码完成，待 Mac 验证（[workbench-verify.md §7](./workbench-verify.md)） |
-| M13 | 应用自带数据：表、行可见性、`app` 工具、员工侧 `ee_app` | M4 | 是 | ✅ 代码完成，待 Mac 验证（[workbench-verify.md §8](./workbench-verify.md)） |
-| M14 | 网页版应用 `/a/<应用标识>`，与 DSH 共用渲染 | M5（共用渲染）、M12、M13 | 是 | ✅ 代码完成，待 Mac / 手机验证（[workbench-verify.md §9](./workbench-verify.md)） |
-| M15 | 数据中台最小版本：上传、数据集、系统连接 `data` | M13（`ref` 字段） | 否 | ✅ 已完成（`ref` 字段与升格放 v1.1，[workbench-verify.md §10](./workbench-verify.md)） |
+| M12 | 从 DSH 打开网页免登录（一次性登录链接） | — | 是 | ✅ 已在真实 `dsh web` 验证（web profile；Desktop 与 M12-2/4/5 未覆盖，[workbench-verify.md §7](./workbench-verify.md)） |
+| M13 | 应用自带数据：表、行可见性、`app` 工具、员工侧 `ee_app` | M4 | 是 | ✅ 已在真实 `dsh web` 验证（M13-1～6，[workbench-verify.md §8](./workbench-verify.md)） |
+| M14 | 网页版应用 `/a/<应用标识>`，与 DSH 共用渲染 | M5（共用渲染）、M12、M13 | 是 | ✅ 已在真实 `dsh web` + 手机视口验证（真机、`dsh://open` 未覆盖，[workbench-verify.md §9](./workbench-verify.md)） |
+| M15 | 数据中台最小版本：上传、数据集、系统连接 `data` | M13（`ref` 字段） | 否 | ✅ 已完成并在真实 `dsh web` 验证核心链路（`ref` 字段与升格放 v1.1，[workbench-verify.md §10](./workbench-verify.md)） |
 | M11 | 发布：README、文档、兼容性矩阵、演示视频 | 全部 | 是 | 未开始 |
 
 M1、M2、M4、M10 互不依赖，可以并行。M12～M15 来自 2026-11-07 的补充讨论（[product-v1.md §10](./product-v1.md)），M12 不依赖任何项，可以最先做；已定都进 v1.0（M15 只做最小版本，升格与 `data__query` 放 v1.1）。
