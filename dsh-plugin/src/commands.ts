@@ -1,6 +1,5 @@
 import type { DshContext, PluginConfig } from "./dsh.js";
 import { DeviceFlow, openBrowser } from "./device.js";
-import { currentSessionOf, sendToSession } from "./host-session.js";
 import type { TokenManager } from "./token.js";
 
 /** /ee-login 后面跟的接入码（网页「开始使用」页给的），形如 ABCD-EFGH；没有就是空串。 */
@@ -70,26 +69,6 @@ export function registerCommands(ctx: DshContext, config: PluginConfig, tokens: 
         const matches = await tokens.npmrcMatches(current.value);
         const expiry = me.expires_at ? ` · ${new Date(me.expires_at).toLocaleDateString()} 到期` : " · 长期有效";
         return { kind: "success", text: `已登录 ${me.username}（${me.department}）· 令牌 ${me.token_prefix}${expiry} · 插件 ${config.version} · npmrc ${matches ? "一致" : "不一致"}` };
-      },
-    });
-    register({
-      name: "ee-save",
-      description: "把这段对话沉淀成能力（提示词 / 技能 / 应用草稿）",
-      handler: async () => {
-        const sessionId = currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
-        if (!sessionId) return { kind: "error", text: "没有当前会话" };
-        const prompt =
-          "刚才这段对话里可能沉淀了值得复用的做法。请把它提炼成一个企业能力：\n" +
-          "1. 先告诉我你建议做成什么——提示词（反复用的一段话）、技能（带工具的操作流程）还是应用（带工作台的助手），以及理由；等我确认后再做，也可以我直接指定类型。\n" +
-          "2. 确认后用 ee_hub 的 create（for_me: true）建好：起一个清晰的标识（slug）、标题和说明，说明第一段用两三句话总结这段对话的来源（写明「来自一次对话」）；正文 / 人设按我们刚才的做法写。\n" +
-          "3. 建好后给我网页上的详情链接（<dsh-ee 地址>/assets/<id>），我想继续改范围或内容就去网页。\n" +
-          "注意：这个能力会把我们对话的摘要发到 dsh-ee 保存。";
-        try {
-          await sendToSession(ctx, sessionId, prompt);
-        } catch (error) {
-          return { kind: "error", text: `发不出去：${(error as Error)?.message ?? error}` };
-        }
-        return { kind: "success", text: "已把提炼请求发给当前会话，接着按提示选类型就好。" };
       },
     });
     register({

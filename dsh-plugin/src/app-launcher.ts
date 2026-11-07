@@ -46,11 +46,14 @@ export function createLauncher(ctx: any, deps: LauncherDeps) {
     await after(app, id);
   };
 
-  /** 首屏：在当前空白会话里直接开始，并记下绑定。 */
+  /** 首屏：在当前空白会话里直接开始，并记下绑定；宿主把首屏会话做成懒创建的、取不到时退化为新建。 */
   const launchHero = async (app: CatalogApp) => {
     const id = currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
-    if (!id) throw new Error("当前没有空白会话");
-    await sendOnce(ctx, id, startText(app, app.starters[0]));
+    if (!id) {
+      await launchNew(app);
+      return;
+    }
+    await sendOnce(ctx, id, startText(app, app.starters?.[0]));
     await bind(app, id);
     await after(app, id);
   };
@@ -75,6 +78,7 @@ export function createLauncher(ctx: any, deps: LauncherDeps) {
       await launch();
       return "";
     } catch (error) {
+      try { console.error("dsh-ee launch failed:", error); } catch { /* console 不可用时忽略 */ }
       if (error instanceof SendUnknownError) return sendUnknownNotice;
       return fallback();
     }

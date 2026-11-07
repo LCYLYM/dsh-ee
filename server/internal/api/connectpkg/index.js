@@ -295,46 +295,6 @@ function openBrowser(url) {
   });
 }
 
-// src/host-session.ts
-function currentSessionOf(snapshot) {
-  if (typeof snapshot?.current === "string") return snapshot.current;
-  const rows = Object.values(snapshot?.byId ?? {});
-  return rows.find((row) => (row?.retainedBy?.mainView ?? 0) > 0)?.id ?? "";
-}
-function checkSendResult(result) {
-  if (result?.kind === "error" || result?.ok === false) {
-    throw new Error(result.text || result.error?.message || result.error?.code || "\u5BBF\u4E3B\u62D2\u7EDD\u4E86\u6D88\u606F");
-  }
-}
-async function sendToSession(ctx, id, text) {
-  const sessions = ctx?.sessions;
-  const send = async (session2) => {
-    if (session2 && typeof ctx?.conversation?.sendSession === "function") {
-      checkSendResult(await ctx.conversation.sendSession(session2, text, [], "queue"));
-      return;
-    }
-    if (session2 && typeof session2.prompt === "function") {
-      checkSendResult(await session2.prompt([{ type: "text", text }], "queue"));
-      return;
-    }
-    throw new Error("\u5BBF\u4E3B\u4E0D\u652F\u6301\u53D1\u9001\u6D88\u606F");
-  };
-  if (typeof sessions?.using === "function") {
-    await sessions.using(id, { source: "dshEEApps" }, async (ref) => {
-      const binding = await ref.ready;
-      await send(binding.session);
-    });
-    return;
-  }
-  let session;
-  for (let i = 0; i < 10; i++) {
-    session = sessions?.binding?.(id)?.session;
-    if (session) break;
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  await send(session);
-}
-
 // src/commands.ts
 function parseSetupCode(rawInput) {
   const code = String(rawInput ?? "").trim().toUpperCase();
@@ -390,21 +350,6 @@ function registerCommands(ctx, config, tokens, onLogin = async () => {
         const matches = await tokens.npmrcMatches(current.value);
         const expiry = me.expires_at ? ` \xB7 ${new Date(me.expires_at).toLocaleDateString()} \u5230\u671F` : " \xB7 \u957F\u671F\u6709\u6548";
         return { kind: "success", text: `\u5DF2\u767B\u5F55 ${me.username}\uFF08${me.department}\uFF09\xB7 \u4EE4\u724C ${me.token_prefix}${expiry} \xB7 \u63D2\u4EF6 ${config.version} \xB7 npmrc ${matches ? "\u4E00\u81F4" : "\u4E0D\u4E00\u81F4"}` };
-      }
-    });
-    register({
-      name: "ee-save",
-      description: "\u628A\u8FD9\u6BB5\u5BF9\u8BDD\u6C89\u6DC0\u6210\u80FD\u529B\uFF08\u63D0\u793A\u8BCD / \u6280\u80FD / \u5E94\u7528\u8349\u7A3F\uFF09",
-      handler: async () => {
-        const sessionId = currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
-        if (!sessionId) return { kind: "error", text: "\u6CA1\u6709\u5F53\u524D\u4F1A\u8BDD" };
-        const prompt = "\u521A\u624D\u8FD9\u6BB5\u5BF9\u8BDD\u91CC\u53EF\u80FD\u6C89\u6DC0\u4E86\u503C\u5F97\u590D\u7528\u7684\u505A\u6CD5\u3002\u8BF7\u628A\u5B83\u63D0\u70BC\u6210\u4E00\u4E2A\u4F01\u4E1A\u80FD\u529B\uFF1A\n1. \u5148\u544A\u8BC9\u6211\u4F60\u5EFA\u8BAE\u505A\u6210\u4EC0\u4E48\u2014\u2014\u63D0\u793A\u8BCD\uFF08\u53CD\u590D\u7528\u7684\u4E00\u6BB5\u8BDD\uFF09\u3001\u6280\u80FD\uFF08\u5E26\u5DE5\u5177\u7684\u64CD\u4F5C\u6D41\u7A0B\uFF09\u8FD8\u662F\u5E94\u7528\uFF08\u5E26\u5DE5\u4F5C\u53F0\u7684\u52A9\u624B\uFF09\uFF0C\u4EE5\u53CA\u7406\u7531\uFF1B\u7B49\u6211\u786E\u8BA4\u540E\u518D\u505A\uFF0C\u4E5F\u53EF\u4EE5\u6211\u76F4\u63A5\u6307\u5B9A\u7C7B\u578B\u3002\n2. \u786E\u8BA4\u540E\u7528 ee_hub \u7684 create\uFF08for_me: true\uFF09\u5EFA\u597D\uFF1A\u8D77\u4E00\u4E2A\u6E05\u6670\u7684\u6807\u8BC6\uFF08slug\uFF09\u3001\u6807\u9898\u548C\u8BF4\u660E\uFF0C\u8BF4\u660E\u7B2C\u4E00\u6BB5\u7528\u4E24\u4E09\u53E5\u8BDD\u603B\u7ED3\u8FD9\u6BB5\u5BF9\u8BDD\u7684\u6765\u6E90\uFF08\u5199\u660E\u300C\u6765\u81EA\u4E00\u6B21\u5BF9\u8BDD\u300D\uFF09\uFF1B\u6B63\u6587 / \u4EBA\u8BBE\u6309\u6211\u4EEC\u521A\u624D\u7684\u505A\u6CD5\u5199\u3002\n3. \u5EFA\u597D\u540E\u7ED9\u6211\u7F51\u9875\u4E0A\u7684\u8BE6\u60C5\u94FE\u63A5\uFF08<dsh-ee \u5730\u5740>/assets/<id>\uFF09\uFF0C\u6211\u60F3\u7EE7\u7EED\u6539\u8303\u56F4\u6216\u5185\u5BB9\u5C31\u53BB\u7F51\u9875\u3002\n\u6CE8\u610F\uFF1A\u8FD9\u4E2A\u80FD\u529B\u4F1A\u628A\u6211\u4EEC\u5BF9\u8BDD\u7684\u6458\u8981\u53D1\u5230 dsh-ee \u4FDD\u5B58\u3002";
-        try {
-          await sendToSession(ctx, sessionId, prompt);
-        } catch (error) {
-          return { kind: "error", text: `\u53D1\u4E0D\u51FA\u53BB\uFF1A${error?.message ?? error}` };
-        }
-        return { kind: "success", text: "\u5DF2\u628A\u63D0\u70BC\u8BF7\u6C42\u53D1\u7ED9\u5F53\u524D\u4F1A\u8BDD\uFF0C\u63A5\u7740\u6309\u63D0\u793A\u9009\u7C7B\u578B\u5C31\u597D\u3002" };
       }
     });
     register({

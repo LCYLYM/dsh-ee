@@ -8,7 +8,7 @@ type VoteRemote = { vote: (request: { app: string; session: string; message: str
 type VoteBindings = { appBindings: () => Promise<unknown> };
 
 /** 在 assistant-actions 槽位（0.2.2 起有；旧宿主没有就直接不出按钮）注册 👍👎。 */
-export function registerVotes(ctx: DshContext, remote: VoteRemote & VoteBindings): void {
+export function registerVotes(ctx: DshContext, remote: VoteRemote & VoteBindings, unwrapRemote: (value: unknown) => any): void {
   if (!ctx?.slots?.inject) return;
   const buttonStyle = { border: 0, background: "transparent", cursor: "pointer", fontSize: 13, padding: "1px 4px", opacity: 0.65 };
   const VoteButtons = (props: any) => {
@@ -23,7 +23,7 @@ export function registerVotes(ctx: DshContext, remote: VoteRemote & VoteBindings
       }
       let app = "";
       try {
-        const bindings = await remote.appBindings() as Record<string, { sessionId?: string }> | undefined;
+        const bindings = unwrapRemote(await remote.appBindings()) as Record<string, { sessionId?: string }> | undefined;
         app = Object.entries(bindings ?? {}).find(([, b]) => b?.sessionId === sessionId)?.[0] ?? "";
       } catch { /* 取不到绑定就只记消息 */ }
       await remote.vote({ app, session: sessionId, message: messageId, vote: value, note }).catch(() => undefined);

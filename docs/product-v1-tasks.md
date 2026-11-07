@@ -13,10 +13,10 @@
 | M3 | 第一批 4 个样板应用 | M1、M2 | 是 | ✅ 代码完成，待真实模型与 Mac 验证（[workbench-verify.md §11](./workbench-verify.md)） |
 | M4 | 导航按「用 / 造 / 管」重组，「自己用」免审核 | — | 否 | ✅ 已完成（2026-11-07） |
 | M5 | 应用编辑器：从样板复制、实时预览、原料一键生成、导入导出 | M2、M4 | 否 | ✅ 已完成（2026-11-08） |
-| M6 | DSH 首屏启动台、「工作台」系统应用、首页小卡片 | M3 | 是 | ✅ 代码完成，待 Mac 验证（[workbench-verify.md §12](./workbench-verify.md)） |
+| M6 | DSH 首屏启动台、「工作台」系统应用、首页小卡片 | M3 | 是 | ✅ 已在真实 `dsh web` 验证（M6-1～3，[workbench-verify.md §12](./workbench-verify.md)） |
 | M7 | 应用详情的依赖与权限状态，一键申请 | M4 | 否 | ✅ 已完成（2026-11-08） |
-| M8 | 反馈：👍👎、使用数据、答不上来的问题 | M3 | 是 | ✅ 代码完成，待 Mac 验证（[workbench-verify.md §12](./workbench-verify.md)） |
-| M9 | `/ee-save`：把对话沉淀成能力 | M4 | 是 | ✅ 代码完成，待 Mac 验证（[workbench-verify.md §12](./workbench-verify.md)） |
+| M8 | 反馈：👍👎、使用数据、答不上来的问题 | M3 | 是 | ✅ 已在真实 `dsh web` 验证（M8-1～2，[workbench-verify.md §12](./workbench-verify.md)） |
+| M9 | `/ee-save`：把对话沉淀成能力 | M4 | 是 | ⚠️ 命令已实现，提炼消息投递待修（[workbench-verify.md §12.1](./workbench-verify.md)） |
 | M10 | 收尾功能：OIDC、月度 AI 落地报告 | — | 否 | ✅ 已完成（2026-11-07） |
 | M12 | 从 DSH 打开网页免登录（一次性登录链接） | — | 是 | ✅ 已在真实 `dsh web` 验证（web profile；Desktop 与 M12-2/4/5 未覆盖，[workbench-verify.md §7](./workbench-verify.md)） |
 | M13 | 应用自带数据：表、行可见性、`app` 工具、员工侧 `ee_app` | M4 | 是 | ✅ 已在真实 `dsh web` 验证（M13-1～6，[workbench-verify.md §8](./workbench-verify.md)） |

@@ -7,6 +7,7 @@ import { enterpriseHeader, enterprisePanel, enterpriseTabId, registerEnterpriseS
 import { registerApps } from "./apps-client.js";
 import { registerWorkbench } from "./workbench-client.js";
 import { registerVotes } from "./votes.js";
+import { registerEeSave } from "./ee-save.js";
 import { registerServerSettings } from "./settings-view.js";
 
 export const inject = ["slots", "remote", "sidebarRightTabs", "sidebarRight", "sessions", "conversation", "workspaces"];
@@ -118,7 +119,8 @@ export async function apply(ctx: any): Promise<void> {
     const { AppsPanel } = apps;
     const workbench = registerWorkbench(ctx, { remote, unwrapRemote, appsNow: apps.appsNow, appsLoaded: apps.appsLoaded, loadApps: apps.loadApps, subscribeApps: apps.subscribeApps });
     apps.setWorkbenchOpener(workbench.openWorkbench);
-    registerVotes(ctx, remote);
+    registerVotes(ctx, remote, unwrapRemote);
+    registerEeSave(ctx);
     let brand: BrandViewData;
     try {
       brand = unwrapRemote(await Promise.race([

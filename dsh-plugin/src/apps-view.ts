@@ -332,7 +332,7 @@ export function launcherPanel(createElement: (...args: any[]) => any, apps: Cata
     createElement("button", { type: "button", onClick: onToggle, "aria-expanded": open, "aria-haspopup": "menu", style: { ...buttonStyle, fontSize: 12, padding: "4px 7px", whiteSpace: "nowrap" } }, "企业应用"),
     createElement("div", {
       role: "region", "aria-label": "应用启动台",
-      style: { position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 60, width: "min(560px, calc(100vw - 48px))", padding: 12, borderRadius: 10, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 8px 30px #0003" },
+      style: { position: "absolute", right: 0, bottom: "calc(100% + 8px)", zIndex: 60, width: "min(560px, calc(100vw - 48px))", maxHeight: "min(420px, calc(100vh - 140px))", overflowY: "auto", padding: 12, borderRadius: 10, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 8px 30px #0003" },
     },
       createElement("div", { style: { fontSize: 13, marginBottom: 8, opacity: 0.85 } },
         todos ? `需要你处理：${todos} 项（都在「工作台」里）` : "从下面挑一个应用开始，或直接说出你的问题"),
