@@ -138,6 +138,22 @@ func (s *Server) handleDemoMonthly(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
+// demoStandIn：演示系统里没有这个人时（比如管理员自己导入示例后来试），借一位示例员工的数据给他看，
+// 免得「我的客户」「我的工单」全是 0。返回空表示不用借；借来的记录在返回里换成他本人的名字。
+func demoStandIn(who string, people []string, standIn string) string {
+	if who == "" || slices.Contains(people, who) {
+		return ""
+	}
+	return standIn
+}
+
+// demoMine：这条记录算不算 who 的（含借来的）。
+func demoMine(name, who, alt string) bool {
+	return who == "" || name == who || (alt != "" && name == alt)
+}
+
+var demoITSMPeople = []string{"周航", "林娜", "赵磊", "孙悦", "何静", "陈一", "吴敏", "郑小雨", "许诺"}
+
 // ---- CRM：50 个客户、合同、拜访记录、续约日期 ----
 
 type demoCustomer struct {
@@ -280,11 +296,12 @@ func (s *Server) handleDemoCRMSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	owner := strings.TrimSpace(r.URL.Query().Get("owner"))
+	alt := demoStandIn(owner, demoCRMOwners, demoCRMOwners[0])
 	limit := time.Now().AddDate(0, 0, 90).Format("2006-01-02")
 	var n, renewals, high int
 	var arr float64
 	for _, c := range s.crm.list() {
-		if owner != "" && c.Owner != owner {
+		if !demoMine(c.Owner, owner, alt) {
 			continue
 		}
 		n++
@@ -306,10 +323,15 @@ func (s *Server) handleDemoCRMCustomers(w http.ResponseWriter, r *http.Request) 
 	}
 	q := r.URL.Query()
 	owner, risk, kw := strings.TrimSpace(q.Get("owner")), strings.TrimSpace(q.Get("risk")), strings.TrimSpace(q.Get("q"))
+	alt := demoStandIn(owner, demoCRMOwners, demoCRMOwners[0])
 	items := []demoCustomer{}
 	for _, c := range s.crm.list() {
-		if (owner == "" || c.Owner == owner) && (risk == "" || c.Risk == risk) && (kw == "" || strings.Contains(c.Name, kw) || strings.Contains(c.Industry, kw)) {
-			items = append(items, customerBrief(c))
+		if demoMine(c.Owner, owner, alt) && (risk == "" || c.Risk == risk) && (kw == "" || strings.Contains(c.Name, kw) || strings.Contains(c.Industry, kw)) {
+			c = customerBrief(c)
+			if alt != "" {
+				c.Owner = owner
+			}
+			items = append(items, c)
 		}
 	}
 	sort.SliceStable(items, func(i, j int) bool { return items[i].RenewAt < items[j].RenewAt })
@@ -342,10 +364,15 @@ func (s *Server) handleDemoCRMRenewals(w http.ResponseWriter, r *http.Request) {
 	}
 	limit := time.Now().AddDate(0, 0, days).Format("2006-01-02")
 	owner := strings.TrimSpace(r.URL.Query().Get("owner"))
+	alt := demoStandIn(owner, demoCRMOwners, demoCRMOwners[0])
 	items := []demoCustomer{}
 	for _, c := range s.crm.list() {
-		if c.RenewAt <= limit && (owner == "" || c.Owner == owner) {
-			items = append(items, customerBrief(c))
+		if c.RenewAt <= limit && demoMine(c.Owner, owner, alt) {
+			c = customerBrief(c)
+			if alt != "" {
+				c.Owner = owner
+			}
+			items = append(items, c)
 		}
 	}
 	rank := map[string]int{"高": 0, "中": 1, "低": 2}
@@ -447,7 +474,7 @@ func demoTickets(now time.Time) []demoTicket {
 		"software": {"申请安装 Visio", "申请 IntelliJ IDEA 授权"},
 		"meeting":  {"大会议室投屏没声音", "视频会议摄像头不工作"},
 	}
-	people := []string{"周航", "林娜", "赵磊", "孙悦", "何静", "陈一", "吴敏", "郑小雨", "许诺"}
+	people := demoITSMPeople
 	var out []demoTicket
 	for i := 0; i < 26; i++ {
 		cat := demoTicketCategories[rng.Intn(len(demoTicketCategories))]
@@ -486,10 +513,14 @@ func (s *Server) handleDemoTickets(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	who, status := strings.TrimSpace(q.Get("requester")), strings.TrimSpace(q.Get("status"))
+	alt := demoStandIn(who, demoITSMPeople, "郑小雨")
 	items := []demoTicket{}
 	for _, t := range s.itsm.list() {
 		open := t.Status == "待处理" || t.Status == "处理中"
-		if (who == "" || t.Requester == who) && (status == "" || t.Status == status || (status == "未解决" && open)) {
+		if demoMine(t.Requester, who, alt) && (status == "" || t.Status == status || (status == "未解决" && open)) {
+			if alt != "" {
+				t.Requester = who
+			}
 			items = append(items, t)
 		}
 	}
@@ -502,10 +533,11 @@ func (s *Server) handleDemoTicketSummary(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	who := strings.TrimSpace(r.URL.Query().Get("requester"))
+	alt := demoStandIn(who, demoITSMPeople, "郑小雨")
 	week := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
 	var open, overdue, resolved int
 	for _, t := range s.itsm.list() {
-		if who != "" && t.Requester != who {
+		if !demoMine(t.Requester, who, alt) {
 			continue
 		}
 		switch {

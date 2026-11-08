@@ -23,6 +23,7 @@ export interface ClientServiceActions {
   updatePlugin: () => Promise<any>;
   webLink: (request: { url?: string }) => Promise<string>;
   insertFormRow: (request: { app: string; pane: string; widget: number; values?: Record<string, unknown> }) => Promise<any>;
+  writeTableRow: (request: { app: string; pane: string; widget: number; action: number; id: number }) => Promise<any>;
   vote: (request: { app: string; session: string; message: string; vote: 1 | -1; note: string }) => Promise<any>;
 }
 
@@ -139,6 +140,11 @@ export class DshEEClientService extends TypertRemoteService {
   @Remote
   async insertFormRow(request: { app: string; pane: string; widget: number; values?: Record<string, unknown> }): Promise<any> {
     return this.actions.insertFormRow(request);
+  }
+
+  @Remote
+  async writeTableRow(request: { app: string; pane: string; widget: number; action: number; id: number }): Promise<any> {
+    return this.actions.writeTableRow(request);
   }
 
   @Remote

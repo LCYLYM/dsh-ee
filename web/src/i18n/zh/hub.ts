@@ -173,6 +173,8 @@ export default {
     copyFailed: "网页上没有 AI：请复制下面这段话，打开 DSH 粘贴到输入框发送。",
     openDSH: "打开 DSH ↗",
     saved: "已保存：{{label}}",
+    updated: "已更新：{{label}}",
+    deleted: "已删除这一行",
     open: "打开网页版",
     short: "网页版",
     toggle: "在网页上也能用",

@@ -3,7 +3,7 @@ import { createElement, useEffect, useRef, useState } from "react";
 import { sendUnknownNotice } from "./app-launcher.js";
 import { currentSessionOf, sendToSession } from "./host-session.js";
 import type { CatalogApp } from "./skills.js";
-import { checklistKey, docWindow, fillPrompt, kbDocUrl, parseWorkbenchAddress, scopeText, workbenchAddress, workbenchScheme, type Board, type Citation, type KBaseItem, type WorkbenchAction, type WorkbenchPane } from "./workbench.js";
+import { checklistKey, docWindow, fillPrompt, kbDocUrl, parseWorkbenchAddress, rowWriteOf, scopeText, workbenchAddress, workbenchScheme, type Board, type Citation, type KBaseItem, type WorkbenchAction, type WorkbenchPane } from "./workbench.js";
 import { openWorkbench } from "./workbench-open.js";
 import { createWebOpener, interceptWebLinks } from "./web-link.js";
 import { kbDocView, missingPaneView, panelView, type DocTarget, type PanelHandlers, type WidgetState } from "./workbench-view.js";
@@ -108,6 +108,9 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
     const [formErrors, setFormErrors] = useState<Record<number, string>>({});
     const [selectedKBs, setSelectedKBs] = useState<string[]>([]);
     const [checks, setChecks] = useState<Record<string, string[]>>({});
+    // 写表的行按钮：正在写的按钮、点过一次等确认的删除按钮
+    const [writing, setWriting] = useState<Set<string>>(new Set());
+    const [armed, setArmed] = useState("");
     const [expanded, setExpanded] = useState<Record<number, number | undefined>>({});
     const { sending, notice, setNotice, send: sendText } = useSending();
     const sessionRef = useRef("");
@@ -202,13 +205,42 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
         .catch(() => setFormError(index, "没有保存，请检查网络后重试"));
     };
     const setFormError = (index: number, error: string) => setFormErrors((current) => ({ ...current, [index]: error }));
+    // 表格的行按钮写表：改状态或删除这一行（删除要点两次），完了刷新读这张表的组件
+    const writeRow = (key: string, action: WorkbenchAction, row: any) => {
+      const write = rowWriteOf(action);
+      if (writing.has(key)) return;
+      if (write === "delete" && armed !== key) {
+        setArmed(key);
+        setTimeout(() => setArmed((current) => (current === key ? "" : current)), 4000);
+        return;
+      }
+      setArmed("");
+      const [index, , , a] = key.split(":").map(Number);
+      setWriting((current) => new Set(current).add(key));
+      Promise.resolve(remote.writeTableRow?.({ app: app.name, pane: pane.id, widget: index, action: a, id: Number(row?.id) }))
+        .then((raw: any) => {
+          const result = unwrapRemote(raw);
+          if (!result?.ok) return setNotice(`没有${write === "delete" ? "删除" : "保存"}：${result?.error || "请把接入插件更新到最新版本"}`);
+          setNotice(write === "delete" ? "已删除这一行" : `已更新：${action.label}`);
+          (pane.widgets ?? []).forEach((widget, i) => { if (widget.source?.table === action.table) void load(i); });
+          if (action.prompt) sendPrompt(key, action, { row });
+        })
+        .catch(() => setNotice("没有保存，请检查网络后重试"))
+        .finally(() => setWriting((current) => {
+          const next = new Set(current);
+          next.delete(key);
+          return next;
+        }));
+    };
     const send = (key: string, action: WorkbenchAction, values: { row?: any; form?: Record<string, any> }) => {
       if (action.table && values.form) return saveToTable(key, action, values.form);
+      if (values.row && rowWriteOf(action)) return writeRow(key, action, values.row);
       sendPrompt(key, action, values);
     };
     const docPane = app.workbench?.panes.find((item) => item.type === "kb_doc");
     const handlers: PanelHandlers = {
-      sending,
+      sending: writing.size ? new Set([...sending, ...writing]) : sending,
+      armed: (key) => armed === key,
       send,
       refresh: (index) => void load(index),
       formValues: (index) => forms[index] ?? {},

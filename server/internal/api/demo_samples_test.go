@@ -148,4 +148,42 @@ func TestSampleApps(t *testing.T) {
 		}}}},
 	}}, nil)
 	expect(t, "不认识的占位符", code, 400, body)
+
+	// 演示系统里没有的人（管理员自己来试）借一位示例员工的数据，「我的客户」不是 0，名字换成他自己
+	code, body = admin.do("POST", "/api/me/apps/customer-brief/source", map[string]any{"pane": "brief", "widget": 0}, nil)
+	expect(t, "管理员的客户数", code, 200, body)
+	if strings.Contains(string(body), `"customers":0`) {
+		t.Fatalf("管理员试用时「我的客户」不应是 0：%s", body)
+	}
+	code, body = zhengWeb.do("POST", "/api/me/apps/customer-brief/source", map[string]any{"pane": "brief", "widget": 8}, nil)
+	expect(t, "郑小雨的客户", code, 200, body)
+	if strings.Contains(string(body), `"owner":"周航"`) {
+		t.Fatalf("借来的客户要换成本人的名字：%.300s", body)
+	}
+
+	// 写表的行按钮：数据源必须就是那张表，set 和 delete 二选一
+	rowApp := func(action map[string]any) map[string]any {
+		return map[string]any{"kind": "app", "slug": "row-write", "spec": map[string]any{
+			"title": "x", "description": "x", "persona": "x",
+			"tables": []map[string]any{{"name": "todos", "title": "待办", "fields": []map[string]any{{"name": "title", "title": "事项", "kind": "text"}, {"name": "status", "title": "状态", "kind": "select", "options": []string{"待办", "已完成"}}}}},
+			"workbench": map[string]any{"panes": []map[string]any{{"id": "m", "type": "panel", "title": "x", "widgets": []map[string]any{
+				{"type": "table", "title": "x", "width": "wide", "source": map[string]any{"table": "todos"}, "rows": "items", "columns": []map[string]any{{"field": "status", "title": "状态", "format": "status"}}, "row_actions": []map[string]any{action}},
+			}}}},
+		}}
+	}
+	code, body = admin.do("POST", "/api/hub", rowApp(map[string]any{"label": "完成", "table": "todos", "set": map[string]any{"status": "不存在的选项"}}), nil)
+	expect(t, "set 的值要合表", code, 400, body)
+	code, body = admin.do("POST", "/api/hub", rowApp(map[string]any{"label": "完成", "table": "todos", "set": map[string]any{"status": "已完成"}, "delete": true}), nil)
+	expect(t, "set 和 delete 二选一", code, 400, body)
+	code, body = admin.do("POST", "/api/hub", rowApp(map[string]any{"label": "删除", "table": "other", "delete": true}), nil)
+	expect(t, "只能改自己的表", code, 400, body)
+	code, body = admin.do("POST", "/api/hub", rowApp(map[string]any{"label": "完成", "table": "todos", "set": map[string]any{"status": "已完成"}}), nil)
+	expect(t, "写表的行按钮", code, 201, body)
+
+	// 再导入一次：内容没变的示例应用不发新版本
+	code, body = admin.do("POST", "/api/admin/demo", nil, nil)
+	expect(t, "再导入", code, 200, body)
+	if strings.Contains(string(body), `"result":"updated"`) {
+		t.Fatalf("内容没变时不应升级示例应用：%.300s", body)
+	}
 }

@@ -70,7 +70,9 @@ var specSchema = map[string]any{
 		"tables（自带数据表）和 workbench（右侧工作台）。表：{name, title, visibility: own 各自填写 | shared 共同维护 | author 作者发布, " +
 		"fields: [{name, title, kind: text|number|money|date|select|bool|user, options, required}]}。" +
 		"工作台的数据源可以写 {\"table\": 表名}（统计写 {\"table\": 表名, \"args\": {\"group_by\": 字段}}，返回 items 里的 count），" +
-		"表单的 submit 写 {\"label\": …, \"table\": 表名} 直接插入一行（不写 fields 就按表生成）。",
+		"表单的 submit 写 {\"label\": …, \"table\": 表名} 直接插入一行（不写 fields 就按表生成）；" +
+		"表格的行按钮写 {\"label\": …, \"table\": 表名, \"set\": {字段: 值}} 改这一行，或 {\"label\": …, \"table\": 表名, \"delete\": true} 删除这一行。" +
+		"每个组件写 width（full / wide / half / third / quarter）按仪表盘排；状态列用 format: status。版式与规范见技能 dsh-ee-app-design，做应用前先读。",
 	"properties": map[string]any{
 		"title":           map[string]any{"type": "string"},
 		"description":     map[string]any{"type": "string", "description": "一两句话，DSH 靠它判断什么时候用"},
@@ -86,7 +88,7 @@ var specSchema = map[string]any{
 		"connections":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 		"knowledge":       map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 		"tables":          map[string]any{"type": "array", "items": map[string]any{"type": "object"}},
-		"workbench":       map[string]any{"type": "object", "description": "{panes: [{id, type: panel, title, widgets: [...]}]}，组件类型 metric / table / chart / checklist / form / actions / markdown / heading / board"},
+		"workbench":       map[string]any{"type": "object", "description": "{panes: [{id, type: panel, title, widgets: [...]}]}，组件类型 metric / table / chart / checklist / form / actions / markdown / heading / board，每个组件可写 width（full / wide / half / third / quarter）"},
 		"web":             map[string]any{"type": "boolean", "description": "开放网页版：能用的人可以在浏览器（含手机）里打开 /a/<标识> 使用工作台，没有 AI"},
 	},
 }

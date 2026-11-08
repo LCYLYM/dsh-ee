@@ -6,7 +6,7 @@ import { dshHome } from "./config.js";
 import { renderResult } from "./bridge.js";
 import type { CatalogApp } from "./skills.js";
 import type { DshContext } from "./dsh.js";
-import { checkBoardBlocks, checklistKey, toolValue, type Board, type BoardBlock, type Citation, type WorkbenchWidget } from "./workbench.js";
+import { checkBoardBlocks, checklistKey, rowWriteOf, toolValue, type Board, type BoardBlock, type Citation, type WorkbenchWidget } from "./workbench.js";
 
 export interface ToolCaller {
   hasTool(serverName: string): boolean;
@@ -58,6 +58,31 @@ export async function insertFormRow(apps: CatalogApp[], tools: ToolCaller, reque
   }
   try {
     toolValue(await tools.callTool("app__write", { action: "insert", app: request.app, table, rows: [row] }));
+    return { ok: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * 表格的行按钮写表：按目录里的配置找到那个按钮（不信任面板传来的表名和字段），经 app__write 改这一行或删掉它。
+ * 删除要服务端的确认码：员工在面板上已经点过两次确认，这里先拿确认码再带着它删。
+ */
+export async function writeTableRow(apps: CatalogApp[], tools: ToolCaller, request: WidgetRequest & { action: number; id: number }): Promise<{ ok: true } | { error: string }> {
+  const widget = findWidget(apps, request);
+  const action = widget?.type === "table" && Number.isInteger(request?.action) ? widget.row_actions?.[request.action] : undefined;
+  const write = action ? rowWriteOf(action) : undefined;
+  const table = widget?.source?.table;
+  if (!action || !write || !table || action.table !== table) return { error: "这个按钮不能改表" };
+  if (!Number.isInteger(request.id) || request.id <= 0) return { error: "这一行没有编号" };
+  try {
+    if (write === "set") {
+      toolValue(await tools.callTool("app__write", { action: "update", app: request.app, table, id: request.id, row: action.set }));
+      return { ok: true };
+    }
+    const args = { action: "delete", app: request.app, table, ids: [request.id] };
+    const preview = toolValue(await tools.callTool("app__write", args));
+    if (preview?.confirm) toolValue(await tools.callTool("app__write", { ...args, confirm: preview.confirm }));
     return { ok: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };

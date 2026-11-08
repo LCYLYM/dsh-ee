@@ -21,6 +21,12 @@ export interface AppsViewState {
   availableOpen?: boolean;
   /** 已点过一次「停用」、等待确认的应用 */
   confirmDisable?: string;
+  /** 侧栏里最多直接列几个，其余进「查看更多」；默认 3 */
+  limit?: number;
+  /** 侧栏的「企业应用」区块能不能隐藏（右侧企业面板里的那份不能） */
+  hideable?: boolean;
+  /** 左侧栏现在是不是隐藏着（应用选择浮层里的开关用） */
+  sidebarHidden?: boolean;
 }
 
 /** 「⋯」菜单用 fixed 定位：up 为真时锚在按钮上方（bottom），否则下方（top）；right 是距窗口右缘的像素。 */
@@ -56,10 +62,30 @@ export interface AppsViewActions {
   toggleMenu?: (name: string, event?: any) => void;
   /** 关掉所有浮层（菜单、应用选择），菜单项点完都要走这里 */
   closeLayers?: () => void;
+  /** 在左侧栏隐藏 / 显示「企业应用」区块（隐藏后在「查看更多」和 设置 → dsh-ee 里能再打开） */
+  setSidebarHidden?: (hidden: boolean) => void;
+
   search: (query: string) => void;
 }
 
 const buttonStyle = { border: 0, background: "transparent", color: "inherit", cursor: "pointer", padding: 0, textAlign: "left" as const };
+
+/** 按应用名给图标配一个底色：同一个应用每次都一样，亮色 / 暗色主题下都只是淡淡一层。 */
+const tileHues = ["#4d6bfe", "#00a3bf", "#16a34a", "#f59e0b", "#db2777", "#8b5cf6", "#0ea5e9", "#ef4444"];
+export function tileHue(name: string): string {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return tileHues[hash % tileHues.length];
+}
+
+/** 卡片上的大图标：圆角方块、按应用名配的淡色底。 */
+export function appTileIcon(createElement: (...args: any[]) => any, app: CatalogApp, size = 40) {
+  const hue = tileHue(app.name);
+  return createElement("span", {
+    "aria-hidden": true,
+    style: { width: size, height: size, flex: `0 0 ${size}px`, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: Math.round(size * 0.28), fontSize: Math.round(size * 0.5), background: `linear-gradient(135deg, color-mix(in srgb, ${hue} 20%, transparent), color-mix(in srgb, ${hue} 7%, transparent))`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${hue} 18%, transparent)` },
+  }, app.icon || Array.from(app.title)[0] || "?");
+}
 
 export function appIcon(createElement: (...args: any[]) => any, app: CatalogApp) {
   return createElement("span", {
@@ -161,59 +187,95 @@ function appRow(createElement: (...args: any[]) => any, app: CatalogApp, actions
     appMenu(createElement, app, actions, confirming, menuOpen, anchor));
 }
 
-/** 「可启用（N）」分组：默认收起；没有就不显示。 */
-function availableGroup(createElement: (...args: any[]) => any, state: AppsViewState, actions: AppsViewActions) {
-  const available = state.available ?? [];
-  if (!available.length || !actions.enable) return null;
-  return createElement("div", { "data-dsh-ee-ui": "available-apps", style: { marginTop: 8, borderTop: "1px solid color-mix(in srgb, currentColor 10%, transparent)", paddingTop: 6 } },
-    createElement("button", { type: "button", onClick: () => actions.toggleAvailable?.(), "aria-expanded": !!state.availableOpen, style: { ...buttonStyle, opacity: 0.75, fontSize: 12 } },
-      `${state.availableOpen ? "▾" : "▸"} 可启用（${available.length}）`),
-    state.availableOpen ? createElement("div", { style: { display: "grid", gap: 4, marginTop: 5 } }, ...available.map((app) => createElement("div", {
-      key: app.name, "data-dsh-ee-available": app.name, style: { display: "flex", alignItems: "center", gap: 8 } },
-      appIcon(createElement, app),
-      createElement("span", { style: { flex: 1, minWidth: 0 } },
-        createElement("span", { style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
-        app.description ? createElement("span", { style: { display: "block", fontSize: 11, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: app.description }, app.description) : null),
-      createElement("button", { type: "button", onClick: () => actions.enable!(app), style: { ...buttonStyle, border: "1px solid currentColor", borderRadius: 6, padding: "2px 8px", fontSize: 12, flex: "0 0 auto" } }, "启用")))) : null);
-}
-
 const matchesQuery = (app: CatalogApp, query: string) => !query || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(query);
 
-/** 「查看全部」浮层里的一行：比侧栏多一行说明文字，点击即打开应用并关掉浮层。 */
-function galleryRow(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions, status?: AppSessionStatus, confirming = false, menuOpen = false, anchor?: MenuAnchor) {
+/** 浮层与卡片共用的样式：Stripe 式的细边框、柔和阴影、悬停微微上浮。 */
+const galleryCss = [
+  ".dshee-gcard{transition:border-color .15s,box-shadow .15s,transform .15s}",
+  ".dshee-gcard:hover{border-color:color-mix(in srgb,#4d6bfe 45%,transparent)!important;box-shadow:0 10px 24px -12px color-mix(in srgb,#4d6bfe 45%,transparent),0 2px 6px -2px color-mix(in srgb,currentColor 10%,transparent)!important;transform:translateY(-2px)}",
+  ".dshee-gcard:focus-visible{outline:2px solid #4d6bfe;outline-offset:2px}",
+  ".dshee-gsearch:focus{outline:none;border-color:#4d6bfe!important;box-shadow:0 0 0 3px color-mix(in srgb,#4d6bfe 18%,transparent)}",
+  "@keyframes dshee-pop{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}",
+  "@keyframes dshee-fade{from{opacity:0}to{opacity:1}}",
+].join("");
+
+const badgeStyle = (color: string) => ({ fontSize: 10.5, fontWeight: 600, padding: "1px 7px", borderRadius: 999, color, background: `color-mix(in srgb, ${color} 13%, transparent)`, whiteSpace: "nowrap" as const });
+
+/** 卡片右上角的标记：状态、新上线、待处理数。 */
+function cardBadges(createElement: (...args: any[]) => any, app: CatalogApp, status?: AppSessionStatus) {
   const statusView = statusViewOf(status);
-  return createElement("div", { key: app.name, "data-dsh-ee-app": app.name, style: { display: "flex", alignItems: "center", gap: 6 } },
-    statusView ? createElement("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
-    createElement("button", {
-      type: "button", onClick: () => { actions.closeLayers?.(); actions.open(app); }, title: app.description,
-      style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, minWidth: 0, flex: 1, padding: "5px 0" },
-    },
-      appIcon(createElement, app),
-      createElement("span", { style: { minWidth: 0, flex: 1 } },
-        createElement("span", { style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
-        app.description ? createElement("span", { style: { display: "block", fontSize: 11, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.description) : null)),
-    missingBadge(createElement, app, actions),
-    appMenu(createElement, app, actions, confirming, menuOpen, anchor));
+  const todo = (app as any).todo;
+  return [
+    statusView ? createElement("span", { key: "status", style: badgeStyle(statusView.color) }, statusView.label) : null,
+    todo ? createElement("span", { key: "todo", style: badgeStyle("#2563eb") }, `${todo} 待处理`) : null,
+    (app as any).new ? createElement("span", { key: "new", style: badgeStyle("#d97706") }, "新") : null,
+  ].filter(Boolean);
 }
 
-/** 「查看全部」：居中的应用选择浮层，搜索 + 完整列表（含可启用分组），点背板或 ✕ 关闭。 */
-function appsGallery(createElement: (...args: any[]) => any, state: AppsViewState, actions: AppsViewActions, filtered: CatalogApp[]) {
+/** 「查看更多」里的一张应用卡：大图标、标题、两行说明，点卡片打开应用；右上角是状态，右下角是「⋯」菜单。 */
+function galleryCard(createElement: (...args: any[]) => any, app: CatalogApp, state: AppsViewState, actions: AppsViewActions) {
+  const status = state.statuses?.[app.name];
+  const open = () => { actions.closeLayers?.(); actions.open(app); };
+  return createElement("div", {
+    key: app.name, "data-dsh-ee-app": app.name, className: "dshee-gcard", role: "button", tabIndex: 0, title: app.description,
+    onClick: open, onKeyDown: (event: any) => { if (event?.key === "Enter" || event?.key === " ") { event.preventDefault?.(); open(); } },
+    style: { position: "relative", display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: 14, border: "1px solid color-mix(in srgb, currentColor 11%, transparent)", background: "color-mix(in srgb, currentColor 1.5%, Canvas)", boxShadow: "0 1px 2px color-mix(in srgb, currentColor 5%, transparent)", cursor: "pointer", minWidth: 0, textAlign: "left" },
+  },
+    createElement("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 } },
+      appTileIcon(createElement, app, 40),
+      createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 4 } }, ...cardBadges(createElement, app, status))),
+    createElement("div", { style: { minWidth: 0 } },
+      createElement("div", { style: { fontSize: 14, fontWeight: 600, letterSpacing: "0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
+      createElement("div", { style: { marginTop: 4, fontSize: 12, lineHeight: 1.55, opacity: 0.62, minHeight: 37, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" } }, app.description || app.starters?.[0] || "")),
+    createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginTop: "auto" }, onClick: (event: any) => event?.stopPropagation?.() },
+      app.missing?.length ? missingBadge(createElement, app, actions) : createElement("button", { type: "button", onClick: open, style: { ...buttonStyle, fontSize: 12, fontWeight: 600, color: "#4d6bfe" } }, "打开 →"),
+      actions.toggleMenu ? appMenu(createElement, app, actions, state.confirmDisable === app.name, state.menuFor === app.name, state.menuAnchor) : null));
+}
+
+/** 「可启用」卡片：范围内、还没启用的自选应用，一键启用。 */
+function availableCard(createElement: (...args: any[]) => any, app: CatalogApp, actions: AppsViewActions) {
+  return createElement("div", {
+    key: app.name, "data-dsh-ee-available": app.name,
+    style: { display: "flex", alignItems: "center", gap: 10, padding: 12, borderRadius: 12, border: "1px dashed color-mix(in srgb, currentColor 18%, transparent)", minWidth: 0 },
+  },
+    appTileIcon(createElement, app, 34),
+    createElement("span", { style: { flex: 1, minWidth: 0 } },
+      createElement("span", { style: { display: "block", fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
+      app.description ? createElement("span", { style: { display: "block", fontSize: 11.5, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: app.description }, app.description) : null),
+    createElement("button", { type: "button", onClick: () => actions.enable!(app), style: { ...buttonStyle, border: "1px solid #4d6bfe", color: "#4d6bfe", borderRadius: 8, padding: "3px 10px", fontSize: 12, fontWeight: 600, flex: "0 0 auto" } }, "启用"));
+}
+
+/**
+ * 「查看更多」：居中的应用网格浮层——搜索、卡片网格、可启用的应用，底部可以把左侧栏的企业应用隐藏 / 显示回来。
+ * 侧栏和首屏共用；点背板、✕ 或 Escape 关闭。
+ */
+export function appsGallery(createElement: (...args: any[]) => any, state: AppsViewState, actions: AppsViewActions, filtered: CatalogApp[]) {
   if (!state.galleryOpen) return null;
   const close = () => actions.closeLayers?.() ?? actions.toggleGallery?.();
-  return createElement("div", { "data-dsh-ee-ui": "apps-gallery", onClick: close, style: { position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } },
+  const available = (state.available ?? []).filter((app) => matchesQuery(app, state.query?.trim().toLowerCase() ?? ""));
+  const grid = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 210px), 1fr))", gap: 12 };
+  return createElement("div", { "data-dsh-ee-ui": "apps-gallery", onClick: close, style: { position: "fixed", inset: 0, zIndex: 60, background: "rgba(10, 37, 64, 0.38)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, animation: "dshee-fade .15s ease-out" } },
+    createElement("style", null, galleryCss),
     createElement("div", {
       role: "dialog", "aria-modal": "true", "aria-label": "企业应用", onClick: (event: any) => event?.stopPropagation?.(),
-      style: { width: "min(460px, calc(100vw - 32px))", maxHeight: "min(600px, calc(100vh - 48px))", display: "flex", flexDirection: "column", borderRadius: 10, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 12px 40px #0005", padding: "12px 14px", fontSize: 13 },
+      style: { width: "min(920px, calc(100vw - 32px))", maxHeight: "min(720px, calc(100vh - 40px))", display: "flex", flexDirection: "column", borderRadius: 18, border: "1px solid color-mix(in srgb, currentColor 12%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 30px 60px -12px rgba(50, 50, 93, 0.3), 0 18px 36px -18px rgba(0, 0, 0, 0.35)", fontSize: 13, overflow: "hidden", animation: "dshee-pop .2s ease-out" },
     },
-      createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } },
-        createElement("strong", { style: { fontSize: 14, flex: 1 } }, `企业应用（${state.apps.length}）`),
-        createElement("button", { type: "button", "aria-label": "关闭", onClick: close, style: { ...buttonStyle, fontSize: 15, padding: "2px 6px", opacity: 0.7 } }, "✕")),
-      createElement("input", { "aria-label": "搜索企业应用", value: state.query ?? "", onChange: (event: any) => actions.search(event.target.value), placeholder: "搜索…", style: { width: "100%", boxSizing: "border-box", marginBottom: 4, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }),
-      createElement("div", { style: { overflowY: "auto", display: "grid", gap: 2, marginTop: 6, flex: 1, minHeight: 0 } },
+      createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "18px 22px 14px", borderBottom: "1px solid color-mix(in srgb, currentColor 9%, transparent)" } },
+        createElement("div", { style: { flex: "1 1 200px", minWidth: 0 } },
+          createElement("div", { style: { fontSize: 17, fontWeight: 650, letterSpacing: "-0.01em" } }, "企业应用"),
+          createElement("div", { style: { fontSize: 12, opacity: 0.6, marginTop: 2 } }, `${state.apps.length} 个应用 · 点一个开始，AI 会带着工作台一起打开`)),
+        createElement("input", { "aria-label": "搜索企业应用", className: "dshee-gsearch", value: state.query ?? "", onChange: (event: any) => actions.search(event.target.value), placeholder: "搜索应用…", style: { flex: "1 1 220px", maxWidth: 300, boxSizing: "border-box", height: 34, padding: "0 12px", borderRadius: 9, border: "1px solid color-mix(in srgb, currentColor 16%, transparent)", background: "transparent", color: "inherit", fontSize: 13 } }),
+        createElement("button", { type: "button", "aria-label": "关闭", onClick: close, style: { ...buttonStyle, fontSize: 16, padding: "4px 8px", opacity: 0.6, borderRadius: 8 } }, "✕")),
+      createElement("div", { style: { overflowY: "auto", flex: 1, minHeight: 0, padding: "18px 22px 22px", display: "grid", gap: 20, alignContent: "start" } },
         filtered.length
-          ? filtered.map((app) => galleryRow(createElement, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name, state.menuFor === app.name, state.menuAnchor))
-          : createElement("div", { style: { padding: "14px 4px", opacity: 0.6 } }, "没有匹配的应用")),
-      availableGroup(createElement, state, actions)));
+          ? createElement("div", { style: grid }, ...filtered.map((app) => galleryCard(createElement, app, state, actions)))
+          : createElement("div", { style: { padding: "36px 4px", textAlign: "center", opacity: 0.6 } }, "没有匹配的应用"),
+        available.length && actions.enable ? createElement("section", { "data-dsh-ee-ui": "available-apps" },
+          createElement("div", { style: { fontSize: 12, fontWeight: 600, opacity: 0.65, margin: "0 0 10px" } }, `可启用（${available.length}）`),
+          createElement("div", { style: grid }, ...available.map((app) => availableCard(createElement, app, actions)))) : null),
+      actions.setSidebarHidden ? createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, padding: "11px 22px", borderTop: "1px solid color-mix(in srgb, currentColor 9%, transparent)", fontSize: 12, opacity: 0.8, cursor: "pointer" } },
+        createElement("input", { type: "checkbox", checked: !state.sidebarHidden, onChange: () => actions.setSidebarHidden!(!state.sidebarHidden), style: { accentColor: "#4d6bfe" } }),
+        "在左侧栏显示企业应用") : null));
 }
 
 export function appsSection(createElement: (...args: any[]) => any, state: AppsViewState, actions: AppsViewActions) {
@@ -225,23 +287,31 @@ export function appsSection(createElement: (...args: any[]) => any, state: AppsV
   if (!state.apps.length && !(state.available ?? []).length) return null;
   const query = state.query?.trim().toLowerCase() ?? "";
   const filtered = state.apps.filter((app) => matchesQuery(app, query));
-  const shown = filtered.slice(0, 6);
-  // 标题行常驻：收起时区块只占这一行（钉在侧栏底部），展开后才是列表与「查看全部」
-  const header = createElement("button", {
-    type: "button", onClick: () => actions.toggleCollapsed?.(), "aria-expanded": !state.collapsed,
-    title: state.collapsed ? "展开企业应用" : "收起企业应用",
-    style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "2px 0", margin: "0 0 5px", fontSize: 13, fontWeight: 600 },
-  },
-    createElement("span", { "aria-hidden": true, style: { fontSize: 10, opacity: 0.7 } }, state.collapsed ? "▸" : "▾"),
-    "企业应用",
-    state.collapsed ? createElement("span", { style: { fontSize: 12, fontWeight: 400, opacity: 0.6 } }, `（${state.apps.length}）`) : null);
+  // 侧栏只列前几个（默认 3 个），免得把会话历史顶出去；其余在「查看更多」的网格里
+  const shown = state.apps.slice(0, state.limit ?? 3);
+  const more = state.apps.length - shown.length;
+  // 标题行常驻：收起时区块只占这一行（钉在侧栏底部），展开后才是列表与「查看更多」
+  const header = createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, margin: "0 0 5px" } },
+    createElement("button", {
+      type: "button", onClick: () => actions.toggleCollapsed?.(), "aria-expanded": !state.collapsed,
+      title: state.collapsed ? "展开企业应用" : "收起企业应用",
+      style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, padding: "2px 0", fontSize: 13, fontWeight: 600 },
+    },
+      createElement("span", { "aria-hidden": true, style: { fontSize: 10, opacity: 0.7 } }, state.collapsed ? "▸" : "▾"),
+      "企业应用",
+      state.collapsed ? createElement("span", { style: { fontSize: 12, fontWeight: 400, opacity: 0.6 } }, `（${state.apps.length}）`) : null),
+    state.hideable && actions.setSidebarHidden ? createElement("button", {
+      type: "button", onClick: () => actions.setSidebarHidden!(true), title: "在左侧栏隐藏企业应用（在「查看更多」或 设置 → dsh-ee 里可以再打开）",
+      style: { ...buttonStyle, fontSize: 11.5, opacity: 0.5, padding: "2px 4px" },
+    }, "隐藏") : null);
   return createElement("section", { "data-dsh-ee-ui": "apps", style: { padding: "10px 12px", fontSize: 13 } },
     header,
     state.collapsed ? null : [
-      state.apps.length > 8 ? createElement("input", { key: "search", "aria-label": "搜索企业应用", value: state.query ?? "", onChange: (event: any) => actions.search(event.target.value), placeholder: "搜索…", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }) : null,
-      createElement("div", { key: "list", style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name, state.menuFor === app.name, state.menuAnchor))),
-      createElement("button", { key: "all", type: "button", onClick: () => actions.toggleGallery?.(), style: { ...buttonStyle, marginTop: 7, opacity: 0.7 } }, `查看全部（${state.apps.length}）`),
-      availableGroup(createElement, state, actions),
+      createElement("div", { key: "list", style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name, state.menuFor === app.name && !state.galleryOpen, state.menuAnchor))),
+      createElement("button", { key: "all", type: "button", onClick: () => actions.toggleGallery?.(), style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 6, marginTop: 6, padding: "4px 0", opacity: 0.72, fontSize: 12.5 } },
+        createElement("span", { "aria-hidden": true, style: { width: 30, textAlign: "center", fontSize: 14 } }, "⊞"),
+        more > 0 ? `查看更多（${state.apps.length}）` : "全部应用"),
+      (state.available ?? []).length && actions.enable ? createElement("button", { key: "available", type: "button", onClick: () => actions.toggleGallery?.(), style: { ...buttonStyle, display: "block", marginTop: 4, fontSize: 12, opacity: 0.65 } }, `＋ 可启用（${state.available!.length}）`) : null,
       state.notice ? createElement("p", { key: "notice", role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null,
     ],
     appsGallery(createElement, state, actions, filtered));
@@ -313,35 +383,56 @@ export function inProgressView(createElement: (...args: any[]) => any, items: In
     })));
 }
 
-/** M6 首屏启动台：锚在 hero 行右端、向下铺开的卡片区；没有应用时退回原下拉。 */
-export function launcherPanel(createElement: (...args: any[]) => any, apps: CatalogApp[], onOpen: (app: CatalogApp) => void, query = "", onSearch: (query: string) => void = () => {}, notice = "", open = false, onToggle: () => void = () => {}) {
-  if (!apps.length) return null;
+/** 首屏横排的位置：贴在输入框正下方，宽度和输入框一样；maxHeight 是到窗口下沿还剩多少。 */
+export interface StripPlace {
+  left: number;
+  top: number;
+  width: number;
+  maxHeight: number;
+}
+
+export const STRIP_CARD_MIN = 176;
+export const STRIP_GAP = 10;
+
+/** 一行放得下几张卡（含最后的「查看更多」）。 */
+export function stripSlots(width: number): number {
+  return Math.max(2, Math.min(6, Math.floor((width + STRIP_GAP) / (STRIP_CARD_MIN + STRIP_GAP))));
+}
+
+/**
+ * 首屏：输入框下方一行横排的应用卡，放不下的进最后一张「查看更多」（打开网格浮层）。
+ * place 由宿主量出来（输入框的位置），量到之前不显示；窗口太矮（输入框下面放不下一行）时也不显示。
+ */
+export function heroStrip(createElement: (...args: any[]) => any, apps: CatalogApp[], place: StripPlace | undefined, onOpen: (app: CatalogApp) => void, onMore: () => void, notice = "") {
+  if (!apps.length || !place || place.maxHeight < 86) return null;
+  const slots = stripSlots(place.width);
+  const fits = apps.length <= slots;
+  const shown = fits ? apps : apps.slice(0, slots - 1);
   const todos = apps.reduce((n, a) => n + ((a as any).todo ?? 0), 0);
-  const cards = apps.slice(0, 8);
-  const starters = apps.flatMap((a) => (a.starters ?? []).slice(0, 1).map((s) => ({ app: a, text: s }))).slice(0, 3);
+  const tile = { display: "flex", alignItems: "center", gap: 10, minWidth: 0, padding: "10px 12px", borderRadius: 12, border: "1px solid color-mix(in srgb, currentColor 10%, transparent)", background: "color-mix(in srgb, currentColor 1.5%, transparent)", boxShadow: "0 1px 2px color-mix(in srgb, currentColor 5%, transparent)", color: "inherit", cursor: "pointer", textAlign: "left" as const, font: "inherit" };
   const card = (app: CatalogApp) => createElement("button", {
-    key: app.name, type: "button", onClick: () => onOpen(app),
-    style: { ...buttonStyle, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: 10, borderRadius: 8, border: "1px solid color-mix(in srgb, currentColor 12%, transparent)", textAlign: "left", minWidth: 0 },
+    key: app.name, type: "button", className: "dshee-gcard", onClick: () => onOpen(app), title: app.description || app.title, "data-dsh-ee-app": app.name, style: tile,
   },
-    createElement("span", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600 } },
-      appIcon(createElement, app), createElement("span", null, app.title),
-      (app as any).new ? createElement("span", { style: { fontSize: 10, padding: "0 5px", borderRadius: 99, background: "#d9770622", color: "#d97706" } }, "新") : null,
-      (app as any).todo ? createElement("span", { style: { fontSize: 10, padding: "0 5px", borderRadius: 99, background: "#2563eb22", color: "#2563eb" } }, `${(app as any).todo} 待处理`) : null),
-    createElement("span", { style: { fontSize: 11, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" } }, app.description || app.starters?.[0] || ""));
-  return createElement("div", { "data-dsh-ee-ui": "hero-apps", style: { position: "relative", display: "inline-block" } },
-    createElement("button", { type: "button", onClick: onToggle, "aria-expanded": open, "aria-haspopup": "menu", style: { ...buttonStyle, fontSize: 12, padding: "4px 7px", whiteSpace: "nowrap" } }, "企业应用"),
-    createElement("div", {
-      role: "region", "aria-label": "应用启动台",
-      style: { position: "absolute", right: 0, bottom: "calc(100% + 8px)", zIndex: 60, width: "min(560px, calc(100vw - 48px))", maxHeight: "min(420px, calc(100vh - 140px))", overflowY: "auto", padding: 12, borderRadius: 10, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 8px 30px #0003" },
-    },
-      createElement("div", { style: { fontSize: 13, marginBottom: 8, opacity: 0.85 } },
-        todos ? `需要你处理：${todos} 项（都在「工作台」里）` : "从下面挑一个应用开始，或直接说出你的问题"),
-      createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 } }, ...cards.map(card)),
-      starters.length ? createElement("div", { style: { marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 } },
-        starters.map(({ app, text }) => createElement("button", {
-          key: `${app.name}:${text}`, type: "button", onClick: () => onOpen(app),
-          title: `${app.title}：${text}`,
-          style: { ...buttonStyle, fontSize: 11, padding: "4px 9px", borderRadius: 99, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-        }, text))) : null,
-      notice ? createElement("p", { role: "status", style: { margin: "8px 0 0", fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" } }, notice) : null));
+    appTileIcon(createElement, app, 34),
+    createElement("span", { style: { minWidth: 0, flex: 1 } },
+      createElement("span", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 600 } },
+        createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
+        (app as any).todo ? createElement("span", { style: badgeStyle("#2563eb") }, String((app as any).todo)) : (app as any).new ? createElement("span", { style: badgeStyle("#d97706") }, "新") : null),
+      createElement("span", { style: { display: "block", marginTop: 2, fontSize: 11.5, opacity: 0.58, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.description || app.starters?.[0] || "")));
+  const more = fits ? null : createElement("button", {
+    key: "@more", type: "button", className: "dshee-gcard", onClick: onMore, "data-dsh-ee-ui": "hero-more",
+    style: { ...tile, justifyContent: "center", borderStyle: "dashed", background: "transparent", boxShadow: "none" },
+  },
+    createElement("span", { "aria-hidden": true, style: { fontSize: 16, color: "#4d6bfe" } }, "⊞"),
+    createElement("span", { style: { fontSize: 13, fontWeight: 600 } }, `查看更多（${apps.length}）`));
+  return createElement("div", {
+    "data-dsh-ee-ui": "hero-apps", role: "region", "aria-label": "企业应用",
+    style: { position: "absolute", left: place.left, top: place.top, width: place.width, maxHeight: place.maxHeight, overflow: "hidden", zIndex: 4, animation: "dshee-fade .25s ease-out" },
+  },
+    createElement("style", null, galleryCss),
+    createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, margin: "0 2px 8px", fontSize: 12 } },
+      createElement("span", { style: { fontWeight: 600, opacity: 0.7 } }, "企业应用"),
+      todos ? createElement("span", { style: { color: "#2563eb" } }, `需要你处理：${todos} 项`) : createElement("span", { style: { opacity: 0.5 } }, "点一个开始，工作台会在右侧打开")),
+    createElement("div", { style: { display: "grid", gridTemplateColumns: `repeat(${slots}, minmax(0, 1fr))`, gap: STRIP_GAP } }, ...shown.map(card), more),
+    notice ? createElement("p", { role: "status", style: { margin: "8px 2px 0", fontSize: 11.5, lineHeight: 1.5, overflowWrap: "anywhere" } }, notice) : null);
 }

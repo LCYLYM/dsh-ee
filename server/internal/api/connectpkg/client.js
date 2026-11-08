@@ -23,6 +23,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/client.ts
 var client_exports = {};
 __export(client_exports, {
+  LOGIN_POLL_MS: () => LOGIN_POLL_MS,
   apply: () => apply,
   inject: () => inject
 });
@@ -20105,6 +20106,19 @@ var import_react = require("react");
 
 // src/apps-view.ts
 var buttonStyle = { border: 0, background: "transparent", color: "inherit", cursor: "pointer", padding: 0, textAlign: "left" };
+var tileHues = ["#4d6bfe", "#00a3bf", "#16a34a", "#f59e0b", "#db2777", "#8b5cf6", "#0ea5e9", "#ef4444"];
+function tileHue(name) {
+  let hash2 = 0;
+  for (const ch of name) hash2 = hash2 * 31 + ch.charCodeAt(0) >>> 0;
+  return tileHues[hash2 % tileHues.length];
+}
+function appTileIcon(createElement5, app, size = 40) {
+  const hue = tileHue(app.name);
+  return createElement5("span", {
+    "aria-hidden": true,
+    style: { width: size, height: size, flex: `0 0 ${size}px`, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: Math.round(size * 0.28), fontSize: Math.round(size * 0.5), background: `linear-gradient(135deg, color-mix(in srgb, ${hue} 20%, transparent), color-mix(in srgb, ${hue} 7%, transparent))`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${hue} 18%, transparent)` }
+  }, app.icon || Array.from(app.title)[0] || "?");
+}
 function appIcon(createElement5, app) {
   return createElement5("span", {
     "aria-hidden": true,
@@ -20239,71 +20253,96 @@ function appRow(createElement5, app, actions, status, confirming = false, menuOp
     appMenu(createElement5, app, actions, confirming, menuOpen, anchor2)
   );
 }
-function availableGroup(createElement5, state, actions) {
-  const available = state.available ?? [];
-  if (!available.length || !actions.enable) return null;
+var matchesQuery = (app, query) => !query || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(query);
+var galleryCss = [
+  ".dshee-gcard{transition:border-color .15s,box-shadow .15s,transform .15s}",
+  ".dshee-gcard:hover{border-color:color-mix(in srgb,#4d6bfe 45%,transparent)!important;box-shadow:0 10px 24px -12px color-mix(in srgb,#4d6bfe 45%,transparent),0 2px 6px -2px color-mix(in srgb,currentColor 10%,transparent)!important;transform:translateY(-2px)}",
+  ".dshee-gcard:focus-visible{outline:2px solid #4d6bfe;outline-offset:2px}",
+  ".dshee-gsearch:focus{outline:none;border-color:#4d6bfe!important;box-shadow:0 0 0 3px color-mix(in srgb,#4d6bfe 18%,transparent)}",
+  "@keyframes dshee-pop{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}",
+  "@keyframes dshee-fade{from{opacity:0}to{opacity:1}}"
+].join("");
+var badgeStyle = (color) => ({ fontSize: 10.5, fontWeight: 600, padding: "1px 7px", borderRadius: 999, color, background: `color-mix(in srgb, ${color} 13%, transparent)`, whiteSpace: "nowrap" });
+function cardBadges(createElement5, app, status) {
+  const statusView = statusViewOf(status);
+  const todo = app.todo;
+  return [
+    statusView ? createElement5("span", { key: "status", style: badgeStyle(statusView.color) }, statusView.label) : null,
+    todo ? createElement5("span", { key: "todo", style: badgeStyle("#2563eb") }, `${todo} \u5F85\u5904\u7406`) : null,
+    app.new ? createElement5("span", { key: "new", style: badgeStyle("#d97706") }, "\u65B0") : null
+  ].filter(Boolean);
+}
+function galleryCard(createElement5, app, state, actions) {
+  const status = state.statuses?.[app.name];
+  const open2 = () => {
+    actions.closeLayers?.();
+    actions.open(app);
+  };
   return createElement5(
     "div",
-    { "data-dsh-ee-ui": "available-apps", style: { marginTop: 8, borderTop: "1px solid color-mix(in srgb, currentColor 10%, transparent)", paddingTop: 6 } },
-    createElement5(
-      "button",
-      { type: "button", onClick: () => actions.toggleAvailable?.(), "aria-expanded": !!state.availableOpen, style: { ...buttonStyle, opacity: 0.75, fontSize: 12 } },
-      `${state.availableOpen ? "\u25BE" : "\u25B8"} \u53EF\u542F\u7528\uFF08${available.length}\uFF09`
-    ),
-    state.availableOpen ? createElement5("div", { style: { display: "grid", gap: 4, marginTop: 5 } }, ...available.map((app) => createElement5(
-      "div",
-      {
-        key: app.name,
-        "data-dsh-ee-available": app.name,
-        style: { display: "flex", alignItems: "center", gap: 8 }
+    {
+      key: app.name,
+      "data-dsh-ee-app": app.name,
+      className: "dshee-gcard",
+      role: "button",
+      tabIndex: 0,
+      title: app.description,
+      onClick: open2,
+      onKeyDown: (event) => {
+        if (event?.key === "Enter" || event?.key === " ") {
+          event.preventDefault?.();
+          open2();
+        }
       },
-      appIcon(createElement5, app),
-      createElement5(
-        "span",
-        { style: { flex: 1, minWidth: 0 } },
-        createElement5("span", { style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
-        app.description ? createElement5("span", { style: { display: "block", fontSize: 11, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: app.description }, app.description) : null
-      ),
-      createElement5("button", { type: "button", onClick: () => actions.enable(app), style: { ...buttonStyle, border: "1px solid currentColor", borderRadius: 6, padding: "2px 8px", fontSize: 12, flex: "0 0 auto" } }, "\u542F\u7528")
-    ))) : null
+      style: { position: "relative", display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: 14, border: "1px solid color-mix(in srgb, currentColor 11%, transparent)", background: "color-mix(in srgb, currentColor 1.5%, Canvas)", boxShadow: "0 1px 2px color-mix(in srgb, currentColor 5%, transparent)", cursor: "pointer", minWidth: 0, textAlign: "left" }
+    },
+    createElement5(
+      "div",
+      { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 } },
+      appTileIcon(createElement5, app, 40),
+      createElement5("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 4 } }, ...cardBadges(createElement5, app, status))
+    ),
+    createElement5(
+      "div",
+      { style: { minWidth: 0 } },
+      createElement5("div", { style: { fontSize: 14, fontWeight: 600, letterSpacing: "0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
+      createElement5("div", { style: { marginTop: 4, fontSize: 12, lineHeight: 1.55, opacity: 0.62, minHeight: 37, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" } }, app.description || app.starters?.[0] || "")
+    ),
+    createElement5(
+      "div",
+      { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginTop: "auto" }, onClick: (event) => event?.stopPropagation?.() },
+      app.missing?.length ? missingBadge(createElement5, app, actions) : createElement5("button", { type: "button", onClick: open2, style: { ...buttonStyle, fontSize: 12, fontWeight: 600, color: "#4d6bfe" } }, "\u6253\u5F00 \u2192"),
+      actions.toggleMenu ? appMenu(createElement5, app, actions, state.confirmDisable === app.name, state.menuFor === app.name, state.menuAnchor) : null
+    )
   );
 }
-var matchesQuery = (app, query) => !query || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(query);
-function galleryRow(createElement5, app, actions, status, confirming = false, menuOpen = false, anchor2) {
-  const statusView = statusViewOf(status);
+function availableCard(createElement5, app, actions) {
   return createElement5(
     "div",
-    { key: app.name, "data-dsh-ee-app": app.name, style: { display: "flex", alignItems: "center", gap: 6 } },
-    statusView ? createElement5("span", { "aria-label": statusView.label, title: statusView.label, style: { width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: statusView.color } }) : null,
+    {
+      key: app.name,
+      "data-dsh-ee-available": app.name,
+      style: { display: "flex", alignItems: "center", gap: 10, padding: 12, borderRadius: 12, border: "1px dashed color-mix(in srgb, currentColor 18%, transparent)", minWidth: 0 }
+    },
+    appTileIcon(createElement5, app, 34),
     createElement5(
-      "button",
-      {
-        type: "button",
-        onClick: () => {
-          actions.closeLayers?.();
-          actions.open(app);
-        },
-        title: app.description,
-        style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 9, minWidth: 0, flex: 1, padding: "5px 0" }
-      },
-      appIcon(createElement5, app),
-      createElement5(
-        "span",
-        { style: { minWidth: 0, flex: 1 } },
-        createElement5("span", { style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
-        app.description ? createElement5("span", { style: { display: "block", fontSize: 11, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.description) : null
-      )
+      "span",
+      { style: { flex: 1, minWidth: 0 } },
+      createElement5("span", { style: { display: "block", fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
+      app.description ? createElement5("span", { style: { display: "block", fontSize: 11.5, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: app.description }, app.description) : null
     ),
-    missingBadge(createElement5, app, actions),
-    appMenu(createElement5, app, actions, confirming, menuOpen, anchor2)
+    createElement5("button", { type: "button", onClick: () => actions.enable(app), style: { ...buttonStyle, border: "1px solid #4d6bfe", color: "#4d6bfe", borderRadius: 8, padding: "3px 10px", fontSize: 12, fontWeight: 600, flex: "0 0 auto" } }, "\u542F\u7528")
   );
 }
 function appsGallery(createElement5, state, actions, filtered) {
   if (!state.galleryOpen) return null;
   const close = () => actions.closeLayers?.() ?? actions.toggleGallery?.();
+  const available = (state.available ?? []).filter((app) => matchesQuery(app, state.query?.trim().toLowerCase() ?? ""));
+  const grid = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 210px), 1fr))", gap: 12 };
   return createElement5(
     "div",
-    { "data-dsh-ee-ui": "apps-gallery", onClick: close, style: { position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } },
+    { "data-dsh-ee-ui": "apps-gallery", onClick: close, style: { position: "fixed", inset: 0, zIndex: 60, background: "rgba(10, 37, 64, 0.38)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, animation: "dshee-fade .15s ease-out" } },
+    createElement5("style", null, galleryCss),
     createElement5(
       "div",
       {
@@ -20311,21 +20350,37 @@ function appsGallery(createElement5, state, actions, filtered) {
         "aria-modal": "true",
         "aria-label": "\u4F01\u4E1A\u5E94\u7528",
         onClick: (event) => event?.stopPropagation?.(),
-        style: { width: "min(460px, calc(100vw - 32px))", maxHeight: "min(600px, calc(100vh - 48px))", display: "flex", flexDirection: "column", borderRadius: 10, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 12px 40px #0005", padding: "12px 14px", fontSize: 13 }
+        style: { width: "min(920px, calc(100vw - 32px))", maxHeight: "min(720px, calc(100vh - 40px))", display: "flex", flexDirection: "column", borderRadius: 18, border: "1px solid color-mix(in srgb, currentColor 12%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 30px 60px -12px rgba(50, 50, 93, 0.3), 0 18px 36px -18px rgba(0, 0, 0, 0.35)", fontSize: 13, overflow: "hidden", animation: "dshee-pop .2s ease-out" }
       },
       createElement5(
         "div",
-        { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } },
-        createElement5("strong", { style: { fontSize: 14, flex: 1 } }, `\u4F01\u4E1A\u5E94\u7528\uFF08${state.apps.length}\uFF09`),
-        createElement5("button", { type: "button", "aria-label": "\u5173\u95ED", onClick: close, style: { ...buttonStyle, fontSize: 15, padding: "2px 6px", opacity: 0.7 } }, "\u2715")
+        { style: { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "18px 22px 14px", borderBottom: "1px solid color-mix(in srgb, currentColor 9%, transparent)" } },
+        createElement5(
+          "div",
+          { style: { flex: "1 1 200px", minWidth: 0 } },
+          createElement5("div", { style: { fontSize: 17, fontWeight: 650, letterSpacing: "-0.01em" } }, "\u4F01\u4E1A\u5E94\u7528"),
+          createElement5("div", { style: { fontSize: 12, opacity: 0.6, marginTop: 2 } }, `${state.apps.length} \u4E2A\u5E94\u7528 \xB7 \u70B9\u4E00\u4E2A\u5F00\u59CB\uFF0CAI \u4F1A\u5E26\u7740\u5DE5\u4F5C\u53F0\u4E00\u8D77\u6253\u5F00`)
+        ),
+        createElement5("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", className: "dshee-gsearch", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u5E94\u7528\u2026", style: { flex: "1 1 220px", maxWidth: 300, boxSizing: "border-box", height: 34, padding: "0 12px", borderRadius: 9, border: "1px solid color-mix(in srgb, currentColor 16%, transparent)", background: "transparent", color: "inherit", fontSize: 13 } }),
+        createElement5("button", { type: "button", "aria-label": "\u5173\u95ED", onClick: close, style: { ...buttonStyle, fontSize: 16, padding: "4px 8px", opacity: 0.6, borderRadius: 8 } }, "\u2715")
       ),
-      createElement5("input", { "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 4, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }),
       createElement5(
         "div",
-        { style: { overflowY: "auto", display: "grid", gap: 2, marginTop: 6, flex: 1, minHeight: 0 } },
-        filtered.length ? filtered.map((app) => galleryRow(createElement5, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name, state.menuFor === app.name, state.menuAnchor)) : createElement5("div", { style: { padding: "14px 4px", opacity: 0.6 } }, "\u6CA1\u6709\u5339\u914D\u7684\u5E94\u7528")
+        { style: { overflowY: "auto", flex: 1, minHeight: 0, padding: "18px 22px 22px", display: "grid", gap: 20, alignContent: "start" } },
+        filtered.length ? createElement5("div", { style: grid }, ...filtered.map((app) => galleryCard(createElement5, app, state, actions))) : createElement5("div", { style: { padding: "36px 4px", textAlign: "center", opacity: 0.6 } }, "\u6CA1\u6709\u5339\u914D\u7684\u5E94\u7528"),
+        available.length && actions.enable ? createElement5(
+          "section",
+          { "data-dsh-ee-ui": "available-apps" },
+          createElement5("div", { style: { fontSize: 12, fontWeight: 600, opacity: 0.65, margin: "0 0 10px" } }, `\u53EF\u542F\u7528\uFF08${available.length}\uFF09`),
+          createElement5("div", { style: grid }, ...available.map((app) => availableCard(createElement5, app, actions)))
+        ) : null
       ),
-      availableGroup(createElement5, state, actions)
+      actions.setSidebarHidden ? createElement5(
+        "label",
+        { style: { display: "flex", alignItems: "center", gap: 8, padding: "11px 22px", borderTop: "1px solid color-mix(in srgb, currentColor 9%, transparent)", fontSize: 12, opacity: 0.8, cursor: "pointer" } },
+        createElement5("input", { type: "checkbox", checked: !state.sidebarHidden, onChange: () => actions.setSidebarHidden(!state.sidebarHidden), style: { accentColor: "#4d6bfe" } }),
+        "\u5728\u5DE6\u4FA7\u680F\u663E\u793A\u4F01\u4E1A\u5E94\u7528"
+      ) : null
     )
   );
 }
@@ -20341,29 +20396,44 @@ function appsSection(createElement5, state, actions) {
   if (!state.apps.length && !(state.available ?? []).length) return null;
   const query = state.query?.trim().toLowerCase() ?? "";
   const filtered = state.apps.filter((app) => matchesQuery(app, query));
-  const shown = filtered.slice(0, 6);
+  const shown = state.apps.slice(0, state.limit ?? 3);
+  const more = state.apps.length - shown.length;
   const header2 = createElement5(
-    "button",
-    {
+    "div",
+    { style: { display: "flex", alignItems: "center", gap: 4, margin: "0 0 5px" } },
+    createElement5(
+      "button",
+      {
+        type: "button",
+        onClick: () => actions.toggleCollapsed?.(),
+        "aria-expanded": !state.collapsed,
+        title: state.collapsed ? "\u5C55\u5F00\u4F01\u4E1A\u5E94\u7528" : "\u6536\u8D77\u4F01\u4E1A\u5E94\u7528",
+        style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, padding: "2px 0", fontSize: 13, fontWeight: 600 }
+      },
+      createElement5("span", { "aria-hidden": true, style: { fontSize: 10, opacity: 0.7 } }, state.collapsed ? "\u25B8" : "\u25BE"),
+      "\u4F01\u4E1A\u5E94\u7528",
+      state.collapsed ? createElement5("span", { style: { fontSize: 12, fontWeight: 400, opacity: 0.6 } }, `\uFF08${state.apps.length}\uFF09`) : null
+    ),
+    state.hideable && actions.setSidebarHidden ? createElement5("button", {
       type: "button",
-      onClick: () => actions.toggleCollapsed?.(),
-      "aria-expanded": !state.collapsed,
-      title: state.collapsed ? "\u5C55\u5F00\u4F01\u4E1A\u5E94\u7528" : "\u6536\u8D77\u4F01\u4E1A\u5E94\u7528",
-      style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "2px 0", margin: "0 0 5px", fontSize: 13, fontWeight: 600 }
-    },
-    createElement5("span", { "aria-hidden": true, style: { fontSize: 10, opacity: 0.7 } }, state.collapsed ? "\u25B8" : "\u25BE"),
-    "\u4F01\u4E1A\u5E94\u7528",
-    state.collapsed ? createElement5("span", { style: { fontSize: 12, fontWeight: 400, opacity: 0.6 } }, `\uFF08${state.apps.length}\uFF09`) : null
+      onClick: () => actions.setSidebarHidden(true),
+      title: "\u5728\u5DE6\u4FA7\u680F\u9690\u85CF\u4F01\u4E1A\u5E94\u7528\uFF08\u5728\u300C\u67E5\u770B\u66F4\u591A\u300D\u6216 \u8BBE\u7F6E \u2192 dsh-ee \u91CC\u53EF\u4EE5\u518D\u6253\u5F00\uFF09",
+      style: { ...buttonStyle, fontSize: 11.5, opacity: 0.5, padding: "2px 4px" }
+    }, "\u9690\u85CF") : null
   );
   return createElement5(
     "section",
     { "data-dsh-ee-ui": "apps", style: { padding: "10px 12px", fontSize: 13 } },
     header2,
     state.collapsed ? null : [
-      state.apps.length > 8 ? createElement5("input", { key: "search", "aria-label": "\u641C\u7D22\u4F01\u4E1A\u5E94\u7528", value: state.query ?? "", onChange: (event) => actions.search(event.target.value), placeholder: "\u641C\u7D22\u2026", style: { width: "100%", boxSizing: "border-box", marginBottom: 7, padding: 6, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 18%, transparent)", background: "transparent", color: "inherit" } }) : null,
-      createElement5("div", { key: "list", style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement5, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name, state.menuFor === app.name, state.menuAnchor))),
-      createElement5("button", { key: "all", type: "button", onClick: () => actions.toggleGallery?.(), style: { ...buttonStyle, marginTop: 7, opacity: 0.7 } }, `\u67E5\u770B\u5168\u90E8\uFF08${state.apps.length}\uFF09`),
-      availableGroup(createElement5, state, actions),
+      createElement5("div", { key: "list", style: { display: "grid", gap: 2 } }, ...shown.map((app) => appRow(createElement5, app, actions, state.statuses?.[app.name], state.confirmDisable === app.name, state.menuFor === app.name && !state.galleryOpen, state.menuAnchor))),
+      createElement5(
+        "button",
+        { key: "all", type: "button", onClick: () => actions.toggleGallery?.(), style: { ...buttonStyle, display: "flex", alignItems: "center", gap: 6, marginTop: 6, padding: "4px 0", opacity: 0.72, fontSize: 12.5 } },
+        createElement5("span", { "aria-hidden": true, style: { width: 30, textAlign: "center", fontSize: 14 } }, "\u229E"),
+        more > 0 ? `\u67E5\u770B\u66F4\u591A\uFF08${state.apps.length}\uFF09` : "\u5168\u90E8\u5E94\u7528"
+      ),
+      (state.available ?? []).length && actions.enable ? createElement5("button", { key: "available", type: "button", onClick: () => actions.toggleGallery?.(), style: { ...buttonStyle, display: "block", marginTop: 4, fontSize: 12, opacity: 0.65 } }, `\uFF0B \u53EF\u542F\u7528\uFF08${state.available.length}\uFF09`) : null,
       state.notice ? createElement5("p", { key: "notice", role: "status", style: { margin: "7px 0 0", lineHeight: 1.5, overflowWrap: "anywhere" } }, state.notice) : null
     ],
     appsGallery(createElement5, state, actions, filtered)
@@ -20409,62 +20479,101 @@ function inProgressView(createElement5, items, onOpen) {
     }))
   );
 }
-function launcherPanel(createElement5, apps, onOpen, query = "", onSearch = () => {
-}, notice = "", open2 = false, onToggle = () => {
-}) {
-  if (!apps.length) return null;
+var STRIP_CARD_MIN = 176;
+var STRIP_GAP = 10;
+function stripSlots(width) {
+  return Math.max(2, Math.min(6, Math.floor((width + STRIP_GAP) / (STRIP_CARD_MIN + STRIP_GAP))));
+}
+function heroStrip(createElement5, apps, place, onOpen, onMore, notice = "") {
+  if (!apps.length || !place || place.maxHeight < 86) return null;
+  const slots = stripSlots(place.width);
+  const fits = apps.length <= slots;
+  const shown = fits ? apps : apps.slice(0, slots - 1);
   const todos = apps.reduce((n, a) => n + (a.todo ?? 0), 0);
-  const cards = apps.slice(0, 8);
-  const starters = apps.flatMap((a) => (a.starters ?? []).slice(0, 1).map((s) => ({ app: a, text: s }))).slice(0, 3);
+  const tile = { display: "flex", alignItems: "center", gap: 10, minWidth: 0, padding: "10px 12px", borderRadius: 12, border: "1px solid color-mix(in srgb, currentColor 10%, transparent)", background: "color-mix(in srgb, currentColor 1.5%, transparent)", boxShadow: "0 1px 2px color-mix(in srgb, currentColor 5%, transparent)", color: "inherit", cursor: "pointer", textAlign: "left", font: "inherit" };
   const card2 = (app) => createElement5(
     "button",
     {
       key: app.name,
       type: "button",
+      className: "dshee-gcard",
       onClick: () => onOpen(app),
-      style: { ...buttonStyle, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: 10, borderRadius: 8, border: "1px solid color-mix(in srgb, currentColor 12%, transparent)", textAlign: "left", minWidth: 0 }
+      title: app.description || app.title,
+      "data-dsh-ee-app": app.name,
+      style: tile
     },
+    appTileIcon(createElement5, app, 34),
     createElement5(
       "span",
-      { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600 } },
-      appIcon(createElement5, app),
-      createElement5("span", null, app.title),
-      app.new ? createElement5("span", { style: { fontSize: 10, padding: "0 5px", borderRadius: 99, background: "#d9770622", color: "#d97706" } }, "\u65B0") : null,
-      app.todo ? createElement5("span", { style: { fontSize: 10, padding: "0 5px", borderRadius: 99, background: "#2563eb22", color: "#2563eb" } }, `${app.todo} \u5F85\u5904\u7406`) : null
-    ),
-    createElement5("span", { style: { fontSize: 11, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" } }, app.description || app.starters?.[0] || "")
+      { style: { minWidth: 0, flex: 1 } },
+      createElement5(
+        "span",
+        { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 600 } },
+        createElement5("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.title),
+        app.todo ? createElement5("span", { style: badgeStyle("#2563eb") }, String(app.todo)) : app.new ? createElement5("span", { style: badgeStyle("#d97706") }, "\u65B0") : null
+      ),
+      createElement5("span", { style: { display: "block", marginTop: 2, fontSize: 11.5, opacity: 0.58, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, app.description || app.starters?.[0] || "")
+    )
+  );
+  const more = fits ? null : createElement5(
+    "button",
+    {
+      key: "@more",
+      type: "button",
+      className: "dshee-gcard",
+      onClick: onMore,
+      "data-dsh-ee-ui": "hero-more",
+      style: { ...tile, justifyContent: "center", borderStyle: "dashed", background: "transparent", boxShadow: "none" }
+    },
+    createElement5("span", { "aria-hidden": true, style: { fontSize: 16, color: "#4d6bfe" } }, "\u229E"),
+    createElement5("span", { style: { fontSize: 13, fontWeight: 600 } }, `\u67E5\u770B\u66F4\u591A\uFF08${apps.length}\uFF09`)
   );
   return createElement5(
     "div",
-    { "data-dsh-ee-ui": "hero-apps", style: { position: "relative", display: "inline-block" } },
-    createElement5("button", { type: "button", onClick: onToggle, "aria-expanded": open2, "aria-haspopup": "menu", style: { ...buttonStyle, fontSize: 12, padding: "4px 7px", whiteSpace: "nowrap" } }, "\u4F01\u4E1A\u5E94\u7528"),
+    {
+      "data-dsh-ee-ui": "hero-apps",
+      role: "region",
+      "aria-label": "\u4F01\u4E1A\u5E94\u7528",
+      style: { position: "absolute", left: place.left, top: place.top, width: place.width, maxHeight: place.maxHeight, overflow: "hidden", zIndex: 4, animation: "dshee-fade .25s ease-out" }
+    },
+    createElement5("style", null, galleryCss),
     createElement5(
       "div",
-      {
-        role: "region",
-        "aria-label": "\u5E94\u7528\u542F\u52A8\u53F0",
-        style: { position: "absolute", right: 0, bottom: "calc(100% + 8px)", zIndex: 60, width: "min(560px, calc(100vw - 48px))", maxHeight: "min(420px, calc(100vh - 140px))", overflowY: "auto", padding: 12, borderRadius: 10, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", background: "Canvas", color: "CanvasText", boxShadow: "0 8px 30px #0003" }
-      },
-      createElement5(
-        "div",
-        { style: { fontSize: 13, marginBottom: 8, opacity: 0.85 } },
-        todos ? `\u9700\u8981\u4F60\u5904\u7406\uFF1A${todos} \u9879\uFF08\u90FD\u5728\u300C\u5DE5\u4F5C\u53F0\u300D\u91CC\uFF09` : "\u4ECE\u4E0B\u9762\u6311\u4E00\u4E2A\u5E94\u7528\u5F00\u59CB\uFF0C\u6216\u76F4\u63A5\u8BF4\u51FA\u4F60\u7684\u95EE\u9898"
-      ),
-      createElement5("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 } }, ...cards.map(card2)),
-      starters.length ? createElement5(
-        "div",
-        { style: { marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 } },
-        starters.map(({ app, text }) => createElement5("button", {
-          key: `${app.name}:${text}`,
-          type: "button",
-          onClick: () => onOpen(app),
-          title: `${app.title}\uFF1A${text}`,
-          style: { ...buttonStyle, fontSize: 11, padding: "4px 9px", borderRadius: 99, border: "1px solid color-mix(in srgb, currentColor 15%, transparent)", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
-        }, text))
-      ) : null,
-      notice ? createElement5("p", { role: "status", style: { margin: "8px 0 0", fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" } }, notice) : null
-    )
+      { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, margin: "0 2px 8px", fontSize: 12 } },
+      createElement5("span", { style: { fontWeight: 600, opacity: 0.7 } }, "\u4F01\u4E1A\u5E94\u7528"),
+      todos ? createElement5("span", { style: { color: "#2563eb" } }, `\u9700\u8981\u4F60\u5904\u7406\uFF1A${todos} \u9879`) : createElement5("span", { style: { opacity: 0.5 } }, "\u70B9\u4E00\u4E2A\u5F00\u59CB\uFF0C\u5DE5\u4F5C\u53F0\u4F1A\u5728\u53F3\u4FA7\u6253\u5F00")
+    ),
+    createElement5("div", { style: { display: "grid", gridTemplateColumns: `repeat(${slots}, minmax(0, 1fr))`, gap: STRIP_GAP } }, ...shown.map(card2), more),
+    notice ? createElement5("p", { role: "status", style: { margin: "8px 2px 0", fontSize: 11.5, lineHeight: 1.5, overflowWrap: "anywhere" } }, notice) : null
   );
+}
+
+// src/sidebar-pref.ts
+var KEY = "dsh-ee:sidebar-apps";
+var listeners = /* @__PURE__ */ new Set();
+var memory;
+function readSidebarMode() {
+  if (memory) return memory;
+  try {
+    const value = globalThis.localStorage?.getItem(KEY);
+    if (value === "collapsed" || value === "hidden") return memory = value;
+  } catch {
+  }
+  return memory = "shown";
+}
+function setSidebarMode(mode) {
+  memory = mode;
+  try {
+    globalThis.localStorage?.setItem(KEY, mode);
+  } catch {
+  }
+  for (const listener of listeners) listener();
+}
+function subscribeSidebarMode(listener) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 // src/host-session.ts
@@ -20755,10 +20864,10 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
   const seen = /* @__PURE__ */ new Set();
   let started = false;
   let loaded = false;
-  const listeners = /* @__PURE__ */ new Set();
+  const listeners2 = /* @__PURE__ */ new Set();
   const update = (patch) => {
     snapshot = { ...snapshot, ...patch };
-    for (const listener of listeners) listener();
+    for (const listener of listeners2) listener();
   };
   const refresh = singleFlight(async () => {
     update({ busy: true });
@@ -20804,12 +20913,12 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     const [local, setLocal] = (0, import_react.useState)(snapshot);
     (0, import_react.useEffect)(() => {
       const listener = () => setLocal(snapshot);
-      listeners.add(listener);
+      listeners2.add(listener);
       listener();
       started = true;
       void refresh();
       return () => {
-        listeners.delete(listener);
+        listeners2.delete(listener);
       };
     }, []);
     return local;
@@ -20913,17 +21022,16 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     search: () => {
     }
   });
-  const AppsSection = () => {
-    const overview = useOverview();
-    const state = useApps();
-    const [collapsed, setCollapsed] = (0, import_react.useState)(false);
+  const useSidebarMode = () => {
+    const [mode, setMode] = (0, import_react.useState)(readSidebarMode());
+    (0, import_react.useEffect)(() => subscribeSidebarMode(() => setMode(readSidebarMode())), []);
+    return mode;
+  };
+  const useLayers = () => {
     const [galleryOpen, setGalleryOpen] = (0, import_react.useState)(false);
     const [menuFor, setMenuFor] = (0, import_react.useState)("");
     const [menuAnchor, setMenuAnchor] = (0, import_react.useState)(void 0);
     const [query, setQuery] = (0, import_react.useState)("");
-    const [notice, setNotice] = (0, import_react.useState)("");
-    const [availableOpen, setAvailableOpen] = (0, import_react.useState)(false);
-    const [confirmDisable, setConfirmDisable] = (0, import_react.useState)("");
     const closeMenu = () => {
       setMenuFor("");
       setMenuAnchor(void 0);
@@ -20931,6 +21039,7 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
     const closeLayers = () => {
       closeMenu();
       setGalleryOpen(false);
+      setQuery("");
     };
     const toggleMenu = (name, event) => {
       if (!name || name === menuFor) {
@@ -20948,9 +21057,14 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
       if (!menuFor && !galleryOpen) return;
       if (typeof window === "undefined") return;
       const onKey = (event) => {
-        if (event?.key === "Escape") closeLayers();
+        if (event?.key === "Escape") {
+          if (menuFor) closeMenu();
+          else closeLayers();
+        }
       };
-      const onScroll = () => closeMenu();
+      const onScroll = (event) => {
+        if (!event?.target?.closest?.('[data-dsh-ee-ui="apps-gallery"]') || menuFor) closeMenu();
+      };
       window.addEventListener("keydown", onKey);
       window.addEventListener("resize", onScroll);
       window.document?.addEventListener?.("scroll", onScroll, true);
@@ -20960,46 +21074,149 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
         window.document?.removeEventListener?.("scroll", onScroll, true);
       };
     }, [menuFor, galleryOpen]);
+    return { galleryOpen, setGalleryOpen, menuFor, menuAnchor, query, setQuery, closeMenu, closeLayers, toggleMenu };
+  };
+  const makeAppsSection = (placement) => () => {
+    const overview = useOverview();
+    const state = useApps();
+    const mode = useSidebarMode();
+    const layers = useLayers();
+    const [panelCollapsed, setPanelCollapsed] = (0, import_react.useState)(false);
+    const [notice, setNotice] = (0, import_react.useState)("");
+    const [availableOpen, setAvailableOpen] = (0, import_react.useState)(false);
+    const [confirmDisable, setConfirmDisable] = (0, import_react.useState)("");
     if (!overview.data && !overview.failed) return null;
+    const sidebar = placement === "sidebar";
+    if (sidebar && mode === "hidden") return null;
+    const collapsed = sidebar ? mode === "collapsed" : panelCollapsed;
     const actions = {
       ...useActions(setNotice, launchSidebar, setConfirmDisable),
-      search: setQuery,
+      search: layers.setQuery,
       toggleAvailable: () => setAvailableOpen(!availableOpen),
       toggleCollapsed: () => {
-        setCollapsed(!collapsed);
-        closeMenu();
+        if (sidebar) setSidebarMode(collapsed ? "shown" : "collapsed");
+        else setPanelCollapsed(!collapsed);
+        layers.closeMenu();
       },
       toggleGallery: () => {
-        setGalleryOpen(!galleryOpen);
-        closeMenu();
+        layers.setGalleryOpen(!layers.galleryOpen);
+        layers.closeMenu();
       },
-      toggleMenu,
-      closeLayers
+      toggleMenu: layers.toggleMenu,
+      closeLayers: layers.closeLayers,
+      setSidebarHidden: (hidden) => {
+        setSidebarMode(hidden ? "hidden" : "shown");
+        if (hidden) layers.closeLayers();
+      }
     };
     const statuses = Object.fromEntries(state.apps.map((app) => {
       const id = state.bindings[app.name]?.sessionId;
       return [app.name, id ? visibleAppStatus(applicationStatus(state.sessionSnapshot, id), `${app.name}:${id}`, seen) : void 0];
     }));
-    return appsSection(import_react.createElement, { apps: state.apps, available: state.available, availableOpen, confirmDisable, loggedIn: !!overview.data?.me, collapsed, galleryOpen, menuFor, menuAnchor, query, notice, statuses }, actions);
+    return appsSection(import_react.createElement, {
+      apps: state.apps,
+      available: state.available,
+      availableOpen,
+      confirmDisable,
+      loggedIn: !!overview.data?.me,
+      collapsed,
+      galleryOpen: layers.galleryOpen,
+      menuFor: layers.menuFor,
+      menuAnchor: layers.menuAnchor,
+      query: layers.query,
+      notice,
+      statuses,
+      limit: sidebar ? 3 : 6,
+      hideable: sidebar,
+      sidebarHidden: mode === "hidden"
+    }, actions);
+  };
+  const AppsSection = makeAppsSection("sidebar");
+  const PanelAppsSection = makeAppsSection("panel");
+  const inputColumn = (seat) => {
+    const editor = seat.querySelector?.("textarea, [contenteditable='true'], [role='textbox']");
+    const seatWidth = seat.getBoundingClientRect?.().width ?? 0;
+    let column = seat;
+    for (let node2 = editor?.parentElement; node2 && node2 !== seat; node2 = node2.parentElement) {
+      const width = node2.getBoundingClientRect?.().width ?? 0;
+      if (width > 0 && width < seatWidth - 1) column = node2;
+    }
+    return column;
+  };
+  const useBelowComposer = (anchor2, probe, ready) => {
+    const [place, setPlace] = (0, import_react.useState)(void 0);
+    const [missing, setMissing] = (0, import_react.useState)(false);
+    (0, import_react.useEffect)(() => {
+      if (!ready || typeof window === "undefined") return;
+      const seat = anchor2.current?.closest?.("[data-composer-seat]") ?? window.document?.querySelector?.("[data-composer-seat]");
+      if (!seat) {
+        setMissing(true);
+        return;
+      }
+      let frame = 0;
+      const measure = () => {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => {
+          const r = inputColumn(seat).getBoundingClientRect?.();
+          const origin = probe.current?.getBoundingClientRect?.() ?? { left: 0, top: 0 };
+          if (!r || r.width < 200) return setPlace(void 0);
+          const top = r.bottom + 18;
+          const next = { left: Math.round(r.left - origin.left), top: Math.round(top - origin.top), width: Math.round(r.width), maxHeight: Math.round(window.innerHeight - top - 12) };
+          setPlace((current) => current && current.left === next.left && current.top === next.top && current.width === next.width && current.maxHeight === next.maxHeight ? current : next);
+        });
+      };
+      measure();
+      const observer = typeof ResizeObserver === "undefined" ? void 0 : new ResizeObserver(measure);
+      observer?.observe(seat);
+      observer?.observe(window.document.body);
+      window.addEventListener("resize", measure);
+      window.document.addEventListener("scroll", measure, true);
+      const timer = setInterval(measure, 800);
+      return () => {
+        cancelAnimationFrame(frame);
+        observer?.disconnect();
+        window.removeEventListener("resize", measure);
+        window.document.removeEventListener("scroll", measure, true);
+        clearInterval(timer);
+      };
+    }, [ready]);
+    return { place, missing };
   };
   const HeroApps = () => {
     const state = useApps();
-    const [query, setQuery] = (0, import_react.useState)("");
+    const mode = useSidebarMode();
+    const layers = useLayers();
     const [notice, setNotice] = (0, import_react.useState)("");
-    const [menuOpen, setMenuOpen] = (0, import_react.useState)(false);
+    const anchor2 = (0, import_react.useRef)(null);
+    const probe = (0, import_react.useRef)(null);
+    const { place, missing } = useBelowComposer(anchor2, probe, state.apps.length > 0);
     const open2 = (app) => {
-      setMenuOpen(false);
+      layers.closeLayers();
       void openWithFallback(app, launcher.launchHero).then(setNotice);
     };
-    (0, import_react.useEffect)(() => {
-      if (!menuOpen || typeof window === "undefined") return;
-      const onKey = (event) => {
-        if (event?.key === "Escape") setMenuOpen(false);
-      };
-      window.addEventListener("keydown", onKey);
-      return () => window.removeEventListener("keydown", onKey);
-    }, [menuOpen]);
-    return launcherPanel(import_react.createElement, state.apps, open2, query, setQuery, notice, menuOpen, () => setMenuOpen(!menuOpen));
+    const query = layers.query.trim().toLowerCase();
+    const filtered = state.apps.filter((app) => !query || `${app.title} ${app.description} ${app.name}`.toLowerCase().includes(query));
+    const gallery = appsGallery(import_react.createElement, { apps: state.apps, available: state.available, loggedIn: true, galleryOpen: layers.galleryOpen, query: layers.query, sidebarHidden: mode === "hidden" }, {
+      ...useActions(setNotice, launcher.launchHero),
+      open: open2,
+      search: layers.setQuery,
+      closeLayers: layers.closeLayers,
+      toggleGallery: () => layers.setGalleryOpen(!layers.galleryOpen),
+      setSidebarHidden: (hidden) => setSidebarMode(hidden ? "hidden" : "shown")
+    }, filtered);
+    if (!state.apps.length) return null;
+    const fallback = missing ? (0, import_react.createElement)("button", { type: "button", onClick: () => layers.setGalleryOpen(true), "data-dsh-ee-ui": "hero-apps", style: { border: 0, background: "transparent", color: "inherit", cursor: "pointer", fontSize: 12, padding: "4px 7px", whiteSpace: "nowrap" } }, "\u4F01\u4E1A\u5E94\u7528") : null;
+    return (0, import_react.createElement)(
+      "span",
+      { ref: anchor2, "data-dsh-ee-ui": "hero-anchor", style: { display: "inline-flex", width: fallback ? void 0 : 0, height: fallback ? void 0 : 0 } },
+      fallback,
+      (0, import_react.createElement)(
+        "span",
+        { ref: probe, style: { position: "fixed", left: 0, top: 0, width: 0, height: 0, zIndex: 4 } },
+        heroStrip(import_react.createElement, state.apps, place, open2, () => layers.setGalleryOpen(true), notice)
+      ),
+      gallery
+    );
   };
   const InProgress = () => {
     const state = useApps();
@@ -21008,7 +21225,7 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
       void openSession(ctx, item.sessionId).catch(() => void 0);
     });
   };
-  const AppsPanel = () => (0, import_react.createElement)("div", null, (0, import_react.createElement)(InProgress), (0, import_react.createElement)(AppsSection));
+  const AppsPanel = () => (0, import_react.createElement)("div", null, (0, import_react.createElement)(InProgress), (0, import_react.createElement)(PanelAppsSection));
   ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({ name: "sidebar.footer.action", id: "dsh-ee-apps", order: 30, label: "\u4F01\u4E1A\u5E94\u7528" }, AppsSection));
   ctx.slots.inject("conversation.hero.options", () => ctx.slots.register({ name: "conversation.hero.options", id: "dsh-ee-apps", order: 100, label: "\u4F01\u4E1A\u5E94\u7528" }, HeroApps));
   return {
@@ -21020,9 +21237,9 @@ function registerApps(ctx, remote, useOverview, unwrapRemote2) {
       return refresh();
     },
     subscribeApps: (listener) => {
-      listeners.add(listener);
+      listeners2.add(listener);
       return () => {
-        listeners.delete(listener);
+        listeners2.delete(listener);
       };
     },
     setWorkbenchOpener: (opener) => {
@@ -21170,6 +21387,19 @@ function kbDocUrl(base, citation) {
   const lines = citation.from === citation.to ? `#L${citation.from}` : `#L${citation.from}-${citation.to}`;
   return `${base}/knowledge/docs/${citation.doc}${version2}${lines}`;
 }
+function rowWriteOf(action) {
+  if (!action.table) return void 0;
+  if (action.delete) return "delete";
+  return action.set && Object.keys(action.set).length ? "set" : void 0;
+}
+function statusTone(value) {
+  const text = String(value ?? "");
+  if (!text) return "neutral";
+  if (/驳回|拒绝|失败|逾期|超时|超标|异常|取消|过期|^高$|高风险|紧急|错误/.test(text)) return "bad";
+  if (/已完成|已解决|已通过|通过|已归还|已报销|已拜访|完成|正常|^低$|合作中|成功|已关闭|已签/.test(text)) return "good";
+  if (/待|中$|处理中|进行中|审批|计划|借用|续约|^中$|新客户|草稿|已出发/.test(text)) return "warn";
+  return "neutral";
+}
 
 // src/workbench-open.ts
 function waitMounted(sidebarRight, sessionId, timeoutMs = 5e3) {
@@ -21203,8 +21433,11 @@ async function openWorkbench(ctx, app, sessionId, force = false) {
   if (!await waitMounted(sidebarRight, sessionId)) return false;
   if (!force && workbenchOpenIn(sidebarRight, sessionId, app.name)) return false;
   let opened = 0;
+  let tabbed = false;
   panes.forEach((pane, index) => {
-    const placement = index === 1 ? { preferNewPane: true } : {};
+    const aside = pane.type === "web" || pane.type === "kb_doc";
+    const placement = index === 1 && aside ? { preferNewPane: true } : {};
+    if (index > 0 && !aside) tabbed = true;
     try {
       if (pane.type === "web") {
         sidebarRight.openTab("browser", { ...placement, params: { url: pane.url } });
@@ -21215,6 +21448,12 @@ async function openWorkbench(ctx, app, sessionId, force = false) {
     } catch {
     }
   });
+  if (tabbed && panes[0].type !== "web") {
+    try {
+      sidebarRight.openResource(workbenchAddress(app.name, panes[0].id), {});
+    } catch {
+    }
+  }
   return opened > 0;
 }
 
@@ -21222,28 +21461,74 @@ async function openWorkbench(ctx, app, sessionId, force = false) {
 function actionLabel(handlers, action) {
   return handlers.viaDSH && !action.table ? `${action.label} \u2197` : action.label;
 }
-var muted = { opacity: 0.65, fontSize: 12 };
-var card = { border: "1px solid color-mix(in srgb, currentColor 14%, transparent)", borderRadius: 10, padding: "10px 12px", background: "color-mix(in srgb, currentColor 2%, transparent)" };
-var buttonStyle2 = { border: "1px solid color-mix(in srgb, currentColor 25%, transparent)", borderRadius: 6, background: "transparent", color: "inherit", cursor: "pointer", padding: "3px 9px", fontSize: 12 };
+function actionButton(h, handlers, key, action, onClick) {
+  const write = rowWriteOf(action);
+  const armed = write === "delete" && !!handlers.armed?.(key);
+  return button2(h, armed ? "\u786E\u8BA4\u5220\u9664" : actionLabel(handlers, action), onClick, handlers.sending.has(key), key, armed ? "armed" : write === "delete" ? "danger" : "default");
+}
+var muted = { color: "var(--ee-muted)", fontSize: 12 };
+var card = {
+  border: "1px solid var(--ee-border)",
+  borderRadius: 12,
+  padding: "14px 16px",
+  background: "var(--ee-card-bg, color-mix(in srgb, currentColor 2.5%, transparent))",
+  boxShadow: "0 1px 1px color-mix(in srgb, currentColor 4%, transparent), 0 2px 6px -2px color-mix(in srgb, currentColor 8%, transparent)",
+  boxSizing: "border-box",
+  minWidth: 0,
+  height: "100%"
+};
+var buttonStyle2 = { border: "1px solid var(--ee-border-strong)", borderRadius: 8, background: "var(--ee-card-bg, transparent)", color: "inherit", cursor: "pointer", padding: "5px 11px", fontSize: 12, fontWeight: 500, lineHeight: 1.4, whiteSpace: "nowrap" };
+var primaryButton = { ...buttonStyle2, border: "1px solid var(--ee-accent)", background: "var(--ee-accent)", color: "#fff", padding: "7px 16px", fontSize: 13 };
 var warn = "#b45309";
-var seriesColors = ["#4f6ef7", "#16a34a", "#f59e0b", "#db2777"];
+var seriesColors = ["#4d6bfe", "#00a3bf", "#f59e0b", "#db2777"];
 var widgetNames = { metric: "\u6307\u6807", table: "\u8868\u683C", chart: "\u56FE\u8868", checklist: "\u6E05\u5355", form: "\u8868\u5355", actions: "\u5FEB\u6377\u6309\u94AE", markdown: "\u8BF4\u660E", heading: "", board: "AI \u770B\u677F", kb_scope: "\u67E5\u54EA\u4E9B\u5E93" };
-var panelCss = "@keyframes dshee-in{from{opacity:.2;transform:translateY(3px)}to{opacity:1;transform:none}}@keyframes dshee-pulse{0%,100%{opacity:.45}50%{opacity:.9}}";
-function button2(h, label, onClick, disabled = false, key) {
-  return h("button", { key, type: "button", onClick, disabled, style: { ...buttonStyle2, opacity: disabled ? 0.5 : 1, cursor: disabled ? "default" : "pointer" } }, label);
+var toneColors = { good: "#16a34a", warn: "#d97706", bad: "#dc2626", neutral: "currentColor" };
+var panelCss = [
+  "@keyframes dshee-in{from{opacity:.2;transform:translateY(3px)}to{opacity:1;transform:none}}",
+  "@keyframes dshee-pulse{0%,100%{opacity:.45}50%{opacity:.9}}",
+  ".dshee-root{container-type:inline-size;--ee-accent:#4d6bfe;--ee-border:color-mix(in srgb,currentColor 10%,transparent);--ee-border-strong:color-mix(in srgb,currentColor 18%,transparent);--ee-soft:color-mix(in srgb,currentColor 4%,transparent);--ee-muted:color-mix(in srgb,currentColor 60%,transparent)}",
+  ".dshee-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px;align-items:stretch}",
+  ".dshee-grid>.dshee-w{grid-column:span 12;min-width:0}",
+  ".dshee-grid>.dshee-w-metric{grid-column:span 6}",
+  "@container (min-width:600px){.dshee-grid>.dshee-w-quarter{grid-column:span 3}.dshee-grid>.dshee-w-third{grid-column:span 4}.dshee-grid>.dshee-w-half{grid-column:span 6}.dshee-grid>.dshee-w-wide{grid-column:span 8}.dshee-grid>.dshee-w-full{grid-column:span 12}.dshee-grid{gap:16px}}",
+  ".dshee-btn{transition:background .15s,border-color .15s,box-shadow .15s,transform .05s}.dshee-btn:hover:not(:disabled){border-color:var(--ee-accent);color:var(--ee-accent)}.dshee-btn:active:not(:disabled){transform:translateY(1px)}",
+  ".dshee-primary:hover:not(:disabled){filter:brightness(1.08);color:#fff!important;box-shadow:0 4px 12px -4px color-mix(in srgb,var(--ee-accent) 60%,transparent)}",
+  ".dshee-danger{color:#dc2626!important}.dshee-danger:hover:not(:disabled){border-color:#dc2626!important}.dshee-armed{background:#dc2626!important;border-color:#dc2626!important;color:#fff!important}",
+  ".dshee-tile{transition:border-color .15s,box-shadow .15s,transform .15s}.dshee-tile:hover{border-color:color-mix(in srgb,var(--ee-accent) 55%,transparent);box-shadow:0 6px 16px -8px color-mix(in srgb,var(--ee-accent) 45%,transparent);transform:translateY(-1px)}",
+  ".dshee-row{transition:background .12s}.dshee-row:hover{background:var(--ee-soft)}",
+  ".dshee-input{transition:border-color .15s,box-shadow .15s}.dshee-input:focus{outline:none;border-color:var(--ee-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--ee-accent) 18%,transparent)}",
+  ".dshee-card{transition:box-shadow .2s}"
+].join("");
+function button2(h, label, onClick, disabled = false, key, variant = "default") {
+  const style = variant === "primary" ? primaryButton : buttonStyle2;
+  const className = `dshee-btn${variant === "primary" ? " dshee-primary" : variant === "danger" ? " dshee-danger" : variant === "armed" ? " dshee-armed" : ""}`;
+  return h("button", { key, type: "button", onClick, disabled, className, style: { ...style, opacity: disabled ? 0.5 : 1, cursor: disabled ? "default" : "pointer" } }, label);
 }
 function header(h, widget, refresh, aside) {
   return h(
     "div",
-    { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 } },
-    h("strong", { style: { fontSize: 13 } }, widget.title || widgetNames[widget.type]),
+    { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, minHeight: 20 } },
+    h("strong", { style: { fontSize: 13, fontWeight: 600, letterSpacing: "0.01em", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, widget.title || widgetNames[widget.type]),
     h(
       "span",
-      { style: { display: "flex", alignItems: "center", gap: 6 } },
+      { style: { display: "flex", alignItems: "center", gap: 6, flex: "0 0 auto" } },
       aside ?? null,
-      refresh ? h("button", { type: "button", onClick: refresh, "aria-label": "\u5237\u65B0", title: "\u5237\u65B0", style: { ...buttonStyle2, border: 0, padding: "0 4px" } }, "\u21BB") : null
+      refresh ? h("button", { type: "button", onClick: refresh, "aria-label": "\u5237\u65B0", title: "\u5237\u65B0", className: "dshee-btn", style: { ...buttonStyle2, border: 0, background: "transparent", padding: "0 4px", fontSize: 13, color: "var(--ee-muted)" } }, "\u21BB") : null
     )
   );
+}
+function statusPill(h, value, text) {
+  const color = toneColors[statusTone(value)];
+  return h(
+    "span",
+    { "data-status": statusTone(value), style: { display: "inline-flex", alignItems: "center", gap: 5, padding: "1px 8px", borderRadius: 999, fontSize: 11.5, fontWeight: 500, lineHeight: "18px", color, background: `color-mix(in srgb, ${color} 12%, transparent)`, whiteSpace: "nowrap" } },
+    h("span", { "aria-hidden": true, style: { width: 6, height: 6, borderRadius: "50%", background: color, opacity: 0.85 } }),
+    text
+  );
+}
+function cell(h, value, format) {
+  const text = formatValue(value, format === "status" ? void 0 : format);
+  return format === "status" && text !== "\u2014" ? statusPill(h, value, text) : text;
 }
 function skeleton(h, shape = "rows") {
   const bar = (key, width, height = 10) => h("div", { key, style: { width, height, borderRadius: 4, background: "color-mix(in srgb, currentColor 12%, transparent)", animation: "dshee-pulse 1.4s ease-in-out infinite" } });
@@ -21288,8 +21573,9 @@ function emptyView(h, index, widget, handlers, fallback = "\u6682\u65E0\u6570\u6
   const key = `${index}:empty`;
   return h(
     "div",
-    { "data-state": "empty", style: { display: "grid", gap: 6, justifyItems: "start", fontSize: 12 } },
-    h("span", { style: { opacity: 0.7 } }, widget.empty?.text || fallback),
+    { "data-state": "empty", style: { display: "grid", gap: 10, justifyItems: "center", textAlign: "center", fontSize: 12, padding: "18px 12px", borderRadius: 10, border: "1px dashed var(--ee-border-strong)", background: "var(--ee-soft)" } },
+    h("span", { "aria-hidden": true, style: { fontSize: 18, opacity: 0.55 } }, "\u2205"),
+    h("span", { style: { color: "var(--ee-muted)", lineHeight: 1.6, maxWidth: 360 } }, widget.empty?.text || fallback),
     action ? button2(h, actionLabel(handlers, action), () => handlers.send(key, action, {}), handlers.sending.has(key), key) : null
   );
 }
@@ -21300,16 +21586,29 @@ function metricView(h, widget, state, refresh, handlers, index = 0) {
     const value = getPath(state.value, widget.field);
     const text = formatValue(value, widget.format);
     const delta = widget.delta_field ? formatDelta(getPath(state.value, widget.delta_field)) : void 0;
+    const deltaColor = delta?.direction === "up" ? "#16a34a" : delta?.direction === "down" ? "#dc2626" : "currentColor";
     body = h(
       "div",
       { style: { display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" } },
       // key 跟着值走：值变了重新挂载，播一次淡入
-      h("span", { key: text, "data-value": text, style: { fontSize: 24, fontWeight: 600, fontVariantNumeric: "tabular-nums", animation: "dshee-in .35s ease-out" } }, text),
-      delta ? h("span", { style: { fontSize: 12, fontWeight: 500, color: delta.direction === "up" ? "#16a34a" : delta.direction === "down" ? "#dc2626" : "inherit", opacity: delta.direction === "flat" ? 0.6 : 1 } }, delta.text) : null
+      h("span", { key: text, "data-value": text, style: { fontSize: 26, lineHeight: 1.15, fontWeight: 600, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums", animation: "dshee-in .35s ease-out" } }, text),
+      delta ? h("span", { style: { fontSize: 11.5, fontWeight: 600, padding: "1px 7px", borderRadius: 999, color: deltaColor, background: `color-mix(in srgb, ${deltaColor} 12%, transparent)`, opacity: delta.direction === "flat" ? 0.7 : 1 } }, delta.text) : null
     );
   }
-  return h("section", { style: card }, header(h, widget, refresh), body);
+  return h(
+    "section",
+    { className: "dshee-card", style: { ...card, padding: "13px 16px 15px" } },
+    h(
+      "div",
+      { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 8 } },
+      h("span", { style: { fontSize: 12, fontWeight: 500, color: "var(--ee-muted)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, widget.title || widgetNames.metric),
+      h("button", { type: "button", onClick: refresh, "aria-label": "\u5237\u65B0", title: "\u5237\u65B0", className: "dshee-btn", style: { ...buttonStyle2, border: 0, background: "transparent", padding: "0 2px", fontSize: 12, color: "var(--ee-muted)" } }, "\u21BB")
+    ),
+    body
+  );
 }
+var th = { textAlign: "left", padding: "8px 10px", borderBottom: "1px solid var(--ee-border)", whiteSpace: "nowrap", fontWeight: 500, fontSize: 11.5, color: "var(--ee-muted)", background: "var(--ee-soft)" };
+var td = { padding: "9px 10px", borderBottom: "1px solid var(--ee-border)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", verticalAlign: "middle" };
 function tableView(h, index, widget, state, handlers) {
   const note = stateView(h, index, widget, state, handlers);
   const columns = widget.columns ?? [];
@@ -21317,60 +21616,70 @@ function tableView(h, index, widget, state, handlers) {
   const detail = widget.detail ?? [];
   const open2 = handlers.expandedRow?.(index);
   let body = note;
+  let count = null;
   if (!note) {
     const { rows, total } = tableRows(state.value, widget.rows);
     const span = columns.length + (actions.length ? 1 : 0) + (detail.length ? 1 : 0);
+    if (rows.length) count = h("span", { style: { ...muted, fontSize: 11.5, fontVariantNumeric: "tabular-nums" } }, `${total} \u6761`);
     body = rows.length === 0 ? emptyView(h, index, widget, handlers) : h(
       "div",
-      { style: { overflowX: "auto" } },
+      { style: { overflowX: "auto", margin: "0 -16px", borderTop: "1px solid var(--ee-border)" } },
       h(
         "table",
-        { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
+        { style: { width: "100%", borderCollapse: "collapse", fontSize: 12.5 } },
         h("thead", null, h(
           "tr",
           null,
-          detail.length ? h("th", { key: "toggle", style: { width: 18 } }) : null,
-          ...columns.map((column, c) => h("th", { key: c, style: { textAlign: "left", padding: "4px 6px", borderBottom: "1px solid color-mix(in srgb, currentColor 15%, transparent)", whiteSpace: "nowrap", fontWeight: 500, opacity: 0.75 } }, column.title)),
-          actions.length ? h("th", { key: "actions" }) : null
+          detail.length ? h("th", { key: "toggle", style: { ...th, width: 18, paddingLeft: 16, paddingRight: 0 } }) : null,
+          ...columns.map((column, c) => h("th", { key: c, style: { ...th, paddingLeft: c === 0 && !detail.length ? 16 : 10, textAlign: column.format === "money" || column.format === "number" || column.format === "compact" ? "right" : "left" } }, column.title)),
+          actions.length ? h("th", { key: "actions", style: { ...th, paddingRight: 16 } }) : null
         )),
         h("tbody", null, ...rows.flatMap((row, r) => {
           const expanded = open2 === r;
           const line = h(
             "tr",
-            { key: r, style: { cursor: detail.length ? "pointer" : "default", background: expanded ? "color-mix(in srgb, currentColor 5%, transparent)" : "transparent" }, onClick: detail.length ? () => handlers.toggleRow?.(index, r) : void 0 },
-            detail.length ? h("td", { key: "toggle", style: { padding: "4px 2px", opacity: 0.6 } }, h("button", { type: "button", "aria-expanded": expanded, "aria-label": expanded ? "\u6536\u8D77\u8BE6\u60C5" : "\u5C55\u5F00\u8BE6\u60C5", onClick: (event) => {
+            { key: r, className: "dshee-row", style: { cursor: detail.length ? "pointer" : "default", background: expanded ? "var(--ee-soft)" : void 0 }, onClick: detail.length ? () => handlers.toggleRow?.(index, r) : void 0 },
+            detail.length ? h("td", { key: "toggle", style: { ...td, padding: "9px 0 9px 16px", color: "var(--ee-muted)" } }, h("button", { type: "button", "aria-expanded": expanded, "aria-label": expanded ? "\u6536\u8D77\u8BE6\u60C5" : "\u5C55\u5F00\u8BE6\u60C5", onClick: (event) => {
               event?.stopPropagation?.();
               handlers.toggleRow?.(index, r);
-            }, style: { ...buttonStyle2, border: 0, padding: 0 } }, expanded ? "\u25BE" : "\u25B8")) : null,
-            ...columns.map((column, c) => h("td", { key: c, style: { padding: "4px 6px", borderBottom: "1px solid color-mix(in srgb, currentColor 8%, transparent)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis" }, title: String(formatValue(getPath(row, column.field), column.format) ?? "") }, formatValue(getPath(row, column.field), column.format))),
+            }, style: { ...buttonStyle2, border: 0, background: "transparent", padding: 0, color: "inherit" } }, expanded ? "\u25BE" : "\u25B8")) : null,
+            ...columns.map((column, c) => {
+              const value = getPath(row, column.field);
+              const numeric = column.format === "money" || column.format === "number" || column.format === "compact";
+              return h("td", { key: c, style: { ...td, paddingLeft: c === 0 && !detail.length ? 16 : 10, fontWeight: c === 0 ? 500 : 400, textAlign: numeric ? "right" : "left" }, title: String(formatValue(value, column.format === "status" ? void 0 : column.format) ?? "") }, cell(h, value, column.format));
+            }),
             actions.length ? h(
               "td",
-              { key: "actions", style: { padding: "4px 6px", whiteSpace: "nowrap" }, onClick: (event) => event?.stopPropagation?.() },
-              ...actions.map((action, a) => {
-                const key = `${index}:row:${r}:${a}`;
-                return button2(h, actionLabel(handlers, action), () => handlers.send(key, action, { row }), handlers.sending.has(key), key);
-              })
+              { key: "actions", style: { ...td, paddingRight: 16, textAlign: "right", maxWidth: "none" }, onClick: (event) => event?.stopPropagation?.() },
+              h(
+                "span",
+                { style: { display: "inline-flex", gap: 6 } },
+                ...actions.map((action, a) => {
+                  const key = `${index}:row:${r}:${a}`;
+                  return actionButton(h, handlers, key, action, () => handlers.send(key, action, { row }));
+                })
+              )
             ) : null
           );
           if (!expanded) return [line];
           return [line, h("tr", { key: `${r}:detail` }, h(
             "td",
-            { colSpan: span, style: { padding: "6px 8px 10px 24px", borderBottom: "1px solid color-mix(in srgb, currentColor 8%, transparent)" } },
+            { colSpan: span, style: { padding: "10px 16px 14px 40px", borderBottom: "1px solid var(--ee-border)", background: "var(--ee-soft)" } },
             h(
               "dl",
-              { "data-detail": r, style: { margin: 0, display: "grid", gridTemplateColumns: "max-content minmax(0, 1fr)", gap: "4px 12px", animation: "dshee-in .2s ease-out" } },
+              { "data-detail": r, style: { margin: 0, display: "grid", gridTemplateColumns: "max-content minmax(0, 1fr)", gap: "6px 16px", fontSize: 12.5, animation: "dshee-in .2s ease-out" } },
               ...detail.flatMap((field, f) => [
-                h("dt", { key: `t${f}`, style: { opacity: 0.6 } }, field.title),
-                h("dd", { key: `d${f}`, style: { margin: 0, overflowWrap: "anywhere" } }, formatValue(getPath(row, field.field), field.format))
+                h("dt", { key: `t${f}`, style: { color: "var(--ee-muted)" } }, field.title),
+                h("dd", { key: `d${f}`, style: { margin: 0, overflowWrap: "anywhere" } }, cell(h, getPath(row, field.field), field.format))
               ])
             )
           ))];
         }))
       ),
-      total > rows.length ? h("div", { style: { ...muted, marginTop: 6 } }, `\u5171 ${total} \u884C\uFF0C\u53EA\u663E\u793A\u524D ${rows.length} \u884C`) : null
+      total > rows.length ? h("div", { style: { ...muted, padding: "8px 16px 0" } }, `\u5171 ${total} \u884C\uFF0C\u53EA\u663E\u793A\u524D ${rows.length} \u884C`) : null
     );
   }
-  return h("section", { style: card }, header(h, widget, () => handlers.refresh(index)), body);
+  return h("section", { className: "dshee-card", style: { ...card, paddingBottom: note || !count ? 14 : 6 } }, header(h, widget, () => handlers.refresh(index), count), body);
 }
 function chartView(h, index, widget, state, handlers) {
   const note = stateView(h, index, widget, state, handlers, "chart");
@@ -21379,7 +21688,7 @@ function chartView(h, index, widget, state, handlers) {
     const data = chartSeries(state.value, widget);
     body = data.labels.length === 0 ? emptyView(h, index, widget, handlers) : widget.chart === "pie" ? pieChart(h, data) : xyChart(h, widget.chart === "bar" ? "bar" : "line", data);
   }
-  return h("section", { style: card }, header(h, widget, () => handlers.refresh(index)), body);
+  return h("section", { className: "dshee-card", style: card }, header(h, widget, () => handlers.refresh(index)), body);
 }
 function legend(h, items) {
   return h(
@@ -21400,7 +21709,7 @@ function niceMax(max) {
   return Math.ceil(max / step) * step;
 }
 function xyChart(h, kind, data) {
-  const W = 320, H = 150, left = 34, bottom = 18, top = 8, right = 6;
+  const W = 480, H = 170, left = 38, bottom = 18, top = 8, right = 6;
   const max = niceMax(Math.max(0, ...data.series.flatMap((s) => s.values)));
   const n = data.labels.length;
   const plotW = W - left - right, plotH = H - top - bottom;
@@ -21421,12 +21730,14 @@ function xyChart(h, kind, data) {
       const barW = groupW / data.series.length;
       return s.values.map((v, i) => h(
         "rect",
-        { key: `b${si}-${i}`, x: left + slot * i + (slot - groupW) / 2 + barW * si, y: y(v), width: Math.max(barW - 1, 1), height: Math.max(top + plotH - y(v), 0), rx: 2, fill: color },
+        { key: `b${si}-${i}`, x: left + slot * i + (slot - groupW) / 2 + barW * si, y: y(v), width: Math.max(barW - 1, 1), height: Math.max(top + plotH - y(v), 0), rx: 3, fill: color, fillOpacity: 0.9 },
         h("title", null, `${data.labels[i]} \xB7 ${s.title}\uFF1A${formatValue(v, s.format)}`)
       ));
     }
     const points = s.values.map((v, i) => `${xMid(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    const area = si === 0 && n > 1 ? h("polygon", { key: `a${si}`, points: `${xMid(0).toFixed(1)},${(top + plotH).toFixed(1)} ${points} ${xMid(n - 1).toFixed(1)},${(top + plotH).toFixed(1)}`, fill: color, fillOpacity: 0.08 }) : null;
     return [
+      area,
       h("polyline", { key: `l${si}`, points, fill: "none", stroke: color, strokeWidth: 2, strokeLinejoin: "round", strokeLinecap: "round" }),
       ...s.values.map((v, i) => h(
         "circle",
@@ -21440,7 +21751,7 @@ function xyChart(h, kind, data) {
   return h(
     "div",
     null,
-    h("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img", "aria-label": data.series.map((s) => s.title).join("\u3001"), style: { display: "block", overflow: "visible" } }, ...grid, ...marks, ...xLabels),
+    h("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img", "aria-label": data.series.map((s) => s.title).join("\u3001"), style: { display: "block", overflow: "visible", maxHeight: 240 } }, ...grid, ...marks, ...xLabels),
     data.series.length > 1 ? legend(h, data.series.map((s, i) => ({ label: s.title, color: seriesColors[i % seriesColors.length] }))) : null
   );
 }
@@ -21479,15 +21790,15 @@ function checklistView(h, index, widget, state, handlers) {
   if (!note) {
     body = items.length === 0 ? emptyView(h, index, widget, handlers) : h(
       "div",
-      { style: { display: "grid", gap: 8 } },
+      { style: { display: "grid", gap: 10 } },
       h(
         "div",
-        { style: { height: 4, borderRadius: 999, background: "color-mix(in srgb, currentColor 10%, transparent)", overflow: "hidden" } },
-        h("div", { style: { width: `${done / items.length * 100}%`, height: "100%", background: seriesColors[1], transition: "width .3s ease-out" } })
+        { style: { height: 6, borderRadius: 999, background: "var(--ee-soft)", overflow: "hidden" } },
+        h("div", { style: { width: `${done / items.length * 100}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg, var(--ee-accent), #00a3bf)", transition: "width .3s ease-out" } })
       ),
       h(
         "ul",
-        { style: { listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 4 } },
+        { style: { listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 2 } },
         ...items.map((item) => {
           const on = checked.includes(item.id);
           return h(
@@ -21495,21 +21806,22 @@ function checklistView(h, index, widget, state, handlers) {
             { key: item.id },
             h(
               "label",
-              { style: { display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, cursor: "pointer" } },
-              h("input", { type: "checkbox", checked: on, onChange: () => handlers.toggleCheck?.(index, item.id), style: { marginTop: 2 } }),
-              h("span", { style: { textDecoration: on ? "line-through" : "none", opacity: on ? 0.55 : 1 } }, item.text)
+              { className: "dshee-row", style: { display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, lineHeight: 1.5, cursor: "pointer", padding: "5px 6px", borderRadius: 6 } },
+              h("input", { type: "checkbox", checked: on, onChange: () => handlers.toggleCheck?.(index, item.id), style: { marginTop: 3, accentColor: "var(--ee-accent)" } }),
+              h("span", { style: { textDecoration: on ? "line-through" : "none", opacity: on ? 0.5 : 1 } }, item.text)
             )
           );
         })
       )
     );
   }
-  const progress = items.length ? h("span", { style: { ...muted, fontVariantNumeric: "tabular-nums" } }, `${done}/${items.length}`) : null;
-  return h("section", { style: card }, header(h, widget, fromSource ? () => handlers.refresh(index) : void 0, progress), body);
+  const progress = items.length ? h("span", { style: { fontSize: 11.5, fontWeight: 600, padding: "1px 8px", borderRadius: 999, color: done === items.length ? "#16a34a" : "var(--ee-accent)", background: `color-mix(in srgb, ${done === items.length ? "#16a34a" : "var(--ee-accent)"} 12%, transparent)`, fontVariantNumeric: "tabular-nums" } }, `${done}/${items.length}`) : null;
+  return h("section", { className: "dshee-card", style: card }, header(h, widget, fromSource ? () => handlers.refresh(index) : void 0, progress), body);
 }
 function headingView(h, widget) {
-  return h("h3", { style: { margin: "6px 2px -2px", fontSize: 12, fontWeight: 600, letterSpacing: "0.02em", opacity: 0.7 } }, widget.title);
+  return h("h3", { style: { margin: "8px 2px 0", fontSize: 14, fontWeight: 600, letterSpacing: "0.01em", display: "flex", alignItems: "center", gap: 8 } }, widget.title);
 }
+var inputStyle = { width: "100%", boxSizing: "border-box", height: 34, padding: "0 10px", borderRadius: 8, border: "1px solid var(--ee-border-strong)", background: "var(--ee-card-bg, transparent)", color: "inherit", fontSize: 13 };
 function formView(h, index, widget, handlers) {
   const values = handlers.formValues(index);
   const fields = widget.fields ?? [];
@@ -21523,8 +21835,9 @@ function formView(h, index, widget, handlers) {
     const common = {
       "aria-label": field.label,
       value: values[field.name] ?? "",
+      className: "dshee-input",
       onChange: (event) => handlers.setFormValue(index, field.name, event.target.value),
-      style: { width: "100%", boxSizing: "border-box", padding: 5, borderRadius: 5, border: "1px solid color-mix(in srgb, currentColor 20%, transparent)", background: "transparent", color: "inherit", fontSize: 12 }
+      style: inputStyle
     };
     if (field.kind === "select") {
       return h("select", common, h("option", { value: "" }, "\u8BF7\u9009\u62E9"), ...(field.options ?? []).map((option) => h("option", { key: option, value: option }, option)));
@@ -21533,39 +21846,68 @@ function formView(h, index, widget, handlers) {
   };
   return h(
     "section",
-    { style: card },
+    { className: "dshee-card", style: card },
     header(h, widget),
     h(
       "div",
-      { style: { display: "grid", gap: 8 } },
+      { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 170px), 1fr))", gap: "10px 12px" } },
       ...fields.map((field) => h(
         "label",
-        { key: field.name, style: { display: "grid", gap: 3, fontSize: 12 } },
-        h("span", null, field.label, field.required ? h("span", { style: { color: "#b45309" } }, " *") : null),
+        { key: field.name, style: { display: "grid", gap: 5, fontSize: 12, fontWeight: 500, alignContent: "start" } },
+        h("span", null, field.label, field.required ? h("span", { style: { color: "#dc2626" } }, " *") : null),
         input2(field)
       ))
     ),
-    handlers.formError(index) ? h("div", { role: "alert", style: { color: "#b45309", fontSize: 12, marginTop: 6 } }, handlers.formError(index)) : null,
-    h("div", { style: { marginTop: 8 } }, button2(h, widget.submit ? actionLabel(handlers, widget.submit) || "\u63D0\u4EA4" : "\u63D0\u4EA4", submit, handlers.sending.has(key)))
+    handlers.formError(index) ? h("div", { role: "alert", style: { color: "#dc2626", fontSize: 12, marginTop: 8 } }, handlers.formError(index)) : null,
+    h("div", { style: { marginTop: 12, display: "flex", justifyContent: "flex-end" } }, button2(h, widget.submit ? actionLabel(handlers, widget.submit) || "\u63D0\u4EA4" : "\u63D0\u4EA4", submit, handlers.sending.has(key), void 0, "primary"))
   );
 }
 function actionsView(h, index, widget, handlers) {
   return h(
     "section",
-    { style: card },
+    { className: "dshee-card", style: card },
     header(h, widget),
     h(
       "div",
-      { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+      { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 130px), 1fr))", gap: 8 } },
       ...(widget.actions ?? []).map((action, a) => {
         const key = `${index}:action:${a}`;
-        return button2(h, actionLabel(handlers, action), () => handlers.send(key, action, {}), handlers.sending.has(key), key);
+        const disabled = handlers.sending.has(key);
+        return h("button", {
+          key,
+          type: "button",
+          disabled,
+          className: "dshee-tile",
+          onClick: () => handlers.send(key, action, {}),
+          style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, padding: "9px 11px", borderRadius: 9, border: "1px solid var(--ee-border)", background: "var(--ee-card-bg, var(--ee-soft))", color: "inherit", cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.5 : 1, fontSize: 12.5, fontWeight: 500, textAlign: "left" }
+        }, actionLabel(handlers, action), h("span", { "aria-hidden": true, style: { color: "var(--ee-accent)", fontSize: 14, lineHeight: 1 } }, "\u203A"));
       })
     )
   );
 }
+function inline(h, text) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+  return parts.map((part, i) => part.startsWith("**") && part.endsWith("**") && part.length > 4 ? h("strong", { key: i, style: { fontWeight: 600 } }, part.slice(2, -2)) : part);
+}
 function markdownView(h, widget) {
-  return h("section", { style: card }, widget.title ? header(h, widget) : null, h("div", { style: { whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6 } }, widget.text ?? ""));
+  const blocks = [];
+  let list = [];
+  const flush = () => {
+    if (!list.length) return;
+    blocks.push(h("ul", { key: `l${blocks.length}`, style: { margin: 0, paddingLeft: 18, display: "grid", gap: 3 } }, ...list.map((item, i) => h("li", { key: i }, ...inline(h, item)))));
+    list = [];
+  };
+  for (const line of (widget.text ?? "").split("\n")) {
+    const item = /^\s*[-*]\s+(.*)$/.exec(line);
+    if (item) {
+      list.push(item[1]);
+      continue;
+    }
+    flush();
+    if (line.trim()) blocks.push(h("p", { key: `p${blocks.length}`, style: { margin: 0 } }, ...inline(h, line)));
+  }
+  flush();
+  return h("section", { className: "dshee-card", style: card }, widget.title ? header(h, widget) : null, h("div", { style: { display: "grid", gap: 6, fontSize: 12.5, lineHeight: 1.7, color: "color-mix(in srgb, currentColor 85%, transparent)" } }, ...blocks));
 }
 var citationBadges = {
   ok: { text: "\u2714 \u5DF2\u6838\u5BF9\u539F\u6587", color: "#15803d" },
@@ -21587,7 +21929,7 @@ function citationsView(h, items, key, open2, hrefOf) {
         h(
           "div",
           { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 } },
-          open2 ? h("button", { type: "button", onClick: () => open2(item), title: "\u67E5\u770B\u539F\u6587", style: { ...buttonStyle2, padding: "1px 6px" } }, where) : hrefOf?.(item) ? h("a", { href: hrefOf(item), target: "_blank", rel: "noopener noreferrer", title: "\u5728 dsh-ee \u7F51\u9875\u4E0A\u770B\u539F\u6587", style: { color: "inherit", textDecoration: "underline" } }, `${where} \u2197`) : h("span", null, where),
+          open2 ? h("button", { type: "button", onClick: () => open2(item), title: "\u67E5\u770B\u539F\u6587", className: "dshee-btn", style: { ...buttonStyle2, padding: "1px 7px" } }, where) : hrefOf?.(item) ? h("a", { href: hrefOf(item), target: "_blank", rel: "noopener noreferrer", title: "\u5728 dsh-ee \u7F51\u9875\u4E0A\u770B\u539F\u6587", style: { color: "inherit", textDecoration: "underline" } }, `${where} \u2197`) : h("span", null, where),
           h("span", { style: { color: badge.color, fontSize: 11, opacity: item.status === "unchecked" || !item.status ? 0.6 : 1 } }, badge.text)
         ),
         h("div", { style: { ...muted, marginTop: 2, whiteSpace: "pre-wrap" } }, `\u201C${item.quote}\u201D`)
@@ -21612,7 +21954,7 @@ function kbScopeView(h, widget, state, handlers, index = 0) {
   ));
   return h(
     "section",
-    { style: card },
+    { className: "dshee-card", style: card },
     header(h, widget),
     body,
     bases.length > 0 ? h("div", { style: { ...muted, marginTop: 6 } }, selected.length ? `\u53EA\u67E5\u52FE\u9009\u7684 ${selected.length} \u4E2A\u5E93` : "\u6CA1\u6709\u52FE\u9009\u65F6\u67E5\u5168\u90E8") : null
@@ -21621,61 +21963,94 @@ function kbScopeView(h, widget, state, handlers, index = 0) {
 function boardView(h, widget, board, openCitation, citationHref) {
   let body;
   if (!board?.blocks?.length) {
-    body = h("div", { style: muted }, "AI \u5904\u7406\u5B8C\u4EE5\u540E\u4F1A\u628A\u7ED3\u679C\u5199\u5728\u8FD9\u91CC\u3002");
+    body = h("div", { style: { ...muted, padding: "16px 12px", borderRadius: 10, border: "1px dashed var(--ee-border-strong)", textAlign: "center", lineHeight: 1.6 } }, "AI \u5904\u7406\u5B8C\u4EE5\u540E\u4F1A\u628A\u7ED3\u679C\u5199\u5728\u8FD9\u91CC\u3002");
   } else {
     body = h(
       "div",
-      { style: { display: "grid", gap: 8 } },
+      { style: { display: "grid", gap: 10 } },
       ...board.blocks.map((block, b) => {
-        if (block.type === "text") return h("div", { key: b, style: { whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6 } }, block.text);
-        if (block.type === "list") return h("ul", { key: b, style: { margin: 0, paddingLeft: 18, fontSize: 12 } }, ...block.items.map((item, i) => h("li", { key: i }, item)));
+        if (block.type === "text") return h("div", { key: b, style: { whiteSpace: "pre-wrap", fontSize: 12.5, lineHeight: 1.7 } }, block.text);
+        if (block.type === "list") return h("ul", { key: b, style: { margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.7 } }, ...block.items.map((item, i) => h("li", { key: i }, item)));
         if (block.type === "citations") return citationsView(h, block.items, b, openCitation, citationHref);
         return h(
-          "table",
-          { key: b, style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
-          h("thead", null, h("tr", null, ...block.columns.map((column, c) => h("th", { key: c, style: { textAlign: "left", padding: "3px 6px" } }, column)))),
-          h("tbody", null, ...block.rows.map((row, r) => h("tr", { key: r }, ...row.map((cell, c) => h("td", { key: c, style: { padding: "3px 6px", borderTop: "1px solid color-mix(in srgb, currentColor 8%, transparent)" } }, cell)))))
+          "div",
+          { key: b, style: { overflowX: "auto", border: "1px solid var(--ee-border)", borderRadius: 8 } },
+          h(
+            "table",
+            { style: { width: "100%", borderCollapse: "collapse", fontSize: 12.5 } },
+            h("thead", null, h("tr", null, ...block.columns.map((column, c) => h("th", { key: c, style: th }, column)))),
+            h("tbody", null, ...block.rows.map((row, r) => h("tr", { key: r, className: "dshee-row" }, ...row.map((value, c) => h("td", { key: c, style: { ...td, whiteSpace: "normal", maxWidth: "none", borderBottom: r === block.rows.length - 1 ? 0 : td.borderBottom } }, value)))))
+          )
         );
       }),
-      h("div", { style: muted }, `\u66F4\u65B0\u4E8E ${new Date(board.updatedAt).toLocaleString("zh-CN")}`)
+      h("div", { style: { ...muted, fontSize: 11 } }, `\u66F4\u65B0\u4E8E ${new Date(board.updatedAt).toLocaleString("zh-CN")}`)
     );
   }
-  return h("section", { style: card }, header(h, widget), body);
+  const badge = h("span", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: "0.04em", color: "#fff", padding: "1px 7px", borderRadius: 999, background: "linear-gradient(135deg, var(--ee-accent), #8b5cf6)" } }, "AI");
+  return h("section", { className: "dshee-card", style: { ...card, borderTop: "2px solid color-mix(in srgb, var(--ee-accent) 55%, transparent)" } }, header(h, widget, void 0, badge), body);
+}
+function widgetWidths(widgets) {
+  const out = widgets.map((w) => w.width ?? "full");
+  for (let i = 0; i < widgets.length; ) {
+    if (widgets[i].type !== "metric" || widgets[i].width) {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < widgets.length && widgets[j].type === "metric" && !widgets[j].width) j++;
+    const run = j - i;
+    for (let k = i; k < j; k++) {
+      const left = run - Math.floor((k - i) / 4) * 4;
+      const n = Math.min(left, 4);
+      out[k] = n >= 4 ? "quarter" : n === 3 ? "third" : n === 2 ? "half" : "full";
+    }
+    i = j;
+  }
+  return out;
 }
 function panelView(h, pane, state, handlers) {
   const widgets = pane.widgets ?? [];
+  const widths = widgetWidths(widgets);
+  const render = (widget, index) => {
+    switch (widget.type) {
+      case "metric":
+        return metricView(h, widget, state.data[index], () => handlers.refresh(index), handlers, index);
+      case "table":
+        return tableView(h, index, widget, state.data[index], handlers);
+      case "chart":
+        return chartView(h, index, widget, state.data[index], handlers);
+      case "checklist":
+        return checklistView(h, index, widget, state.data[index], handlers);
+      case "form":
+        return formView(h, index, widget, handlers);
+      case "actions":
+        return actionsView(h, index, widget, handlers);
+      case "markdown":
+        return markdownView(h, widget);
+      case "heading":
+        return headingView(h, widget);
+      case "board":
+        return boardView(h, widget, state.board, handlers.openCitation, handlers.citationHref);
+      case "kb_scope":
+        return kbScopeView(h, widget, state.data[index], handlers, index);
+      default:
+        return null;
+    }
+  };
   return h(
     "div",
-    { "data-dsh-ee-ui": "workbench", style: { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } },
+    { "data-dsh-ee-ui": "workbench", className: "dshee-root", style: { padding: 14, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box" } },
     h("style", { key: "css" }, panelCss),
-    state.notice ? h("p", { role: "status", style: { margin: 0, fontSize: 12, overflowWrap: "anywhere" } }, state.notice) : null,
-    ...widgets.map((widget, index) => {
-      const key = `w${index}`;
-      switch (widget.type) {
-        case "metric":
-          return h("div", { key }, metricView(h, widget, state.data[index], () => handlers.refresh(index), handlers, index));
-        case "table":
-          return h("div", { key }, tableView(h, index, widget, state.data[index], handlers));
-        case "chart":
-          return h("div", { key }, chartView(h, index, widget, state.data[index], handlers));
-        case "checklist":
-          return h("div", { key }, checklistView(h, index, widget, state.data[index], handlers));
-        case "form":
-          return h("div", { key }, formView(h, index, widget, handlers));
-        case "actions":
-          return h("div", { key }, actionsView(h, index, widget, handlers));
-        case "markdown":
-          return h("div", { key }, markdownView(h, widget));
-        case "heading":
-          return h("div", { key }, headingView(h, widget));
-        case "board":
-          return h("div", { key }, boardView(h, widget, state.board, handlers.openCitation, handlers.citationHref));
-        case "kb_scope":
-          return h("div", { key }, kbScopeView(h, widget, state.data[index], handlers, index));
-        default:
-          return null;
-      }
-    })
+    state.notice ? h("p", { role: "status", style: { margin: "0 0 12px", fontSize: 12, padding: "8px 12px", borderRadius: 8, background: "color-mix(in srgb, var(--ee-accent) 9%, transparent)", border: "1px solid color-mix(in srgb, var(--ee-accent) 22%, transparent)", overflowWrap: "anywhere" } }, state.notice) : null,
+    h(
+      "div",
+      { className: "dshee-grid" },
+      ...widgets.map((widget, index) => {
+        const width = widget.type === "heading" ? "full" : widths[index];
+        const narrow = widget.type === "metric" && width !== "full" ? " dshee-w-metric" : "";
+        return h("div", { key: `w${index}`, className: `dshee-w dshee-w-${width}${narrow}`, "data-widget": widget.type }, render(widget, index));
+      })
+    )
   );
 }
 function missingPaneView(h) {
@@ -21735,17 +22110,17 @@ function onScreenSession(ctx) {
 }
 function createDocTargets() {
   const targets = /* @__PURE__ */ new Map();
-  const listeners = /* @__PURE__ */ new Set();
+  const listeners2 = /* @__PURE__ */ new Set();
   return {
     get: (app) => targets.get(app),
     set: (app, target) => {
       targets.set(app, target);
-      for (const listener of listeners) listener();
+      for (const listener of listeners2) listener();
     },
     subscribe: (listener) => {
-      listeners.add(listener);
+      listeners2.add(listener);
       return () => {
-        listeners.delete(listener);
+        listeners2.delete(listener);
       };
     }
   };
@@ -21804,6 +22179,8 @@ function registerWorkbench(ctx, deps) {
     const [formErrors, setFormErrors] = (0, import_react2.useState)({});
     const [selectedKBs, setSelectedKBs] = (0, import_react2.useState)([]);
     const [checks, setChecks] = (0, import_react2.useState)({});
+    const [writing, setWriting] = (0, import_react2.useState)(/* @__PURE__ */ new Set());
+    const [armed, setArmed] = (0, import_react2.useState)("");
     const [expanded, setExpanded] = (0, import_react2.useState)({});
     const { sending, notice, setNotice, send: sendText } = useSending();
     const sessionRef = (0, import_react2.useRef)("");
@@ -21894,13 +22271,40 @@ function registerWorkbench(ctx, deps) {
       }).catch(() => setFormError(index, "\u6CA1\u6709\u4FDD\u5B58\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u540E\u91CD\u8BD5"));
     };
     const setFormError = (index, error62) => setFormErrors((current) => ({ ...current, [index]: error62 }));
+    const writeRow = (key, action, row) => {
+      const write = rowWriteOf(action);
+      if (writing.has(key)) return;
+      if (write === "delete" && armed !== key) {
+        setArmed(key);
+        setTimeout(() => setArmed((current) => current === key ? "" : current), 4e3);
+        return;
+      }
+      setArmed("");
+      const [index, , , a] = key.split(":").map(Number);
+      setWriting((current) => new Set(current).add(key));
+      Promise.resolve(remote.writeTableRow?.({ app: app.name, pane: pane.id, widget: index, action: a, id: Number(row?.id) })).then((raw) => {
+        const result = unwrapRemote2(raw);
+        if (!result?.ok) return setNotice(`\u6CA1\u6709${write === "delete" ? "\u5220\u9664" : "\u4FDD\u5B58"}\uFF1A${result?.error || "\u8BF7\u628A\u63A5\u5165\u63D2\u4EF6\u66F4\u65B0\u5230\u6700\u65B0\u7248\u672C"}`);
+        setNotice(write === "delete" ? "\u5DF2\u5220\u9664\u8FD9\u4E00\u884C" : `\u5DF2\u66F4\u65B0\uFF1A${action.label}`);
+        (pane.widgets ?? []).forEach((widget, i) => {
+          if (widget.source?.table === action.table) void load(i);
+        });
+        if (action.prompt) sendPrompt(key, action, { row });
+      }).catch(() => setNotice("\u6CA1\u6709\u4FDD\u5B58\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u540E\u91CD\u8BD5")).finally(() => setWriting((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      }));
+    };
     const send = (key, action, values) => {
       if (action.table && values.form) return saveToTable(key, action, values.form);
+      if (values.row && rowWriteOf(action)) return writeRow(key, action, values.row);
       sendPrompt(key, action, values);
     };
     const docPane = app.workbench?.panes.find((item) => item.type === "kb_doc");
     const handlers = {
-      sending,
+      sending: writing.size ? /* @__PURE__ */ new Set([...sending, ...writing]) : sending,
+      armed: (key) => armed === key,
       send,
       refresh: (index) => void load(index),
       formValues: (index) => forms[index] ?? {},
@@ -22046,7 +22450,7 @@ function registerVotes(ctx, remote, unwrapRemote2) {
 }
 
 // src/ee-save.ts
-var EE_SAVE_PROMPT = "\u521A\u624D\u8FD9\u6BB5\u5BF9\u8BDD\u91CC\u53EF\u80FD\u6C89\u6DC0\u4E86\u503C\u5F97\u590D\u7528\u7684\u505A\u6CD5\u3002\u8BF7\u628A\u5B83\u63D0\u70BC\u6210\u4E00\u4E2A\u4F01\u4E1A\u80FD\u529B\uFF1A\n1. \u5148\u544A\u8BC9\u6211\u4F60\u5EFA\u8BAE\u505A\u6210\u4EC0\u4E48\u2014\u2014\u63D0\u793A\u8BCD\uFF08\u53CD\u590D\u7528\u7684\u4E00\u6BB5\u8BDD\uFF09\u3001\u6280\u80FD\uFF08\u5E26\u5DE5\u5177\u7684\u64CD\u4F5C\u6D41\u7A0B\uFF09\u8FD8\u662F\u5E94\u7528\uFF08\u5E26\u5DE5\u4F5C\u53F0\u7684\u52A9\u624B\uFF09\uFF0C\u4EE5\u53CA\u7406\u7531\uFF1B\u7B49\u6211\u786E\u8BA4\u540E\u518D\u505A\uFF0C\u4E5F\u53EF\u4EE5\u6211\u76F4\u63A5\u6307\u5B9A\u7C7B\u578B\u3002\n2. \u786E\u8BA4\u540E\u7528 ee_hub \u7684 create\uFF08for_me: true\uFF09\u5EFA\u597D\uFF1A\u8D77\u4E00\u4E2A\u6E05\u6670\u7684\u6807\u8BC6\uFF08slug\uFF09\u3001\u6807\u9898\u548C\u8BF4\u660E\uFF0C\u8BF4\u660E\u7B2C\u4E00\u6BB5\u7528\u4E24\u4E09\u53E5\u8BDD\u603B\u7ED3\u8FD9\u6BB5\u5BF9\u8BDD\u7684\u6765\u6E90\uFF08\u5199\u660E\u300C\u6765\u81EA\u4E00\u6B21\u5BF9\u8BDD\u300D\uFF09\uFF1B\u6B63\u6587 / \u4EBA\u8BBE\u6309\u6211\u4EEC\u521A\u624D\u7684\u505A\u6CD5\u5199\u3002\n3. \u5EFA\u597D\u540E\u7ED9\u6211\u7F51\u9875\u4E0A\u7684\u8BE6\u60C5\u94FE\u63A5\uFF08<dsh-ee \u5730\u5740>/assets/<id>\uFF09\uFF0C\u6211\u60F3\u7EE7\u7EED\u6539\u8303\u56F4\u6216\u5185\u5BB9\u5C31\u53BB\u7F51\u9875\u3002\n\u6CE8\u610F\uFF1A\u8FD9\u4E2A\u80FD\u529B\u4F1A\u628A\u6211\u4EEC\u5BF9\u8BDD\u7684\u6458\u8981\u53D1\u5230 dsh-ee \u4FDD\u5B58\u3002";
+var EE_SAVE_PROMPT = "\u521A\u624D\u8FD9\u6BB5\u5BF9\u8BDD\u91CC\u53EF\u80FD\u6C89\u6DC0\u4E86\u503C\u5F97\u590D\u7528\u7684\u505A\u6CD5\u3002\u8BF7\u628A\u5B83\u63D0\u70BC\u6210\u4E00\u4E2A\u4F01\u4E1A\u80FD\u529B\uFF1A\n1. \u5148\u544A\u8BC9\u6211\u4F60\u5EFA\u8BAE\u505A\u6210\u4EC0\u4E48\u2014\u2014\u63D0\u793A\u8BCD\uFF08\u53CD\u590D\u7528\u7684\u4E00\u6BB5\u8BDD\uFF09\u3001\u6280\u80FD\uFF08\u5E26\u5DE5\u5177\u7684\u64CD\u4F5C\u6D41\u7A0B\uFF09\u8FD8\u662F\u5E94\u7528\uFF08\u5E26\u5DE5\u4F5C\u53F0\u7684\u52A9\u624B\uFF09\uFF0C\u4EE5\u53CA\u7406\u7531\uFF1B\u7B49\u6211\u786E\u8BA4\u540E\u518D\u505A\uFF0C\u4E5F\u53EF\u4EE5\u6211\u76F4\u63A5\u6307\u5B9A\u7C7B\u578B\u3002\n2. \u786E\u8BA4\u540E\u7528 ee_hub \u7684 create\uFF08for_me: true\uFF09\u5EFA\u597D\uFF1A\u8D77\u4E00\u4E2A\u6E05\u6670\u7684\u6807\u8BC6\uFF08slug\uFF09\u3001\u6807\u9898\u548C\u8BF4\u660E\uFF0C\u8BF4\u660E\u7B2C\u4E00\u6BB5\u7528\u4E24\u4E09\u53E5\u8BDD\u603B\u7ED3\u8FD9\u6BB5\u5BF9\u8BDD\u7684\u6765\u6E90\uFF08\u5199\u660E\u300C\u6765\u81EA\u4E00\u6B21\u5BF9\u8BDD\u300D\uFF09\uFF1B\u6B63\u6587 / \u4EBA\u8BBE\u6309\u6211\u4EEC\u521A\u624D\u7684\u505A\u6CD5\u5199\u3002\u505A\u6210\u5E94\u7528\u65F6\u5148\u8BFB\u6280\u80FD dsh-ee-app-design\uFF0C\u5DE5\u4F5C\u53F0\u6309\u91CC\u9762\u7684\u4EEA\u8868\u76D8\u7248\u5F0F\u548C\u54CD\u5E94\u5F0F\u5BBD\u5EA6\u6765\u6392\u3002\n3. \u5EFA\u597D\u540E\u7ED9\u6211\u7F51\u9875\u4E0A\u7684\u8BE6\u60C5\u94FE\u63A5\uFF08<dsh-ee \u5730\u5740>/assets/<id>\uFF09\uFF0C\u6211\u60F3\u7EE7\u7EED\u6539\u8303\u56F4\u6216\u5185\u5BB9\u5C31\u53BB\u7F51\u9875\u3002\n\u6CE8\u610F\uFF1A\u8FD9\u4E2A\u80FD\u529B\u4F1A\u628A\u6211\u4EEC\u5BF9\u8BDD\u7684\u6458\u8981\u53D1\u5230 dsh-ee \u4FDD\u5B58\u3002";
 function registerEeSave(ctx) {
   const commands = ctx.get?.("commands") ?? ctx.commands;
   if (typeof commands?.register !== "function") return;
@@ -22162,6 +22566,19 @@ function serverSettingsView(createElement5, state, actions) {
   ));
   return createElement5("div", { "data-dsh-ee-settings": "ready", style: { maxWidth: 640 } }, ...children);
 }
+function sidebarAppsToggle(createElement5, mode, onChange) {
+  return createElement5(
+    "div",
+    { "data-dsh-ee-settings": "sidebar-apps", style: { maxWidth: 640, marginTop: 20, paddingTop: 16, borderTop: "1px solid color-mix(in srgb, currentColor 14%, transparent)" } },
+    createElement5(
+      "label",
+      { style: { display: "flex", alignItems: "center", gap: 8, fontWeight: 500, cursor: "pointer" } },
+      createElement5("input", { type: "checkbox", checked: mode !== "hidden", onChange: () => onChange(mode === "hidden") }),
+      "\u5728\u5DE6\u4FA7\u680F\u663E\u793A\u4F01\u4E1A\u5E94\u7528"
+    ),
+    createElement5("p", { style: { margin: "6px 0 0", fontSize: 12, lineHeight: 1.6, ...muted2 } }, "\u5DE6\u4FA7\u680F\u53EA\u5217\u524D 3 \u4E2A\u5E94\u7528\uFF0C\u5176\u4F59\u5728\u300C\u67E5\u770B\u66F4\u591A\u300D\u91CC\uFF1B\u9690\u85CF\u540E\u9996\u5C4F\u8F93\u5165\u6846\u4E0B\u65B9\u548C\u53F3\u4FA7\u4F01\u4E1A\u9762\u677F\u91CC\u7167\u6837\u80FD\u6253\u5F00\u4F01\u4E1A\u5E94\u7528\u3002")
+  );
+}
 function registerServerSettings(ctx, deps) {
   const { createElement: createElement5, useState: useState5, useEffect: useEffect4, remote, unwrapRemote: unwrapRemote2 } = deps;
   const message = (error62) => error62 instanceof Error ? error62.message : String(error62);
@@ -22210,13 +22627,20 @@ function registerServerSettings(ctx, deps) {
         patch({ busy: void 0 });
       }
     };
-    return serverSettingsView(createElement5, state, {
-      setDraft: (draft) => patch({ draft, test: void 0 }),
-      test: () => void test(),
-      save: () => void save(state.draft),
-      reset: () => void save(null),
-      update: () => void update()
-    });
+    const [mode, setMode] = useState5(readSidebarMode());
+    useEffect4(() => subscribeSidebarMode(() => setMode(readSidebarMode())), []);
+    return createElement5(
+      "div",
+      null,
+      serverSettingsView(createElement5, state, {
+        setDraft: (draft) => patch({ draft, test: void 0 }),
+        test: () => void test(),
+        save: () => void save(state.draft),
+        reset: () => void save(null),
+        update: () => void update()
+      }),
+      sidebarAppsToggle(createElement5, mode, (shown) => setSidebarMode(shown ? "shown" : "hidden"))
+    );
   };
   ctx.slots.inject("settings.section", () => ctx.slots.register(
     { name: "settings.section", id: settingsSectionId, order: 80, label: () => deps.label },
@@ -22255,6 +22679,7 @@ var clientRemote = createTypertRemoteInfo({
     "dshEE/updatePlugin": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/webLink": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/insertFormRow": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
+    "dshEE/writeTableRow": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } },
     "dshEE/vote": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }
   }
 }, external_exports);
@@ -22268,18 +22693,22 @@ function unwrapRemote(result) {
   return result;
 }
 var OVERVIEW_TIMEOUT_MS = 2e4;
+var LOGIN_POLL_MS = 5e3;
 function createOverviewStore(remote) {
   let snapshot = { failed: false, busy: false };
   let inflight = false;
-  const listeners = /* @__PURE__ */ new Set();
+  const listeners2 = /* @__PURE__ */ new Set();
+  const loginListeners = /* @__PURE__ */ new Set();
   const update = (patch) => {
+    const wasIn = !!snapshot.data?.me;
     snapshot = { ...snapshot, ...patch };
-    for (const listener of listeners) listener();
+    for (const listener of listeners2) listener();
+    if (!wasIn && snapshot.data?.me) for (const listener of loginListeners) listener();
   };
-  const refresh = async () => {
+  const refresh = async (quiet = false) => {
     if (inflight) return;
     inflight = true;
-    update({ busy: true });
+    if (!quiet) update({ busy: true });
     try {
       const data = unwrapRemote(await Promise.race([
         remote.overview(),
@@ -22290,23 +22719,34 @@ function createOverviewStore(remote) {
       update({ failed: true, failure: void 0 });
     } finally {
       inflight = false;
-      update({ busy: false });
+      if (!quiet) update({ busy: false });
     }
+  };
+  const pollLogin = () => {
+    if (snapshot.data?.me || !listeners2.size) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    void refresh(true);
   };
   const use = () => {
     const [local, setLocal] = (0, import_react4.useState)(snapshot);
     (0, import_react4.useEffect)(() => {
       const listener = () => setLocal(snapshot);
-      listeners.add(listener);
+      listeners2.add(listener);
       listener();
       if (!snapshot.data) void refresh();
       return () => {
-        listeners.delete(listener);
+        listeners2.delete(listener);
       };
     }, []);
-    return { ...local, hasData: () => !!snapshot.data, setBusy: (busy) => update({ busy }), refresh };
+    return { ...local, hasData: () => !!snapshot.data, setBusy: (busy) => update({ busy }), refresh: () => refresh() };
   };
-  return { use, refresh };
+  const onLogin = (listener) => {
+    loginListeners.add(listener);
+    return () => {
+      loginListeners.delete(listener);
+    };
+  };
+  return { use, refresh: () => refresh(), pollLogin, onLogin };
 }
 async function apply(ctx) {
   await ctx.remote.$mount(clientRemote);
@@ -22316,6 +22756,14 @@ async function apply(ctx) {
     registerServerSettings(ctx, { createElement: import_react4.createElement, useState: import_react4.useState, useEffect: import_react4.useEffect, remote, unwrapRemote, label: "dsh-ee", onSaved: () => void overview.refresh() });
     const useOverview = (_remote) => overview.use();
     const apps = registerApps(ctx, remote, useOverview, unwrapRemote);
+    ctx.effect(() => {
+      const timer = setInterval(overview.pollLogin, LOGIN_POLL_MS);
+      const off = overview.onLogin(() => void apps.loadApps());
+      return () => {
+        clearInterval(timer);
+        off();
+      };
+    });
     const { AppsPanel } = apps;
     const workbench = registerWorkbench(ctx, { remote, unwrapRemote, appsNow: apps.appsNow, appsLoaded: apps.appsLoaded, loadApps: apps.loadApps, subscribeApps: apps.subscribeApps });
     apps.setWorkbenchOpener(workbench.openWorkbench);
@@ -22335,17 +22783,15 @@ async function apply(ctx) {
       const state = useOverview(remote);
       const [notice, setNotice] = (0, import_react4.useState)("");
       const [doctor, setDoctor] = (0, import_react4.useState)(void 0);
+      const loggedIn = !!state.data?.me;
+      (0, import_react4.useEffect)(() => {
+        if (loggedIn) setNotice("");
+      }, [loggedIn]);
       const login = async () => {
         state.setBusy(true);
         try {
           const result = unwrapRemote(await remote.login());
           setNotice(result?.text || "\u8BF7\u5728\u6D4F\u89C8\u5668\u5B8C\u6210\u4F01\u4E1A\u767B\u5F55\u3002");
-          void (async () => {
-            for (let i = 0; i < 36 && !state.hasData(); i++) {
-              await new Promise((resolve) => setTimeout(resolve, 5e3));
-              await state.refresh();
-            }
-          })();
         } catch {
           setNotice("\u53D1\u8D77\u767B\u5F55\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u540E\u91CD\u8BD5\u3002");
         } finally {

@@ -1,3 +1,4 @@
+import { readSidebarMode, setSidebarMode, subscribeSidebarMode, type SidebarAppsMode } from "./sidebar-pref.js";
 import type { ConnectUpdate } from "./connect-update.js";
 import type { ServerSettings, ServerTest } from "./server-settings.js";
 
@@ -92,6 +93,15 @@ export function serverSettingsView(createElement: (...args: any[]) => any, state
 }
 
 /** 在 DSH 设置面板里注册「dsh-ee」页。onSaved 在地址生效后调用（刷新企业面板等）。 */
+/** 「在左侧栏显示企业应用」：侧栏里点了「隐藏」以后，从这里打开回来。 */
+export function sidebarAppsToggle(createElement: (...args: any[]) => any, mode: SidebarAppsMode, onChange: (shown: boolean) => void) {
+  return createElement("div", { "data-dsh-ee-settings": "sidebar-apps", style: { maxWidth: 640, marginTop: 20, paddingTop: 16, borderTop: "1px solid color-mix(in srgb, currentColor 14%, transparent)" } },
+    createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, fontWeight: 500, cursor: "pointer" } },
+      createElement("input", { type: "checkbox", checked: mode !== "hidden", onChange: () => onChange(mode === "hidden") }),
+      "在左侧栏显示企业应用"),
+    createElement("p", { style: { margin: "6px 0 0", fontSize: 12, lineHeight: 1.6, ...muted } }, "左侧栏只列前 3 个应用，其余在「查看更多」里；隐藏后首屏输入框下方和右侧企业面板里照样能打开企业应用。"));
+}
+
 export function registerServerSettings(ctx: any, deps: {
   createElement: (...args: any[]) => any;
   useState: <T>(value: T) => [T, (value: T | ((prev: T) => T)) => void];
@@ -148,13 +158,17 @@ export function registerServerSettings(ctx: any, deps: {
         patch({ busy: undefined });
       }
     };
-    return serverSettingsView(createElement, state, {
-      setDraft: (draft) => patch({ draft, test: undefined }),
-      test: () => void test(),
-      save: () => void save(state.draft),
-      reset: () => void save(null),
-      update: () => void update(),
-    });
+    const [mode, setMode] = useState<SidebarAppsMode>(readSidebarMode());
+    useEffect(() => subscribeSidebarMode(() => setMode(readSidebarMode())), []);
+    return createElement("div", null,
+      serverSettingsView(createElement, state, {
+        setDraft: (draft) => patch({ draft, test: undefined }),
+        test: () => void test(),
+        save: () => void save(state.draft),
+        reset: () => void save(null),
+        update: () => void update(),
+      }),
+      sidebarAppsToggle(createElement, mode, (shown) => setSidebarMode(shown ? "shown" : "hidden")));
   };
   ctx.slots.inject("settings.section", () => ctx.slots.register(
     { name: "settings.section", id: settingsSectionId, order: 80, label: () => deps.label },

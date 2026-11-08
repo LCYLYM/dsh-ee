@@ -5,9 +5,16 @@ export interface WorkbenchAction {
   label: string;
   /** 发给 AI 的话；表单提交到表（table）时可以不填 */
   prompt: string;
-  /** 表单提交到应用自带的表：直接插入一行，不经过 AI */
+  /** 表单提交到应用自带的表：直接插入一行，不经过 AI；表格的行按钮写表时是表格自己的那张表 */
   table?: string;
+  /** 行按钮：直接改这一行的这几个字段（不经过 AI） */
+  set?: Record<string, unknown>;
+  /** 行按钮：删掉这一行（点两次确认） */
+  delete?: boolean;
 }
+
+/** 组件在宽面板上占多宽；窄面板上一律占满一行（指标两个一行）。 */
+export type WidgetWidth = "full" | "wide" | "half" | "third" | "quarter";
 
 export interface WorkbenchField {
   name: string;
@@ -26,6 +33,7 @@ export interface WorkbenchColumn {
 export interface WorkbenchWidget {
   type: "metric" | "table" | "chart" | "checklist" | "form" | "actions" | "markdown" | "heading" | "board" | "kb_scope";
   title?: string;
+  width?: WidgetWidth;
   text?: string;
   /** table：应用自带的表；目录里已经由服务端换成 app__rows 调用 */
   source?: { connection: string; tool: string; args?: Record<string, unknown>; table?: string };
@@ -329,4 +337,21 @@ export function kbDocUrl(base: string, citation: Pick<Citation, "doc" | "version
   const version = citation.version && Number.isInteger(citation.version) && citation.version > 0 ? `?v=${citation.version}` : "";
   const lines = citation.from === citation.to ? `#L${citation.from}` : `#L${citation.from}-${citation.to}`;
   return `${base}/knowledge/docs/${citation.doc}${version}${lines}`;
+}
+
+/** 写表的行按钮：改字段还是删除；不写表的按钮返回 undefined（照常发给 AI）。 */
+export function rowWriteOf(action: WorkbenchAction): "set" | "delete" | undefined {
+  if (!action.table) return undefined;
+  if (action.delete) return "delete";
+  return action.set && Object.keys(action.set).length ? "set" : undefined;
+}
+
+/** 状态标签的配色：按文字里的关键词分成好 / 进行中 / 坏 / 中性四类。 */
+export function statusTone(value: unknown): "good" | "warn" | "bad" | "neutral" {
+  const text = String(value ?? "");
+  if (!text) return "neutral";
+  if (/驳回|拒绝|失败|逾期|超时|超标|异常|取消|过期|^高$|高风险|紧急|错误/.test(text)) return "bad";
+  if (/已完成|已解决|已通过|通过|已归还|已报销|已拜访|完成|正常|^低$|合作中|成功|已关闭|已签/.test(text)) return "good";
+  if (/待|中$|处理中|进行中|审批|计划|借用|续约|^中$|新客户|草稿|已出发/.test(text)) return "warn";
+  return "neutral";
 }

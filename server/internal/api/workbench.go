@@ -32,6 +32,8 @@ type wbPane struct {
 type wbWidget struct {
 	Type  string `json:"type"` // metric | table | chart | checklist | form | actions | markdown | heading | board | kb_scope
 	Title string `json:"title,omitempty"`
+	// 宽面板（网页、展开的右侧栏）上占多宽：full | wide（三分之二）| half | third | quarter，留空按类型自动排；窄面板上一律占满一行（指标两个一行）
+	Width string `json:"width,omitempty"`
 	// markdown：说明文字
 	Text string `json:"text,omitempty"`
 	// metric、table：取数用的只读企业工具
@@ -95,8 +97,11 @@ type wbColumn struct {
 type wbAction struct {
 	Label  string `json:"label"`
 	Prompt string `json:"prompt,omitempty"`
-	// 表单提交到应用自带的表：直接插入一行，不经过 AI（prompt 可选，填了插入后再发给 AI）
-	Table string `json:"table,omitempty"`
+	// 表单提交到应用自带的表：直接插入一行，不经过 AI（prompt 可选，填了插入后再发给 AI）。
+	// 表格的行按钮也可以写表（数据源是这张表时）：set 改这一行的几个字段，delete 删掉这一行（点两次确认）。
+	Table  string         `json:"table,omitempty"`
+	Set    map[string]any `json:"set,omitempty"`
+	Delete bool           `json:"delete,omitempty"`
 }
 
 type wbField struct {
@@ -108,13 +113,15 @@ type wbField struct {
 }
 
 var (
-	wbFieldNameRe   = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
-	wbPathRe        = regexp.MustCompile(`^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$`)
+	wbFieldNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	wbPathRe      = regexp.MustCompile(`^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$`)
 	// {{scope.kbs}} 是同一个面板上「查哪些库」勾选的知识库，没勾就是全部
 	wbPlaceholderRe = regexp.MustCompile(`\{\{\s*([a-z]+)\.([A-Za-z0-9_.]+)\s*\}\}`)
-	wbFormats       = []string{"", "money", "number", "compact", "percent", "date"}
-	wbCheckIDRe     = regexp.MustCompile(`^[A-Za-z0-9_-]{1,40}$`)
-	wbChartKinds    = []string{"line", "bar", "pie"}
+	// status：显示成带颜色的状态标签（已完成 / 处理中 / 已驳回 …按文字自动配色）
+	wbFormats    = []string{"", "money", "number", "compact", "percent", "date", "status"}
+	wbWidths     = []string{"", "full", "wide", "half", "third", "quarter"}
+	wbCheckIDRe  = regexp.MustCompile(`^[A-Za-z0-9_-]{1,40}$`)
+	wbChartKinds = []string{"line", "bar", "pie"}
 )
 
 // validateWorkbench 只检查结构；数据源是不是只读工具要查库，见 checkWorkbenchSources。
@@ -178,6 +185,9 @@ func validateWidget(w *wbWidget, deps wbDeps) string {
 	if !limitRunes(w.Title, 40) {
 		return "标题最多 40 个字"
 	}
+	if w.Width = strings.TrimSpace(w.Width); !slices.Contains(wbWidths, w.Width) {
+		return "宽度（width）只能是 full / wide（三分之二）/ half / third / quarter 或留空"
+	}
 	keepSource, keepField, keepRows, keepForm, keepActions, keepText := false, false, false, false, false, false
 	switch w.Type {
 	case "metric":
@@ -189,7 +199,7 @@ func validateWidget(w *wbWidget, deps wbDeps) string {
 			return "要显示的字段（field）必填，用点号路径，例如 summary.total"
 		}
 		if !slices.Contains(wbFormats, w.Format) {
-			return "显示格式只能是 money / number / compact / percent / date 或留空"
+			return "显示格式只能是 money / number / compact / percent / date / status 或留空"
 		}
 		if w.DeltaField != "" && !wbPathRe.MatchString(w.DeltaField) {
 			return "变化比例字段（delta_field）要用点号路径"
@@ -215,7 +225,7 @@ func validateWidget(w *wbWidget, deps wbDeps) string {
 				return fmt.Sprintf("第 %d 列的标题必填，最多 40 个字", k+1)
 			}
 			if !slices.Contains(wbFormats, c.Format) {
-				return fmt.Sprintf("第 %d 列的显示格式只能是 money / number / compact / percent / date 或留空", k+1)
+				return fmt.Sprintf("第 %d 列的显示格式只能是 money / number / compact / percent / date / status 或留空", k+1)
 			}
 		}
 		if len(w.Detail) > 12 {
@@ -228,6 +238,9 @@ func validateWidget(w *wbWidget, deps wbDeps) string {
 			return "每行最多 3 个按钮"
 		}
 		for k := range w.RowActions {
+			if msg := validateRowWrite(&w.RowActions[k], w.Source, deps); msg != "" {
+				return fmt.Sprintf("第 %d 个行按钮：%s", k+1, msg)
+			}
 			if msg := validateAction(&w.RowActions[k], "row", nil); msg != "" {
 				return fmt.Sprintf("第 %d 个行按钮：%s", k+1, msg)
 			}
@@ -441,7 +454,7 @@ func validateColumns(cols []wbColumn, what string) string {
 			return fmt.Sprintf("%s第 %d 项的标题必填，最多 40 个字", what, k+1)
 		}
 		if !slices.Contains(wbFormats, c.Format) {
-			return fmt.Sprintf("%s第 %d 项的显示格式只能是 money / number / compact / percent / date 或留空", what, k+1)
+			return fmt.Sprintf("%s第 %d 项的显示格式只能是 money / number / compact / percent / date / status 或留空", what, k+1)
 		}
 	}
 	return ""
@@ -507,14 +520,51 @@ func checkSourceArgs(src *wbSource) string {
 	return ""
 }
 
+// validateRowWrite 检查写表的行按钮：表格的数据源必须就是这张表；set 和 delete 二选一，set 只能改表里能填的字段。
+func validateRowWrite(a *wbAction, src *wbSource, deps wbDeps) string {
+	a.Table = strings.TrimSpace(a.Table)
+	if a.Table == "" {
+		if a.Set != nil || a.Delete {
+			return "set / delete 要和 table 一起写"
+		}
+		return ""
+	}
+	if src == nil || src.Table != a.Table {
+		return "行按钮只能改表格自己的数据表（数据源写 {\"table\": \"" + a.Table + "\"}）"
+	}
+	t := findTable(deps.tables, a.Table)
+	if t == nil {
+		return "表 " + a.Table + " 不在这个应用的数据表里"
+	}
+	if a.Delete == (len(a.Set) > 0) {
+		return "写表的行按钮要么 set 改字段，要么 delete 删除这一行"
+	}
+	if len(a.Set) > 12 {
+		return "set 最多改 12 个字段"
+	}
+	for name, v := range a.Set {
+		f := t.field(name)
+		if f == nil || f.Hidden || f.Kind == "user" {
+			return "set 里的字段 " + name + " 不是表「" + t.Title + "」里能改的字段"
+		}
+		if _, msg := cleanValue(f, v); msg != "" {
+			return "set 里的字段 " + name + "：" + msg
+		}
+	}
+	return ""
+}
+
 // validateAction 检查按钮文字和占位符：scope 是 row 时只能用 {{row.x}}，是 form 时只能用表单里有的 {{form.x}}。
 func validateAction(a *wbAction, scope string, formFields map[string]bool) string {
 	a.Label, a.Prompt = strings.TrimSpace(a.Label), strings.TrimSpace(a.Prompt)
 	if a.Label == "" || !limitRunes(a.Label, 20) {
 		return "按钮文字必填，最多 20 个字"
 	}
-	if a.Table != "" && scope != "form" {
-		return "只有表单的提交按钮能写到表里（table）"
+	if a.Table != "" && scope != "form" && scope != "row" {
+		return "只有表单的提交按钮和表格的行按钮能写到表里（table）"
+	}
+	if (a.Set != nil || a.Delete) && (scope != "row" || a.Table == "") {
+		return "只有写表的行按钮能用 set / delete"
 	}
 	if !limitRunes(a.Prompt, 1000) || (a.Prompt == "" && a.Table == "") {
 		return "发给 AI 的话必填，最多 1000 个字"
@@ -638,6 +688,15 @@ func workbenchContent(wb *appWorkbench) string {
 		for _, w := range p.Widgets {
 			if w.Type == "form" && w.Submit != nil && w.Submit.Table != "" {
 				fmt.Fprintf(&b, "\n表单「%s」提交后直接存进这个应用的表 `%s`，不经过你；用户问起时用 app__rows 查。\n", w.Title, w.Submit.Table)
+			}
+			for _, a := range w.RowActions {
+				if a.Table != "" {
+					what := "改这一行"
+					if a.Delete {
+						what = "删掉这一行"
+					}
+					fmt.Fprintf(&b, "\n表格「%s」的「%s」按钮直接%s（表 `%s`），不经过你。\n", w.Title, a.Label, what, a.Table)
+				}
 			}
 		}
 	}

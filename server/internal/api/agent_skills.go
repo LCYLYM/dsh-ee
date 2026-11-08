@@ -41,6 +41,13 @@ func systemSkills(set *store.AppSettings, server string, v viewer) []systemSkill
 			WhenToUse:   "用户说连不上、没有某个技能或工具、提示额度或登录问题，或输入 /dsh-ee-doctor 时",
 		},
 		body: doctorBody(server, t),
+	}, {
+		skill: dshSkill{
+			Name: "dsh-ee-app-design", Title: "企业应用设计规范", Kind: store.KindSkill, ModelInvocable: true, UserInvocable: true,
+			Description: "做企业应用（微应用）时的工作台设计规范：仪表盘版式、响应式宽度、指标 / 图表 / 表格 / 表单的写法，以及自带数据表的增删改查",
+			WhenToUse:   "用户要做、改一个企业应用或它的工作台，或你要用 ee_hub 的 create / new_version 提交 kind 为 app 的内容之前",
+		},
+		body: appDesignBody(t),
 	}}
 	if v.access.Has(rbac.RegistryPublish) {
 		out = append(out, systemSkill{
@@ -148,7 +155,7 @@ func shareBody(set *store.AppSettings, t func(string) string) string {
 	b.WriteString("## 选类型\n\n")
 	b.WriteString("- **skill 技能**：一套给模型看的做事步骤，模型会在合适的时候自己加载。需要 `title`、`description`、`body`，建议写 `when_to_use`。\n")
 	b.WriteString("- **prompt 提示词**：用户用 `/名字` 手动触发的一段固定提示词。需要 `title`、`description`、`body`。\n")
-	b.WriteString("- **app 微应用**：一个有人设的小助手，可以带示例问题和依赖的技能。需要 `title`、`description`、`persona`，可加 `starters`、`skills`、`plugins`。\n\n")
+	b.WriteString("- **app 微应用**：一个有人设的小助手，可以带示例问题和依赖的技能。需要 `title`、`description`、`persona`，可加 `starters`、`skills`、`plugins`。带工作台的应用**先读技能 `dsh-ee-app-design`**，按里面的版式和规范写 `workbench` 与 `tables`。\n\n")
 	b.WriteString("## 整理规范\n\n")
 	b.WriteString("- `slug` 是标识，也是 `/命令名`：小写字母、数字和连字符，例如 `weekly-report`，最多 48 个字符，不能以 `dsh-ee-` 开头。\n")
 	b.WriteString("- `description` 一两句话讲清楚它做什么、什么时候用，DSH 靠它判断要不要加载。\n")
@@ -237,5 +244,65 @@ func setupBody(t func(string) string) string {
 	b.WriteString("- **DSH 接入插件**：以上改完（访问地址、默认模型改过都要）再 `connect_publish`；发布后 `setup_status` 里这一项变完成。这台 DSH 上已装的接入插件不会自动升级：发布了新版本后，用 `plugin_manager` 的 `install_bundle` 安装 `<访问地址>/dl/connect/dsh-connect-<新版本>.tgz`（会弹审批），按结果提示决定要不要重启。\n\n")
 	b.WriteString("## 员工接入通知\n\n")
 	b.WriteString("`setup_status` 在地址配好后会给出 `install_command` 和 `onboarding`（一段可以直接发给员工的文案）。把它原样给管理员，提醒：员工运行命令后在浏览器点一次「授权」即可；Windows 用户看 /setup 页的 PowerShell 命令；新账号别忘了先分配额度。也可以告诉员工：登录 dsh-ee 网页后会进入「开始使用」页，复制页面上的一段话贴给 DSH，按提示点一次「确认授权」就能接入。\n")
+	return b.String()
+}
+
+// appDesignBody 是做企业应用时的工作台设计规范：让 AI 做出来的应用像一套精心设计的业务系统，
+// 在 DSH 右侧栏（窄）和网页版（宽）上都好用。渲染是固定的一套（Stripe 式：留白、细边框、柔和阴影、
+// 品牌蓝点缀），AI 只需要选对组件、排对顺序、写好宽度和文案。
+func appDesignBody(t func(string) string) string {
+	var b strings.Builder
+	b.WriteString("# 企业应用设计规范\n\n")
+	b.WriteString("企业应用的工作台会出现在两个地方：DSH 右侧栏（窄，约 360～480 像素）和网页版 `/a/<标识>`（宽，桌面上最宽约 1200 像素，也会在手机上打开）。")
+	b.WriteString("样式由 dsh-ee 统一渲染（白底卡片、细边框、柔和阴影、品牌蓝点缀，跟随亮色 / 暗色主题），**你不写 HTML、CSS 或颜色**，只负责选组件、排顺序、定宽度、写文案。")
+	b.WriteString("目标是让人一眼看上去像一套精心设计的业务系统，而不是一张普通表单。\n\n")
+
+	b.WriteString("## 版式：按仪表盘排\n\n")
+	b.WriteString("一个窗格（pane）从上到下按这个顺序排，没有的部分跳过：\n\n")
+	b.WriteString("1. **指标行**：2～4 个 `metric`，放最关键的数字（待办数、金额、完成率）。4 个用 `quarter`，3 个用 `third`，2 个用 `half`。有环比就写 `delta_field`。\n")
+	b.WriteString("2. **趋势与操作**：一个 `chart`（`wide` 或 `half`）配一组 `actions`（`third` 或 `half`）。\n")
+	b.WriteString("3. **办事区**：`form`（`third` 或 `half`）和 `board` AI 看板（`half`）并排；或者表单 `third` + 表格 `wide`。\n")
+	b.WriteString("4. **明细表**：`table` 用 `full`，放在最下面。\n\n")
+	b.WriteString("规则：\n\n")
+	b.WriteString("- **每个组件都写 `width`**：`full`（整行）/ `wide`（三分之二）/ `half` / `third` / `quarter`。同一行的宽度加起来正好一整行（例如 quarter×4、third+wide、half+half）。")
+	b.WriteString("窄屏时自动变成一列（指标两个一行），不用为手机另写一套。\n")
+	b.WriteString("- 一个窗格 6～10 个组件最好，最多 12 个；内容多就拆成 2～3 个窗格（例如「概览」+「我的记录」），第一个窗格放最常用的。\n")
+	b.WriteString("- 用指标行开头时不用再加 `heading`；`heading` 只在一个窗格里有两组不相关的内容时用来分段。\n")
+	b.WriteString("- 每个有数据源的组件都写 `empty`：一句人话说明为什么是空的 + 一个建议操作，不要只写「暂无数据」。\n\n")
+
+	b.WriteString("## 组件写法\n\n")
+	b.WriteString("- **metric**：标题写清单位，如「本月已报（元）」；大金额用 `compact`（显示 1.2 万），比例用 `percent`。\n")
+	b.WriteString("- **table**：3～6 列，最重要的列放第一列；状态、风险、优先级这类列用 `format: \"status\"`，会显示成带颜色的标签（已完成 / 通过 → 绿，处理中 / 待审批 → 黄，驳回 / 高风险 → 红）。次要字段放进 `detail`（点开一行看详情），不要把列塞满。日期列用 `date`，金额用 `money`。\n")
+	b.WriteString("- **chart**：趋势用 `line`，对比用 `bar`，占比用 `pie`（不超过 6 类）；标题写清是什么、什么时间范围。\n")
+	b.WriteString("- **form**：3～6 个字段，必填的标 `required`，选项固定的用 `select`；提交按钮文字是动词，如「生成简报」「登记借用」。\n")
+	b.WriteString("- **actions**：3～5 个按钮，文字 2～6 个字，是用户最常问的事。\n")
+	b.WriteString("- **board**：AI 每轮写结论的地方，标题写它装什么，如「计算结果」「简报」。\n")
+	b.WriteString("- **markdown**：只用于欢迎语和联系人这类说明，支持 `**加粗**` 和 `- ` 列表，两三行以内。\n\n")
+
+	b.WriteString("## 自带数据：让网页版也能增删改查\n\n")
+	b.WriteString("网页版没有 AI。要让应用在网页上也好用，给它一张自带的表（`tables`），把增删改查都做在工作台上：\n\n")
+	b.WriteString("- **增**：`form` 的 `submit` 写 `{\"label\": \"保存\", \"table\": \"表名\"}`，不写 `fields` 就按表生成。\n")
+	b.WriteString("- **查**：`table` 的 `source` 写 `{\"table\": \"表名\"}`，`rows` 写 `items`；统计用 `{\"table\": \"表名\", \"args\": {\"group_by\": \"字段\"}}` 配饼图或柱状图。\n")
+	b.WriteString("- **改**：表格的行按钮写 `{\"label\": \"完成\", \"table\": \"表名\", \"set\": {\"status\": \"已完成\"}}`，点一下直接改这一行（适合状态流转）。\n")
+	b.WriteString("- **删**：行按钮写 `{\"label\": \"删除\", \"table\": \"表名\", \"delete\": true}`，员工点两次确认后删除。\n")
+	b.WriteString("- 每行最多 3 个按钮：通常是一个改状态、一个交给 AI（写 `prompt`，可用 `{{row.字段}}`）、一个删除。\n")
+	b.WriteString("- 表的 `visibility`：各自填写的记录用 `own`，大家一起维护的用 `shared`，只有作者发布的公告用 `author`。状态字段用 `select`，并把第一项设为初始状态。\n\n")
+
+	b.WriteString("## 文案\n\n")
+	b.WriteString("- 标题短（2～8 个字）、具体，用员工的说法（「我的报销单」而不是「报销单数据」）。\n")
+	b.WriteString("- 「我的 …」类数据源在 `args` 里用 `{{me.name}}` 按当前员工取。\n")
+	b.WriteString("- 不要在标题里放 emoji；应用的 `icon` 放一个 emoji 就够了。\n\n")
+
+	b.WriteString("## 示例：一个窗格的骨架\n\n```json\n")
+	b.WriteString(`{"id":"home","type":"panel","title":"概览","widgets":[` + "\n")
+	b.WriteString(`  {"type":"metric","title":"待处理","width":"third","source":{"connection":"crm","tool":"get_summary","args":{"owner":"{{me.name}}"}},"field":"pending","format":"number"},` + "\n")
+	b.WriteString(`  {"type":"metric","title":"本月新增","width":"third","source":{"connection":"crm","tool":"get_summary","args":{"owner":"{{me.name}}"}},"field":"new","format":"number"},` + "\n")
+	b.WriteString(`  {"type":"metric","title":"完成率","width":"third","source":{"connection":"crm","tool":"get_summary"},"field":"done_rate","format":"percent"},` + "\n")
+	b.WriteString(`  {"type":"form","title":"新建记录","width":"third","submit":{"label":"保存","table":"tickets"}},` + "\n")
+	b.WriteString(`  {"type":"table","title":"我的记录","width":"wide","source":{"table":"tickets"},"rows":"items",` + "\n")
+	b.WriteString(`   "columns":[{"field":"title","title":"事项"},{"field":"due","title":"截止","format":"date"},{"field":"status","title":"状态","format":"status"}],` + "\n")
+	b.WriteString(`   "row_actions":[{"label":"完成","table":"tickets","set":{"status":"已完成"}},{"label":"问 AI","prompt":"帮我处理「{{row.title}}」"},{"label":"删除","table":"tickets","delete":true}],` + "\n")
+	b.WriteString(`   "empty":{"text":"还没有记录，在左边新建一条"}}` + "\n]}\n```\n\n")
+	fmt.Fprintf(&b, "做好后用 %s 的 `create`（自己用时带 `for_me: true`）提交；提交前把窗格和组件的排布用一两句话讲给用户确认。\n", t("ee_hub"))
 	return b.String()
 }

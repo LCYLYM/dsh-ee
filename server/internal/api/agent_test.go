@@ -526,7 +526,7 @@ func TestAgentTools(t *testing.T) {
 
 	t.Run("系统技能", func(t *testing.T) {
 		names := a.catalog().skillNames()
-		for _, want := range []string{"dsh-ee-guide", "dsh-ee-doctor", "dsh-ee-share"} {
+		for _, want := range []string{"dsh-ee-guide", "dsh-ee-doctor", "dsh-ee-share", "dsh-ee-app-design"} {
 			if !slices.Contains(names, want) {
 				t.Fatalf("目录里应有系统技能 %s：%v", want, names)
 			}

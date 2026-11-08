@@ -255,12 +255,18 @@ const demoITSMOpenAPI = `{
 // demoImportSelfApp 以员工本人的身份建一个「自己用」的应用（范围只有他，直接上架）。
 func (s *Server) demoImportSelfApp(ctx context.Context, d demoSelfApp) (demoItem, error) {
 	it := demoItem{Kind: d.Kind, Slug: d.Slug, Title: d.Spec.Title, Result: "exists"}
-	if _, err := s.store.GetAssetBySlug(ctx, d.Slug); err == nil {
-		return it, nil
-	} else if !errors.Is(err, store.ErrNotFound) {
+	existing, err := s.store.GetAssetBySlug(ctx, d.Slug)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return it, err
 	}
 	owner, err := s.store.GetUserByUsername(ctx, d.Owner)
+	if existing != nil {
+		// 自己用的应用里，带数据中台工作台的那个按环境换内容，不参与升级
+		if err != nil || d.DataWorkbench != nil {
+			return it, nil
+		}
+		return s.demoUpgradeApp(ctx, it, existing, d.Spec, owner.ID)
+	}
 	if err != nil {
 		return it, fmt.Errorf("找不到演示员工 %s：%w", d.Owner, err)
 	}
@@ -347,15 +353,16 @@ func demoOutingApp() demoSelfApp {
 			}},
 		},
 		Workbench: &appWorkbench{Panes: []wbPane{{ID: "main", Type: "panel", Title: "团建报名", Widgets: []wbWidget{
-			{Type: "heading", Title: "公告"},
-			{Type: "table", Title: "活动安排", Source: &wbSource{Table: "notes"}, Rows: "items", Columns: []wbColumn{{Field: "title", Title: "事项"}, {Field: "content", Title: "说明"}}},
-			{Type: "heading", Title: "报名"},
-			{Type: "form", Title: "我要报名", Submit: &wbAction{Label: "报名", Table: "signups"}},
-			{Type: "table", Title: "我的报名", Source: &wbSource{Table: "signups"}, Rows: "items",
-				Columns:    []wbColumn{{Field: "session", Title: "场次"}, {Field: "people", Title: "人数"}, {Field: "diet", Title: "忌口"}},
-				RowActions: []wbAction{{Label: "改报名", Prompt: "我想修改第 {{row.id}} 条报名（{{row.session}}，{{row.people}} 人）"}},
-				Empty:      &wbEmpty{Text: "你还没有报名", Action: &wbAction{Label: "让 AI 帮我报名", Prompt: "帮我报名这次团建"}}},
-			{Type: "chart", Title: "按场次统计（组织者看全部）", Chart: "pie", Source: &wbSource{Table: "signups", Args: json.RawMessage(`{"group_by":"session"}`)}, Rows: "items", X: "session", Y: []wbColumn{{Field: "count", Title: "报名数"}}},
+			{Type: "table", Title: "活动安排", Source: &wbSource{Table: "notes"}, Rows: "items", Width: "half", Columns: []wbColumn{{Field: "title", Title: "事项"}, {Field: "content", Title: "说明"}}},
+			{Type: "chart", Title: "按场次统计（组织者看全部）", Chart: "pie", Source: &wbSource{Table: "signups", Args: json.RawMessage(`{"group_by":"session"}`)}, Rows: "items", X: "session", Y: []wbColumn{{Field: "count", Title: "报名数"}}, Width: "half"},
+			{Type: "form", Title: "我要报名", Width: "third", Submit: &wbAction{Label: "报名", Table: "signups"}},
+			{Type: "table", Title: "我的报名", Source: &wbSource{Table: "signups"}, Rows: "items", Width: "wide",
+				Columns: []wbColumn{{Field: "session", Title: "场次", Format: "status"}, {Field: "people", Title: "人数"}, {Field: "diet", Title: "忌口"}},
+				RowActions: []wbAction{
+					{Label: "改报名", Prompt: "我想修改第 {{row.id}} 条报名（{{row.session}}，{{row.people}} 人）"},
+					{Label: "取消报名", Table: "signups", Delete: true},
+				},
+				Empty: &wbEmpty{Text: "你还没有报名", Action: &wbAction{Label: "让 AI 帮我报名", Prompt: "帮我报名这次团建"}}},
 		}}}},
 	}}, Rows: map[string][]demoRow{
 		"notes": {

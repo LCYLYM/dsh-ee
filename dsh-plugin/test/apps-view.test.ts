@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { appIcon, appsSection, heroAppsMenu, inProgressItems, inProgressView, startText } from "../src/apps-view.js";
+import { appIcon, appsSection, heroAppsMenu, heroStrip, inProgressItems, inProgressView, startText, stripSlots } from "../src/apps-view.js";
 import type { CatalogApp } from "../src/skills.js";
 
 const createElement = (type: string, props: any, ...children: any[]) => ({ type, props, children });
@@ -14,19 +14,24 @@ test("空列表隐藏入口，未登录显示登录", () => {
   assert.equal(heroAppsMenu(createElement, [], () => {}), null);
 });
 
-test("侧栏最多六项，「查看全部」打开完整选择，超过八项出现搜索", () => {
+test("侧栏最多三项，「查看更多」打开应用网格（带搜索）", () => {
   const apps = Array.from({ length: 10 }, (_, i) => app(i));
   const folded = appsSection(createElement, { apps, loggedIn: true }, actions);
   const text = JSON.stringify(folded);
   assert.match(text, /应用0/);
-  assert.match(text, /应用5/);
-  assert.doesNotMatch(text, /应用6/);
-  assert.match(text, /查看全部（10）/);
-  assert.match(text, /搜索企业应用/);
+  assert.match(text, /应用2/);
+  assert.doesNotMatch(text, /应用3/);
+  assert.match(text, /查看更多（10）/);
+  assert.doesNotMatch(text, /搜索企业应用/);
+  const panel = JSON.stringify(appsSection(createElement, { apps, loggedIn: true, limit: 6 }, actions));
+  assert.match(panel, /应用5/);
+  assert.doesNotMatch(panel, /应用6/);
   const gallery = appsSection(createElement, { apps, loggedIn: true, galleryOpen: true }, actions);
   const galleryText = JSON.stringify(gallery);
   assert.match(galleryText, /apps-gallery/);
   assert.match(galleryText, /应用9/);
+  assert.match(galleryText, /搜索企业应用/);
+  assert.match(galleryText, /repeat\(auto-fill/);
   const empty = appsSection(createElement, { apps, loggedIn: true, galleryOpen: true, query: "不存在" }, actions);
   assert.match(JSON.stringify(empty), /没有匹配的应用/);
 });
@@ -113,14 +118,14 @@ test("「进行中」只列待你决定和工作中，待你决定在前，点�
   assert.equal(inProgressView(createElement, [], () => {}), null);
 });
 
-test("可启用分组：没有就不显示，默认收起，展开后点启用", () => {
+test("可启用：没有就不显示，侧栏只有入口，网格里点启用", () => {
   const enabled: string[] = [];
   const withEnable = { ...actions, enable: (target: CatalogApp) => enabled.push(target.name), toggleAvailable() {} };
   assert.doesNotMatch(JSON.stringify(appsSection(createElement, { apps: [app(1)], available: [], loggedIn: true }, withEnable)), /可启用/);
   const folded = appsSection(createElement, { apps: [], available: [app(7)], loggedIn: true }, withEnable);
   assert.match(JSON.stringify(folded), /可启用（1）/);
   assert.doesNotMatch(JSON.stringify(folded), /应用7/);
-  const open = appsSection(createElement, { apps: [], available: [app(7)], availableOpen: true, loggedIn: true }, withEnable);
+  const open = appsSection(createElement, { apps: [], available: [app(7)], galleryOpen: true, loggedIn: true }, withEnable);
   const found: any[] = [];
   const walk = (node: any) => {
     if (!node || typeof node !== "object") return;
@@ -183,4 +188,53 @@ test("缺权限的应用：能打开网页详情时「部分能力不可用」�
   const plain = appsSection(createElement, { apps: [{ ...missing, detail_url: undefined }], loggedIn: true }, actions);
   assert.equal(find(plain, (n) => n.props?.["data-dsh-ee-missing"]), undefined);
   assert.match(JSON.stringify(plain), /部分能力不可用/);
+});
+
+test("侧栏可以隐藏：只有左侧栏那份有「隐藏」，网格底部能再打开", () => {
+  const hidden: boolean[] = [];
+  const withHide = { ...actions, setSidebarHidden: (value: boolean) => hidden.push(value) };
+  const find = (node: any, pred: (n: any) => boolean, out: any[] = []): any[] => {
+    if (!node || typeof node !== "object") return out;
+    if (pred(node)) out.push(node);
+    for (const c of (node.children ?? []).flat(Infinity)) find(c, pred, out);
+    return out;
+  };
+  const sidebar = appsSection(createElement, { apps: [app(1)], loggedIn: true, hideable: true }, withHide);
+  find(sidebar, (n) => n.type === "button" && n.children.includes("隐藏"))[0].props.onClick();
+  assert.deepEqual(hidden, [true]);
+  assert.equal(find(appsSection(createElement, { apps: [app(1)], loggedIn: true }, withHide), (n) => n.type === "button" && n.children.includes("隐藏")).length, 0);
+  const gallery = appsSection(createElement, { apps: [app(1)], loggedIn: true, galleryOpen: true, sidebarHidden: true }, withHide);
+  const box = find(gallery, (n) => n.type === "input" && n.props?.type === "checkbox")[0];
+  assert.equal(box.props.checked, false);
+  box.props.onChange();
+  assert.deepEqual(hidden, [true, false]);
+});
+
+test("首屏横排：按宽度放几张卡，放不下的进「查看更多」；量到位置之前不显示", () => {
+  const apps = Array.from({ length: 9 }, (_, i) => app(i));
+  assert.equal(heroStrip(createElement, apps, undefined, () => {}, () => {}), null);
+  assert.equal(heroStrip(createElement, apps, { left: 0, top: 0, width: 900, maxHeight: 40 }, () => {}, () => {}), null);
+  assert.equal(stripSlots(900), 4);
+  assert.equal(stripSlots(1120), 6);
+  assert.equal(stripSlots(300), 2);
+  const opened: string[] = [];
+  let more = 0;
+  const strip = heroStrip(createElement, apps, { left: 10, top: 400, width: 900, maxHeight: 300 }, (a) => opened.push(a.name), () => { more++; });
+  const text = JSON.stringify(strip);
+  assert.match(text, /应用2/);
+  assert.doesNotMatch(text, /应用3/);
+  assert.match(text, /查看更多（9）/);
+  const buttons: any[] = [];
+  const walk = (node: any) => {
+    if (!node || typeof node !== "object") return;
+    if (node.type === "button") buttons.push(node);
+    for (const c of (node.children ?? []).flat(Infinity)) walk(c);
+  };
+  walk(strip);
+  buttons[0].props.onClick();
+  buttons[buttons.length - 1].props.onClick();
+  assert.deepEqual(opened, ["app-0"]);
+  assert.equal(more, 1);
+  const few = JSON.stringify(heroStrip(createElement, apps.slice(0, 3), { left: 0, top: 0, width: 900, maxHeight: 300 }, () => {}, () => {}));
+  assert.doesNotMatch(few, /查看更多/);
 });

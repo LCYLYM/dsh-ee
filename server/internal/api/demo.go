@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -105,9 +106,17 @@ func (s *Server) handleDemoClaims(w http.ResponseWriter, r *http.Request) {
 	}
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
 	who := strings.TrimSpace(r.URL.Query().Get("applicant"))
+	people := make([]string, 0, len(demoTravelPeople))
+	for _, p := range demoTravelPeople {
+		people = append(people, p.name)
+	}
+	alt := demoStandIn(who, people, demoTravelPeople[0].name)
 	items := []demoClaim{}
 	for _, c := range s.demo.list() {
-		if (status == "" || c.Status == status || (status == "异常" && len(c.Flags) > 0)) && (who == "" || c.Applicant == who) {
+		if (status == "" || c.Status == status || (status == "异常" && len(c.Flags) > 0)) && demoMine(c.Applicant, who, alt) {
+			if alt != "" && c.Applicant == alt {
+				c.Applicant = who
+			}
 			items = append(items, c)
 		}
 	}
@@ -184,6 +193,10 @@ func (s *Server) demoState(ctx context.Context) ([]demoItem, bool) {
 		items = append(items, s.demoExists(ctx, "kb", b.Slug, b.Title))
 	}
 	for _, a := range demoAssets() {
+		if a.Kind == store.KindApp {
+			items = append(items, s.demoAppState(ctx, a.Slug, a.Spec.Title, a.Spec))
+			continue
+		}
 		items = append(items, s.demoExists(ctx, a.Kind, a.Slug, a.Spec.Title))
 	}
 	for _, u := range demoUsers {
@@ -194,6 +207,10 @@ func (s *Server) demoState(ctx context.Context) ([]demoItem, bool) {
 		items = append(items, res)
 	}
 	for _, a := range demoSelfApps() {
+		if a.Kind == store.KindApp && a.DataWorkbench == nil {
+			items = append(items, s.demoAppState(ctx, a.Slug, a.Spec.Title, a.Spec))
+			continue
+		}
 		items = append(items, s.demoExists(ctx, a.Kind, a.Slug, a.Spec.Title))
 	}
 	imported := true
@@ -215,6 +232,79 @@ func (s *Server) demoExists(ctx context.Context, kind, slug, title string) demoI
 		res.Result = "exists"
 	}
 	return res
+}
+
+// demoAppState 同 demoExists，另外看示例应用是不是比这一版旧（升级 dsh-ee 后示例改过）：旧的报 outdated，
+// 部署清单上的「导入示例」按钮会重新出现，点一下就升级。
+func (s *Server) demoAppState(ctx context.Context, slug, title string, sp assetSpec) demoItem {
+	res := s.demoExists(ctx, store.KindApp, slug, title)
+	if res.Result != "exists" {
+		return res
+	}
+	a, err := s.store.GetAssetBySlug(ctx, slug)
+	if err != nil {
+		return res
+	}
+	if next, ok, _ := s.demoAppNext(ctx, a, sp); ok && next != nil {
+		res.Result = "outdated"
+	}
+	return res
+}
+
+// demoAppNext 返回示例应用要升级到的内容；不是导入的示例、或者线上已经是这一版时 ok 为假。
+func (s *Server) demoAppNext(ctx context.Context, a *store.Asset, sp assetSpec) (json.RawMessage, bool, error) {
+	recs, err := s.store.DemoRecords(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	ours := false
+	for _, r := range recs {
+		ours = ours || (r.Kind == "asset" && r.RefID == a.ID)
+	}
+	if !ours {
+		return nil, false, nil
+	}
+	live, err := s.store.LiveAssetVersions(ctx, []int64{a.ID})
+	if err != nil {
+		return nil, false, err
+	}
+	lv := live[a.ID]
+	if lv == nil {
+		return nil, false, nil
+	}
+	if msg := validateSpec(store.KindApp, &sp); msg != "" {
+		return nil, false, errors.New(msg)
+	}
+	next, _ := json.Marshal(sp)
+	cur, _ := json.Marshal(parseSpec(lv.Spec))
+	if bytes.Equal(cur, next) {
+		return nil, false, nil
+	}
+	return next, true, nil
+}
+
+// demoUpgradeApp 把导入过的示例应用升级到这一版：发一个新版本，旧版本留在历史里，可以回退。
+// 管理员自己改过的内容也会被这一版盖掉（样板本来就是拿来复制的，复制出来的副本不受影响）。
+func (s *Server) demoUpgradeApp(ctx context.Context, it demoItem, a *store.Asset, sp assetSpec, by int64) (demoItem, error) {
+	next, ok, err := s.demoAppNext(ctx, a, sp)
+	if err != nil || !ok {
+		return it, err
+	}
+	if msg, err := s.checkWorkbenchSources(ctx, parseSpec(next).Workbench); err != nil {
+		return it, err
+	} else if msg != "" {
+		return it, errors.New(msg)
+	}
+	if msg, err := s.checkAppTablesChange(ctx, a, parseSpec(next)); err != nil {
+		return it, err
+	} else if msg != "" {
+		return it, errors.New(msg)
+	}
+	if _, err := s.store.AddAssetVersion(ctx, a.ID, next, store.StatusPublished, by); err != nil {
+		return it, err
+	}
+	it.Result = "updated"
+	return it, nil
 }
 
 // POST /api/admin/demo：导入示例内容。要超级管理员：会建账号、连接，并把微应用推到全员的 DSH。
@@ -302,7 +392,10 @@ func (s *Server) demoImportKBase(ctx context.Context, d demoKBase, by int64) (de
 func (s *Server) demoImportAsset(r *http.Request, d demoAsset, by int64) (demoItem, error) {
 	ctx := r.Context()
 	it := demoItem{Kind: d.Kind, Slug: d.Slug, Title: d.Spec.Title, Result: "exists"}
-	if _, err := s.store.GetAssetBySlug(ctx, d.Slug); err == nil {
+	if a, err := s.store.GetAssetBySlug(ctx, d.Slug); err == nil {
+		if d.Kind == store.KindApp {
+			return s.demoUpgradeApp(ctx, it, a, d.Spec, by)
+		}
 		return it, nil
 	} else if !errors.Is(err, store.ErrNotFound) {
 		return it, err

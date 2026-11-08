@@ -29,7 +29,8 @@ export function workbenchOpenIn(sidebarRight: any, sessionId: string, app: strin
 }
 
 /**
- * 在会话的右侧栏打开应用的工作台：第一个窗格占主区，第二个窗格优先另开一栏，其余作为标签页。
+ * 在会话的右侧栏打开应用的工作台：第一个窗格占主区；第二个窗格是内部系统网页或知识库原文时另开一栏，
+ * 其余业务面板都作为同一栏里的标签页（右侧栏不分两栏挤着看），最后切回第一个窗格。
  * 已经打开过（员工也可能自己关掉了部分窗格）就不动，除非 force（「⋯ → 打开工作台」）。
  */
 export async function openWorkbench(ctx: any, app: CatalogApp, sessionId: string, force = false): Promise<boolean> {
@@ -39,8 +40,12 @@ export async function openWorkbench(ctx: any, app: CatalogApp, sessionId: string
   if (!(await waitMounted(sidebarRight, sessionId))) return false;
   if (!force && workbenchOpenIn(sidebarRight, sessionId, app.name)) return false;
   let opened = 0;
+  let tabbed = false;
   panes.forEach((pane, index) => {
-    const placement = index === 1 ? { preferNewPane: true } : {};
+    // 内部系统网页、知识库原文要和面板对照着看，另开一栏；业务面板不分栏
+    const aside = pane.type === "web" || pane.type === "kb_doc";
+    const placement = index === 1 && aside ? { preferNewPane: true } : {};
+    if (index > 0 && !aside) tabbed = true;
     try {
       if (pane.type === "web") {
         sidebarRight.openTab("browser", { ...placement, params: { url: pane.url } });
@@ -52,5 +57,13 @@ export async function openWorkbench(ctx: any, app: CatalogApp, sessionId: string
       // 某个窗格打不开（例如 web profile 没开官方浏览器时 openTab('browser') 会抛错），其余窗格照常打开
     }
   });
+  // 同一栏里又开了标签页时，切回第一个窗格（打开已开着的地址只会切过去）
+  if (tabbed && panes[0].type !== "web") {
+    try {
+      sidebarRight.openResource(workbenchAddress(app.name, panes[0].id), {});
+    } catch {
+      // 切不回去也不影响使用
+    }
+  }
   return opened > 0;
 }

@@ -42,6 +42,7 @@ const clientRemote = createTypertRemoteInfo({
     "dshEE/updatePlugin": { service: "dshEE", parameters: [], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/webLink": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/insertFormRow": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
+    "dshEE/writeTableRow": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
     "dshEE/vote": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
   },
 }, z);
@@ -67,19 +68,25 @@ interface OverviewSnapshot {
 }
 
 const OVERVIEW_TIMEOUT_MS = 20_000;
+/** 没登录时每隔几秒看一次登录状态：在浏览器里确认授权后，不用重开 DSH 就能看到已登录。 */
+export const LOGIN_POLL_MS = 5_000;
 
 function createOverviewStore(remote: any) {
   let snapshot: OverviewSnapshot = { failed: false, busy: false };
   let inflight = false;
   const listeners = new Set<() => void>();
+  const loginListeners = new Set<() => void>();
   const update = (patch: Partial<OverviewSnapshot>) => {
+    const wasIn = !!snapshot.data?.me;
     snapshot = { ...snapshot, ...patch };
     for (const listener of listeners) listener();
+    if (!wasIn && snapshot.data?.me) for (const listener of loginListeners) listener();
   };
-  const refresh = async () => {
+  /** quiet：后台轮询用，不把界面切到「忙」，免得按钮每 5 秒闪一下。 */
+  const refresh = async (quiet = false) => {
     if (inflight) return;
     inflight = true;
-    update({ busy: true });
+    if (!quiet) update({ busy: true });
     try {
       const data = unwrapRemote(await Promise.race([
         remote.overview(),
@@ -90,8 +97,14 @@ function createOverviewStore(remote: any) {
       update({ failed: true, failure: undefined });
     } finally {
       inflight = false;
-      update({ busy: false });
+      if (!quiet) update({ busy: false });
     }
+  };
+  /** 没登录、并且有界面在看时，静默再查一次；页面在后台时不查。 */
+  const pollLogin = () => {
+    if (snapshot.data?.me || !listeners.size) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    void refresh(true);
   };
   const use = () => {
     const [local, setLocal] = useState(snapshot);
@@ -102,9 +115,13 @@ function createOverviewStore(remote: any) {
       if (!snapshot.data) void refresh();
       return () => { listeners.delete(listener); };
     }, []);
-    return { ...local, hasData: () => !!snapshot.data, setBusy: (busy: boolean) => update({ busy }), refresh };
+    return { ...local, hasData: () => !!snapshot.data, setBusy: (busy: boolean) => update({ busy }), refresh: () => refresh() };
   };
-  return { use, refresh };
+  const onLogin = (listener: () => void) => {
+    loginListeners.add(listener);
+    return () => { loginListeners.delete(listener); };
+  };
+  return { use, refresh: () => refresh(), pollLogin, onLogin };
 }
 
 export async function apply(ctx: any): Promise<void> {
@@ -116,6 +133,12 @@ export async function apply(ctx: any): Promise<void> {
     registerServerSettings(ctx, { createElement, useState: useState as any, useEffect, remote, unwrapRemote, label: "dsh-ee", onSaved: () => void overview.refresh() });
     const useOverview = (_remote?: any) => overview.use();
     const apps = registerApps(ctx, remote, useOverview, unwrapRemote);
+    // 登录状态轮询跟着插件生命周期走；一登录上就重新拉企业应用（不等 60 秒的目录轮询）
+    ctx.effect(() => {
+      const timer = setInterval(overview.pollLogin, LOGIN_POLL_MS);
+      const off = overview.onLogin(() => void apps.loadApps());
+      return () => { clearInterval(timer); off(); };
+    });
     const { AppsPanel } = apps;
     const workbench = registerWorkbench(ctx, { remote, unwrapRemote, appsNow: apps.appsNow, appsLoaded: apps.appsLoaded, loadApps: apps.loadApps, subscribeApps: apps.subscribeApps });
     apps.setWorkbenchOpener(workbench.openWorkbench);
@@ -136,17 +159,15 @@ export async function apply(ctx: any): Promise<void> {
       const state = useOverview(remote);
       const [notice, setNotice] = useState("");
       const [doctor, setDoctor] = useState<DoctorViewData | undefined>(undefined);
+      // 轮询发现已登录：去掉「请在浏览器确认」这类过时的提示
+      const loggedIn = !!state.data?.me;
+      useEffect(() => { if (loggedIn) setNotice(""); }, [loggedIn]);
       const login = async () => {
         state.setBusy(true);
         try {
           const result = unwrapRemote(await remote.login());
           setNotice(result?.text || "请在浏览器完成企业登录。");
-          void (async () => {
-            for (let i = 0; i < 36 && !state.hasData(); i++) {
-              await new Promise((resolve) => setTimeout(resolve, 5000));
-              await state.refresh();
-            }
-          })();
+          // 之后由全局的登录轮询（每 5 秒）发现登录成功
         } catch {
           setNotice("发起登录失败，请检查网络后重试。");
         } finally {

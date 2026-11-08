@@ -175,6 +175,8 @@ export default {
     copyFailed: "There's no AI on the web: copy the text below, open DSH and paste it into the input box.",
     openDSH: "Open DSH ↗",
     saved: "Saved: {{label}}",
+    updated: "Updated: {{label}}",
+    deleted: "Row deleted",
     open: "Open web version",
     short: "Web",
     toggle: "Available on the web",

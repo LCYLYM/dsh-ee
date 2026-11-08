@@ -2856,8 +2856,8 @@ function validateName(subject, value) {
 }
 
 // src/brand.ts
-var _vote_dec, _insertFormRow_dec, _webLink_dec, _updatePlugin_dec, _saveServer_dec, _testServer_dec, _serverSettings_dec, _doctor_dec, _login_dec, _overview_dec, _kbDoc_dec, _setChecklist_dec, _checklists_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
-var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _checklists_dec = [Remote], _setChecklist_dec = [Remote], _kbDoc_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _serverSettings_dec = [Remote], _testServer_dec = [Remote], _saveServer_dec = [Remote], _updatePlugin_dec = [Remote], _webLink_dec = [Remote], _insertFormRow_dec = [Remote], _vote_dec = [Remote], _a) {
+var _vote_dec, _writeTableRow_dec, _insertFormRow_dec, _webLink_dec, _updatePlugin_dec, _saveServer_dec, _testServer_dec, _serverSettings_dec, _doctor_dec, _login_dec, _overview_dec, _kbDoc_dec, _setChecklist_dec, _checklists_dec, _board_dec, _workbenchData_dec, _unbindApp_dec, _bindApp_dec, _appBindings_dec, _disableApp_dec, _enableApp_dec, _availableApps_dec, _apps_dec, _brand_dec, _a, _init;
+var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [Remote], _apps_dec = [Remote], _availableApps_dec = [Remote], _enableApp_dec = [Remote], _disableApp_dec = [Remote], _appBindings_dec = [Remote], _bindApp_dec = [Remote], _unbindApp_dec = [Remote], _workbenchData_dec = [Remote], _board_dec = [Remote], _checklists_dec = [Remote], _setChecklist_dec = [Remote], _kbDoc_dec = [Remote], _overview_dec = [Remote], _login_dec = [Remote], _doctor_dec = [Remote], _serverSettings_dec = [Remote], _testServer_dec = [Remote], _saveServer_dec = [Remote], _updatePlugin_dec = [Remote], _webLink_dec = [Remote], _insertFormRow_dec = [Remote], _writeTableRow_dec = [Remote], _vote_dec = [Remote], _a) {
   constructor(ctx, actions) {
     super(ctx, "dshEE");
     this.actions = actions;
@@ -2929,6 +2929,9 @@ var DshEEClientService = class extends (_a = TypertRemoteService, _brand_dec = [
   async insertFormRow(request) {
     return this.actions.insertFormRow(request);
   }
+  async writeTableRow(request) {
+    return this.actions.writeTableRow(request);
+  }
   async vote(request) {
     return this.actions.vote(request);
   }
@@ -2956,6 +2959,7 @@ __decorateElement(_init, 1, "saveServer", _saveServer_dec, DshEEClientService);
 __decorateElement(_init, 1, "updatePlugin", _updatePlugin_dec, DshEEClientService);
 __decorateElement(_init, 1, "webLink", _webLink_dec, DshEEClientService);
 __decorateElement(_init, 1, "insertFormRow", _insertFormRow_dec, DshEEClientService);
+__decorateElement(_init, 1, "writeTableRow", _writeTableRow_dec, DshEEClientService);
 __decorateElement(_init, 1, "vote", _vote_dec, DshEEClientService);
 __decoratorMetadata(_init, DshEEClientService);
 function registerBrand(ctx, actions) {
@@ -3335,6 +3339,11 @@ function checkBoardBlocks(blocks) {
   }
   return { blocks: out };
 }
+function rowWriteOf(action) {
+  if (!action.table) return void 0;
+  if (action.delete) return "delete";
+  return action.set && Object.keys(action.set).length ? "set" : void 0;
+}
 
 // src/workbench-host.ts
 function findWidget(apps, request) {
@@ -3365,6 +3374,26 @@ async function insertFormRow(apps, tools, request) {
   }
   try {
     toolValue(await tools.callTool("app__write", { action: "insert", app: request.app, table, rows: [row] }));
+    return { ok: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+async function writeTableRow(apps, tools, request) {
+  const widget = findWidget(apps, request);
+  const action = widget?.type === "table" && Number.isInteger(request?.action) ? widget.row_actions?.[request.action] : void 0;
+  const write2 = action ? rowWriteOf(action) : void 0;
+  const table = widget?.source?.table;
+  if (!action || !write2 || !table || action.table !== table) return { error: "\u8FD9\u4E2A\u6309\u94AE\u4E0D\u80FD\u6539\u8868" };
+  if (!Number.isInteger(request.id) || request.id <= 0) return { error: "\u8FD9\u4E00\u884C\u6CA1\u6709\u7F16\u53F7" };
+  try {
+    if (write2 === "set") {
+      toolValue(await tools.callTool("app__write", { action: "update", app: request.app, table, id: request.id, row: action.set }));
+      return { ok: true };
+    }
+    const args = { action: "delete", app: request.app, table, ids: [request.id] };
+    const preview = toolValue(await tools.callTool("app__write", args));
+    if (preview?.confirm) toolValue(await tools.callTool("app__write", { ...args, confirm: preview.confirm }));
     return { ok: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
@@ -3644,6 +3673,7 @@ function apply(ctx, input) {
       unbindApp: async (name2) => appBindings.unbind(name2),
       workbenchData: async (request) => readWidgetData(await (await skillsReady).readApps(), bridge, request),
       insertFormRow: async (request) => insertFormRow(await (await skillsReady).readApps(), bridge, request),
+      writeTableRow: async (request) => writeTableRow(await (await skillsReady).readApps(), bridge, request),
       vote: async (request) => {
         const token = await tokens.resolve();
         if (!token) throw new Error("\u6CA1\u6709\u767B\u5F55\u4F01\u4E1A\u8D26\u53F7");

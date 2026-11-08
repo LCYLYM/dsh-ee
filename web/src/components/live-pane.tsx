@@ -1,8 +1,7 @@
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
-import { Card } from "./ui";
-import { fillPrompt, panelView, type PanelHandlers, type WidgetState, type WorkbenchAction, type WorkbenchPane, type WorkbenchWidget } from "../lib/workbench-render";
+import { fillPrompt, panelView, rowWriteOf, type PanelHandlers, type WidgetState, type WorkbenchAction, type WorkbenchPane, type WorkbenchWidget } from "../lib/workbench-render";
 
 /**
  * 一个业务面板：取数、表单、清单、到 DSH 里继续。网页版应用（M14）和编辑器的实时预览（M5）共用，
@@ -43,7 +42,7 @@ export function LivePane({
   // AI 看板只在 DSH 里有内容：换成一句说明，组件的位置不变（取数按位置）
   const pane = useMemo<WorkbenchPane>(() => ({
     ...raw,
-    widgets: (raw.widgets ?? []).map((w) => (w.type === "board" ? { type: "markdown", title: w.title || t("appWeb.board"), text: t("appWeb.boardNote") } : w)),
+    widgets: (raw.widgets ?? []).map((w) => (w.type === "board" ? { type: "markdown", title: w.title || t("appWeb.board"), text: t("appWeb.boardNote"), width: w.width } : w)),
   }), [raw, t]);
   const [data, setData] = useState<Record<number, WidgetState>>({});
   const [forms, setForms] = useState<Record<number, Record<string, unknown>>>({});
@@ -52,6 +51,8 @@ export function LivePane({
   const [expanded, setExpanded] = useState<Record<number, number | undefined>>({});
   const [selectedKBs, setSelectedKBs] = useState<string[]>([]);
   const [sending, setSending] = useState<Set<string>>(new Set());
+  // 删除行的按钮点过一次、等再点一次确认
+  const [armed, setArmed] = useState("");
   const [notice, setNotice] = useState("");
   const [handoff, setHandoff] = useState("");
   const live = useRef(true);
@@ -141,6 +142,35 @@ export function LivePane({
         .finally(() => busy(key, false));
       return;
     }
+    // 表格的行按钮写表：改状态或删除这一行，完了刷新读这张表的组件
+    const write = values.row ? rowWriteOf(action) : undefined;
+    if (write && values.row) {
+      if (mode === "preview") {
+        setNotice(t("studio.previewInsert", { table: action.table }));
+        setHandoff("");
+        return;
+      }
+      if (sending.has(key)) return;
+      if (write === "delete" && armed !== key) {
+        setArmed(key);
+        setTimeout(() => setArmed((a) => (a === key ? "" : a)), 4000);
+        return;
+      }
+      setArmed("");
+      const row = values.row;
+      busy(key, true);
+      const done = write === "delete" ? api.appDeleteRow(slug, action.table!, Number(row.id)) : api.appUpdateRow(slug, action.table!, Number(row.id), action.set ?? {});
+      Promise.resolve(done)
+        .then(() => {
+          setNotice(write === "delete" ? t("appWeb.deleted") : t("appWeb.updated", { label: action.label }));
+          setHandoff("");
+          (pane.widgets ?? []).forEach((w, i) => { if (w.source?.table === action.table) void load(i); });
+          if (action.prompt) void continueInDSH(fillPrompt(action.prompt, { row }));
+        })
+        .catch((e: unknown) => setNotice(e instanceof Error ? e.message : String(e)))
+        .finally(() => busy(key, false));
+      return;
+    }
     void continueInDSH(fillPrompt(action.prompt, { ...values, scope: { kbs: kbsText() } }));
     if (values.form) setForms((f) => ({ ...f, [index]: {} }));
   };
@@ -172,12 +202,13 @@ export function LivePane({
     toggleRow: (i, row) => setExpanded((e) => ({ ...e, [i]: e[i] === row ? undefined : row })),
     requestHref,
     viaDSH: true,
+    armed: (key) => armed === key,
   };
 
   return (
     <div data-app-web={mode === "web" ? "" : undefined} data-live-preview={mode === "preview" ? "" : undefined} className="space-y-3">
       {notice && (
-        <div role="status" className="rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-neutral-800">
+        <div role="status" className="mx-3.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-neutral-800">
           {notice}
           {handoff && (
             <>
@@ -187,7 +218,8 @@ export function LivePane({
           )}
         </div>
       )}
-      <Card className="overflow-hidden text-neutral-900">{panelView(createElement, pane, { data }, handlers)}</Card>
+      {/* 卡片底色：浅色主题是白卡片配浅灰页面（Stripe 式），深色跟随主题的卡片色 */}
+      <div className="text-neutral-900 [--ee-card-bg:#fff] dark:[--ee-card-bg:var(--card)]">{panelView(createElement, pane, { data }, handlers)}</div>
     </div>
   );
 }

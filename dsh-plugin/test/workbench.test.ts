@@ -370,3 +370,63 @@ test("表单提交到应用自带的表：只带表单里的字段，经 app__wr
   const bad = fakeTools({ app__write: { readOnly: false, result: { isError: true, content: [{ type: "text", text: "字段「场次」必填" }] } } });
   assert.deepEqual(await insertFormRow([app], bad, { app: "outing", pane: "main", widget: 0, values: {} }), { error: "字段「场次」必填" });
 });
+
+// ---- 仪表盘版式与写表的行按钮 ----
+
+const rowsPane: WorkbenchPane = {
+  id: "todo", type: "panel", title: "待办",
+  widgets: [
+    { type: "metric", title: "待办", source: { connection: "app", tool: "rows", table: "todos" }, field: "total" },
+    { type: "metric", title: "已完成", source: { connection: "app", tool: "rows", table: "todos" }, field: "total" },
+    { type: "metric", title: "逾期", source: { connection: "app", tool: "rows", table: "todos" }, field: "total" },
+    { type: "table", title: "我的待办", width: "wide", source: { connection: "app", tool: "rows", table: "todos" }, rows: "items",
+      columns: [{ field: "title", title: "事项" }, { field: "status", title: "状态", format: "status" }],
+      row_actions: [{ label: "完成", prompt: "", table: "todos", set: { status: "已完成" } }, { label: "删除", prompt: "", table: "todos", delete: true }] },
+  ],
+};
+
+test("仪表盘：没写宽度的连续指标平分一行，状态列显示成带颜色的标签", async () => {
+  const { widgetWidths } = await import("../src/workbench-view.js");
+  assert.deepEqual(widgetWidths(rowsPane.widgets!), ["third", "third", "third", "wide"]);
+  assert.deepEqual(widgetWidths([...rowsPane.widgets!.slice(0, 3), rowsPane.widgets![0], rowsPane.widgets![0]]), ["quarter", "quarter", "quarter", "quarter", "full"]);
+  const view = panelView(h, rowsPane, { data: { 3: { status: "ready", value: { items: [{ id: 7, title: "领电脑", status: "已完成" }, { id: 8, title: "交材料", status: "已驳回" }] } } } }, handlers());
+  const cells = find(view, (node) => node.props?.["data-status"]);
+  assert.deepEqual(cells.map((node) => node.props["data-status"]), ["good", "bad"]);
+  assert.equal(find(view, (node) => node.props?.className?.includes("dshee-w-wide")).length, 1);
+});
+
+test("删除按钮点过一次显示「确认删除」", () => {
+  const view = panelView(h, rowsPane, { data: { 3: { status: "ready", value: { items: [{ id: 7, title: "领电脑", status: "待办" }] } } } }, { ...handlers(), armed: (key) => key === "3:row:0:1" });
+  assert.equal(find(view, (node) => node.type === "button" && node.children.includes("确认删除")).length, 1);
+});
+
+test("写表的行按钮：按目录里的配置改这一行；删除先拿确认码再删；不是写表的按钮拒绝", async () => {
+  const { writeTableRow } = await import("../src/workbench-host.js");
+  const apps: CatalogApp[] = [{ ...app, name: "todo-app", workbench: { panes: [rowsPane] } }];
+  const calls: any[] = [];
+  const tools = {
+    hasTool: () => true,
+    isReadOnlyTool: () => false,
+    callTool: async (name: string, args: any) => {
+      calls.push([name, args]);
+      const value = args.action === "delete" && !args.confirm ? { confirm_required: true, confirm: "c-1" } : { ok: true };
+      return { content: [{ type: "text", text: JSON.stringify(value) }] };
+    },
+  };
+  assert.deepEqual(await writeTableRow(apps, tools, { app: "todo-app", pane: "todo", widget: 3, action: 0, id: 7 }), { ok: true });
+  assert.deepEqual(calls[0], ["app__write", { action: "update", app: "todo-app", table: "todos", id: 7, row: { status: "已完成" } }]);
+  assert.deepEqual(await writeTableRow(apps, tools, { app: "todo-app", pane: "todo", widget: 3, action: 1, id: 8 }), { ok: true });
+  assert.deepEqual(calls.slice(1).map((c) => c[1].confirm), [undefined, "c-1"]);
+  assert.deepEqual(await writeTableRow(apps, tools, { app: "todo-app", pane: "todo", widget: 0, action: 0, id: 7 }), { error: "这个按钮不能改表" });
+});
+
+test("多个业务面板在同一栏里开成标签页，最后切回第一个", async () => {
+  const fake = fakeSidebar("s1");
+  const two: CatalogApp = { ...app, workbench: { panes: [workbench.panes[0], { id: "plans", type: "panel", title: "计划", widgets: [{ type: "markdown", text: "x" }] }] } };
+  assert.equal(await openWorkbench({ sidebarRight: fake.sidebarRight }, two, "s1"), true);
+  assert.deepEqual(fake.opened, [
+    ["resource", "dsh-resource://dsh-ee-workbench/expense-helper/main", {}],
+    ["resource", "dsh-resource://dsh-ee-workbench/expense-helper/plans", {}],
+    ["resource", "dsh-resource://dsh-ee-workbench/expense-helper/main", {}],
+  ]);
+});
