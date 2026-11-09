@@ -164,6 +164,7 @@ var agentExcluded = map[string]string{
 	"GET /v1/models":                            "模型网关协议入口",
 	"POST /v1/chat/completions":                 "模型网关协议入口",
 	"POST /api/me/packages":                     "网页上传；Agent 用 ee_plugins.upload（经 /api/agent/packages）",
+	"POST /api/me/packages/check":               "网页发布前预检；Agent 的 upload 会直接发布，暂不单独暴露检查工具",
 
 	"GET /api/me/welcome":            "网页登录后的落点判断",
 	"PUT /api/me/welcome":            "网页「开始使用」页的「以后再说」",

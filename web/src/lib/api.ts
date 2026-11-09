@@ -176,6 +176,18 @@ export interface ScanItem {
   params?: Record<string, string | number>;
 }
 
+/** 发布前预检的结果（POST /api/me/packages/check），不落库。 */
+export interface PackageCheck {
+  name: string;
+  version: string;
+  is_plugin: boolean;
+  can_submit: boolean;
+  will_publish: boolean;
+  requires_review: boolean;
+  scan: ScanItem[];
+  conflicts: { key: string; params?: Record<string, string | number> }[];
+}
+
 /** 能力列表里的一项（server/internal/api/catalog.go 的 catalogItem）。 */
 export interface CatalogPlugin {
   name: string;
@@ -1513,6 +1525,11 @@ export const api = {
   catalog: () => request<{ plugins: CatalogPlugin[] }>("GET", "/api/catalog").then((r) => r.plugins),
   catalogDetail: (name: string) => request<PackageDetail>("GET", `/api/catalog/${encName(name)}`),
   myPackages: () => request<{ packages: MyPackage[] }>("GET", "/api/me/packages").then((r) => r.packages),
+  /** 发布前预检：请求体就是 npm pack 生成的 .tgz，只检查不发布。 */
+  checkPackage: (file: Blob) =>
+    request<PackageCheck>("POST", "/api/me/packages/check", undefined, {
+      raw: { body: file, type: "application/octet-stream" },
+    }),
   /** 网页发布：请求体就是 npm pack 生成的 .tgz。 */
   uploadPackage: (file: Blob, tag?: string) =>
     request<{ name: string; version: string; status: PluginStatus; created: boolean }>(
