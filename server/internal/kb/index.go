@@ -411,12 +411,35 @@ func snippet(c Chunk, terms []string) (int, string) {
 	if r := []rune(text); len(r) > snippetRunes*2 {
 		text = string(r[:snippetRunes*2]) + "…"
 	}
+	// 命中的是表格里的一行：前面带上表头，不用再读一次就知道每列是什么
+	if head := tableHeader(lines, at); head != "" {
+		text = head + " … " + text
+	}
 	for _, t := range terms {
 		if t = strings.TrimSpace(t); t != "" && !strings.ContainsAny(t, "【】") {
 			text = replaceFold(text, t)
 		}
 	}
 	return c.From + at, text
+}
+
+var tableSep = regexp.MustCompile(`^\|(\s*:?-{3,}:?\s*\|)+$`)
+
+// tableHeader 找第 at 行所在表格的表头行；第 at 行不是表格的数据行时返回空。
+func tableHeader(lines []string, at int) string {
+	if at >= len(lines) || !strings.HasPrefix(strings.TrimSpace(lines[at]), "|") || tableSep.MatchString(strings.TrimSpace(lines[at])) {
+		return ""
+	}
+	for i := at; i > 0; i-- {
+		l := strings.TrimSpace(lines[i])
+		if !strings.HasPrefix(l, "|") {
+			return ""
+		}
+		if tableSep.MatchString(l) {
+			return strings.TrimSpace(lines[i-1])
+		}
+	}
+	return ""
 }
 
 // replaceFold 不区分大小写地把 term 标成【term】（原样保留原文的写法）。

@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"mime"
@@ -328,16 +329,37 @@ func (s *Server) handleKBDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// kdocConvert 是文档上记的转换体检：转换结果，加上维护者选的转换设置、正文是否在网页上改过。
+type kdocConvert struct {
+	kb.Info
+	HeaderOption string `json:"header_option,omitempty"`
+	Edited       bool   `json:"edited,omitempty"`
+}
+
+func convertRecord(info kb.Info, opt kb.Options) json.RawMessage {
+	raw, _ := json.Marshal(kdocConvert{Info: info, HeaderOption: opt.Header})
+	return raw
+}
+
+func headerOption(v string) (string, bool) {
+	switch v {
+	case "", "first", "none":
+		return v, true
+	}
+	return "", false
+}
+
 // convertUpload 把上传的文件转成正文，原件存进 blob 存储（npm 源不可用时只存正文）。
-func (s *Server) convertUpload(name string, data []byte) (*kb.Converted, *store.KDoc, error) {
-	conv, err := kb.Convert(name, data)
+func (s *Server) convertUpload(name string, data []byte, opt kb.Options) (*kb.Converted, *store.KDoc, error) {
+	conv, err := kb.Convert(name, data, opt)
 	if err != nil {
 		return nil, nil, err
 	}
 	if len(conv.Markdown) > maxKBMarkdown {
 		return nil, nil, errors.New("转换出来的正文超过 8 MB，请拆成几个文件")
 	}
-	origin := &store.KDoc{SourceName: truncateStr(path.Base(strings.ReplaceAll(name, "\\", "/")), 255), Mime: conv.Mime, Size: int64(len(data))}
+	origin := &store.KDoc{SourceName: truncateStr(path.Base(strings.ReplaceAll(name, "\\", "/")), 255), Mime: conv.Mime, Size: int64(len(data)),
+		ConvertInfo: convertRecord(conv.Info, opt)}
 	if s.registry != nil {
 		if d, err := s.registry.Blobs().Put(bytes.NewReader(data), maxKBFile); err == nil {
 			origin.BlobKey = d.Key
@@ -352,9 +374,78 @@ type kbUploadResult struct {
 	File  string      `json:"file"`
 	Doc   *store.KDoc `json:"doc,omitempty"`
 	Error string      `json:"error,omitempty"`
+	// 同目录下有同名文档，这次更新成了它的新版本
+	Updated bool `json:"updated,omitempty"`
+}
+
+// sameDoc 找同一个目录下跟上传的文件同名的文档：原文件名一样，或者标题就是文件名（去掉扩展名）。
+func sameDoc(docs []*store.KDoc, folder, file string) *store.KDoc {
+	base := path.Base(strings.ReplaceAll(file, "\\", "/"))
+	stem := strings.TrimSpace(strings.TrimSuffix(base, path.Ext(base)))
+	var byTitle *store.KDoc
+	for _, d := range docs {
+		if d.Folder != folder {
+			continue
+		}
+		if d.SourceName == base {
+			return d
+		}
+		if byTitle == nil && d.Title == stem {
+			byTitle = d
+		}
+	}
+	return byTitle
+}
+
+type kbUploadCheckReq struct {
+	Folder string   `json:"folder"`
+	Files  []string `json:"files"`
+}
+
+// POST /api/kb/{id}/docs/check：上传前看哪些文件在这个目录下已经有同名文档，网页上让维护者选「更新」还是「另存一篇」。
+func (s *Server) handleKBUploadCheck(w http.ResponseWriter, r *http.Request) {
+	b, v, ok := s.loadKBase(w, r)
+	if !ok {
+		return
+	}
+	if !v.kbMaintains(b) {
+		writeErr(w, http.StatusForbidden, "只有维护者或知识库管理员能上传文档")
+		return
+	}
+	var req kbUploadCheckReq
+	if !readJSON(w, r, &req) {
+		return
+	}
+	folder, msg := cleanFolder(req.Folder)
+	if msg != "" {
+		writeErr(w, http.StatusBadRequest, msg)
+		return
+	}
+	if len(req.Files) > 50 {
+		writeErr(w, http.StatusBadRequest, "一次最多上传 50 个文件")
+		return
+	}
+	docs, err := s.store.ListKDocs(r.Context(), b.ID)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	type item struct {
+		File string      `json:"file"`
+		Doc  *store.KDoc `json:"doc"`
+	}
+	items := []item{}
+	for _, f := range req.Files {
+		if d := sameDoc(docs, folder, f); d != nil {
+			items = append(items, item{File: f, Doc: d})
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
 // POST /api/kb/{id}/docs：multipart，可以一次传多个文件（字段 file）；字段 folder 是放进哪个目录。
+// 同目录下已有同名文档时默认更新成它的新版本；字段 new（可以有多个，值是文件名）里列出的文件另存为新文档。
+// 字段 header 是 Excel / CSV 的表头设置（first / none，不填自动判断）。
 // 不带文件、带 title 和 markdown 时直接新建一篇 Markdown 文档。
 func (s *Server) handleKBUpload(w http.ResponseWriter, r *http.Request) {
 	b, v, ok := s.loadKBase(w, r)
@@ -405,6 +496,18 @@ func (s *Server) handleKBUpload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "一次最多上传 50 个文件")
 		return
 	}
+	header, okHeader := headerOption(r.FormValue("header"))
+	if !okHeader {
+		writeErr(w, http.StatusBadRequest, "header 只能是 first 或 none")
+		return
+	}
+	opt := kb.Options{Header: header}
+	asNew := r.MultipartForm.Value["new"]
+	existing, err := s.store.ListKDocs(r.Context(), b.ID)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
 	results := []kbUploadResult{}
 	created := 0
 	for _, fh := range files {
@@ -427,13 +530,26 @@ func (s *Server) handleKBUpload(w http.ResponseWriter, r *http.Request) {
 			results = append(results, res)
 			continue
 		}
-		conv, origin, err := s.convertUpload(fh.Filename, data)
+		conv, origin, err := s.convertUpload(fh.Filename, data, opt)
 		if err != nil {
 			res.Error = err.Error()
 			results = append(results, res)
 			continue
 		}
-		d := &store.KDoc{BaseID: b.ID, Title: truncateStr(conv.Title, 200), Folder: folder, SourceName: origin.SourceName, Mime: origin.Mime, BlobKey: origin.BlobKey, Size: origin.Size}
+		if same := sameDoc(existing, folder, fh.Filename); same != nil && !slices.Contains(asNew, fh.Filename) {
+			// 同名文档：出一个新版本，旧版本和旧引用都还在
+			updated, err := s.store.UpdateKDoc(r.Context(), same.ID, store.KDocPatch{Markdown: &conv.Markdown, Note: "上传新版本 " + origin.SourceName, Origin: origin, ConvertInfo: origin.ConvertInfo}, uid)
+			if err != nil {
+				s.internalErr(w, r, err)
+				return
+			}
+			created++
+			res.Doc, res.Updated = updated, true
+			results = append(results, res)
+			s.audit(r, auditKBDocEdit, "kb:"+b.Slug+"/"+strconv.FormatInt(updated.ID, 10), map[string]any{"file": origin.SourceName, "version": updated.Version})
+			continue
+		}
+		d := &store.KDoc{BaseID: b.ID, Title: truncateStr(conv.Title, 200), Folder: folder, SourceName: origin.SourceName, Mime: origin.Mime, BlobKey: origin.BlobKey, Size: origin.Size, ConvertInfo: origin.ConvertInfo}
 		if err := s.store.CreateKDoc(r.Context(), d, conv.Markdown, "上传 "+origin.SourceName, uid); err != nil {
 			s.internalErr(w, r, err)
 			return
@@ -441,6 +557,7 @@ func (s *Server) handleKBUpload(w http.ResponseWriter, r *http.Request) {
 		created++
 		res.Doc = d
 		results = append(results, res)
+		existing = append(existing, d)
 		s.audit(r, auditKBDocCreate, "kb:"+b.Slug+"/"+strconv.FormatInt(d.ID, 10), map[string]any{"title": d.Title, "file": origin.SourceName})
 	}
 	status := http.StatusCreated
@@ -578,6 +695,14 @@ func (s *Server) handleKDocPatch(w http.ResponseWriter, r *http.Request) {
 			if p.Note == "" {
 				p.Note = "网页编辑"
 			}
+			// 记下「手工改过」：重新转换会覆盖这些修改，网页上要提醒
+			if len(d.ConvertInfo) > 0 {
+				var c kdocConvert
+				if json.Unmarshal(d.ConvertInfo, &c) == nil && !c.Edited {
+					c.Edited = true
+					p.ConvertInfo, _ = json.Marshal(c)
+				}
+			}
 		}
 	}
 	updated, err := s.store.UpdateKDoc(r.Context(), d.ID, p, currentUser(r).ID)
@@ -615,17 +740,92 @@ func (s *Server) handleKDocReplace(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "读取文件失败，或文件超过 50 MB")
 		return
 	}
-	conv, origin, err := s.convertUpload(fh.Filename, data)
+	conv, origin, err := s.convertUpload(fh.Filename, data, kb.Options{Header: savedHeader(d)})
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	updated, err := s.store.UpdateKDoc(r.Context(), d.ID, store.KDocPatch{Markdown: &conv.Markdown, Note: "重新上传 " + origin.SourceName, Origin: origin}, currentUser(r).ID)
+	updated, err := s.store.UpdateKDoc(r.Context(), d.ID, store.KDocPatch{Markdown: &conv.Markdown, Note: "重新上传 " + origin.SourceName, Origin: origin, ConvertInfo: origin.ConvertInfo}, currentUser(r).ID)
 	if err != nil {
 		s.internalErr(w, r, err)
 		return
 	}
 	s.audit(r, auditKBDocEdit, "kb:"+b.Slug+"/"+strconv.FormatInt(d.ID, 10), map[string]any{"file": origin.SourceName, "version": updated.Version})
+	writeJSON(w, http.StatusOK, updated)
+}
+
+// savedHeader 是维护者上次给这篇文档选的表头设置。
+func savedHeader(d *store.KDoc) string {
+	var c kdocConvert
+	if len(d.ConvertInfo) > 0 && json.Unmarshal(d.ConvertInfo, &c) == nil {
+		return c.HeaderOption
+	}
+	return ""
+}
+
+type kdocReconvertReq struct {
+	Header string `json:"header"`
+}
+
+// POST /api/kb-docs/{id}/reconvert：用原件按新的设置（Excel / CSV 的表头）重新转换；正文变了就出一个新版本。
+// 网页上改过的正文会被覆盖，网页上先提醒。
+func (s *Server) handleKDocReconvert(w http.ResponseWriter, r *http.Request) {
+	d, b, v, ok := s.loadKDoc(w, r)
+	if !ok {
+		return
+	}
+	var req kdocReconvertReq
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if !s.requireKDocEdit(w, v, b) {
+		return
+	}
+	header, okHeader := headerOption(req.Header)
+	if !okHeader {
+		writeErr(w, http.StatusBadRequest, "header 只能是 first 或 none")
+		return
+	}
+	if d.BlobKey == "" || s.registry == nil {
+		writeErr(w, http.StatusBadRequest, "这篇文档没有原件，不能重新转换")
+		return
+	}
+	f, err := s.registry.Blobs().Open(d.BlobKey)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "原件已经不在了，请重新上传")
+		return
+	}
+	data, err := io.ReadAll(io.LimitReader(f, maxKBFile+1))
+	f.Close()
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	opt := kb.Options{Header: header}
+	conv, err := kb.Convert(d.SourceName, data, opt)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if len(conv.Markdown) > maxKBMarkdown {
+		writeErr(w, http.StatusBadRequest, "转换出来的正文超过 8 MB，请拆成几个文件")
+		return
+	}
+	cur, err := s.store.KDocText(r.Context(), d.ID, 0)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	p := store.KDocPatch{ConvertInfo: convertRecord(conv.Info, opt)}
+	if cur.Markdown != conv.Markdown {
+		p.Markdown, p.Note = &conv.Markdown, "重新转换"
+	}
+	updated, err := s.store.UpdateKDoc(r.Context(), d.ID, p, currentUser(r).ID)
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	s.audit(r, auditKBDocEdit, "kb:"+b.Slug+"/"+strconv.FormatInt(d.ID, 10), map[string]any{"reconvert": header, "version": updated.Version})
 	writeJSON(w, http.StatusOK, updated)
 }
 

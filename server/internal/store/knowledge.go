@@ -78,6 +78,8 @@ type KDoc struct {
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 	HasOrigin  bool      `json:"has_original"`
+	// 转换体检（JSON，结构见 api 包的 kdocConvert）；网页新建的文档为空
+	ConvertInfo json.RawMessage `json:"convert_info,omitempty"`
 }
 
 type KDocText struct {
@@ -281,12 +283,13 @@ func bumpRevision(ctx context.Context, e execer, baseID int64, t time.Time) erro
 	return err
 }
 
-const kdocCols = "id, base_id, title, folder, source_name, mime, blob_key, size, version, line_count, updated_by, created_at, updated_at"
+const kdocCols = "id, base_id, title, folder, source_name, mime, blob_key, size, version, line_count, updated_by, created_at, updated_at, convert_info"
 
 func scanKDoc(row interface{ Scan(...any) error }) (*KDoc, error) {
 	var d KDoc
 	var by sql.NullInt64
-	err := row.Scan(&d.ID, &d.BaseID, &d.Title, &d.Folder, &d.SourceName, &d.Mime, &d.BlobKey, &d.Size, &d.Version, &d.Lines, &by, &d.CreatedAt, &d.UpdatedAt)
+	var info sql.NullString
+	err := row.Scan(&d.ID, &d.BaseID, &d.Title, &d.Folder, &d.SourceName, &d.Mime, &d.BlobKey, &d.Size, &d.Version, &d.Lines, &by, &d.CreatedAt, &d.UpdatedAt, &info)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -296,8 +299,18 @@ func scanKDoc(row interface{ Scan(...any) error }) (*KDoc, error) {
 	if by.Valid {
 		d.UpdatedBy = &by.Int64
 	}
+	if info.Valid && info.String != "" {
+		d.ConvertInfo = json.RawMessage(info.String)
+	}
 	d.HasOrigin = d.BlobKey != ""
 	return &d, nil
+}
+
+func nullJSON(raw json.RawMessage) any {
+	if len(raw) == 0 {
+		return nil
+	}
+	return string(raw)
 }
 
 func countLines(md string) int {
@@ -314,9 +327,9 @@ func (s *Store) CreateKDoc(ctx context.Context, d *KDoc, markdown, note string, 
 	t := now()
 	d.Version, d.Lines = 1, countLines(markdown)
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO kb_docs (base_id, title, folder, source_name, mime, blob_key, size, version, line_count, updated_by, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		d.BaseID, d.Title, d.Folder, d.SourceName, d.Mime, d.BlobKey, d.Size, d.Version, d.Lines, nullID(by), t, t)
+		`INSERT INTO kb_docs (base_id, title, folder, source_name, mime, blob_key, size, version, line_count, updated_by, created_at, updated_at, convert_info)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		d.BaseID, d.Title, d.Folder, d.SourceName, d.Mime, d.BlobKey, d.Size, d.Version, d.Lines, nullID(by), t, t, nullJSON(d.ConvertInfo))
 	if err != nil {
 		return err
 	}
@@ -368,6 +381,8 @@ type KDocPatch struct {
 	Note     string
 	// 重新上传了文件：换原件
 	Origin *KDoc
+	// 换转换体检（重新上传、重新转换、网页上改了正文时）
+	ConvertInfo json.RawMessage
 }
 
 // UpdateKDoc 修改文档，返回修改后的文档。
@@ -391,6 +406,9 @@ func (s *Store) UpdateKDoc(ctx context.Context, id int64, p KDocPatch, by int64)
 	if p.Origin != nil {
 		d.SourceName, d.Mime, d.BlobKey, d.Size = p.Origin.SourceName, p.Origin.Mime, p.Origin.BlobKey, p.Origin.Size
 	}
+	if p.ConvertInfo != nil {
+		d.ConvertInfo = p.ConvertInfo
+	}
 	if p.Markdown != nil {
 		d.Version++
 		d.Lines = countLines(*p.Markdown)
@@ -400,8 +418,8 @@ func (s *Store) UpdateKDoc(ctx context.Context, id int64, p KDocPatch, by int64)
 		}
 	}
 	if _, err := tx.ExecContext(ctx,
-		`UPDATE kb_docs SET title = ?, folder = ?, source_name = ?, mime = ?, blob_key = ?, size = ?, version = ?, line_count = ?, updated_by = ?, updated_at = ? WHERE id = ?`,
-		d.Title, d.Folder, d.SourceName, d.Mime, d.BlobKey, d.Size, d.Version, d.Lines, nullID(by), t, d.ID); err != nil {
+		`UPDATE kb_docs SET title = ?, folder = ?, source_name = ?, mime = ?, blob_key = ?, size = ?, version = ?, line_count = ?, updated_by = ?, updated_at = ?, convert_info = ? WHERE id = ?`,
+		d.Title, d.Folder, d.SourceName, d.Mime, d.BlobKey, d.Size, d.Version, d.Lines, nullID(by), t, nullJSON(d.ConvertInfo), d.ID); err != nil {
 		return nil, err
 	}
 	if err := bumpRevision(ctx, tx, d.BaseID, t); err != nil {

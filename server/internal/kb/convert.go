@@ -10,6 +10,7 @@ import (
 	"path"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -17,11 +18,11 @@ import (
 	"github.com/ledongthuc/pdf"
 )
 
-// 支持的格式：Markdown、纯文本、Word（.docx）、PDF（有文字层的）。
-var Formats = []string{".md", ".markdown", ".txt", ".docx", ".pdf"}
+// 支持的格式：Markdown、纯文本、Word（.docx）、PDF（有文字层的）、Excel（.xlsx）、CSV、PPT（.pptx）。
+var Formats = []string{".md", ".markdown", ".txt", ".docx", ".pdf", ".xlsx", ".csv", ".pptx"}
 
 // ErrUnsupported 表示不支持这种文件。
-var ErrUnsupported = errors.New("只支持 PDF、Word（.docx）、Markdown 和纯文本文件")
+var ErrUnsupported = errors.New("只支持 PDF、Word（.docx）、Excel（.xlsx）、CSV、PPT（.pptx）、Markdown 和纯文本文件")
 
 // ErrNoText 表示文件里抽不出文字（多半是扫描件）。
 var ErrNoText = errors.New("这个文件里没有可以提取的文字，可能是扫描件；扫描件暂不支持")
@@ -31,10 +32,45 @@ type Converted struct {
 	Title    string
 	Markdown string
 	Mime     string
+	Info     Info
+}
+
+// Info 是转换「体检」：跟员工能不能查到有关的事，上传后给维护者看，也记在文档上。
+type Info struct {
+	Format string `json:"format"` // md / txt / docx / pdf / xlsx / csv / pptx
+	// PDF、PPT 的页数
+	Pages int `json:"pages,omitempty"`
+	// 没有收录的页（PDF 扫描页、乱码页）
+	Skipped []SkippedPage `json:"skipped,omitempty"`
+	// 去掉的页眉页脚有几种（PDF）
+	HeaderFooter int `json:"header_footer,omitempty"`
+	// 补回的自动编号个数（Word）
+	Numbering int `json:"numbering,omitempty"`
+	Tables    int `json:"tables,omitempty"`
+	// Excel / CSV
+	Sheets       int    `json:"sheets,omitempty"`
+	HiddenSheets int    `json:"hidden_sheets,omitempty"`
+	Rows         int    `json:"rows,omitempty"`
+	Header       string `json:"header,omitempty"`   // first：第一行是表头；letters：用 A、B、C 当列名
+	Encoding     string `json:"encoding,omitempty"` // CSV 不是 UTF-8 时的原编码
+	// PPT 里带备注的页数
+	Notes int `json:"notes,omitempty"`
+}
+
+// SkippedPage 是一页没有收录的原因。
+type SkippedPage struct {
+	Page   int    `json:"page"`
+	Reason string `json:"reason"` // scanned：扫描页；garbled：文字是乱码
+}
+
+// Options 是转换时可以改的设置。
+type Options struct {
+	// Excel / CSV 的表头：""（自动判断）、"first"（第一行是表头）、"none"（第一行就是数据）
+	Header string
 }
 
 // Convert 按文件扩展名把上传的文件转成 Markdown 正文。
-func Convert(name string, data []byte) (*Converted, error) {
+func Convert(name string, data []byte, opt Options) (*Converted, error) {
 	ext := strings.ToLower(path.Ext(name))
 	title := strings.TrimSpace(strings.TrimSuffix(path.Base(strings.ReplaceAll(name, "\\", "/")), path.Ext(name)))
 	var out *Converted
@@ -42,14 +78,30 @@ func Convert(name string, data []byte) (*Converted, error) {
 	switch ext {
 	case ".md", ".markdown":
 		out, err = textFile(data, "text/markdown")
+		if out != nil {
+			out.Info.Format = "md"
+		}
 	case ".txt":
 		out, err = textFile(data, "text/plain")
+		if out != nil {
+			out.Info.Format = "txt"
+		}
 	case ".docx":
 		out, err = convertDocx(data)
 	case ".pdf":
 		out, err = convertPDF(data)
+	case ".xlsx":
+		out, err = convertXLSX(data, opt)
+	case ".csv":
+		out, err = convertCSV(data, opt)
+	case ".pptx":
+		out, err = convertPPTX(data)
 	case ".doc":
-		return nil, errors.New("旧版 Word（.doc）不支持，请另存为 .docx 后再上传")
+		return nil, errors.New("旧版 Word（.doc）不支持，请在 Word 里另存为 .docx 后再上传")
+	case ".xls":
+		return nil, errors.New("旧版 Excel（.xls）不支持，请在 Excel 里另存为 .xlsx 后再上传")
+	case ".ppt":
+		return nil, errors.New("旧版 PowerPoint（.ppt）不支持，请在 PowerPoint 里另存为 .pptx 后再上传")
 	default:
 		return nil, ErrUnsupported
 	}
@@ -67,11 +119,11 @@ func Convert(name string, data []byte) (*Converted, error) {
 }
 
 func textFile(data []byte, mime string) (*Converted, error) {
-	data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
-	if !utf8.Valid(data) {
-		return nil, errors.New("文件不是 UTF-8 编码，请转成 UTF-8 后再上传")
+	text, enc, err := decodeText(data)
+	if err != nil {
+		return nil, err
 	}
-	return &Converted{Markdown: string(data), Mime: mime}, nil
+	return &Converted{Markdown: text, Mime: mime, Info: Info{Encoding: enc}}, nil
 }
 
 var blankRuns = regexp.MustCompile(`\n{3,}`)
@@ -93,19 +145,21 @@ func tidy(s string) string {
 
 const maxDocxXML = 64 << 20
 
-// convertDocx 读 word/document.xml：段落样式里的「标题 N」转成 #，列表项转成 -，表格转成 Markdown 表格。
+// convertDocx 读 word/document.xml：段落样式里的「标题 N」转成 #，自动编号补回正文，项目符号转成 -，表格转成 Markdown 表格。
 func convertDocx(data []byte) (*Converted, error) {
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, errors.New("不是有效的 .docx 文件")
 	}
-	var doc, styles []byte
+	var doc, styles, num []byte
 	for _, f := range zr.File {
 		switch f.Name {
 		case "word/document.xml":
 			doc, err = readZip(f)
 		case "word/styles.xml":
 			styles, err = readZip(f)
+		case "word/numbering.xml":
+			num, err = readZip(f)
 		}
 		if err != nil {
 			return nil, err
@@ -114,12 +168,13 @@ func convertDocx(data []byte) (*Converted, error) {
 	if doc == nil {
 		return nil, errors.New("不是有效的 .docx 文件：缺少 word/document.xml")
 	}
-	headings := docxHeadingStyles(styles)
-	md, title, err := docxBody(doc, headings)
+	st := docxStyles(styles)
+	info := Info{Format: "docx"}
+	md, title, err := docxBody(doc, st, parseNumbering(num), &info)
 	if err != nil {
 		return nil, err
 	}
-	return &Converted{Title: title, Markdown: md, Mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}, nil
+	return &Converted{Title: title, Markdown: md, Mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", Info: info}, nil
 }
 
 func readZip(f *zip.File) ([]byte, error) {
@@ -136,36 +191,76 @@ func readZip(f *zip.File) ([]byte, error) {
 
 var headingStyleRe = regexp.MustCompile(`(?i)^(heading|标题)\s*([1-6])$`)
 
-// docxHeadingStyles 找出标题样式（样式 id → 级别）。中文 Word 的样式 id 常是数字，要看样式名和大纲级别。
-func docxHeadingStyles(styles []byte) map[string]int {
-	out := map[string]int{"Title": 1}
+// styleNum 是段落样式里带的自动编号（标题样式常常这样绑定「第一章」）。ilvl 为 -1 表示样式里没写级别。
+type styleNum struct {
+	numID string
+	ilvl  int
+}
+
+type docxStyleInfo struct {
+	headings map[string]int // 样式 id → 标题级别
+	nums     map[string]styleNum
+}
+
+// docxStyles 找出标题样式（样式 id → 级别）和样式上的编号。中文 Word 的样式 id 常是数字，要看样式名和大纲级别。
+func docxStyles(styles []byte) docxStyleInfo {
+	out := docxStyleInfo{headings: map[string]int{"Title": 1}, nums: map[string]styleNum{}}
 	for i := 1; i <= 6; i++ {
-		out[fmt.Sprintf("Heading%d", i)] = i
+		out.headings[fmt.Sprintf("Heading%d", i)] = i
 	}
 	if styles == nil {
 		return out
 	}
+	type val struct {
+		Val string `xml:"val,attr"`
+	}
 	var s struct {
 		Styles []struct {
-			ID   string `xml:"styleId,attr"`
-			Name struct {
-				Val string `xml:"val,attr"`
-			} `xml:"name"`
-			PPr struct {
+			ID      string `xml:"styleId,attr"`
+			Name    val    `xml:"name"`
+			BasedOn *val   `xml:"basedOn"`
+			PPr     struct {
 				Outline *struct {
 					Val int `xml:"val,attr"`
 				} `xml:"outlineLvl"`
+				NumPr *struct {
+					Ilvl  *val `xml:"ilvl"`
+					NumID *val `xml:"numId"`
+				} `xml:"numPr"`
 			} `xml:"pPr"`
 		} `xml:"style"`
 	}
 	if xml.Unmarshal(styles, &s) != nil {
 		return out
 	}
+	based := map[string]string{}
 	for _, st := range s.Styles {
 		if m := headingStyleRe.FindStringSubmatch(strings.TrimSpace(st.Name.Val)); m != nil {
-			out[st.ID] = int(m[2][0] - '0')
+			out.headings[st.ID] = int(m[2][0] - '0')
 		} else if st.PPr.Outline != nil && st.PPr.Outline.Val >= 0 && st.PPr.Outline.Val < 6 {
-			out[st.ID] = st.PPr.Outline.Val + 1
+			out.headings[st.ID] = st.PPr.Outline.Val + 1
+		}
+		if np := st.PPr.NumPr; np != nil && np.NumID != nil {
+			sn := styleNum{numID: np.NumID.Val, ilvl: -1}
+			if np.Ilvl != nil {
+				sn.ilvl, _ = strconv.Atoi(np.Ilvl.Val)
+			}
+			out.nums[st.ID] = sn
+		}
+		if st.BasedOn != nil {
+			based[st.ID] = st.BasedOn.Val
+		}
+	}
+	// 编号可以从基础样式继承
+	for id := range based {
+		if _, ok := out.nums[id]; ok {
+			continue
+		}
+		for p, depth := based[id], 0; p != "" && depth < 10; p, depth = based[p], depth+1 {
+			if sn, ok := out.nums[p]; ok {
+				out.nums[id] = sn
+				break
+			}
 		}
 	}
 	return out
@@ -174,12 +269,15 @@ func docxHeadingStyles(styles []byte) map[string]int {
 type docxPara struct {
 	style   string
 	outline int // 段落自己的大纲级别，-1 表示没有
-	list    bool
-	text    strings.Builder
+	// 段落自己的编号（numPr）；numID 为空表示没写，用样式上的
+	numID  string
+	ilvl   int
+	hasNum bool // 段落写了 numPr
+	text   strings.Builder
 }
 
-// docxBody 流式解析正文，只关心段落、文字、换行、制表符和表格。
-func docxBody(doc []byte, headings map[string]int) (string, string, error) {
+// docxBody 流式解析正文，只关心段落、文字、换行、制表符、编号和表格。
+func docxBody(doc []byte, st docxStyleInfo, num *numbering, info *Info) (string, string, error) {
 	dec := xml.NewDecoder(bytes.NewReader(doc))
 	var out strings.Builder
 	var title string
@@ -189,23 +287,50 @@ func docxBody(doc []byte, headings map[string]int) (string, string, error) {
 		rows [][]string
 		row  []string
 		cell strings.Builder
+		// 当前单元格：横向合并几列；纵向合并（1 开始合并、2 接着上一行）
+		span, vmerge int
 	}
 	var tables []*table
-	inText := false
+	inText, inNumPr := false, false
 	writePara := func(p *docxPara) {
+		// 先算编号：空段落在 Word 里也会占掉一个号
+		numID, ilvl := p.numID, p.ilvl
+		if numID == "" {
+			if sn, ok := st.nums[p.style]; ok {
+				numID, ilvl = sn.numID, sn.ilvl
+			}
+		}
+		if ilvl < 0 {
+			ilvl = num.levelFor(numID, p.style)
+		}
+		var label string
+		bullet := p.hasNum
+		if numID != "" {
+			var ok bool
+			label, bullet, ok = num.next(numID, ilvl)
+			// 找不到编号定义时按项目符号处理；numId 为 0 表示去掉了编号
+			bullet = bullet || !ok && p.hasNum && numID != "0"
+		}
 		text := strings.TrimSpace(p.text.String())
 		if text == "" {
 			return
+		}
+		if label != "" {
+			info.Numbering++
+		}
+		prefixed := text
+		if label != "" {
+			prefixed = label + num.suffix(numID, ilvl) + text
 		}
 		if len(tables) > 0 {
 			t := tables[len(tables)-1]
 			if t.cell.Len() > 0 {
 				t.cell.WriteString(" ")
 			}
-			t.cell.WriteString(text)
+			t.cell.WriteString(prefixed)
 			return
 		}
-		level := headings[p.style]
+		level := st.headings[p.style]
 		if p.outline >= 0 && p.outline < 6 {
 			level = p.outline + 1
 		}
@@ -214,11 +339,11 @@ func docxBody(doc []byte, headings map[string]int) (string, string, error) {
 			if title == "" && level == 1 {
 				title = text
 			}
-			out.WriteString(strings.Repeat("#", level) + " " + strings.ReplaceAll(text, "\n", " ") + "\n\n")
-		case p.list:
+			out.WriteString(strings.Repeat("#", level) + " " + strings.ReplaceAll(prefixed, "\n", " ") + "\n\n")
+		case bullet:
 			out.WriteString("- " + text + "\n")
 		default:
-			out.WriteString(text + "\n\n")
+			out.WriteString(prefixed + "\n\n")
 		}
 	}
 	for {
@@ -233,7 +358,7 @@ func docxBody(doc []byte, headings map[string]int) (string, string, error) {
 		case xml.StartElement:
 			switch t.Name.Local {
 			case "p":
-				para = &docxPara{outline: -1}
+				para = &docxPara{outline: -1, ilvl: -1}
 			case "pStyle":
 				if para != nil {
 					para.style = attr(t, "val")
@@ -243,8 +368,31 @@ func docxBody(doc []byte, headings map[string]int) (string, string, error) {
 					fmt.Sscanf(attr(t, "val"), "%d", &para.outline)
 				}
 			case "numPr":
+				inNumPr = true
 				if para != nil {
-					para.list = true
+					para.hasNum = true
+				}
+			case "numId":
+				if para != nil && inNumPr {
+					para.numID = attr(t, "val")
+				}
+			case "ilvl":
+				if para != nil && inNumPr {
+					para.ilvl, _ = strconv.Atoi(attr(t, "val"))
+				}
+			case "gridSpan":
+				if n := len(tables); n > 0 {
+					if v, err := strconv.Atoi(attr(t, "val")); err == nil && v > 1 && v <= 64 {
+						tables[n-1].span = v
+					}
+				}
+			case "vMerge":
+				if n := len(tables); n > 0 {
+					if attr(t, "val") == "restart" {
+						tables[n-1].vmerge = 1
+					} else {
+						tables[n-1].vmerge = 2
+					}
 				}
 			case "t":
 				inText = true
@@ -259,14 +407,17 @@ func docxBody(doc []byte, headings map[string]int) (string, string, error) {
 			case "tbl":
 				tables = append(tables, &table{})
 			case "tc":
-				if len(tables) > 0 {
-					tables[len(tables)-1].cell.Reset()
+				if n := len(tables); n > 0 {
+					tables[n-1].cell.Reset()
+					tables[n-1].span, tables[n-1].vmerge = 1, 0
 				}
 			}
 		case xml.EndElement:
 			switch t.Name.Local {
 			case "t":
 				inText = false
+			case "numPr":
+				inNumPr = false
 			case "p":
 				if para != nil {
 					writePara(para)
@@ -275,7 +426,16 @@ func docxBody(doc []byte, headings map[string]int) (string, string, error) {
 			case "tc":
 				if n := len(tables); n > 0 {
 					tb := tables[n-1]
-					tb.row = append(tb.row, strings.ReplaceAll(strings.TrimSpace(tb.cell.String()), "|", "\\|"))
+					text := strings.ReplaceAll(strings.TrimSpace(tb.cell.String()), "|", "\\|")
+					// 纵向合并的格子：把上面那格的内容抄下来，这一行单独看也是完整的
+					if col := len(tb.row); tb.vmerge == 2 && text == "" && len(tb.rows) > 0 && col < len(tb.rows[len(tb.rows)-1]) {
+						text = tb.rows[len(tb.rows)-1][col]
+					}
+					tb.row = append(tb.row, text)
+					// 横向合并：补上空格子，列才对得齐
+					for i := 1; i < tb.span; i++ {
+						tb.row = append(tb.row, "")
+					}
 					tb.cell.Reset()
 				}
 			case "tr":
@@ -298,6 +458,9 @@ func docxBody(doc []byte, headings map[string]int) (string, string, error) {
 					outer.cell.WriteString(strings.ReplaceAll(md, "\n", " "))
 				} else {
 					out.WriteString(md + "\n")
+					if md != "" {
+						info.Tables++
+					}
 				}
 			}
 		case xml.CharData:

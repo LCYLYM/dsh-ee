@@ -212,10 +212,12 @@ func (s *Server) routes() []route {
 		prm("PATCH /api/kb/{id}", s.handleKBPatch, rbac.PortalView),
 		prm("DELETE /api/kb/{id}", s.handleKBDelete, rbac.KnowledgeManage),
 		prm("POST /api/kb/{id}/docs", s.handleKBUpload, rbac.PortalView),
+		prm("POST /api/kb/{id}/docs/check", s.handleKBUploadCheck, rbac.PortalView),
 		prm("GET /api/kb-docs/{id}", s.handleKDocDetail, rbac.PortalView),
 		prm("PATCH /api/kb-docs/{id}", s.handleKDocPatch, rbac.PortalView),
 		prm("DELETE /api/kb-docs/{id}", s.handleKDocDelete, rbac.PortalView),
 		prm("POST /api/kb-docs/{id}/file", s.handleKDocReplace, rbac.PortalView),
+		prm("POST /api/kb-docs/{id}/reconvert", s.handleKDocReconvert, rbac.PortalView),
 		prm("GET /api/kb-docs/{id}/original", s.handleKDocOriginal, rbac.PortalView),
 
 		// DSH 接入：接入插件的发布，以及员工本机 DSH 调用的目录与 MCP 网关（令牌认证）

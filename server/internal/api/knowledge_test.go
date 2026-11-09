@@ -486,3 +486,117 @@ func TestKnowledge(t *testing.T) {
 		t.Fatalf("删掉的文档不应还能读：%s", text)
 	}
 }
+
+// 同名文件更新成新版本、另存一篇、上传前预检、转换体检、按表头设置重新转换。
+func TestKnowledgeUploadVersions(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	if _, err := api.Bootstrap(ctx, st, "admin", "admin-password-123"); err != nil {
+		t.Fatal(err)
+	}
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+	box, _ := secret.NewBox(key)
+	srv := api.New(st, box, api.Options{DataDir: t.TempDir()}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+	admin := newClient(t, ts.URL)
+	code, body := admin.do("POST", "/api/auth/login", map[string]string{"username": "admin", "password": "admin-password-123"}, nil)
+	expect(t, "管理员登录", code, 200, body)
+	code, body = admin.do("POST", "/api/kb", map[string]any{"slug": "hr", "title": "人事制度"}, nil)
+	expect(t, "建库", code, 201, body)
+	kbID := decodeAs[struct{ ID int64 }](t, body).ID
+	docs := "/api/kb/" + itoa(kbID) + "/docs"
+
+	type result struct {
+		File    string `json:"file"`
+		Error   string `json:"error"`
+		Updated bool   `json:"updated"`
+		Doc     *struct {
+			ID          int64           `json:"id"`
+			Version     int             `json:"version"`
+			ConvertInfo json.RawMessage `json:"convert_info"`
+		} `json:"doc"`
+	}
+	upload := func(fields map[string]string, files map[string][]byte) []result {
+		t.Helper()
+		code, body := admin.upload(docs, fields, files)
+		expect(t, "上传", code, 201, body)
+		return decodeAs[struct{ Results []result }](t, body).Results
+	}
+	csv1 := []byte("姓名,部门,分机\n王五,财务部,8001\n")
+	r := upload(map[string]string{"folder": "通讯录"}, map[string][]byte{"分机表.csv": csv1, "年假.md": []byte("# 年假\n\n每年 5 天。\n")})
+	var phone, leave int64
+	for _, x := range r {
+		if x.Doc == nil {
+			t.Fatalf("上传失败：%+v", x)
+		}
+		if x.File == "分机表.csv" {
+			phone = x.Doc.ID
+			if !strings.Contains(string(x.Doc.ConvertInfo), `"format":"csv"`) || !strings.Contains(string(x.Doc.ConvertInfo), `"header":"first"`) {
+				t.Fatalf("体检 = %s", x.Doc.ConvertInfo)
+			}
+		} else {
+			leave = x.Doc.ID
+		}
+	}
+
+	// 预检：同目录同名的才算
+	code, body = admin.do("POST", docs+"/check", map[string]any{"folder": "通讯录", "files": []string{"分机表.csv", "年假.docx", "新文件.pdf"}}, nil)
+	expect(t, "预检", code, 200, body)
+	items := decodeAs[struct {
+		Items []struct {
+			File string `json:"file"`
+			Doc  struct {
+				ID int64 `json:"id"`
+			} `json:"doc"`
+		}
+	}](t, body).Items
+	if len(items) != 2 || items[0].Doc.ID != phone || items[1].Doc.ID != leave {
+		t.Fatalf("预检 = %s", body)
+	}
+	code, body = admin.do("POST", docs+"/check", map[string]any{"folder": "", "files": []string{"分机表.csv"}}, nil)
+	if !strings.Contains(string(body), `"items":[]`) {
+		t.Fatalf("别的目录不算同名：%s", body)
+	}
+
+	// 再传同名文件：更新成第 2 版，不新建
+	r = upload(map[string]string{"folder": "通讯录"}, map[string][]byte{"分机表.csv": []byte("姓名,部门,分机\n王五,财务部,8009\n")})
+	if !r[0].Updated || r[0].Doc.ID != phone || r[0].Doc.Version != 2 {
+		t.Fatalf("同名应更新：%+v", r[0])
+	}
+	// 选了「另存一篇」
+	r = upload(map[string]string{"folder": "通讯录", "new": "分机表.csv"}, map[string][]byte{"分机表.csv": csv1})
+	if r[0].Updated || r[0].Doc.ID == phone {
+		t.Fatalf("另存应新建：%+v", r[0])
+	}
+	code, body = admin.do("GET", "/api/kb/"+itoa(kbID), nil, nil)
+	if n := decodeAs[struct {
+		KB struct{ Docs int } `json:"kb"`
+	}](t, body).KB.Docs; n != 3 {
+		t.Fatalf("文档数 = %d", n)
+	}
+
+	// 重新转换：第一行不是表头
+	code, body = admin.do("POST", "/api/kb-docs/"+itoa(phone)+"/reconvert", map[string]any{"header": "none"}, nil)
+	expect(t, "重新转换", code, 200, body)
+	code, body = admin.do("GET", "/api/kb-docs/"+itoa(phone), nil, nil)
+	if !strings.Contains(string(body), "| A | B | C |") || !strings.Contains(string(body), `"header_option":"none"`) || !strings.Contains(string(body), `"version":3`) {
+		t.Fatalf("重新转换后 = %s", body)
+	}
+	code, body = admin.do("POST", "/api/kb-docs/"+itoa(phone)+"/reconvert", map[string]any{"header": "bad"}, nil)
+	expect(t, "错误的表头设置", code, 400, body)
+
+	// 网页上改过正文：记下「手工改过」
+	code, body = admin.do("PATCH", "/api/kb-docs/"+itoa(phone), map[string]any{"markdown": "# 分机\n\n王五 8009\n"}, nil)
+	expect(t, "改正文", code, 200, body)
+	if !strings.Contains(string(body), `"edited":true`) {
+		t.Fatalf("应记下手工改过：%s", body)
+	}
+	// 网页新建的文档不能重新转换
+	code, body = admin.upload(docs, map[string]string{"title": "说明", "markdown": "# 说明\n"}, nil)
+	expect(t, "新建", code, 201, body)
+	note := decodeAs[struct{ Results []result }](t, body).Results[0].Doc.ID
+	code, body = admin.do("POST", "/api/kb-docs/"+itoa(note)+"/reconvert", map[string]any{}, nil)
+	expect(t, "没有原件", code, 400, body)
+}
