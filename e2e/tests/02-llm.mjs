@@ -1,6 +1,6 @@
 // 模型接入：添加上游 → 检查连接 → 从上游导入模型 → 改对外名称 → 用 key 按对外名称调用
 import http from "node:http";
-import { ADMIN_PW, BASE, api, assert, assertEq, login, newPage, shot, step, tag } from "../lib.mjs";
+import { ADMIN_PW, BASE, api, assert, assertEq, login, newPage, shot, step, tag, nav } from "../lib.mjs";
 
 export default async function (t) {
   const seen = [];
@@ -25,7 +25,7 @@ export default async function (t) {
     const page = await newPage(t);
     await login(page, "admin", ADMIN_PW);
 
-    await page.locator("aside").getByRole("link", { name: "模型接入" }).click();
+    await nav(page, { name: "模型接入" });
     await page.getByRole("button", { name: "添加上游" }).click();
     await page.getByLabel("厂商").selectOption("custom");
     await page.getByLabel("名称", { exact: false }).first().fill(`测试厂商${tag}`);

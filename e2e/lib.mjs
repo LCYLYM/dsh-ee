@@ -124,3 +124,14 @@ export async function api(page, method, url, body) {
 export async function shot(page, name) {
   await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: true });
 }
+
+/**
+ * 点侧边栏里的页面。侧边栏分「工作台」「管理后台」两套菜单，只显示当前这一套；
+ * 要找的页面不在当前这套里时，先点底部的切换入口。
+ */
+export async function nav(page, opts) {
+  const aside = page.locator("aside");
+  const link = aside.getByRole("link", opts);
+  if (!(await link.count())) await aside.locator("[data-nav-switch]").click();
+  await link.first().click();
+}

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { NavLink, Outlet, Link, useLocation } from "react-router";
-import { ExternalLink, LogOut, Menu as MenuGlyph, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { NavLink, Outlet, Link, useLocation, useNavigate } from "react-router";
+import { ExternalLink, LogOut, Menu as MenuGlyph, Search, X } from "lucide-react";
 import { WhaleMark } from "./whale-mark";
 import { useStore } from "../lib/store";
 import { useAuth } from "../lib/auth";
@@ -13,6 +13,8 @@ import type { Menu } from "../lib/api";
 import { cx } from "./ui";
 import { useTranslation } from "react-i18next";
 import { Tip } from "@/components/tip";
+import { CommandPalette, useHashFocus, useSearchShortcut } from "./command-palette";
+import { entryOf, rememberSpace, rememberedSpace, spaceOfPath, splitSpaces, type NavSpace } from "../lib/nav-space";
 
 
 /** 个别页面在侧边栏上的附加状态（计数、已关闭、按设置隐藏），按 page_key 挂接。 */
@@ -67,10 +69,80 @@ function NavEntry({ m, onNavigate }: { m: Menu; onNavigate: () => void }) {
   );
 }
 
-function Sidebar({ onNavigate }: { onNavigate: () => void }) {
+/** 当前显示哪一套菜单：当前页面属于哪套就是哪套，不在菜单里的页面沿用上一次的。 */
+function useNavSpace() {
+  const { tree } = useMenus();
+  const { pathname } = useLocation();
+  const spaces = splitSpaces(tree);
+  const matched = spaceOfPath(spaces, pathname);
+  let space: NavSpace = matched ?? rememberedSpace();
+  if (!spaces[space].length) space = space === "admin" ? "work" : "admin";
+  useEffect(() => {
+    if (matched) rememberSpace(matched, pathname);
+  }, [matched, pathname]);
+  return { spaces, space };
+}
+
+/** 「工作台 / 管理后台」切换；两套里有一套是空的（例如普通员工）就不显示。 */
+function SpaceSwitch({ onNavigate }: { onNavigate: () => void }) {
+  const { spaces, space } = useNavSpace();
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  if (!spaces.work.length || !spaces.admin.length) return null;
+  return (
+    <div className="mx-1 mb-4 grid grid-cols-2 rounded-lg bg-neutral-100 p-0.5 text-sm" role="tablist" aria-label={t("nav.admin")}>
+      {(["work", "admin"] as const).map((s) => {
+        const active = s === space;
+        return (
+          <button
+            key={s}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            {...(active ? {} : { "data-nav-switch": "" })}
+            onClick={() => {
+              if (active) return;
+              const to = entryOf(spaces, s);
+              if (to) {
+                navigate(to);
+                onNavigate();
+              }
+            }}
+            className={cx(
+              "rounded-md py-1.5 font-medium transition",
+              active ? "bg-card text-neutral-900 shadow-card ring-1 ring-neutral-200/70" : "text-neutral-500 hover:text-neutral-900",
+            )}
+          >
+            {t(s === "work" ? "nav.work" : "nav.admin")}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SearchButton({ onOpen }: { onOpen: () => void }) {
+  const { t } = useTranslation();
+  const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="mx-1 mb-4 flex h-8 items-center gap-2 rounded-md border border-neutral-200 bg-card px-2.5 text-left text-sm text-neutral-500 transition hover:border-neutral-300 hover:text-neutral-800"
+    >
+      <Search size={14} />
+      <span className="flex-1 truncate">{t("nav.search")}</span>
+      <kbd className="rounded border border-neutral-200 px-1 font-sans text-[11px] text-neutral-400">{mac ? "⌘K" : "Ctrl K"}</kbd>
+    </button>
+  );
+}
+
+function Sidebar({ onNavigate, onSearch }: { onNavigate: () => void; onSearch: () => void }) {
   const { settings } = useStore();
   const { user, logout } = useAuth();
-  const { tree, loading, error, reload } = useMenus();
+  const { loading, error, reload } = useMenus();
+  const { spaces, space } = useNavSpace();
+  const tree = spaces[space];
   const { t } = useTranslation();
   const menuTitle = useMenuTitle();
   const L = useLabels();
@@ -83,6 +155,8 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
           <span className="block text-xs text-neutral-500">{settings.orgName}</span>
         </span>
       </Link>
+      <SearchButton onOpen={onSearch} />
+      <SpaceSwitch onNavigate={onNavigate} />
       <div className="flex flex-col gap-6 pb-6">
         {loading && <div className="px-3 text-sm text-neutral-500">{t("shell.loadingMenus")}</div>}
         {error && (
@@ -92,23 +166,22 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
         )}
         {tree.map((n) =>
           n.kind === "group" ? (
-            n.visible && n.children.some((c) => c.visible) ? (
+            n.children.length ? (
               <div key={n.id}>
                 <div className="px-3 pb-1.5 text-xs font-semibold tracking-wide text-neutral-400">{menuTitle(n)}</div>
                 <nav className="flex flex-col gap-0.5">
                   {n.children
-                    .filter((c) => c.visible)
                     .map((c) => (
                       <NavEntry key={`${c.id}-${c.page_key}`} m={c} onNavigate={onNavigate} />
                     ))}
                 </nav>
               </div>
             ) : null
-          ) : n.visible ? (
+          ) : (
             <nav key={n.id} className="flex flex-col">
               <NavEntry key={`${n.id}-${n.page_key}`} m={n} onNavigate={onNavigate} />
             </nav>
-          ) : null,
+          ),
         )}
       </div>
       <div className="mt-auto flex items-center justify-between border-t border-neutral-200/70 px-3 pt-4">
@@ -155,7 +228,11 @@ export function AppLayout() {
   const { search } = useLocation();
   const [open, setOpen] = useState(false);
   const { t } = useTranslation();
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
+  const [searching, setSearching] = useState(false);
+  const toggleSearch = useCallback(() => setSearching((v) => !v), []);
+  useSearchShortcut(toggleSearch);
+  useHashFocus(pathname, hash);
   // 用块体：新版浏览器的 scrollTo 会返回 Promise，被当成 effect 的清理函数会报错
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -164,7 +241,7 @@ export function AppLayout() {
   return (
     <div className="min-h-screen bg-neutral-50 lg:flex">
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 overflow-y-auto border-r border-neutral-200/70 bg-card lg:block">
-        <Sidebar onNavigate={() => {}} />
+        <Sidebar onNavigate={() => {}} onSearch={() => setSearching(true)} />
       </aside>
 
       <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-neutral-200/70 bg-card/90 px-4 backdrop-blur lg:hidden">
@@ -178,10 +255,14 @@ export function AppLayout() {
         </button>
         <span className="text-sm font-bold text-neutral-900">dsh-ee</span>
         <span className="text-sm text-neutral-500">{settings.orgName}</span>
+        <button type="button" aria-label={t("nav.search")} onClick={() => setSearching(true)} className="ml-auto rounded-md p-1.5 text-neutral-600 hover:bg-neutral-100">
+          <Search size={18} />
+        </button>
       </header>
+      <CommandPalette open={searching} onOpenChange={setSearching} />
       {open && (
         <div className="fixed inset-x-0 top-12 bottom-0 z-20 overflow-y-auto bg-card lg:hidden">
-          <Sidebar onNavigate={() => setOpen(false)} />
+          <Sidebar onNavigate={() => setOpen(false)} onSearch={() => { setOpen(false); setSearching(true); }} />
         </div>
       )}
 

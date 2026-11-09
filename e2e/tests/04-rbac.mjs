@@ -1,19 +1,18 @@
 // RBAC：改菜单名称与路由 → 建角色 → 建用户分配角色 → 该用户只看到对应菜单、接口按权限拒绝
-import { ADMIN_PW, BASE, api, assert, assertEq, login, logout, newPage, shot, step, tag } from "../lib.mjs";
+import { ADMIN_PW, BASE, api, assert, assertEq, login, logout, newPage, shot, step, tag, nav } from "../lib.mjs";
 
 export default async function (t) {
   const page = await newPage(t);
   const side = () => page.locator("aside").innerText();
   await login(page, "admin", ADMIN_PW);
   try {
-    await page.locator("aside").getByRole("link", { name: "菜单与页面" }).click();
+    await nav(page, { name: "菜单与页面" });
     await page.getByRole("button", { name: /企业应用/ }).click();
     await page.getByLabel("标题").fill("应用广场");
     await page.getByLabel("路由").fill("/applications");
     await page.getByRole("button", { name: "保存", exact: true }).click();
-    await page.locator("aside").getByRole("link", { name: "应用广场" }).waitFor();
     step("菜单「企业应用」改名为「应用广场」");
-    await page.locator("aside").getByRole("link", { name: "应用广场" }).click();
+    await nav(page, { name: "应用广场" });
     await page.waitForURL(`${BASE}/applications`);
     await page.getByRole("heading", { name: "企业应用" }).waitFor();
     step("新路由 /applications 打开的是企业应用页面");
@@ -29,7 +28,7 @@ export default async function (t) {
     await page.waitForURL(`${BASE}/build/materials?tab=skill`);
     step("/hub?tab=skill 跳到「原料」的技能");
 
-    await page.locator("aside").getByRole("link", { name: "角色与权限" }).click();
+    await nav(page, { name: "角色与权限" });
     await page.getByRole("button", { name: "新建角色" }).click();
     const form = page.locator("form").filter({ has: page.getByRole("button", { name: "创建角色" }) });
     await form.getByPlaceholder("额度管理员").fill(`额度管理员${tag}`);
@@ -42,7 +41,7 @@ export default async function (t) {
     await shot(page, "rbac-roles");
 
     const uname = `qa.${tag}`;
-    await page.locator("aside").getByRole("link", { name: "用户", exact: true }).click();
+    await nav(page, { name: "用户", exact: true });
     await page.getByRole("button", { name: "新建用户" }).click();
     await page.getByPlaceholder("zhang.wei").fill(uname);
     await page.getByLabel("初始密码").fill("qa-password-12");

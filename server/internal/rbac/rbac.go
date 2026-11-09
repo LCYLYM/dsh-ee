@@ -111,24 +111,35 @@ var DefaultMenus = []Menu{
 		{Kind: "page", Title: "接入指南", Path: "/setup", PageKey: "setup", Icon: "Terminal", Permission: PortalView},
 		{Kind: "page", Title: "我的令牌", Path: "/tokens", PageKey: "my-keys", Icon: "KeyRound", Permission: KeysSelf},
 	}},
-	{Kind: "group", Title: "账号与模型", Children: []Menu{
+	// 以下是管理后台：网页侧栏在 /admin 页面里只显示这些分组（见 web/src/components/layout.tsx）
+	{Kind: "group", Title: "运营", Children: []Menu{
+		{Kind: "page", Title: "总览", Path: "/admin", PageKey: "admin-dashboard", Icon: "Gauge", Permission: DashboardView},
+		{Kind: "page", Title: "运营数据", Path: "/admin/stats", PageKey: "admin-stats", Icon: "LayoutDashboard", Permission: DashboardView},
+		{Kind: "page", Title: "审计日志", Path: "/admin/audit", PageKey: "admin-audit", Icon: "ScrollText", Permission: AuditView},
+	}},
+	{Kind: "group", Title: "账号与权限", Children: []Menu{
 		{Kind: "page", Title: "用户", Path: "/admin/users", PageKey: "admin-users", Icon: "Users", Permission: UsersView},
 		{Kind: "page", Title: "角色与权限", Path: "/admin/roles", PageKey: "admin-roles", Icon: "ShieldCheck", Permission: RolesManage},
 		{Kind: "page", Title: "菜单与页面", Path: "/admin/menus", PageKey: "admin-menus", Icon: "PanelsTopLeft", Permission: MenusManage},
+	}},
+	{Kind: "group", Title: "模型与额度", Children: []Menu{
 		{Kind: "page", Title: "模型接入", Path: "/admin/providers", PageKey: "admin-providers", Icon: "Bot", Permission: ProvidersManage},
 		{Kind: "page", Title: "额度分配", Path: "/admin/quotas", PageKey: "admin-quotas", Icon: "Wallet", Permission: QuotasManage},
 		{Kind: "page", Title: "令牌管理", Path: "/admin/tokens", PageKey: "admin-keys", Icon: "KeyRound", Permission: KeysManage},
 	}},
-	{Kind: "group", Title: "管理", Children: []Menu{
-		{Kind: "page", Title: "总览", Path: "/admin", PageKey: "admin-dashboard", Icon: "Gauge", Permission: DashboardView},
-		{Kind: "page", Title: "运营数据", Path: "/admin/stats", PageKey: "admin-stats", Icon: "LayoutDashboard", Permission: DashboardView},
-		{Kind: "page", Title: "审计日志", Path: "/admin/audit", PageKey: "admin-audit", Icon: "ScrollText", Permission: AuditView},
+	{Kind: "group", Title: "能力与连接", Children: []Menu{
 		{Kind: "page", Title: "能力管理", Path: "/admin/plugins", PageKey: "admin-plugins", Icon: "Boxes", Permission: PluginsManage},
-		{Kind: "page", Title: "企业连接", Path: "/admin/connections", PageKey: "admin-connections", Icon: "Cable", Permission: ConnectionsManage},
 		{Kind: "page", Title: "待审核", Path: "/admin/review", PageKey: "admin-review", Icon: "ClipboardCheck", Permission: PluginsManage},
+		{Kind: "page", Title: "企业连接", Path: "/admin/connections", PageKey: "admin-connections", Icon: "Cable", Permission: ConnectionsManage},
+	}},
+	{Kind: "group", Title: "分发与源", Children: []Menu{
+		{Kind: "page", Title: "DSH 分发", Path: "/admin/distribution", PageKey: "admin-distribution", Icon: "Download", Permission: DistributionManage},
 		{Kind: "page", Title: "npm 源", Path: "/admin/registry", PageKey: "admin-registry", Icon: "Server", Permission: RegistryManage},
 		{Kind: "page", Title: "上游预载", Path: "/admin/upstream", PageKey: "admin-upstream", Icon: "CloudDownload", Permission: UpstreamManage},
-		{Kind: "page", Title: "DSH 分发", Path: "/admin/distribution", PageKey: "admin-distribution", Icon: "Download", Permission: DistributionManage},
+	}},
+	{Kind: "group", Title: "系统", Children: []Menu{
+		{Kind: "page", Title: "品牌与外观", Path: "/admin/brand", PageKey: "admin-brand", Icon: "Palette", Permission: SettingsManage},
+		{Kind: "page", Title: "登录方式", Path: "/admin/auth", PageKey: "admin-auth", Icon: "LogIn", Permission: SettingsManage},
 		{Kind: "page", Title: "系统设置", Path: "/admin/settings", PageKey: "admin-settings", Icon: "Settings", Permission: SettingsManage},
 	}},
 }

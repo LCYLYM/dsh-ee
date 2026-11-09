@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/hikariming/dsh-ee/server/internal/rbac"
@@ -97,6 +98,130 @@ func TestMigrateMenusToBuild(t *testing.T) {
 		}
 		if byKey["apps"].Sort >= byKey["workbench"].Sort {
 			t.Fatal("企业应用应排在我的工作台前面（默认首页）")
+		}
+	}
+}
+
+// 0020 之前的默认管理菜单：「账号与模型」「管理」两组。
+var menusBefore0020 = []rbac.Menu{
+	{Kind: "group", Title: "用", Children: []rbac.Menu{
+		{Kind: "page", Title: "企业应用", Path: "/apps", PageKey: "apps", Permission: rbac.PortalView},
+	}},
+	{Kind: "group", Title: "账号与模型", Children: []rbac.Menu{
+		{Kind: "page", Title: "用户", Path: "/admin/users", PageKey: "admin-users", Permission: rbac.UsersView},
+		{Kind: "page", Title: "角色与权限", Path: "/admin/roles", PageKey: "admin-roles", Permission: rbac.RolesManage},
+		{Kind: "page", Title: "菜单与页面", Path: "/admin/menus", PageKey: "admin-menus", Permission: rbac.MenusManage},
+		{Kind: "page", Title: "模型接入", Path: "/admin/providers", PageKey: "admin-providers", Permission: rbac.ProvidersManage},
+		{Kind: "page", Title: "额度分配", Path: "/admin/quotas", PageKey: "admin-quotas", Permission: rbac.QuotasManage},
+		{Kind: "page", Title: "令牌管理", Path: "/admin/tokens", PageKey: "admin-keys", Permission: rbac.KeysManage},
+	}},
+	{Kind: "group", Title: "管理", Children: []rbac.Menu{
+		{Kind: "page", Title: "总览", Path: "/admin", PageKey: "admin-dashboard", Permission: rbac.DashboardView},
+		{Kind: "page", Title: "运营数据", Path: "/admin/stats", PageKey: "admin-stats", Permission: rbac.DashboardView},
+		{Kind: "page", Title: "审计日志", Path: "/admin/audit", PageKey: "admin-audit", Permission: rbac.AuditView},
+		{Kind: "page", Title: "能力管理", Path: "/admin/plugins", PageKey: "admin-plugins", Permission: rbac.PluginsManage},
+		{Kind: "page", Title: "企业连接", Path: "/admin/connections", PageKey: "admin-connections", Permission: rbac.ConnectionsManage},
+		{Kind: "page", Title: "待审核", Path: "/admin/review", PageKey: "admin-review", Permission: rbac.PluginsManage},
+		{Kind: "page", Title: "npm 源", Path: "/admin/registry", PageKey: "admin-registry", Permission: rbac.RegistryManage},
+		{Kind: "page", Title: "上游预载", Path: "/admin/upstream", PageKey: "admin-upstream", Permission: rbac.UpstreamManage},
+		{Kind: "page", Title: "DSH 分发", Path: "/admin/distribution", PageKey: "admin-distribution", Permission: rbac.DistributionManage},
+		{Kind: "page", Title: "系统设置", Path: "/admin/settings", PageKey: "admin-settings", Permission: rbac.SettingsManage},
+	}},
+}
+
+// 已有部署升级到 0020：管理菜单拆成六组，新增「品牌与外观」「登录方式」；管理员改过的项不动。
+func TestMigrateMenusAdminNav(t *testing.T) {
+	ctx := context.Background()
+	for _, renamed := range []bool{false, true} {
+		st := openTokenTestStore(t)
+		if err := st.ResetMenus(ctx, menusBefore0020); err != nil {
+			t.Fatal(err)
+		}
+		if renamed {
+			if _, err := st.DB().ExecContext(ctx, "UPDATE menus SET title = '模型供应商' WHERE page_key = 'admin-providers'"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := st.DB().ExecContext(ctx, "DELETE FROM schema_migrations WHERE version = '0020_admin_nav'"); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.Migrate(ctx); err != nil {
+			t.Fatal(err)
+		}
+		ms, err := st.ListMenus(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		byID := map[int64]*Menu{}
+		byKey := map[string]*Menu{}
+		var groups []*Menu
+		for _, m := range ms {
+			byID[m.ID] = m
+			if m.Kind == "group" {
+				groups = append(groups, m)
+			} else {
+				byKey[m.PageKey] = m
+			}
+		}
+		slices.SortFunc(groups, func(a, b *Menu) int { return a.Sort - b.Sort })
+		var titles []string
+		for _, g := range groups {
+			titles = append(titles, g.Title)
+		}
+		if !slices.Equal(titles, []string{"用", "运营", "账号与权限", "模型与额度", "能力与连接", "分发与源", "系统"}) {
+			t.Fatalf("分组：%v", titles)
+		}
+		parent := func(key string) string {
+			m := byKey[key]
+			if m == nil || m.ParentID == nil {
+				return ""
+			}
+			return byID[*m.ParentID].Title
+		}
+		want := map[string]string{
+			"admin-dashboard": "运营", "admin-stats": "运营", "admin-audit": "运营",
+			"admin-users": "账号与权限", "admin-roles": "账号与权限", "admin-menus": "账号与权限",
+			"admin-providers": "模型与额度", "admin-quotas": "模型与额度", "admin-keys": "模型与额度",
+			"admin-plugins": "能力与连接", "admin-review": "能力与连接", "admin-connections": "能力与连接",
+			"admin-distribution": "分发与源", "admin-registry": "分发与源", "admin-upstream": "分发与源",
+			"admin-settings": "系统", "admin-brand": "系统", "admin-auth": "系统",
+		}
+		if renamed {
+			want["admin-providers"] = "账号与权限"
+		}
+		for key, g := range want {
+			if got := parent(key); got != g {
+				t.Fatalf("%s 应在「%s」里，实际「%s」", key, g, got)
+			}
+		}
+		if b := byKey["admin-brand"]; b.Path != "/admin/brand" || b.Permission != rbac.SettingsManage || b.Sort >= byKey["admin-settings"].Sort {
+			t.Fatalf("品牌与外观：%+v", b)
+		}
+		// 再跑一次不会重复插入
+		if _, err := st.DB().ExecContext(ctx, "DELETE FROM schema_migrations WHERE version = '0020_admin_nav'"); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.Migrate(ctx); err != nil {
+			t.Fatal(err)
+		}
+		again, _ := st.ListMenus(ctx)
+		if len(again) != len(ms) {
+			t.Fatalf("重复迁移后菜单数 %d → %d", len(ms), len(again))
+		}
+	}
+}
+
+// 全新部署的默认菜单与迁移后的结构一致：管理页面都在管理分组里，用户页面都不在。
+func TestDefaultMenusAdminGroups(t *testing.T) {
+	for _, g := range rbac.DefaultMenus {
+		admin := 0
+		for _, c := range g.Children {
+			if strings.HasPrefix(c.Path, "/admin") {
+				admin++
+			}
+		}
+		if admin != 0 && admin != len(g.Children) {
+			t.Fatalf("分组「%s」混了管理页面和员工页面", g.Title)
 		}
 	}
 }

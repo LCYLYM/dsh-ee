@@ -106,6 +106,10 @@ export interface Settings {
     enabled: boolean;
     name: string;
     logoRev: string;
+    /** DSH 首屏的大标题；空表示保留 DSH 自带的标题。 */
+    title: string;
+    logoShape: BrandLogoShape;
+    theme: BrandTheme;
   };
   auth: "local" | "ldap" | "oidc";
   /** DSH 接入插件（<主作用域>/dsh-connect）：由 dsh-ee 生成并发布到自己的 npm 源。 */
@@ -160,3 +164,20 @@ export interface AuditEvent {
   /** 执行端：DSH 版本与操作系统。 */
   client: string;
 }
+
+export type BrandLogoShape = "circle" | "rounded" | "plain";
+
+/** 一个颜色在浅色、深色模式下的取值；空表示该模式用 DSH 默认。 */
+export interface BrandColor {
+  light: string;
+  dark: string;
+}
+
+/** DSH 配色：colors 是常用位置，服务端换算成设计变量；tokens 直接写 --dsw-* 变量。 */
+export interface BrandTheme {
+  preset: string;
+  colors: Partial<Record<BrandColorKey, BrandColor>>;
+  tokens: Record<string, BrandColor>;
+}
+
+export type BrandColorKey = "accent" | "accentText" | "accentSoft" | "sidebar" | "sidebarActive" | "background" | "input";

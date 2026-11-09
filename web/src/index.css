@@ -443,3 +443,12 @@ svg .scene-fade { animation-name: scene-fade-in; }
     animation: none;
   }
 }
+/* 全局搜索跳到某一项设置时，闪一下那一节 */
+@keyframes nav-flash {
+  0%, 60% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand-500) 45%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+[data-flash] {
+  animation: nav-flash 2.4s ease-out;
+  border-radius: 0.75rem;
+}

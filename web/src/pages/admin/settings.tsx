@@ -1,19 +1,17 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { useStore } from "../../lib/store";
 import type { Settings } from "../../lib/types";
 import { Button, Card, cx, Field, inputBase, inputCls, PageHeader, Segmented, ToggleRow } from "../../components/ui";
-import LdapSettings from "./ldap-settings";
-import OidcSettings from "./oidc-settings";
 import { DemoSettings } from "../../components/demo-import";
 import ConnectSettings from "./connect-settings";
-import BrandSettings from "./brand-settings";
-import { PageLink } from "../../lib/menus";
+import { PageLink, useMenus } from "../../lib/menus";
 import { Trans, useTranslation } from "react-i18next";
 
-function Section({ title, desc, children }: { title: string; desc?: string; children: ReactNode }) {
+/** 设置页的一节。id 用于页内目录与全局搜索定位（lib/search-index.ts）。 */
+export function Section({ id, title, desc, children }: { id?: string; title: string; desc?: string; children: ReactNode }) {
   return (
-    <Card className="p-6">
+    <Card id={id} className="scroll-mt-6 p-6">
       <div className="mb-5">
         <h2 className="font-semibold text-neutral-900">{title}</h2>
         {desc && <p className="mt-0.5 text-sm text-neutral-500">{desc}</p>}
@@ -33,7 +31,7 @@ export default function AdminSettings() {
     }));
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl">
       <PageHeader
         title={t("settingsAdmin.title")}
         desc={t("settingsAdmin.desc")}
@@ -50,8 +48,10 @@ export default function AdminSettings() {
           </Button>
         }
       />
-      <div className="space-y-6">
-        <Section title={t("settingsAdmin.basics")}>
+      <div className="lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-8">
+      <SettingsToc />
+      <div className="max-w-3xl space-y-6">
+        <Section id="settings-basics" title={t("settingsAdmin.basics")}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t("settingsAdmin.orgName")}>
               <input className={inputCls} value={s.orgName} onChange={(e) => set("orgName", e.target.value)} />
@@ -65,7 +65,7 @@ export default function AdminSettings() {
           </Field>
         </Section>
 
-        <Section title={t("settingsAdmin.scoring")} desc={t("settingsAdmin.scoringDesc")}>
+        <Section id="settings-scoring" title={t("settingsAdmin.scoring")} desc={t("settingsAdmin.scoringDesc")}>
           <ToggleRow
             label={t("settingsAdmin.enableScoring")}
             desc={t("settingsAdmin.enableScoringDesc")}
@@ -103,7 +103,7 @@ export default function AdminSettings() {
           </div>
         </Section>
 
-        <Section title={t("settingsAdmin.admission")}>
+        <Section id="settings-admission" title={t("settingsAdmin.admission")}>
           <Field
             label={t("settingsAdmin.admissionMode")}
             hint={
@@ -123,7 +123,7 @@ export default function AdminSettings() {
           </Field>
         </Section>
 
-        <Section title={t("settingsAdmin.upstream")}>
+        <Section id="settings-upstream" title={t("settingsAdmin.upstream")}>
           <Field label={t("settingsAdmin.network")}>
             <Segmented
               value={s.upstream.mode}
@@ -157,7 +157,7 @@ export default function AdminSettings() {
           </Field>
         </Section>
 
-        <Section title={t("settingsAdmin.distribution")}>
+        <Section id="settings-distribution" title={t("settingsAdmin.distribution")}>
           <ToggleRow
             label={t("settingsAdmin.offerDownload")}
             desc={t("settingsAdmin.offerDownloadDesc")}
@@ -166,26 +166,85 @@ export default function AdminSettings() {
           />
         </Section>
 
-        <Section title={t("brandAdmin.title")} desc={t("brandAdmin.desc")}>
-          <BrandSettings />
-        </Section>
-
-        <Section title={t("connectAdmin.title")}>
+        <Section id="settings-connect" title={t("connectAdmin.title")}>
           <ConnectSettings />
         </Section>
 
-        <Section title={t("settingsAdmin.auth")} desc={t("settingsAdmin.authNote")}>
-          <LdapSettings />
-        </Section>
-
-        <Section title={t("oidcAdmin.title")}>
-          <OidcSettings />
-        </Section>
-
-        <Section title={t("demo.title")} desc={t("demo.desc")}>
+        <Section id="settings-demo" title={t("demo.title")} desc={t("demo.desc")}>
           <DemoSettings />
         </Section>
       </div>
+      </div>
     </div>
+  );
+}
+
+const TOC: { id: string; label: string }[] = [
+  { id: "settings-basics", label: "settingsAdmin.basics" },
+  { id: "settings-scoring", label: "settingsAdmin.scoring" },
+  { id: "settings-admission", label: "settingsAdmin.admission" },
+  { id: "settings-upstream", label: "settingsAdmin.upstream" },
+  { id: "settings-distribution", label: "settingsAdmin.distribution" },
+  { id: "settings-connect", label: "connectAdmin.title" },
+  { id: "settings-demo", label: "demo.title" },
+];
+
+/** 左侧的本页目录：滚动时高亮当前一节；下面是从这里拆出去的页面。 */
+function SettingsToc() {
+  const { t } = useTranslation();
+  const { hasPage } = useMenus();
+  const [current, setCurrent] = useState(TOC[0].id);
+  useEffect(() => {
+    const els = TOC.map((x) => document.getElementById(x.id)).filter((x): x is HTMLElement => !!x);
+    if (!els.length || typeof IntersectionObserver === "undefined") return;
+    const seen = new Map<string, boolean>();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) seen.set(e.target.id, e.isIntersecting);
+        const first = TOC.find((x) => seen.get(x.id));
+        if (first) setCurrent(first.id);
+      },
+      { rootMargin: "-10% 0px -55% 0px" },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+  const related = (["admin-brand", "admin-auth"] as const).filter((k) => hasPage(k));
+  return (
+    <nav aria-label={t("nav.toc")} className="mb-6 lg:sticky lg:top-8 lg:mb-0 lg:self-start">
+      <div className="px-2 pb-1.5 text-xs font-semibold tracking-wide text-neutral-400">{t("nav.toc")}</div>
+      <div className="flex flex-wrap gap-1 lg:flex-col lg:gap-0.5">
+        {TOC.map((x) => (
+          <a
+            key={x.id}
+            href={`#${x.id}`}
+            onClick={(e) => {
+              e.preventDefault();
+              document.getElementById(x.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+              history.replaceState(null, "", `#${x.id}`);
+              setCurrent(x.id);
+            }}
+            className={cx(
+              "rounded-md px-2 py-1 text-sm transition",
+              current === x.id ? "bg-brand-50 font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-200" : "text-neutral-600 hover:bg-neutral-100/70 hover:text-neutral-900",
+            )}
+          >
+            {t(x.label as never)}
+          </a>
+        ))}
+      </div>
+      {related.length > 0 && (
+        <>
+          <div className="mt-5 px-2 pb-1.5 text-xs font-semibold tracking-wide text-neutral-400">{t("nav.related")}</div>
+          <div className="flex flex-wrap gap-1 lg:flex-col lg:gap-0.5">
+            {related.map((k) => (
+              <PageLink key={k} page={k} className="rounded-md px-2 py-1 text-sm text-neutral-600 hover:bg-neutral-100/70 hover:text-neutral-900">
+                {t(`pages.${k}`)} →
+              </PageLink>
+            ))}
+          </div>
+        </>
+      )}
+    </nav>
   );
 }

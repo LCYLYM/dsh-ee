@@ -28,6 +28,8 @@ import AdminRegistry from "./admin/registry";
 import AdminUpstream from "./admin/upstream";
 import AdminDistribution from "./admin/distribution";
 import AdminSettings from "./admin/settings";
+import AdminBrand from "./admin/brand";
+import AdminAuth from "./admin/auth";
 import type { PageKey } from "../lib/page-meta";
 
 export const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
@@ -58,5 +60,7 @@ export const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
   "admin-registry": AdminRegistry,
   "admin-upstream": AdminUpstream,
   "admin-distribution": AdminDistribution,
+  "admin-brand": AdminBrand,
+  "admin-auth": AdminAuth,
   "admin-settings": AdminSettings,
 };

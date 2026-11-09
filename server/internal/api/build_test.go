@@ -222,7 +222,7 @@ func TestBuildSelfUse(t *testing.T) {
 	}
 	code, body = admin.do("GET", "/api/me/menus", nil, nil)
 	expect(t, "管理员菜单", code, 200, body)
-	if !strings.Contains(string(body), `"title":"管理"`) {
-		t.Fatalf("管理员应看到「管理」：%s", body)
+	if !strings.Contains(string(body), `"title":"运营"`) {
+		t.Fatalf("管理员应看到「运营」：%s", body)
 	}
 }

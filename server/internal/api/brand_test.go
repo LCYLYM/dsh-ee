@@ -160,3 +160,110 @@ func TestBrandCatalogRevision(t *testing.T) {
 	code, body = anonymous.do("GET", "/api/dsh/brand/logo?rev="+secondUpload["logo_rev"], nil, nil)
 	expect(t, "公开 PNG logo", code, 200, body)
 }
+
+func TestBrandLook(t *testing.T) {
+	f := newPrincipalFixture(t)
+	_, settingsBody := f.admin.do("GET", "/api/settings", nil, nil)
+	settings := decode[store.AppSettings](t, settingsBody)
+	if settings.Brand.LogoShape != "circle" || settings.Brand.Theme.Colors == nil {
+		t.Fatalf("默认外观：%+v", settings.Brand)
+	}
+	settings.Brand.Enabled = true
+	settings.Brand.Name = "星河科技"
+	settings.Brand.Title = "星河科技企业工作台"
+	settings.Brand.LogoShape = "plain"
+	settings.Brand.Theme.Colors = map[string]store.BrandColor{
+		"accent":  {Light: "#2563eb", Dark: "#60a5fa"},
+		"sidebar": {Light: "rgb(241 245 249)"},
+		"input":   {},
+	}
+	settings.Brand.Theme.Tokens = map[string]store.BrandColor{"--dsw-alias-state-business-primary": {Light: "color-mix(in srgb, var(--dsw-static-blue-500) 80%, white)", Dark: "#93c5fd"}}
+
+	for name, bad := range map[string]func(s *store.AppSettings){
+		"未知颜色": func(s *store.AppSettings) {
+			s.Brand.Theme.Colors = map[string]store.BrandColor{"glow": {Light: "#fff"}}
+		},
+		"url": func(s *store.AppSettings) {
+			s.Brand.Theme.Colors = map[string]store.BrandColor{"accent": {Light: "url(https://evil/x)"}}
+		},
+		"引号": func(s *store.AppSettings) {
+			s.Brand.Theme.Colors = map[string]store.BrandColor{"accent": {Light: `"red"`}}
+		},
+		"分号": func(s *store.AppSettings) {
+			s.Brand.Theme.Colors = map[string]store.BrandColor{"accent": {Light: "red; color: blue"}}
+		},
+		"外部变量": func(s *store.AppSettings) {
+			s.Brand.Theme.Colors = map[string]store.BrandColor{"accent": {Light: "var(--evil)"}}
+		},
+		"变量名": func(s *store.AppSettings) {
+			s.Brand.Theme.Tokens = map[string]store.BrandColor{"color": {Light: "#fff"}}
+		},
+		"外形":      func(s *store.AppSettings) { s.Brand.LogoShape = "star" },
+		"标题过长":    func(s *store.AppSettings) { s.Brand.Title = strings.Repeat("星", 33) },
+		"标题用官方全名": func(s *store.AppSettings) { s.Brand.Title = "DeepSeek Harness 工作台" },
+	} {
+		next := *settings.Clone()
+		bad(&next)
+		code, body := f.admin.do("PUT", "/api/admin/settings", next, nil)
+		expect(t, name, code, 400, body)
+	}
+
+	code, body := f.admin.do("PUT", "/api/admin/settings", settings, nil)
+	expect(t, "保存品牌外观", code, 200, body)
+	saved := decode[store.AppSettings](t, body)
+	if _, ok := saved.Brand.Theme.Colors["input"]; ok || len(saved.Brand.Theme.Colors) != 2 {
+		t.Fatalf("两种模式都空的颜色应去掉：%v", saved.Brand.Theme.Colors)
+	}
+
+	u := f.user(t, "look-user", nil)
+	f.token(t, u.ID, "ee_at_look", []string{rbac.ScopeHub}, nil, nil)
+	brand := func() map[string]any {
+		req, _ := http.NewRequest("GET", f.ts.URL+"/api/dsh/catalog", nil)
+		req.Header.Set("Authorization", "Bearer ee_at_look")
+		resp, err := f.admin.hc.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var data map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&data)
+		return data["brand"].(map[string]any)
+	}
+	b := brand()
+	theme := b["theme"].(map[string]any)
+	pair := func(token string) map[string]any { v, _ := theme[token].(map[string]any); return v }
+	if b["title"] != "星河科技企业工作台" || b["logo_shape"] != "plain" {
+		t.Fatalf("目录品牌：%v", b)
+	}
+	if p := pair("--dsw-alias-button-primary-fill"); p["light"] != "#2563eb" || p["dark"] != "#60a5fa" {
+		t.Fatalf("主色应换算到按钮变量：%v", theme)
+	}
+	if p := pair("--dsw-specific-sidebar-fill"); p["light"] != "rgb(241 245 249)" || p["dark"] != "" {
+		t.Fatalf("深色留空表示用默认：%v", p)
+	}
+	if p := pair("--dsw-alias-state-business-primary"); p["dark"] != "#93c5fd" {
+		t.Fatalf("直接写的变量应覆盖常用颜色：%v", p)
+	}
+
+	// 网页删掉一个颜色后，PUT 要能真的删掉（不是和旧 map 合并）
+	settings.Brand.Theme.Colors = map[string]store.BrandColor{"accent": {Light: "#16a34a"}}
+	code, body = f.admin.do("PUT", "/api/admin/settings", settings, nil)
+	expect(t, "删掉侧栏颜色", code, 200, body)
+	if theme = brand()["theme"].(map[string]any); theme["--dsw-specific-sidebar-fill"] != nil {
+		t.Fatalf("侧栏颜色应已删除：%v", theme)
+	}
+	// 请求里不带 brand 段时，配色保持原样
+	code, body = f.admin.do("PUT", "/api/admin/settings", map[string]any{"orgName": "星河"}, nil)
+	expect(t, "只改组织名", code, 200, body)
+	if theme = brand()["theme"].(map[string]any); theme["--dsw-alias-brand-primary"] == nil {
+		t.Fatalf("没带 brand 时配色不应丢：%v", theme)
+	}
+
+	// 关掉品牌后不下发外观
+	settings.Brand.Enabled = false
+	code, body = f.admin.do("PUT", "/api/admin/settings", settings, nil)
+	expect(t, "关闭品牌", code, 200, body)
+	if b = brand(); b["theme"] != nil || b["title"] != nil {
+		t.Fatalf("关闭品牌后不应下发外观：%v", b)
+	}
+}

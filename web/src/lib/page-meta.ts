@@ -40,6 +40,8 @@ const META = {
   "admin-registry": { title: "npm 源", defaultPath: "/admin/registry", description: "路由规则、上游、访问令牌" },
   "admin-upstream": { title: "上游预载", defaultPath: "/admin/upstream", description: "在线同步与离线导入" },
   "admin-distribution": { title: "DSH 分发", defaultPath: "/admin/distribution", description: "DSH 本体分发" },
+  "admin-brand": { title: "品牌与外观", defaultPath: "/admin/brand", description: "DSH 里的企业名称、logo、首屏标题与配色" },
+  "admin-auth": { title: "登录方式", defaultPath: "/admin/auth", description: "LDAP / AD 与企业统一登录（OIDC）" },
   "admin-settings": { title: "系统设置", defaultPath: "/admin/settings", description: "全局设置" },
 } satisfies Record<string, PageMeta>;
 

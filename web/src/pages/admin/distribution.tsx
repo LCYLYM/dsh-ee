@@ -107,7 +107,7 @@ export default function AdminDistribution() {
       />
       {!settings.distribution.enabled && (
         <Card className="mb-6 border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-          <Trans i18nKey="distributionAdmin.disabledNote" components={{ link: <PageLink page="admin-settings" className="mx-1 underline" /> }} />
+          <Trans i18nKey="distributionAdmin.disabledNote" components={{ link: <PageLink page="admin-settings" suffix="#settings-distribution" className="mx-1 underline" /> }} />
         </Card>
       )}
       <Card className="mb-6 grid gap-5 p-5 md:grid-cols-3">

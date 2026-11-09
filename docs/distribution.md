@@ -119,6 +119,8 @@ DMG 另设一个 `kind = dmg` 的行：版本取下载时清单的 `version`，�
 
 ### 6.1 品牌（浏览器部分）
 
+> 2026-11-09 补充：首屏标题、logo 外形、配色与不重启生效见 [branding.md](branding.md)。
+
 - dsh-ee 设置里新增 `Brand`：`Name`（≤ 24 字，**拒绝包含「DeepSeek Harness」**，界面提示可以写「某某 AI · 基于 DSH」）、`Logo`（SVG/PNG ≤ 256 KB，正方形，SVG 要先清理掉脚本）、`Enabled`。
 - 接入插件新增浏览器入口 `client.js`，在 `dsh-plugin/` 里用 esbuild 构建；`package.json` 加 `dsh.client`（写法参照 `ui-brand-official` 的 `"dsh": { "client": { "inject": [...], "platform": "web" } }`），注册上面三个位置。
 - 数据**运行时拉取**，不写死在包里：浏览器部分向插件的服务端部分要品牌数据（服务端部分已经轮询 `/api/dsh/catalog`，在返回结果里加上 `brand: { name, logoUrl, revision }` 即可）。logo 用 `<img src="{base}/api/dsh/brand/logo?rev=…">` 显示，图片请求不受 CORS 限制，这个接口公开访问。S-M1 已通过，写法以用户提供的样例为准（见交接文档 §2）。

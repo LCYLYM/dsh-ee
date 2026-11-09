@@ -19896,15 +19896,21 @@ function date4(params) {
 }
 
 // src/brand-view.ts
+function shapeStyle(shape, size) {
+  if (shape === "plain") return { borderRadius: 0, objectFit: "contain" };
+  if (shape === "rounded") return { borderRadius: Math.round(size * 0.22), objectFit: "cover" };
+  return { borderRadius: "50%", objectFit: "cover" };
+}
 function brandMark(createElement5, brand, props = {}) {
   const size = props.size ?? 32;
+  const shape = shapeStyle(brand.logo_shape, size);
   if (brand.logo_url) {
     return createElement5("img", {
       src: brand.logo_url,
       alt: brand.name,
       width: size,
       height: size,
-      style: { width: size, height: size, borderRadius: "50%", objectFit: "cover", display: "block" }
+      style: { width: size, height: size, ...shape, display: "block" }
     });
   }
   const letter = (brand.name.trim().charAt(0) || "\u4F01").toUpperCase();
@@ -19913,7 +19919,7 @@ function brandMark(createElement5, brand, props = {}) {
     style: {
       width: size,
       height: size,
-      borderRadius: "50%",
+      borderRadius: brand.logo_shape === "circle" || !brand.logo_shape ? "50%" : Math.round(size * 0.22),
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
@@ -19926,6 +19932,82 @@ function brandMark(createElement5, brand, props = {}) {
 }
 function brandName(createElement5, brand) {
   return createElement5("span", { "data-dsh-ee-brand": brand.revision || "neutral" }, brand.name);
+}
+function heroBrand(createElement5, brand, props = {}) {
+  const title = (brand.title ?? "").trim();
+  if (!title) return brandMark(createElement5, brand, props);
+  const size = Math.round((props.size ?? 34) * 1.4);
+  return createElement5("span", {
+    "data-dsh-ee-hero-title": brand.revision || "neutral",
+    style: { display: "inline-flex", alignItems: "center", gap: 14, fontWeight: 600, letterSpacing: "0.02em" }
+  }, brandMark(createElement5, brand, { size }), createElement5("span", null, title));
+}
+var HERO_TITLE_CSS = "span:has([data-dsh-ee-hero-title]) + span:not(:has([data-dsh-ee-hero-title])) { display: none !important; }";
+var TOKEN_NAME = /^--dsw-[a-z0-9-]{1,80}$/;
+function themeOverrides(brand) {
+  if (!brand?.enabled || !brand.theme || typeof brand.theme !== "object") return void 0;
+  const out = {};
+  for (const [name, pair] of Object.entries(brand.theme)) {
+    if (!TOKEN_NAME.test(name) || !pair || typeof pair !== "object") continue;
+    const light = typeof pair.light === "string" ? pair.light : "";
+    const dark = typeof pair.dark === "string" ? pair.dark : "";
+    if (light || dark) out[name] = { light, dark };
+  }
+  return Object.keys(out).length ? out : void 0;
+}
+function brandKey(brand) {
+  return JSON.stringify(brand ?? null);
+}
+var BRAND_POLL_MS = 6e4;
+function createBrandStore(initial, read) {
+  let current = initial;
+  let key = brandKey(initial);
+  let inflight = false;
+  const listeners2 = /* @__PURE__ */ new Set();
+  const refresh = async () => {
+    if (inflight) return;
+    inflight = true;
+    try {
+      const next = await read();
+      const nextKey = brandKey(next);
+      if (next && nextKey !== key) {
+        current = next;
+        key = nextKey;
+        for (const listener of listeners2) listener();
+      }
+    } catch {
+    } finally {
+      inflight = false;
+    }
+  };
+  const subscribe = (listener) => {
+    listeners2.add(listener);
+    return () => {
+      listeners2.delete(listener);
+    };
+  };
+  return {
+    get: () => current,
+    refresh,
+    subscribe,
+    /** 在组件里读品牌，并在品牌变化时重绘。 */
+    use: (useState5, useEffect4) => {
+      const [, setTick] = useState5(0);
+      useEffect4(() => subscribe(() => setTick((n) => n + 1)), []);
+      return current;
+    },
+    start: () => {
+      const timer = setInterval(() => void refresh(), BRAND_POLL_MS);
+      const onVisible = () => {
+        if (typeof document !== "undefined" && !document.hidden) void refresh();
+      };
+      if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+      return () => {
+        clearInterval(timer);
+        if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+      };
+    }
+  };
 }
 
 // src/status-view.ts
@@ -22769,16 +22851,42 @@ async function apply(ctx) {
     apps.setWorkbenchOpener(workbench.openWorkbench);
     registerVotes(ctx, remote, unwrapRemote);
     registerEeSave(ctx);
+    const readBrand = async () => unwrapRemote(await Promise.race([
+      remote.brand(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("\u8BFB\u53D6\u4F01\u4E1A\u54C1\u724C\u8D85\u65F6")), 1e4))
+    ]));
     let brand;
     try {
-      brand = unwrapRemote(await Promise.race([
-        remote.brand(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("\u8BFB\u53D6\u4F01\u4E1A\u54C1\u724C\u8D85\u65F6")), 1e4))
-      ]));
+      brand = await readBrand();
     } catch {
       brand = { enabled: true, name: "\u4F01\u4E1A", logo_url: "", revision: "" };
     }
     const org = brand?.name || "\u4F01\u4E1A";
+    const brandStore = createBrandStore(brand, readBrand);
+    ctx.effect(() => brandStore.start());
+    ctx.inject(["theme"], (themeCtx) => {
+      let applied = "";
+      let dispose;
+      const sync = () => {
+        const tokens = themeOverrides(brandStore.get());
+        const key = JSON.stringify(tokens ?? null);
+        if (key === applied) return;
+        applied = key;
+        dispose?.();
+        dispose = void 0;
+        if (!tokens) return;
+        try {
+          dispose = themeCtx.theme.overrideTokens("dsh-ee-brand", tokens);
+        } catch {
+        }
+      };
+      sync();
+      const off = brandStore.subscribe(sync);
+      themeCtx.effect(() => () => {
+        off();
+        dispose?.();
+      });
+    });
     const EnterprisePanel = () => {
       const state = useOverview(remote);
       const [notice, setNotice] = (0, import_react4.useState)("");
@@ -22825,14 +22933,28 @@ async function apply(ctx) {
     };
     registerEnterpriseStatus(ctx, org, EnterprisePanel, EnterpriseHeader);
     if (!TAKEOVER) return;
-    if (!brand || brand.enabled === false) brand = { enabled: false, name: org, logo_url: "", revision: "" };
-    brand = { ...brand, name: org };
-    const EnterpriseBrandMark = (props) => brandMark(import_react4.createElement, brand, props);
-    const EnterpriseBrandName = () => brandName(import_react4.createElement, brand);
+    const shown = (current) => {
+      if (!current || current.enabled === false) return { enabled: false, name: current?.name || org, logo_url: "", revision: "" };
+      return { ...current, name: current.name || org };
+    };
+    const EnterpriseBrandMark = (props) => brandMark(import_react4.createElement, shown(brandStore.use(import_react4.useState, import_react4.useEffect)), props);
+    const EnterpriseBrandName = () => brandName(import_react4.createElement, shown(brandStore.use(import_react4.useState, import_react4.useEffect)));
+    const EnterpriseHero = (props) => heroBrand(import_react4.createElement, shown(brandStore.use(import_react4.useState, import_react4.useEffect)), props);
+    if (typeof document !== "undefined") {
+      ctx.effect(() => {
+        const tag = document.createElement("style");
+        tag.dataset.plugin = "dsh-ee-brand";
+        tag.textContent = HERO_TITLE_CSS;
+        document.head.appendChild(tag);
+        return () => {
+          tag.remove();
+        };
+      });
+    }
     ctx.slots.inject("sidebar.brand.mark", () => ctx.slots.inject("sidebar.brand.name", () => ctx.slots.inject("conversation.hero.brand.mark", function* () {
       yield ctx.slots.register({ name: "sidebar.brand.mark" }, EnterpriseBrandMark);
       yield ctx.slots.register({ name: "sidebar.brand.name" }, EnterpriseBrandName);
-      yield ctx.slots.register({ name: "conversation.hero.brand.mark" }, EnterpriseBrandMark);
+      yield ctx.slots.register({ name: "conversation.hero.brand.mark" }, EnterpriseHero);
     })));
   });
 }

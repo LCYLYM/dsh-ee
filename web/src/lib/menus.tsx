@@ -24,6 +24,8 @@ interface Menus {
   pathOf: (pageKey: string) => string;
   /** 登录后默认进入的页面：第一个可见页面。 */
   homePath: string | null;
+  /** 菜单里有没有这个页面（有就说明当前用户能打开）。 */
+  hasPage: (pageKey: string) => boolean;
 }
 
 const Ctx = createContext<Menus | null>(null);
@@ -76,6 +78,7 @@ export function MenuProvider({ children }: { children: ReactNode }) {
       reload,
       pathOf: (key) => byKey.get(key) ?? PAGE_META[key]?.defaultPath ?? "/",
       homePath: flatVisible[0]?.path ?? null,
+      hasPage: (key) => byKey.has(key),
     };
   }, [menus, loading, error, reload]);
 
@@ -100,7 +103,7 @@ export function useMenuTitle() {
   };
 }
 
-const DEFAULT_GROUPS = { 用: 1, 造: 1, 接入: 1, 工作台: 1, 账号与模型: 1, 管理: 1 };
+const DEFAULT_GROUPS = { 用: 1, 造: 1, 接入: 1, 工作台: 1, 账号与模型: 1, 管理: 1, 运营: 1, 账号与权限: 1, 模型与额度: 1, 能力与连接: 1, 分发与源: 1, 系统: 1 };
 
 /** 按 page_key 链接站内页面；suffix 用于带查询参数等，例如 "?tab=x"。 */
 export function PageLink({ page, suffix = "", ...rest }: Omit<LinkProps, "to"> & { page: string; suffix?: string }) {

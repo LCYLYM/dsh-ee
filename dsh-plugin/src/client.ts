@@ -1,7 +1,7 @@
 import { createElement, useEffect, useState } from "react";
 import { createTypertRemoteInfo } from "@deepseek-ai/dsh-typert-protocol";
 import { z } from "zod";
-import { brandMark, brandName, type BrandViewData } from "./brand-view.js";
+import { brandMark, brandName, createBrandStore, heroBrand, HERO_TITLE_CSS, themeOverrides, type BrandViewData } from "./brand-view.js";
 import type { EnterpriseOverview, OverviewFailure } from "./overview.js";
 import { enterpriseHeader, enterprisePanel, enterpriseTabId, registerEnterpriseStatus, type DoctorViewData } from "./status-view.js";
 import { registerApps } from "./apps-client.js";
@@ -144,16 +144,41 @@ export async function apply(ctx: any): Promise<void> {
     apps.setWorkbenchOpener(workbench.openWorkbench);
     registerVotes(ctx, remote, unwrapRemote);
     registerEeSave(ctx);
+    const readBrand = async (): Promise<BrandViewData> => unwrapRemote(await Promise.race([
+      remote.brand(),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("读取企业品牌超时")), 10_000)),
+    ]));
     let brand: BrandViewData;
     try {
-      brand = unwrapRemote(await Promise.race([
-        remote.brand(),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("读取企业品牌超时")), 10_000)),
-      ]));
+      brand = await readBrand();
     } catch {
       brand = { enabled: true, name: "企业", logo_url: "", revision: "" };
     }
     const org = brand?.name || "企业";
+    const brandStore = createBrandStore(brand, readBrand);
+    ctx.effect(() => brandStore.start());
+    // 配色与 logo 无关，不需要接管品牌位置：交给 DSH 的主题服务按设计变量覆盖，改了就跟着变
+    ctx.inject(["theme"], (themeCtx: any) => {
+      let applied = "";
+      let dispose: (() => void) | undefined;
+      const sync = () => {
+        const tokens = themeOverrides(brandStore.get());
+        const key = JSON.stringify(tokens ?? null);
+        if (key === applied) return;
+        applied = key;
+        dispose?.();
+        dispose = undefined;
+        if (!tokens) return;
+        try {
+          dispose = themeCtx.theme.overrideTokens("dsh-ee-brand", tokens);
+        } catch {
+          // 宿主不认某个取值时保留 DSH 默认配色
+        }
+      };
+      sync();
+      const off = brandStore.subscribe(sync);
+      themeCtx.effect(() => () => { off(); dispose?.(); });
+    });
 
     const EnterprisePanel = () => {
       const state = useOverview(remote);
@@ -203,16 +228,28 @@ export async function apply(ctx: any): Promise<void> {
 
     if (!TAKEOVER) return;
     // 品牌在运行时被关闭或取不到时，显示中性的首字母图标与名称，而不是官方 logo。
-    if (!brand || brand.enabled === false) brand = { enabled: false, name: org, logo_url: "", revision: "" };
-    brand = { ...brand, name: org };
-    const EnterpriseBrandMark = (props: { size?: number }) => brandMark(createElement, brand, props);
-    const EnterpriseBrandName = () => brandName(createElement, brand);
+    const shown = (current: BrandViewData): BrandViewData => {
+      if (!current || current.enabled === false) return { enabled: false, name: current?.name || org, logo_url: "", revision: "" };
+      return { ...current, name: current.name || org };
+    };
+    const EnterpriseBrandMark = (props: { size?: number }) => brandMark(createElement, shown(brandStore.use(useState, useEffect)), props);
+    const EnterpriseBrandName = () => brandName(createElement, shown(brandStore.use(useState, useEffect)));
+    const EnterpriseHero = (props: { size?: number }) => heroBrand(createElement, shown(brandStore.use(useState, useEffect)), props);
+    if (typeof document !== "undefined") {
+      ctx.effect(() => {
+        const tag = document.createElement("style");
+        tag.dataset.plugin = "dsh-ee-brand";
+        tag.textContent = HERO_TITLE_CSS;
+        document.head.appendChild(tag);
+        return () => { tag.remove(); };
+      });
+    }
     ctx.slots.inject("sidebar.brand.mark", () =>
       ctx.slots.inject("sidebar.brand.name", () =>
         ctx.slots.inject("conversation.hero.brand.mark", function* () {
           yield ctx.slots.register({ name: "sidebar.brand.mark" }, EnterpriseBrandMark);
           yield ctx.slots.register({ name: "sidebar.brand.name" }, EnterpriseBrandName);
-          yield ctx.slots.register({ name: "conversation.hero.brand.mark" }, EnterpriseBrandMark);
+          yield ctx.slots.register({ name: "conversation.hero.brand.mark" }, EnterpriseHero);
         })));
   });
 }

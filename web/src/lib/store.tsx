@@ -34,6 +34,9 @@ export const defaultSettings: Settings = {
     enabled: false,
     name: "",
     logoRev: "",
+    title: "",
+    logoShape: "circle",
+    theme: { preset: "", colors: {}, tokens: {} },
   },
   auth: "local",
   connect: {

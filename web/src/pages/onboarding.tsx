@@ -13,7 +13,7 @@ import { AgentConnect } from "../components/agent-connect";
 import { DemoCompanyHero, DemoImportStep } from "../components/demo-import";
 
 const pageForStep: Record<string, string> = {
-  ldap: "admin-settings",
+  ldap: "admin-auth",
   roles: "admin-roles",
   connections: "admin-connections",
 };

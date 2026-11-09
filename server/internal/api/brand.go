@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/hikariming/dsh-ee/server/internal/store"
 )
 
 const maxBrandLogoSize = 256 << 10
@@ -25,6 +27,11 @@ type dshBrand struct {
 	Name     string `json:"name"`
 	LogoURL  string `json:"logo_url"`
 	Revision string `json:"revision"`
+	// 以下字段旧版接入插件不认识，会忽略
+	Title     string `json:"title,omitempty"`
+	LogoShape string `json:"logo_shape,omitempty"`
+	// 设计变量 → 浅色 / 深色取值，接入插件交给 DSH 的主题服务
+	Theme map[string]store.BrandColor `json:"theme,omitempty"`
 }
 
 func (s *Server) brandInfo(ctx context.Context, base string) (dshBrand, error) {
@@ -40,6 +47,13 @@ func (s *Server) brandInfo(ctx context.Context, base string) (dshBrand, error) {
 		name = "企业"
 	}
 	brand := dshBrand{Enabled: set.Brand.Enabled, Name: name, Revision: set.Brand.LogoRev}
+	if brand.Enabled {
+		brand.Title = set.Brand.Title
+		brand.LogoShape = set.Brand.LogoShape
+		if tokens := brandThemeTokens(set.Brand.Theme); len(tokens) > 0 {
+			brand.Theme = tokens
+		}
+	}
 	if brand.Enabled && brand.Revision != "" && base != "" {
 		brand.LogoURL = base + "/api/dsh/brand/logo?rev=" + url.QueryEscape(brand.Revision)
 	}

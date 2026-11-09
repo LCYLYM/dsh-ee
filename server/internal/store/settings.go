@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"maps"
 )
 
 // AppSettings 是系统设置，结构与前端 web/src/lib/types.ts 的 Settings 一一对应。
@@ -45,6 +46,11 @@ type AppSettings struct {
 		Enabled bool   `json:"enabled"`
 		Name    string `json:"name"`
 		LogoRev string `json:"logoRev"`
+		// DSH 首屏的大标题，例如「星河科技企业工作台」；空表示保留 DSH 自带的标题
+		Title string `json:"title"`
+		// logo 外形：circle 圆形裁切 / rounded 圆角方形 / plain 原样
+		LogoShape string     `json:"logoShape"`
+		Theme     BrandTheme `json:"theme"`
 	} `json:"brand"`
 	Auth string `json:"auth"`
 	// DSH 接入插件（<主作用域>/dsh-connect）：由 dsh-ee 生成并发布到自己的 npm 源
@@ -83,6 +89,21 @@ type AppSettings struct {
 	} `json:"registry"`
 }
 
+// BrandTheme 是 DSH 界面的配色。Colors 是几个常用位置（主色、侧栏等），
+// 服务端把它们换算成 DSH 的 --dsw-* 设计变量；Tokens 直接写变量，覆盖 Colors 的结果。
+type BrandTheme struct {
+	// 预设名，只给网页标记「当前用的是哪套」，不参与换算
+	Preset string                `json:"preset"`
+	Colors map[string]BrandColor `json:"colors"`
+	Tokens map[string]BrandColor `json:"tokens"`
+}
+
+// BrandColor 是一个颜色在浅色、深色模式下的取值；空表示该模式保留 DSH 默认。
+type BrandColor struct {
+	Light string `json:"light"`
+	Dark  string `json:"dark"`
+}
+
 // DefaultSettings 是首次启动时的设置。默认「按需回源 + 插件要审核」：依赖能直接装，
 // 社区插件和内部发布的插件都要管理员放行。
 func DefaultSettings() *AppSettings {
@@ -115,6 +136,9 @@ func DefaultSettings() *AppSettings {
 	s.Knowledge.QATitle = "知识问答"
 	s.Knowledge.QAIcon = "📚"
 	s.Knowledge.QAStarters = []string{"出差住宿标准是多少？", "新员工入职要准备哪些材料？"}
+	s.Brand.LogoShape = "circle"
+	s.Brand.Theme.Colors = map[string]BrandColor{}
+	s.Brand.Theme.Tokens = map[string]BrandColor{}
 	s.Registry.ProxyMode = "cache"
 	s.Registry.ExtraScopes = []string{}
 	s.Registry.RequireToken = true
@@ -137,6 +161,8 @@ func (s *AppSettings) Clone() *AppSettings {
 	c := *s
 	c.Registry.ExtraScopes = append([]string{}, s.Registry.ExtraScopes...)
 	c.Knowledge.QAStarters = append([]string{}, s.Knowledge.QAStarters...)
+	c.Brand.Theme.Colors = maps.Clone(s.Brand.Theme.Colors)
+	c.Brand.Theme.Tokens = maps.Clone(s.Brand.Theme.Tokens)
 	return &c
 }
 

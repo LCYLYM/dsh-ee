@@ -1,6 +1,6 @@
 // 「用 / 造 / 管」：员工的侧边栏没有管理入口和「插件」；新建应用默认自己用、免审核；
 // 改范围分享 → 管理员在「分享申请」里通过；从样板复制一个应用。
-import { ADMIN_PW, BASE, api, assert, assertEq, login, newPage, shot, step, tag } from "../lib.mjs";
+import { ADMIN_PW, BASE, api, assert, assertEq, login, newPage, shot, step, tag, nav } from "../lib.mjs";
 
 async function dsh(token, path) {
   const r = await fetch(BASE + path, { headers: { Authorization: `Bearer ${token}` } });
@@ -37,7 +37,7 @@ export default async function (t) {
     const token = tok.data.token;
 
     // ---- 新建应用：默认只有我自己，保存即生效 ----
-    await page.locator("aside").getByRole("link", { name: "新建应用" }).click();
+    await nav(page, { name: "新建应用" });
     await page.waitForURL(`${BASE}/build/new`);
     await page.getByText("只有你自己用，保存后直接能在 DSH 里打开，不用审核。").waitFor();
     await page.getByLabel("标识").fill(mine);
@@ -54,7 +54,7 @@ export default async function (t) {
     step("新建应用默认「只有我自己」，提交后不用审核，作者的 DSH 里马上有");
 
     // ---- 我的应用：分享给部门 → 审核中 ----
-    await page.locator("aside").getByRole("link", { name: "我的应用" }).click();
+    await nav(page, { name: "我的应用" });
     const row = page.locator("li", { hasText: `E2E 我的助手 ${tag}` });
     await row.getByText("自己用", { exact: true }).waitFor();
     await row.getByRole("button", { name: "分享…" }).click();
@@ -83,7 +83,7 @@ export default async function (t) {
     step("管理员在「分享申请」里通过，作者看到「已分享」");
 
     // ---- 原料：插件收在高级选项里 ----
-    await page.locator("aside").getByRole("link", { name: "原料" }).click();
+    await nav(page, { name: "原料" });
     await page.getByRole("tab", { name: "知识库" }).waitFor();
     assert(!(await page.locator("main").innerText()).includes("插件"), "原料页默认不应出现「插件」");
     await page.getByRole("button", { name: "显示高级选项" }).click();
@@ -91,7 +91,7 @@ export default async function (t) {
     step("原料页列出知识库、连接、技能、提示词；插件在高级选项里");
 
     // ---- 从样板复制 ----
-    await page.locator("aside").getByRole("link", { name: "从样板复制" }).click();
+    await nav(page, { name: "从样板复制" });
     const card = page.locator("div.rounded-lg", { hasText: `E2E 样板 ${tag}` }).last();
     await card.getByRole("button", { name: "复制为我的应用" }).click();
     await page.waitForURL(/\/build\/new\?from=\d+/);

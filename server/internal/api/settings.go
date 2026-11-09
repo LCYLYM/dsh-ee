@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -70,8 +71,16 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	// 请求里没带的段落保持原样（旧版网页不认识的新段落，例如 knowledge，不会被清空）
 	next := *cur.Clone()
+	// JSON 解进已有的 map 只会增加键，删不掉颜色；先清空，请求里没带再用原来的
+	next.Brand.Theme.Colors, next.Brand.Theme.Tokens = nil, nil
 	if !readJSON(w, r, &next) {
 		return
+	}
+	if next.Brand.Theme.Colors == nil {
+		next.Brand.Theme.Colors = maps.Clone(cur.Brand.Theme.Colors)
+	}
+	if next.Brand.Theme.Tokens == nil {
+		next.Brand.Theme.Tokens = maps.Clone(cur.Brand.Theme.Tokens)
 	}
 	if msg := validateSettings(&next); msg != "" {
 		writeErr(w, http.StatusBadRequest, msg)
@@ -181,6 +190,9 @@ func validateSettings(v *store.AppSettings) string {
 	}
 	if strings.Contains(strings.ToLower(strings.Join(strings.Fields(v.Brand.Name), "")), "deepseekharness") {
 		return "按 DSH 品牌规范，不能使用 DeepSeek Harness 全名，可以写『某某 AI · 基于 DSH』"
+	}
+	if msg := validateBrandLook(v); msg != "" {
+		return msg
 	}
 	if v.Connect.PollSeconds < 15 || v.Connect.PollSeconds > 3600 {
 		return "DSH 接入插件的检查间隔应在 15–3600 秒之间"

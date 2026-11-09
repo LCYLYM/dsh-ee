@@ -13,7 +13,7 @@ import { Toaster } from "@/components/shadcn/sonner";
 import { TooltipProvider } from "@/components/shadcn/tooltip";
 import { ConfirmProvider } from "./lib/confirm";
 import { PAGE_COMPONENTS } from "./pages/registry";
-import type { PageKey } from "./lib/page-meta";
+import { PAGE_META, type PageKey } from "./lib/page-meta";
 import Landing from "./pages/landing";
 import Login from "./pages/login";
 import Account from "./pages/account";
@@ -119,7 +119,10 @@ function LegacyHub() {
 /** 路由来自后端菜单：页面的路由、名称、访问权限都可在「菜单与页面」里在线修改。 */
 function AppRoutes() {
   const { menus } = useMenus();
+  const { can } = useAuth();
   const pages = menus.filter((m) => m.kind === "page" && m.page_key in PAGE_COMPONENTS);
+  // 从系统设置拆出来的页面：管理员改过菜单、迁移没能把它们挂上时，仍可从默认路由打开
+  const splitOut = (["admin-brand", "admin-auth"] as const).filter((k) => can("settings.manage") && !pages.some((m) => m.page_key === k));
   return (
     <Routes>
       <Route index element={<Landing />} />
@@ -172,6 +175,10 @@ function AppRoutes() {
         {!pages.some((m) => m.path === "/hub") && <Route path="hub" element={<LegacyHub />} />}
         {!pages.some((m) => m.path === "/keys") && <Route path="keys" element={<LegacyPage pageKey="my-keys" />} />}
         {!pages.some((m) => m.path === "/admin/keys") && <Route path="admin/keys" element={<LegacyPage pageKey="admin-keys" />} />}
+        {splitOut.map((k) => {
+          const Page = PAGE_COMPONENTS[k];
+          return <Route key={k} path={PAGE_META[k].defaultPath.replace(/^\//, "")} element={<Page />} />;
+        })}
         {pages.map((m) => {
           const Page = PAGE_COMPONENTS[m.page_key as PageKey];
           return <Route key={m.id} path={m.path.replace(/^\//, "")} element={<Page />} />;

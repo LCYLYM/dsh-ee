@@ -1,8 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -220,7 +222,7 @@ func mergeInto(base, changes map[string]any, banned []string, path string) error
 			return fmt.Errorf("不能通过 Agent 修改 %s", full)
 		}
 		cur, ok := base[k]
-		if !ok {
+		if !ok && !slices.Contains(settingsFreeMaps, path) {
 			return fmt.Errorf("没有这个设置项：%s", full)
 		}
 		cm, curIsMap := cur.(map[string]any)
@@ -261,7 +263,10 @@ func diffLines(before, after map[string]any, path string) []string {
 }
 
 // 这些设置项牵连登录方式与企业作用域，改错会把人锁在外面或让 npm 源整体失效，只在网页上改。
-var settingsBanned = []string{"auth", "scope"}
+var settingsBanned = []string{"auth", "scope", "brand.logoRev"}
+
+// settingsFreeMaps 下面的键由使用者自定（颜色名、设计变量名），可以新增；值为 null 表示删掉
+var settingsFreeMaps = []string{"brand.theme.colors", "brand.theme.tokens"}
 
 func settingsMap(ctx context.Context, s *Server) (map[string]any, error) {
 	set, err := s.appSettings(ctx)
@@ -282,6 +287,17 @@ func settingsBody(ctx context.Context, s *Server, _ *Principal, args map[string]
 	ch, _ := args["changes"].(map[string]any)
 	if err := mergeInto(base, ch, settingsBanned, ""); err != nil {
 		return nil, err
+	}
+	// 预览阶段就把取值不对的改动拦下来，不要等用户同意了才报错
+	raw, _ := json.Marshal(base)
+	var next store.AppSettings
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&next); err != nil {
+		return nil, fmt.Errorf("设置格式不对：%v", err)
+	}
+	if msg := validateSettings(&next); msg != "" {
+		return nil, errors.New(msg)
 	}
 	return base, nil
 }
@@ -897,7 +913,10 @@ func adminSpecs() map[string]*agentSpec {
 			Tool: "ee_settings", Action: "get", Summary: "读系统设置（站点、npm 源、上游、DSH 接入、Agent 开关）", Effect: rd, Shape: trimShape,
 		},
 		"PUT /api/admin/settings": {
-			Tool: "ee_settings", Action: "put", Summary: "改系统设置：changes 是要改的项，按设置的层级写，如 {\"connect\":{\"defaultModel\":\"chat\"}}；auth、scope 只能在网页改", En: "Change system settings", Effect: dg,
+			Tool: "ee_settings", Action: "put", Summary: "改系统设置：changes 是要改的项，按设置的层级写，如 {\"connect\":{\"defaultModel\":\"chat\"}}；auth、scope 只能在网页改。" +
+				"换 DSH 品牌外观写 brand：enabled、name（侧栏名称）、title（首屏标题）、logoShape（circle/rounded/plain）、" +
+				"theme.colors.<accent|accentText|accentSoft|sidebar|sidebarActive|background|input>={light,dark}（CSS 颜色，dark 留空则深色模式用默认），" +
+				"theme.tokens.<--dsw-变量名>={light,dark} 直接覆盖 DSH 设计变量；某个颜色设为 null 即删除。logo 只能在网页上传", En: "Change system settings", Effect: dg,
 			Params: []agentParam{{Name: "changes", Required: true, Schema: map[string]any{"type": "object", "description": "按 ee_settings.get 返回的层级写要改的项"}}},
 			Body:   settingsBody,
 			Preview: func(ctx context.Context, s *Server, p *Principal, args map[string]any) (string, error) {

@@ -521,6 +521,36 @@ func TestAdminTools(t *testing.T) {
 		if got := read("ee_settings", map[string]any{"action": "get"}); got["orgName"] != "Agent 公司" {
 			t.Fatalf("设置没生效：%v", got["orgName"])
 		}
+		// 品牌外观：颜色名、设计变量名是自定的键，可以新增；设为 null 删除；只改浅色时深色保持原样
+		theme := func(changes map[string]any) map[string]any {
+			return map[string]any{"action": "put", "changes": map[string]any{"brand": map[string]any{"theme": changes}}}
+		}
+		preview, _ = a.confirmed("ee_settings", map[string]any{"action": "put", "changes": map[string]any{"brand": map[string]any{
+			"enabled": true, "name": "星河科技", "title": "星河科技企业工作台", "logoShape": "rounded",
+			"theme": map[string]any{"colors": map[string]any{"accent": map[string]any{"light": "#2563eb", "dark": "#60a5fa"}}, "tokens": map[string]any{"--dsw-alias-label-primary": map[string]any{"light": "#0f172a"}}},
+		}}})
+		if !strings.Contains(preview, "brand.title") || !strings.Contains(preview, "#2563eb") {
+			t.Fatalf("预览应列出品牌改动：%s", preview)
+		}
+		a.confirmed("ee_settings", theme(map[string]any{"colors": map[string]any{"accent": map[string]any{"light": "#1d4ed8"}, "sidebar": map[string]any{"light": "#f1f5f9"}}}))
+		a.confirmed("ee_settings", theme(map[string]any{"tokens": map[string]any{"--dsw-alias-label-primary": nil}}))
+		got := read("ee_settings", map[string]any{"action": "get"})
+		gotTheme := got["brand"].(map[string]any)["theme"].(map[string]any)
+		accent := gotTheme["colors"].(map[string]any)["accent"].(map[string]any)
+		if accent["light"] != "#1d4ed8" || accent["dark"] != "#60a5fa" || gotTheme["colors"].(map[string]any)["sidebar"] == nil || len(gotTheme["tokens"].(map[string]any)) != 0 {
+			t.Fatalf("品牌配色：%v", gotTheme)
+		}
+		for _, bad := range []map[string]any{
+			theme(map[string]any{"colors": map[string]any{"glow": map[string]any{"light": "#fff"}}}),
+			theme(map[string]any{"tokens": map[string]any{"--other-x": map[string]any{"light": "#fff"}}}),
+			theme(map[string]any{"colors": map[string]any{"accent": map[string]any{"light": "url(https://evil/x)"}}}),
+			{"action": "put", "changes": map[string]any{"brand": map[string]any{"logoRev": "abc"}}},
+		} {
+			if first, isErr := a.call("ee_settings", bad); !isErr {
+				t.Fatalf("%v 应被拒绝：%s", bad, first)
+			}
+		}
+
 		for _, bad := range []map[string]any{{"scope": "@evil"}, {"auth": "ldap"}, {"noSuchKey": 1}, {"connect": map[string]any{"noSuch": true}}} {
 			first, isErr := a.call("ee_settings", map[string]any{"action": "put", "changes": bad})
 			if !isErr && strings.Contains(first, "confirm_required") {

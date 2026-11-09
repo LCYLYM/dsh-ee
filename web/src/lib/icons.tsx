@@ -22,6 +22,8 @@ import {
   House,
   KeyRound,
   Layers,
+  LogIn,
+  Palette,
   LayoutDashboard,
   LayoutGrid,
   ListChecks,
@@ -83,6 +85,8 @@ export const ICONS: Record<string, LucideIcon> = {
   LayoutGrid,
   Copy,
   Layers,
+  Palette,
+  LogIn,
 };
 
 export function MenuIcon({ name, size = 16, className }: { name: string; size?: number; className?: string }) {
