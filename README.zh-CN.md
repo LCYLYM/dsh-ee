@@ -1,0 +1,270 @@
+<div align="center">
+
+# dsh-ee
+
+**[DeepSeek Harness（DSH）](https://github.com/deepseek-ai/deepseek-harness) 企业私有部署平台**
+
+接入企业现有系统与知识，组装成带 AI 的微应用，审核授权后送到每位员工的 DSH 里运行。
+
+[English](./README.md) · 简体中文
+
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.zh-CN.png">
+  <img alt="dsh-ee：企业现有系统与资产接入 dsh-ee，组装成微应用，在员工本机的 DSH 里运行" src="docs/images/hero-light.zh-CN.png">
+</picture>
+
+</div>
+
+## 为什么是 dsh-ee
+
+AI 工具不缺，缺的是把企业**自己的**知识和系统，安全地送到每位员工手里。
+
+| 员工各自用 AI 工具 | 经 dsh-ee 统一下发 |
+|---|---|
+| 制度和指标口径靠员工自己复制粘贴进对话 | 制度、系统、数据封装成能力，装上就能直接问 |
+| 插件和 Skill 来路不明，装之前没人审过 | 每个包先过自动检查，再由管理员审批、按部门授权 |
+| 谁在哪台电脑上调用了什么系统，事后查不到 | 安装与调用记录回流审计，出问题可一键下架 |
+| 好用的提示词和流程留在个人电脑里 | 员工沉淀的新 Skill 回到企业作用域，供全员复用 |
+
+dsh-ee 本身不跑 AI：**推理与工具调用都在员工本机的 DSH 里**。dsh-ee 负责把 DSH 需要的能力、连接、数据、模型与策略备好、管住。
+
+## 功能
+
+- **能力中心**：插件、技能、提示词、企业连接、微应用一处管理，每个都有版本、可用范围（部门 / 角色 / 指定人）与下发方式（自动生效 / 自己启用），启用后自动同步到员工的 DSH。
+- **微应用**：人设 + 工作台 + 原料（知识库、连接、技能、提示词），可以自带数据表。员工在 DSH 里用 `/名字` 打开；也能发布成网页版，手机上也能用。
+- **企业连接（MCP 网关）**：ERP、CRM、工单等内部系统通过 MCP 服务或 OpenAPI 文档接入。凭据加密托管在服务端，不下发到员工电脑；每个工具单独授权，每次调用都有记录。
+- **数据中台**：企业共用的数据集放在单独的库里，用只读账号查询，支持 `:me_department` 这类按人取值的参数。客户、人员、产品等主数据只存一份。
+- **知识库问答**：不依赖向量模型，Agent 多轮关键词检索、读原文后作答，句句带出处；支持 PDF、Word、Markdown，文档有版本、可回滚。
+- **内置 npm 源与审核**：企业作用域的托管与发布、逐版本审核，自动检查安装脚本、依赖、许可证与密钥泄露；企业作用域永不回源，防依赖混淆；支持上游预载与离线包导入导出。
+- **OpenAI 兼容模型网关**：接入 DeepSeek 等上游后对外统一模型名，同名模型可挂多个上游自动故障转移，按账号分配月度 token 额度与可用模型。
+- **一条命令接入**：`curl -fsSL <dsh-ee>/setup.sh | sh`（Windows 用 `irm <dsh-ee>/setup.ps1 | iex`），浏览器确认设备码后，统一令牌 `ee_at_…` 一次配好 npm 源、模型与能力中心。
+- **身份与治理**：本地账号与 LDAP / AD、RBAC、可在线调整的菜单、审计日志，以及按部门、能力、模型、终端统计的运营数据。
+- **信创友好**：单个 Go 静态二进制（linux/amd64、arm64），数据库用 OceanBase 或 TiDB，支持完全离线部署。
+
+## 架构
+
+```mermaid
+flowchart LR
+  subgraph Sources["企业现有系统与资产"]
+    SYS["ERP / CRM / OA / 工单<br/>（MCP · OpenAPI）"]
+    DATA["数仓 / BI 报表<br/>（中台数据集）"]
+    KB["制度 · 文档 · Skill · 提示词 · 插件"]
+  end
+  subgraph EE["dsh-ee（企业私有部署）"]
+    HUB["能力中心<br/>审核 · 授权 · 审计"]
+    APPS["微应用"]
+    GW["模型网关<br/>额度 · 故障转移"]
+    NPM["npm 源"]
+  end
+  subgraph Client["员工本机"]
+    DSH["DSH<br/>推理与工具调用"]
+  end
+  SYS --> HUB
+  DATA --> HUB
+  KB --> HUB
+  HUB --> APPS
+  APPS --> DSH
+  NPM --> DSH
+  GW --> DSH
+  DSH -- "安装与调用记录、新 Skill" --> HUB
+  GW --> LLM["DeepSeek 等上游大模型"]
+```
+
+dsh-ee 是**一个文件**：前端嵌在 Go 二进制里，同一个端口提供界面、接口（`/api`、`/v1`、`/mcp`）、npm 源（`/npm/`）与 DSH 插件索引（`/index/dsh-index.json`）。只依赖一个 MySQL 协议的数据库（**OceanBase** MySQL 模式或 **TiDB**）和一个数据目录。
+
+## 快速开始
+
+### 离线安装包（推荐）
+
+目标机器只需要 docker 与 docker compose v2，不需要外网。
+
+```bash
+tar xzf dsh-ee-<版本>-linux-amd64.tar.gz && cd dsh-ee-<版本>-linux-amd64
+sha256sum -c SHA256SUMS
+
+./install.sh tidb        # dsh-ee + 单机 TiDB
+./install.sh oceanbase   # dsh-ee + 单机 OceanBase（宿主机至少 2 核 8 GB）
+./install.sh external    # 只起 dsh-ee，连接已有数据库：先在 .env 里填 DSH_EE_DSN
+```
+
+第一次执行会生成 `.env`（主密钥与初始管理员密码），并打印管理员密码。**`.env` 要和数据库一起备份**：主密钥丢了，已存的上游凭据就解不开了。
+
+自己打安装包：`make bundle VERSION=v0.1.0 ARCH=amd64`（鲲鹏等用 `ARCH=arm64`）。
+
+### docker compose
+
+```bash
+cd deploy
+cp ../server/.env.example .env   # 填 DSH_EE_SECRET_KEY（openssl rand -base64 32）等
+docker build -t dsh-ee:latest ..
+docker compose -f compose.yml -f compose.tidb.yml up -d
+```
+
+### 不用 docker
+
+```bash
+make build                       # 产物 dist/dsh-ee，已嵌好前端
+DSH_EE_DSN='root:@tcp(127.0.0.1:4000)/dsh_ee' \
+DSH_EE_SECRET_KEY="$(openssl rand -base64 32)" \
+DSH_EE_BOOTSTRAP_ADMIN_PASSWORD='请改成至少十个字符的密码' \
+./dist/dsh-ee
+```
+
+systemd 单元在 [`deploy/systemd`](./deploy/systemd)。HTTPS、反向代理、正式环境数据库与数据中台的配置见 [deploy/README.md](./deploy/README.md)。
+
+### 员工接入
+
+在员工电脑上：
+
+```bash
+curl -fsSL https://<dsh-ee>/setup.sh | sh     # macOS / Linux
+irm https://<dsh-ee>/setup.ps1 | iex          # Windows
+```
+
+在浏览器确认设备码后，DSH 就接上了企业的能力与模型。DSH 对话里可用 `/ee-login`、`/ee-status`、`/ee-logout` 管理登录。
+
+- `ee_at_…` 是统一接入令牌，按账号 RBAC 与令牌 scope 取交集控制模型、npm 源、能力中心和企业连接；服务端只保存哈希。旧 `ee_npm_…` 与 `sk-ee-…` 继续兼容。
+- 脚本把令牌交给 DSH 凭据库，不默认写入 `.env`。服务器或 CI 可用 `setup.sh --token <令牌>` 或 `DSH_EE_TOKEN`，这条兼容路径仍写 `$DSH_HOME/.env`。
+- 升级前请保留原主密钥。回滚到旧服务端后，新 `ee_at_` 令牌不可用，需要重新使用旧令牌；新增表和列不会影响旧版启动。
+
+## 配置
+
+| 环境变量 | 说明 |
+|---|---|
+| `DSH_EE_DSN` | **必填**。MySQL 协议 DSN；库不存在时会尝试创建 |
+| `DSH_EE_SECRET_KEY` | **必填**。32 字节 base64 主密钥，加密上游凭据 |
+| `DSH_EE_ADDR` | 监听地址，默认 `127.0.0.1:8080` |
+| `DSH_EE_BOOTSTRAP_ADMIN` / `_PASSWORD` | 用户表为空时创建的管理员，默认用户名 `admin` |
+| `DSH_EE_PUBLIC_URL` | 对外地址，如 `https://dsh.example.internal`；npm 的 tarball 地址按它生成 |
+| `DSH_EE_COOKIE_SECURE` | 部署在 HTTPS 后面时设为 `true` |
+| `DSH_EE_DATA_DIR` | 数据目录（npm tarball、缓存），默认 `./data` |
+| `DSH_EE_DATA_DSN` / `DSH_EE_DATA_READ_DSN` | 数据中台的库（可写 / 只读账号）；设为 `off` 关闭数据中台 |
+
+完整列表、权限模型与接口说明见 [server/README.md](./server/README.md)。
+
+## 开发
+
+需要 **Go 1.27+**、**Node 22** 与 **pnpm**，以及一个本地 TiDB 或 OceanBase。
+
+```bash
+# 1. 数据库：单机 TiDB（数据保存在 tag dsh-ee 下，下次同样命令会复用）
+tiup playground v8.5.8 --tag dsh-ee --tiflash 0 --without-monitor --host 127.0.0.1
+
+# 2. 服务端（首次启动会自动建库、建表、创建管理员）
+cd server
+cp .env.example .env.local        # 填好 DSH_EE_SECRET_KEY 与管理员密码
+set -a; . ./.env.local; set +a
+go run ./cmd/dsh-ee
+
+# 3. 前端（Vite 把 /api、/v1、/npm、/index 代理到 :8080）
+cd web
+pnpm install
+pnpm dev                          # http://localhost:5188
+```
+
+除落地页与设备确认页外，所有页面都需要登录；账号用服务端首次启动时创建的管理员。
+
+### 演示数据
+
+服务端起来后，可以补一份可直接演示的数据（角色、员工、机器人、额度、上游模型与凭据）：
+
+```bash
+cd server
+set -a; . ./.env.local; set +a
+DSH_EE_SEED_ADMIN_PASSWORD='你的管理员密码' go run ./cmd/seed
+```
+
+- 管理员：使用 `admin` 账号写入，所以需要它的密码（也可用 `DSH_EE_SEED_ADMIN_PASSWORD` 显式指定）。
+- 角色：「审核员」（看总览 + 审核能力）、「运维」（再加 npm 源与上游预载）。
+- 员工：`zhang.wei` / `li.na` / `sun.hao` / `chen.yu` / `zhou.lei` / `wang.fang`，初始密码默认 `dsh-ee-demo-2026`，可用 `DSH_EE_SEED_USER_PASSWORD` 覆盖；其中 `wang.fang` 故意不分配额度，用来演示 429。
+- 机器人：`rd-ci`（研发效能部 CI），负责人是 `zhang.wei`，每月 500 万 token，不能登录网页。
+- 上游：「DeepSeek（官方）」与「内部模型网关」，`deepseek-flash` 同时挂在两个上游上，用于演示故障转移。
+- 业务工作台：只读连接 `ee-catalog`（读 dsh-ee 自己公开的插件索引）和微应用「插件导购」（`plugin-guide`），设计见 [docs/workbench-panels.md](./docs/workbench-panels.md)。
+- 凭据：每个演示员工与机器人各一个 `ee_at_`「演示接入」令牌；明文只在第一次创建时打印。
+
+重复执行是幂等的。上游 key 默认是占位值（`sk-demo-*`），连接检查会失败；接真实上游时用 `DSH_EE_SEED_DEEPSEEK_KEY` / `DSH_EE_SEED_GATEWAY_KEY` 传进去。
+
+### 测试
+
+```bash
+# Go 集成测试（需要一个 TiDB / OceanBase；每个测试建随机库，跑完删除）
+DSH_EE_TEST_DSN='root:@tcp(127.0.0.1:4000)/' make test
+
+# 浏览器端到端测试：对一个已启动的服务（推荐用 make build 的单文件），需要初始管理员密码
+E2E_BASE=http://127.0.0.1:8080 ADMIN_PW=… make e2e      # 或 cd e2e && node run.mjs registry 只跑一个
+
+# 接入插件单元测试与真实 DSH 场景（需先 make build，并准备 DSH 与 Chrome）
+cd dsh-plugin && npm test
+cd e2e/dsh/scenarios && npm test
+```
+
+每次推送 GitHub Actions（`.github/workflows/ci.yml`）会构建前端、对 TiDB 跑 Go 集成测试、用嵌好前端的单文件跑全部端到端测试、校验 compose 并构建镜像。`oceanbase` 工作流（手动触发 / 每周一次）在 OceanBase 上再跑一遍，本地也可以用 `scripts/test-oceanbase.sh`（需要 8 GB 以上内存）。
+
+### 前端约定
+
+- 基础组件来自 [shadcn/ui](https://ui.shadcn.com)（Radix），源码在 `web/src/components/shadcn/`；新增组件：`cd web && pnpm dlx shadcn@latest add <组件名>`。
+- 确认操作用 `useConfirm()`（`lib/confirm.tsx`），不要用 `window.confirm`；提示消息用 `notify(msg)`（Sonner）。
+- 可搜索下拉 `Combobox`、日期选择 `DatePicker` 在 `components/pickers.tsx`；数据表 `DataTable`（TanStack Table）在 `components/data-table.tsx`；悬停提示 `Tip` 在 `components/tip.tsx`。
+- 多语言用 `react-i18next`：文案在 `web/src/i18n/zh/*.ts`（源语言）与 `web/src/i18n/en/*.ts`，英文按中文的结构写，缺键会在 `tsc` 时报错。按浏览器语言自动选择，选择记在 localStorage。
+
+### 目录结构
+
+| 路径 | 内容 |
+|---|---|
+| [`server/`](./server) | Go 服务端：登录与 RBAC、LDAP、模型网关、npm 源、能力中心、MCP 网关、知识库、数据中台 |
+| [`web/`](./web) | 前端：Vite + React + Tailwind（shadcn/ui），中英双语 |
+| [`dsh-plugin/`](./dsh-plugin) | DSH 接入插件 `dsh-connect` |
+| [`deploy/`](./deploy) | compose 文件、离线安装包、systemd 单元 |
+| [`e2e/`](./e2e) | Playwright 端到端测试与真实 DSH 场景 |
+| [`docs/`](./docs) | 设计文档：[总体设计](./docs/design.md)、[能力中心](./docs/capability-hub.md)、[知识库](./docs/knowledge.md)、[产品 v1](./docs/product-v1.md) |
+
+<details>
+<summary>页面一览（默认菜单，可在「菜单与页面」里改）</summary>
+
+| 路径 | 页面 |
+|---|---|
+| `/` | 落地页 |
+| `/login` | 登录 |
+| `/tokens` | 我的令牌：统一新旧令牌、设备、scope 与用量 |
+| `/account` | 账号与修改密码 |
+| `/workbench` | 我的工作台：本月 Token、密钥、装过的能力、部门在用、我分享的 |
+| `/apps` | 微应用：人设 + 技能 + 企业系统 + 插件，在 DSH 里用 /名字 打开 |
+| `/knowledge` | 知识库：建库、权限、上传文档、试搜、检索记录 |
+| `/hub` | 能力中心：插件、技能、提示词、企业连接、微应用 |
+| `/assets/:id`、`/assets/new` | 能力详情与编辑 |
+| `/plugins/:name` | 插件详情：安装命令、自动检查结果、版本、依赖、README |
+| `/dsh` | 下载 DSH 核心 / 桌面版 |
+| `/setup` | 接入企业插件源 |
+| `/publish` | 分享插件、申请引入社区插件、我的提交 |
+| `/admin` | 管理总览 |
+| `/admin/users`、`/admin/roles`、`/admin/menus` | 用户、角色与权限、菜单与页面 |
+| `/admin/providers`、`/admin/quotas`、`/admin/tokens` | 模型接入、额度分配、令牌管理 |
+| `/admin/stats`、`/admin/audit` | 运营数据、审计日志 |
+| `/admin/registry`、`/admin/plugins`、`/admin/review`、`/admin/upstream` | npm 源、能力管理、审核队列、上游预载 |
+| `/admin/connections` | 企业连接：MCP 服务或 OpenAPI 接口、凭据托管、工具级授权 |
+| `/admin/distribution` | DSH 本体分发管理 |
+| `/admin/settings` | 系统设置（含 LDAP / AD） |
+
+</details>
+
+## 项目状态
+
+dsh-ee 处于早期开发阶段（v0.x），版本之间接口与表结构可能变化。已知缺口：
+
+- OIDC 登录尚未实现（本地账号与 LDAP / AD 可用）。
+- DSH 本体分发的版本、安装包与 sha256 仍是占位。
+- 按单实例设计：登录限流、缓存与预载任务在进程内存里，tarball 存在本地磁盘。
+
+详见 [server/README.md](./server/README.md) 的「已知限制」。
+
+## 参与贡献
+
+欢迎提 Issue 和 Pull Request。提 PR 前请跑一下相关测试；界面文案请同时改 `web/src/i18n/zh` 与 `web/src/i18n/en`。
+
+## 许可证
+
+[Apache License 2.0](./LICENSE)
+
+dsh-ee 是独立项目，与 DeepSeek 官方无隶属关系。
