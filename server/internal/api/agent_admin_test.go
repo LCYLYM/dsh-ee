@@ -137,8 +137,9 @@ func TestAdminModeMatrix(t *testing.T) {
 	}
 	check("结束后", liveAgent, want{requestAdmin: true})
 	link := liveAgent.ok("ee_tokens", map[string]any{"action": "request_admin"})
-	if !strings.Contains(fmt.Sprint(link["url"]), fmt.Sprintf("/tokens?elevate=at:%d", live.ID)) {
-		t.Fatalf("链接应指向当前令牌：%v", link)
+	wantURL := fmt.Sprintf("%s/tokens?elevate=at:%d", f.ts.URL, live.ID)
+	if got := fmt.Sprint(link["url"]); got != wantURL {
+		t.Fatalf("链接应带 scheme 和 host：got %q want %q", got, wantURL)
 	}
 
 	// 到期：时间一过立刻失效（不依赖任何定时任务）
