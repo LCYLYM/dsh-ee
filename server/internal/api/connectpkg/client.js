@@ -22435,23 +22435,53 @@ var citationBadges = {
   missing: { text: "\u2716 \u627E\u4E0D\u5230\u8FD9\u7BC7\u6587\u6863", color: "#b91c1c" },
   unchecked: { text: "\u672A\u6838\u5BF9", color: "inherit" }
 };
+function citationChip(h, n, status) {
+  const color = status === "ok" ? "#15803d" : status === "mismatch" || status === "missing" ? "#b91c1c" : "var(--ee-muted)";
+  return h("span", {
+    "aria-hidden": true,
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: 18,
+      height: 18,
+      padding: "0 5px",
+      borderRadius: 999,
+      fontSize: 10.5,
+      fontWeight: 600,
+      color,
+      border: `1px solid color-mix(in srgb, ${color} 45%, transparent)`,
+      background: `color-mix(in srgb, ${color} 10%, transparent)`,
+      boxSizing: "border-box"
+    }
+  }, String(n));
+}
 function citationsView(h, items, key, open2, hrefOf) {
   return h(
     "ol",
-    { key, style: { margin: 0, paddingLeft: 22, fontSize: 12, display: "grid", gap: 6 } },
+    { key, style: { margin: 0, padding: 0, listStyle: "none", fontSize: 12, display: "grid", gap: 8 } },
     ...items.map((item, i) => {
       const badge = citationBadges[item.status ?? "unchecked"];
       const where = `${item.title || `\u6587\u6863 ${item.doc}`} \xB7 \u7B2C ${item.from === item.to ? item.from : `${item.from}\u2013${item.to}`} \u884C`;
+      const tip = `${where}
+\u201C${item.quote}\u201D`;
       return h(
         "li",
-        { key: i, "data-citation": i + 1 },
+        { key: i, "data-citation": i + 1, style: { display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 8px", alignItems: "start" } },
+        citationChip(h, i + 1, item.status),
         h(
           "div",
-          { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 } },
-          open2 ? h("button", { type: "button", onClick: () => open2(item), title: "\u67E5\u770B\u539F\u6587", className: "dshee-btn", style: { ...buttonStyle2, padding: "1px 7px" } }, where) : hrefOf?.(item) ? h("a", { href: hrefOf(item), target: "_blank", rel: "noopener noreferrer", title: "\u5728 dsh-ee \u7F51\u9875\u4E0A\u770B\u539F\u6587", style: { color: "inherit", textDecoration: "underline" } }, `${where} \u2197`) : h("span", null, where),
-          h("span", { style: { color: badge.color, fontSize: 11, opacity: item.status === "unchecked" || !item.status ? 0.6 : 1 } }, badge.text)
-        ),
-        h("div", { style: { ...muted, marginTop: 2, whiteSpace: "pre-wrap" } }, `\u201C${item.quote}\u201D`)
+          { style: { minWidth: 0 } },
+          h(
+            "div",
+            { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 } },
+            open2 ? h("button", { type: "button", onClick: () => open2(item), title: tip, "aria-label": `\u67E5\u770B\u539F\u6587\uFF1A${where}`, className: "dshee-btn", style: { ...buttonStyle2, padding: "1px 7px" } }, where) : hrefOf?.(item) ? h("a", { href: hrefOf(item), target: "_blank", rel: "noopener noreferrer", title: `${tip}
+\u5728 dsh-ee \u7F51\u9875\u4E0A\u770B\u539F\u6587`, style: { color: "inherit", textDecoration: "underline" } }, `${where} \u2197`) : h("span", { title: tip }, where),
+            h("span", { style: { color: badge.color, fontSize: 11, opacity: item.status === "unchecked" || !item.status ? 0.6 : 1 } }, badge.text),
+            item.near_skipped ? h("span", { title: "\u90A3\u4E00\u9875\u662F\u626B\u63CF\u9875\u6216\u4E71\u7801\uFF0C\u6CA1\u6709\u6536\u5F55\u8FDB\u77E5\u8BC6\u5E93\uFF1B\u7B54\u6848\u53EF\u80FD\u6F0F\u4E86\u90A3\u4E00\u9875\u7684\u5185\u5BB9\uFF0C\u8BF7\u770B\u539F\u4EF6", style: { fontSize: 11, color: "#a16207" } }, `\u26A0 \u7B2C ${item.near_skipped} \u9875\u6CA1\u6536\u5F55`) : null
+          ),
+          h("div", { style: { ...muted, marginTop: 2, whiteSpace: "pre-wrap" } }, `\u201C${item.quote}\u201D`)
+        )
       );
     })
   );

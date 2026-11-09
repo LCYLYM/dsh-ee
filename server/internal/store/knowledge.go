@@ -262,6 +262,9 @@ func (s *Store) DeleteKBase(ctx context.Context, id int64) error {
 	if _, err := tx.ExecContext(ctx, "DELETE t FROM kb_doc_texts t JOIN kb_docs d ON d.id = t.doc_id WHERE d.base_id = ?", id); err != nil {
 		return err
 	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM kb_gap_ignores WHERE base_id = ?", id); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM kb_docs WHERE base_id = ?", id); err != nil {
 		return err
 	}
@@ -597,6 +600,59 @@ func (s *Store) RecentKQueries(ctx context.Context, f KQueryFilter) ([]*KQuery, 
 		if len(out) == f.Limit {
 			break
 		}
+	}
+	return out, rows.Err()
+}
+
+// KBGapIgnores 是每个库被忽略的检索词（库 → 归一化后的检索词）。
+func (s *Store) KBGapIgnores(ctx context.Context) (map[int64]map[string]bool, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT base_id, query_key FROM kb_gap_ignores")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]map[string]bool{}
+	for rows.Next() {
+		var base int64
+		var key string
+		if err := rows.Scan(&base, &key); err != nil {
+			return nil, err
+		}
+		if out[base] == nil {
+			out[base] = map[string]bool{}
+		}
+		out[base][key] = true
+	}
+	return out, rows.Err()
+}
+
+// IgnoreKBGap 把一个检索词从这个库的「待补文档」里拿掉；重复忽略不报错。
+func (s *Store) IgnoreKBGap(ctx context.Context, baseID int64, key string, by int64) error {
+	_, err := s.db.ExecContext(ctx, "INSERT IGNORE INTO kb_gap_ignores (base_id, query_key, created_by, created_at) VALUES (?, ?, ?, ?)", baseID, key, nullID(by), now())
+	return err
+}
+
+// KDocBrief 是列表里显示的一篇文档：编号、标题、更新时间。
+type KDocBrief struct {
+	ID        int64     `json:"id"`
+	Title     string    `json:"title"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// RecentKDocs 是一个库最近更新的 n 篇文档。
+func (s *Store) RecentKDocs(ctx context.Context, baseID int64, n int) ([]*KDocBrief, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT id, title, updated_at FROM kb_docs WHERE base_id = ? ORDER BY updated_at DESC, id DESC LIMIT ?", baseID, n)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*KDocBrief
+	for rows.Next() {
+		var d KDocBrief
+		if err := rows.Scan(&d.ID, &d.Title, &d.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, &d)
 	}
 	return out, rows.Err()
 }

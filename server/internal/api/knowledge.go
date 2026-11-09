@@ -126,6 +126,9 @@ type kbItem struct {
 	CanManage bool `json:"can_manage"`
 	// 在可用范围内（能在 DSH 里查）
 	Readable bool `json:"readable"`
+	// 列表里才有：最近更新的几篇；维护者才有：待补文档有几条
+	Recent []*store.KDocBrief `json:"recent,omitempty"`
+	Gaps   *int               `json:"gaps,omitempty"`
 }
 
 func kbItemOf(v viewer, b *store.KBase) kbItem {
@@ -141,8 +144,33 @@ func (s *Server) handleKBList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	items := make([]kbItem, len(bases))
+	var maintained []int64
 	for i, b := range bases {
 		items[i] = kbItemOf(v, b)
+		if items[i].CanEdit {
+			maintained = append(maintained, b.ID)
+		}
+		// 最近更新的几篇：员工最关心的是「什么制度改了」
+		if items[i].Readable {
+			if items[i].Recent, err = s.store.RecentKDocs(r.Context(), b.ID, 3); err != nil {
+				s.internalErr(w, r, err)
+				return
+			}
+		}
+	}
+	// 维护的库：待补文档有几条
+	if len(maintained) > 0 {
+		gaps, err := s.kbGaps(r.Context(), maintained)
+		if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		for i := range items {
+			if items[i].CanEdit {
+				n := len(gaps[items[i].ID])
+				items[i].Gaps = &n
+			}
+		}
 	}
 	resp := map[string]any{"items": items, "can_manage": v.kbManages(), "formats": kb.Formats}
 	set, err := s.appSettings(r.Context())
@@ -244,7 +272,17 @@ func (s *Server) handleKBDetail(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"kb": kbItemOf(v, b), "docs": out, "used_by": used})
+	item := kbItemOf(v, b)
+	if item.CanEdit {
+		gaps, err := s.kbGaps(r.Context(), []int64{b.ID})
+		if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		n := len(gaps[b.ID])
+		item.Gaps = &n
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"kb": item, "docs": out, "used_by": used})
 }
 
 type kbPatchReq struct {
@@ -474,7 +512,8 @@ func (s *Server) handleKBUpload(w http.ResponseWriter, r *http.Request) {
 	uid := currentUser(r).ID
 	files := r.MultipartForm.File["file"]
 	if len(files) == 0 {
-		title, md := strings.TrimSpace(r.FormValue("title")), r.FormValue("markdown")
+		// 浏览器提交表单时会把换行变成 \r\n，统一回 \n（行号、引用核对、编辑时的比较都按 \n）
+		title, md := strings.TrimSpace(r.FormValue("title")), normalizeNewlines(r.FormValue("markdown"))
 		if title == "" || !limitRunes(title, 200) || strings.TrimSpace(md) == "" {
 			writeErr(w, http.StatusBadRequest, "要上传文件，或者填写标题和正文")
 			return
@@ -624,10 +663,26 @@ func (s *Server) handleKDocDetail(w http.ResponseWriter, r *http.Request) {
 	for i, x := range versions {
 		vs[i] = versionItem{KDocText: x, CreatedByName: users.name(x.CreatedBy)}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	resp := map[string]any{
 		"doc": d, "kb": kbItemOf(v, b), "version": text.Version, "markdown": text.Markdown,
 		"outline": kb.Outline(text.Markdown), "versions": vs, "format": docFormat(d),
-	})
+	}
+	// 维护者编辑前要知道：这篇最近被 AI 读过几次（改了以后，引用旧版本的答案会显示「原文已更新」）
+	if v.kbMaintains(b) {
+		reads, err := s.store.RecentKQueries(r.Context(), store.KQueryFilter{Tool: "read", Base: b.ID, Since: time.Now().AddDate(0, 0, -30), Limit: 5000})
+		if err != nil {
+			s.internalErr(w, r, err)
+			return
+		}
+		n := 0
+		for _, q := range reads {
+			if slices.Contains(q.Docs, d.ID) {
+				n++
+			}
+		}
+		resp["reads_30d"] = n
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 type kdocPatchReq struct {
@@ -677,6 +732,8 @@ func (s *Server) handleKDocPatch(w http.ResponseWriter, r *http.Request) {
 		p.Folder = &f
 	}
 	if req.Markdown != nil {
+		norm := normalizeNewlines(*req.Markdown)
+		req.Markdown = &norm
 		if strings.TrimSpace(*req.Markdown) == "" {
 			writeErr(w, http.StatusBadRequest, "正文不能为空")
 			return
@@ -752,6 +809,10 @@ func (s *Server) handleKDocReplace(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit(r, auditKBDocEdit, "kb:"+b.Slug+"/"+strconv.FormatInt(d.ID, 10), map[string]any{"file": origin.SourceName, "version": updated.Version})
 	writeJSON(w, http.StatusOK, updated)
+}
+
+func normalizeNewlines(s string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n")
 }
 
 // docFormat 是文档的格式（pdf、docx、xlsx……），阅读视图按它显示分页线、工作表、每页卡片；网页新建的是 md。

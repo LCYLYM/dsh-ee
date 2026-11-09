@@ -3436,7 +3436,8 @@ async function verifyCitations(tools, blocks) {
         const status = ["ok", "stale", "mismatch", "missing"].includes(result?.status) ? result.status : "unchecked";
         if (status === "mismatch" || status === "missing") bad.push(index);
         if (status === "stale") stale.push(index);
-        return { ...item, title: item.title || result?.title || void 0, status };
+        const near = Number.isInteger(result?.near_skipped) && result.near_skipped > 0 ? result.near_skipped : void 0;
+        return { ...item, title: item.title || result?.title || void 0, status, near_skipped: near };
       })
     };
   });

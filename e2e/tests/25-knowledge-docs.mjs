@@ -155,6 +155,14 @@ export default async function (t) {
   const created = await api(admin, "POST", "/api/kb", { slug: `docs-${tag}`, title: `制度样本 ${tag}`, description: "第二期格式验证" });
   assertEq(created.status, 201, "建库");
   const kbId = created.data.id;
+  try {
+    await run(admin, kbId);
+  } finally {
+    await api(admin, "DELETE", `/api/kb/${kbId}`);
+  }
+}
+
+async function run(admin, kbId) {
 
   // ---- 上传：选文件后先看有没有同名，上传完每个文件一张体检卡 ----
   await admin.goto(`${BASE}/knowledge/${kbId}`);
@@ -266,6 +274,4 @@ export default async function (t) {
   await mark.first().waitFor();
   await shot(admin, "kb2-read-citation-dark");
   await admin.evaluate(() => localStorage.removeItem("dsh-ee:theme"));
-
-  await api(admin, "DELETE", `/api/kb/${kbId}`);
 }

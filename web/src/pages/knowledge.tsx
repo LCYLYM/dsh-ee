@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { BookOpen, Plus } from "lucide-react";
+import { BookOpen, Download, ExternalLink, FolderPlus, MessageSquare, Plus, Search, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { api, formatTime, type KBase, type KBQASettings, type KBQuery, type Scope } from "../lib/api";
+import { api, formatTime, type KBase, type KBQASettings, type KBQuery, type KBSearchResult, type Scope } from "../lib/api";
 import { useAction, useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
 import { scopeSummary } from "../lib/hub";
@@ -11,6 +11,7 @@ import { ScopeEditor } from "../components/scope-editor";
 import { useScopeOptions } from "../components/scope-dialog";
 import { Badge, Button, Card, CardHeader, cx, Field, inputCls, PageHeader, ToggleRow } from "../components/ui";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
+import { Snippet } from "../components/kb-access";
 
 export const kbPath = (id: number) => `/knowledge/${id}`;
 export const kdocPath = (id: number, line?: { from: number; to: number }) => `/knowledge/docs/${id}${line ? `#L${line.from}-${line.to}` : ""}`;
@@ -168,6 +169,162 @@ export function QueryTable({ items, showUser, empty, bases }: { items: KBQuery[]
   );
 }
 
+/** 在全部能查的库里搜标题和内容，结果按文档聚合；也可以把问题带到 DSH 的「知识问答」里问。 */
+function KnowledgeSearch({ qaTitle }: { qaTitle: string }) {
+  const { t } = useTranslation();
+  const { notify } = useStore();
+  const [query, setQuery] = useState("");
+  const [result, setResult] = useState<{ query: string; data: KBSearchResult } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { busy, run } = useAction();
+  const ref = useRef<HTMLInputElement>(null);
+  // 「/」聚焦搜索框
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (e.key === "/" && !e.metaKey && !e.ctrlKey && !["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) && !el.isContentEditable) {
+        e.preventDefault();
+        ref.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  const search = async () => {
+    const q = query.trim();
+    if (!q) return;
+    setError(null);
+    const r = await run(() => api.searchKB({ query: q, mode: "any" }));
+    if (r.ok) setResult({ query: q, data: r.value });
+    else setError(r.error);
+  };
+  // 命中按文档聚合，每篇最多列三处
+  const groups = new Map<number, { title: string; hits: KBSearchResult["hits"] }>();
+  for (const h of result?.data.hits ?? []) {
+    const g = groups.get(h.doc) ?? { title: h.title, hits: [] };
+    if (g.hits.length < 3) g.hits.push(h);
+    groups.set(h.doc, g);
+  }
+  const named = (result?.data.docs ?? []).filter((d) => !groups.has(d.doc));
+  const askInDSH = async () => {
+    const text = `/kb-qa ${query.trim()}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      notify(t("knowledge.askCopied", { name: qaTitle }));
+    } catch {
+      notify(text);
+    }
+  };
+  return (
+    <Card className="mb-6 p-5">
+      <form
+        className="flex flex-wrap gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void search();
+        }}
+      >
+        <div className="relative min-w-0 flex-1">
+          <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-neutral-400" aria-hidden />
+          <input
+            ref={ref}
+            className={cx(inputCls, "h-11 pl-9 text-base")}
+            value={query}
+            placeholder={t("knowledge.searchPlaceholder")}
+            aria-label={t("knowledge.searchPlaceholder")}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+        <Button type="submit" className="h-11" disabled={busy || !query.trim()}>
+          {t("knowledge.searchSubmit")}
+        </Button>
+        <Button type="button" variant="secondary" className="h-11" disabled={!query.trim()} onClick={() => void askInDSH()}>
+          <MessageSquare size={15} /> {t("knowledge.askInDSH", { name: qaTitle })}
+        </Button>
+      </form>
+      <p className="mt-2 text-xs text-neutral-500">
+        {t("knowledge.searchHint")}{" "}
+        <a href="dsh://open" className="inline-flex items-center gap-0.5 text-brand-600 hover:underline dark:text-brand-300">
+          {t("knowledge.openDSH")} <ExternalLink size={11} />
+        </a>
+      </p>
+      <ErrorNote>{error}</ErrorNote>
+      {result && (
+        <div className="mt-4 border-t border-neutral-100 pt-4">
+          {groups.size === 0 && named.length === 0 ? (
+            <p className="text-sm text-neutral-600">{t("knowledge.searchNoHit")}</p>
+          ) : (
+            <ul className="space-y-3">
+              {named.map((d) => (
+                <li key={`d${d.doc}`}>
+                  <Link to={kdocPath(d.doc)} className="font-medium text-brand-600 hover:underline dark:text-brand-300">
+                    {d.title}
+                  </Link>
+                  <span className="ml-2 text-xs text-neutral-500">{t("knowledge.titleMatch")}</span>
+                </li>
+              ))}
+              {[...groups.entries()].map(([doc, g]) => (
+                <li key={doc}>
+                  <Link to={kdocPath(doc)} className="font-medium text-brand-600 hover:underline dark:text-brand-300">
+                    {g.title}
+                  </Link>
+                  <ul className="mt-1 space-y-1">
+                    {g.hits.map((h) => (
+                      <li key={`${h.from}-${h.line}`}>
+                        <Link to={kdocPath(doc, { from: h.line, to: h.line })} className="block rounded px-2 py-1 text-sm text-neutral-700 hover:bg-neutral-100">
+                          {h.heading && <span className="mr-2 text-xs text-neutral-500">{h.heading}</span>}
+                          <Snippet text={h.snippet} />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** 一个知识库都没有时：三步引导，管理员可以直接导入示例。 */
+function FirstRun({ onCreate }: { onCreate: () => void }) {
+  const { t } = useTranslation();
+  const steps = [
+    { icon: FolderPlus, title: t("knowledge.guide.step1"), desc: t("knowledge.guide.step1Desc") },
+    { icon: Upload, title: t("knowledge.guide.step2"), desc: t("knowledge.guide.step2Desc") },
+    { icon: MessageSquare, title: t("knowledge.guide.step3"), desc: t("knowledge.guide.step3Desc") },
+  ];
+  return (
+    <Card className="p-6">
+      <h2 className="text-lg font-semibold text-neutral-900">{t("knowledge.guide.title")}</h2>
+      <ol className="mt-4 grid gap-4 md:grid-cols-3">
+        {steps.map((s, i) => (
+          <li key={i} className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+            <div className="flex items-center gap-2 text-sm font-medium text-neutral-900">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-200">{i + 1}</span>
+              <s.icon size={15} className="text-neutral-500" aria-hidden />
+              {s.title}
+            </div>
+            <p className="mt-2 text-sm text-neutral-600">{s.desc}</p>
+          </li>
+        ))}
+      </ol>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Button onClick={onCreate}>
+          <Plus size={15} /> {t("knowledge.create")}
+        </Button>
+        <Link to="/go?setup=1">
+          <Button variant="secondary">
+            <Download size={15} /> {t("knowledge.guide.importDemo")}
+          </Button>
+        </Link>
+      </div>
+    </Card>
+  );
+}
+
 export default function Knowledge() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -194,40 +351,58 @@ export default function Knowledge() {
       />
       <LoadState loading={list.loading && !list.data} error={list.data ? null : list.error} onRetry={list.reload}>
         {items.length === 0 ? (
-          <Card>
-            <p className="px-5 py-10 text-center text-sm text-neutral-600">{manage ? t("knowledge.emptyManage") : t("knowledge.empty")}</p>
-          </Card>
+          manage ? (
+            <FirstRun onCreate={() => setCreating(true)} />
+          ) : (
+            <Card>
+              <p className="px-5 py-10 text-center text-sm text-neutral-600">{t("knowledge.empty")}</p>
+            </Card>
+          )
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {items.map((b) => (
-              <Link key={b.id} to={kbPath(b.id)} className="block">
-                <Card className="h-full p-5 transition hover:border-neutral-300">
+          <>
+            {items.some((b) => b.readable && b.docs > 0) && <KnowledgeSearch qaTitle={list.data?.qa?.qaTitle || t("knowledge.qaName")} />}
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {items.map((b) => (
+                <Card key={b.id} className="relative flex h-full flex-col p-5 transition hover:border-neutral-300">
                   <div className="flex items-start gap-3">
-                    <BookOpen size={20} className="mt-0.5 shrink-0 text-neutral-500" />
-                    <div className="min-w-0">
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300">
+                      <BookOpen size={18} aria-hidden />
+                    </span>
+                    <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-base font-medium text-neutral-900">{b.title}</span>
-                        <span className="font-mono text-xs text-neutral-500">{b.slug}</span>
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {/* 整张卡片可点：链接盖住卡片，卡片里的文档链接浮在上面 */}
+                        <Link to={kbPath(b.id)} className="text-base font-medium text-neutral-900 after:absolute after:inset-0 after:content-['']">
+                          {b.title}
+                        </Link>
+                        {(b.gaps ?? 0) > 0 && <Badge tone="amber">{t("knowledge.gapsBadge", { count: b.gaps })}</Badge>}
                         {b.can_edit && !b.can_manage && <Badge tone="brand">{t("knowledge.maintainerBadge")}</Badge>}
                         {!b.readable && <Badge tone="amber">{t("knowledge.notReadable")}</Badge>}
                       </div>
-                      {b.description && <p className="mt-2 line-clamp-3 text-sm text-neutral-700">{b.description}</p>}
-                      <div className="mt-3 space-y-0.5 text-xs text-neutral-600">
-                        <div>
-                          {t("knowledge.docs", { count: b.docs })} · {t("knowledge.updated", { time: formatTime(b.updated_at) })}
-                        </div>
-                        <div>
-                          {t("knowledge.scope")}：{scopeSummary(t, b.scope, opts.roleName)}
-                        </div>
-                      </div>
+                      {b.description && <p className="mt-1 line-clamp-2 text-sm text-neutral-600">{b.description}</p>}
                     </div>
                   </div>
+                  {(b.recent?.length ?? 0) > 0 && (
+                    <div className="mt-4">
+                      <div className="text-xs font-medium text-neutral-500">{t("knowledge.recent")}</div>
+                      <ul className="mt-1 space-y-0.5">
+                        {b.recent!.map((d) => (
+                          <li key={d.id} className="flex items-center justify-between gap-2 text-sm">
+                            <Link to={kdocPath(d.id)} className="relative z-10 min-w-0 truncate text-neutral-800 hover:text-brand-600 hover:underline">
+                              {d.title}
+                            </Link>
+                            <span className="shrink-0 text-xs text-neutral-400">{formatTime(d.updated_at).slice(0, 10)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div className="mt-auto pt-4 text-xs text-neutral-500">
+                    {t("knowledge.docs", { count: b.docs })} · {t("knowledge.scope")}：{scopeSummary(t, b.scope, opts.roleName)}
+                  </div>
                 </Card>
-              </Link>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
         {manage && list.data && (
           <div className="mt-6">
@@ -243,10 +418,15 @@ export default function Knowledge() {
         </div>
       </Card>
       <Card className="mt-6">
-        <CardHeader title={t("knowledge.myQueries")} />
-        <LoadState loading={mine.loading && !mine.data} error={mine.data ? null : mine.error} onRetry={mine.reload}>
-          <QueryTable items={(mine.data ?? []).slice(0, 30)} empty={t("knowledge.myQueriesEmpty")} bases={new Map(items.map((b) => [b.id, b.title]))} />
-        </LoadState>
+        <details className="group">
+          <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-neutral-900 select-none">
+            <span className="mr-1 inline-block transition group-open:rotate-90">▸</span>
+            {t("knowledge.myQueries")}
+          </summary>
+          <LoadState loading={mine.loading && !mine.data} error={mine.data ? null : mine.error} onRetry={mine.reload}>
+            <QueryTable items={(mine.data ?? []).slice(0, 30)} empty={t("knowledge.myQueriesEmpty")} bases={new Map(items.map((b) => [b.id, b.title]))} />
+          </LoadState>
+        </details>
       </Card>
       <CreateDialog open={creating} onOpenChange={setCreating} onCreated={(b) => navigate(kbPath(b.id))} />
     </div>

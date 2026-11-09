@@ -195,6 +195,35 @@ function ConvertCard({ d, canEdit, onDone }: { d: KDocDetail; canEdit: boolean; 
   );
 }
 
+/** 改了多少行：按行比较（同样的行配对掉，剩下的算增删），够用来提醒，不是精确的 diff。 */
+function lineChanges(before: string, after: string): { added: number; removed: number } {
+  const lines = (s: string) => s.replace(/\r\n?/g, "\n").replace(/\n+$/, "").split("\n");
+  const count = new Map<string, number>();
+  for (const l of lines(before)) count.set(l, (count.get(l) ?? 0) + 1);
+  let added = 0;
+  for (const l of lines(after)) {
+    const n = count.get(l) ?? 0;
+    if (n > 0) count.set(l, n - 1);
+    else added++;
+  }
+  let removed = 0;
+  for (const n of count.values()) removed += n;
+  return { added, removed };
+}
+
+/** 保存前的提醒：改了多少行；这篇最近被 AI 读过的话，引用旧版本的答案会显示「原文已更新」。 */
+function EditImpact({ before, after, reads }: { before: string; after: string; reads?: number }) {
+  const { t } = useTranslation();
+  const { added, removed } = lineChanges(before, after);
+  if (added === 0 && removed === 0) return <p className="text-sm text-neutral-500">{t("kdoc.noChanges")}</p>;
+  return (
+    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+      <span className="font-medium">{t("kdoc.changes", { added, removed })}</span>
+      {reads ? ` · ${t("kdoc.impact", { count: reads })}` : ` · ${t("kdoc.impactNone")}`}
+    </div>
+  );
+}
+
 /** 大纲：滚动时高亮当前所在的标题；点标题滚过去（不改地址里的高亮）。 */
 function Outline({ outline, onJump }: { outline: { level: number; title: string; line: number }[]; onJump: (line: number) => void }) {
   const { t } = useTranslation();
@@ -392,7 +421,19 @@ export default function KnowledgeDoc() {
               <Card className="min-w-0 p-4 sm:p-6">
                 {editing ? (
                   <div className="space-y-3">
-                    <textarea className={cx(inputCls, "h-[60vh] py-2 font-mono text-xs")} value={draft} onChange={(e) => setDraft(e.target.value)} />
+                    <div className="grid gap-4 xl:grid-cols-2">
+                      <div>
+                        <div className="mb-1 text-xs font-medium text-neutral-500">{t("kdoc.editSource")}</div>
+                        <textarea className={cx(inputCls, "h-[64vh] py-2 font-mono text-xs")} value={draft} onChange={(e) => setDraft(e.target.value)} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="mb-1 text-xs font-medium text-neutral-500">{t("kdoc.editPreview")}</div>
+                        <div className="h-[64vh] overflow-auto rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
+                          <KBReader markdown={draft} format={d.format} highlight={null} />
+                        </div>
+                      </div>
+                    </div>
+                    <EditImpact before={d.markdown} after={draft} reads={d.reads_30d} />
                     <Field label={t("kdoc.note")}>
                       <input className={inputCls} value={note} placeholder={t("kdoc.notePlaceholder")} onChange={(e) => setNote(e.target.value)} />
                     </Field>

@@ -142,7 +142,8 @@ export async function verifyCitations(tools: ToolCaller | undefined, blocks: Boa
         const status = ["ok", "stale", "mismatch", "missing"].includes(result?.status) ? result.status : "unchecked";
         if (status === "mismatch" || status === "missing") bad.push(index);
         if (status === "stale") stale.push(index);
-        return { ...item, title: item.title || result?.title || undefined, status } as Citation;
+        const near = Number.isInteger(result?.near_skipped) && result.near_skipped > 0 ? result.near_skipped : undefined;
+        return { ...item, title: item.title || result?.title || undefined, status, near_skipped: near } as Citation;
       }),
     };
   });

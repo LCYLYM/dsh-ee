@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, FilePlus, MoreHorizontal, Sparkles, Upload } from "lucide-react";
-import { api, formatTime, type KBase, type KBMaintainers, type KBSearchResult, type KDoc, type Scope } from "../lib/api";
+import { api, formatTime, type KBase, type KBMaintainers, type KBSearchResult, type Scope } from "../lib/api";
 import { useAction, useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
 import { useConfirm } from "../lib/confirm";
@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { kdocPath, QueryTable } from "./knowledge";
 import { UsedByCard } from "../components/used-by";
 import { filesFromDrop, UploadDialog, type QueuedFile } from "../components/kb-upload";
-import { convertWarns } from "../components/kb-convert";
+import { DocList } from "../components/kb-doc-list";
 import { useAuth } from "../lib/auth";
 import { useMenus } from "../lib/menus";
 
@@ -256,45 +256,97 @@ function SearchTab({ kb }: { kb: KBase }) {
   );
 }
 
-function QueriesTab({ kb }: { kb: KBase }) {
+/** 检索情况：最上面是没查到的（待补文档），其次是常被读的文档，检索流水收在最下面。 */
+function QueriesTab({ kb, onUpload, onChanged }: { kb: KBase; onUpload: () => void; onChanged: () => void }) {
   const { t } = useTranslation();
+  const { notify } = useStore();
+  const gaps = useApi(() => api.kbGaps(kb.id));
   const q = useApi(() => api.kbQueries({ kb: kb.id }));
   const [zero, setZero] = useState(false);
   const items = (q.data ?? []).filter((x) => !zero || (x.tool === "search" && x.hits === 0));
+  const days = gaps.data?.days ?? 30;
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 pb-2">
-        <p className="text-sm text-neutral-600">{t("kbase.queriesHint")}</p>
-        <label className="flex items-center gap-2 text-sm text-neutral-700">
-          <Toggle checked={zero} onChange={setZero} />
-          {t("kbase.onlyZero")}
-        </label>
-      </div>
-      <LoadState loading={q.loading && !q.data} error={q.data ? null : q.error} onRetry={q.reload}>
-        <QueryTable items={items} showUser empty={t("kbase.queriesEmpty")} />
-      </LoadState>
+    <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+      <section className="px-5 py-4">
+        <h3 className="text-sm font-semibold text-neutral-900">{t("kbase.gapsTitle", { days })}</h3>
+        <p className="mt-0.5 text-sm text-neutral-600">{t("kbase.gapsHint")}</p>
+        <LoadState loading={gaps.loading && !gaps.data} error={gaps.data ? null : gaps.error} onRetry={gaps.reload}>
+          {gaps.data && gaps.data.gaps.length === 0 ? (
+            <p className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200">{t("kbase.gapsEmpty", { days })}</p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {gaps.data?.gaps.map((g) => (
+                <li key={g.key} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-neutral-200 px-3 py-2 dark:border-neutral-800">
+                  <div className="min-w-0">
+                    <div className="font-medium text-neutral-900">{g.query}</div>
+                    <div className="text-xs text-neutral-500">{t("kbase.gapCount", { count: g.count, users: g.users, time: formatTime(g.last_at) })}</div>
+                  </div>
+                  {kb.can_edit && (
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={onUpload}>
+                        <Upload size={14} /> {t("kbase.gapUpload")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={async () => {
+                          try {
+                            await api.ignoreKBGap(kb.id, g.key);
+                            notify(t("kbase.gapIgnored", { query: g.query }));
+                            gaps.reload();
+                            onChanged();
+                          } catch (e) {
+                            notify(e instanceof Error ? e.message : String(e));
+                          }
+                        }}
+                      >
+                        {t("kbase.gapIgnore")}
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </LoadState>
+      </section>
+      <section className="px-5 py-4">
+        <h3 className="text-sm font-semibold text-neutral-900">{t("kbase.popularTitle")}</h3>
+        {gaps.data && gaps.data.popular.length === 0 ? (
+          <p className="mt-2 text-sm text-neutral-600">{t("kbase.popularEmpty", { days })}</p>
+        ) : (
+          <ol className="mt-2 space-y-1 text-sm">
+            {gaps.data?.popular.map((p, i) => (
+              <li key={p.doc} className="flex items-center justify-between gap-3">
+                <span className="min-w-0 truncate">
+                  <span className="mr-2 inline-block w-5 text-right text-neutral-400 tabular-nums">{i + 1}</span>
+                  <Link to={kdocPath(p.doc)} className="text-neutral-800 hover:underline">
+                    {p.title}
+                  </Link>
+                </span>
+                <span className="shrink-0 text-xs text-neutral-500">{t("kbase.popularCount", { count: p.reads, users: p.users })}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+      <details className="group">
+        <summary className="cursor-pointer list-none px-5 py-3 text-sm font-semibold text-neutral-900 select-none">
+          <span className="mr-1 inline-block transition group-open:rotate-90">▸</span>
+          {t("kbase.logTitle")}
+        </summary>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-2">
+          <p className="text-sm text-neutral-600">{t("kbase.queriesHint")}</p>
+          <label className="flex items-center gap-2 text-sm text-neutral-700">
+            <Toggle checked={zero} onChange={setZero} />
+            {t("kbase.onlyZero")}
+          </label>
+        </div>
+        <LoadState loading={q.loading && !q.data} error={q.data ? null : q.error} onRetry={q.reload}>
+          <QueryTable items={items} showUser empty={t("kbase.queriesEmpty")} />
+        </LoadState>
+      </details>
     </div>
-  );
-}
-
-const fileKinds: Record<string, { label: string; cls: string }> = {
-  pdf: { label: "PDF", cls: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300" },
-  docx: { label: "W", cls: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" },
-  xlsx: { label: "X", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
-  csv: { label: "CSV", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
-  pptx: { label: "P", cls: "bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" },
-  txt: { label: "TXT", cls: "bg-neutral-100 text-neutral-600" },
-  md: { label: "MD", cls: "bg-neutral-100 text-neutral-600" },
-};
-
-/** 文件类型的小方块：一眼看出是 PDF、Word 还是 Excel。 */
-function FileBadge({ doc }: { doc: KDoc }) {
-  const ext = doc.convert_info?.format || doc.source_name.split(".").pop()?.toLowerCase() || "md";
-  const k = fileKinds[ext] ?? fileKinds.md;
-  return (
-    <span aria-hidden className={cx("mt-0.5 inline-flex h-6 w-7 shrink-0 items-center justify-center rounded text-[10px] font-bold tracking-tight", k.cls)}>
-      {k.label}
-    </span>
   );
 }
 
@@ -310,15 +362,12 @@ export default function KnowledgeBase() {
   const detail = useApi(() => api.kb(Number(id)));
   const [tab, setTab] = useState<Tab>("docs");
   const [folder, setFolder] = useState<string | null>(null);
-  const [filter, setFilter] = useState("");
   const [dialog, setDialog] = useState<"upload" | "new" | "info" | "access" | null>(null);
   // 拖到文档列表上的文件：打开上传窗口，目标目录是当前选的目录
   const [dropped, setDropped] = useState<QueuedFile[] | undefined>(undefined);
   const [dragging, setDragging] = useState(false);
   const kb = detail.data?.kb;
   const docs = detail.data?.docs ?? [];
-  const folders = useMemo(() => [...new Set(docs.map((d) => d.folder))].sort(), [docs]);
-  const shown = docs.filter((d) => (folder === null || d.folder === folder) && (!filter.trim() || d.title.toLowerCase().includes(filter.trim().toLowerCase())));
   const userName = (uid: number) => {
     const u = opts.users?.find((x) => x.id === uid);
     return u ? u.display_name || u.username : `#${uid}`;
@@ -404,11 +453,25 @@ export default function KnowledgeBase() {
               )}
               </div>
             </div>
+            {kb.readable && kb.docs > 0 && can("registry.publish") && (detail.data?.used_by?.length ?? 0) === 0 && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-100 bg-brand-50/60 px-4 py-3 dark:border-brand-500/20 dark:bg-brand-500/10">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-neutral-900">{t("kbase.noAppTitle")}</div>
+                  <p className="text-sm text-neutral-600">{t("kbase.noAppHint")}</p>
+                </div>
+                <Button size="sm" onClick={() => navigate(`${pathOf("app-new")}?knowledge=${encodeURIComponent(kb.slug)}`)}>
+                  <Sparkles size={14} /> {t("studio.makeAppFromKB")}
+                </Button>
+              </div>
+            )}
             <div className="mb-4">
               <Segmented
                 value={tab}
                 onChange={setTab}
-                options={(["docs", "search", ...(kb.can_edit ? ["queries"] : [])] as Tab[]).map((x) => ({ value: x, label: t(`kbase.tabs.${x}`) }))}
+                options={(["docs", "search", ...(kb.can_edit ? ["queries"] : [])] as Tab[]).map((x) => ({
+                  value: x,
+                  label: x === "queries" && kb.gaps ? `${t("kbase.tabs.queries")} · ${t("kbase.gapsShort", { count: kb.gaps })}` : t(`kbase.tabs.${x}`),
+                }))}
               />
             </div>
             <Card>
@@ -436,65 +499,11 @@ export default function KnowledgeBase() {
                       {t("kupload.dropHere", { folder: folder || t("kbase.folderRoot") })}
                     </div>
                   )}
-                  <div className="flex flex-wrap items-center gap-2 px-5 pt-4 pb-3">
-                    <select className={cx(inputBase, "h-9")} value={folder ?? "\u0000"} onChange={(e) => setFolder(e.target.value === "\u0000" ? null : e.target.value)}>
-                      <option value={"\u0000"}>{t("kbase.folderAll")}</option>
-                      {folders.map((f) => (
-                        <option key={f} value={f}>
-                          {f || t("kbase.folderRoot")}
-                        </option>
-                      ))}
-                    </select>
-                    <input className={cx(inputBase, "h-9 w-64")} value={filter} placeholder={t("kbase.filter")} onChange={(e) => setFilter(e.target.value)} />
-                  </div>
-                  {shown.length === 0 ? (
-                    <p className="px-5 py-10 text-center text-sm text-neutral-600">{kb.can_edit && docs.length === 0 ? t("kbase.docsEmptyEdit") : t("kbase.docsEmpty")}</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-y border-neutral-100 text-left text-xs text-neutral-500">
-                            <th className="px-5 py-2 font-normal">{t("kbase.colTitle")}</th>
-                            <th className="px-3 py-2 font-normal">{t("kbase.colFolder")}</th>
-                            <th className="px-3 py-2 text-right font-normal">{t("kbase.colLines")}</th>
-                            <th className="px-3 py-2 text-right font-normal">{t("kbase.colVersion")}</th>
-                            <th className="px-5 py-2 font-normal">{t("kbase.colUpdated")}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {shown.map((d) => (
-                            <tr key={d.id} className="border-b border-neutral-50 last:border-0">
-                              <td className="px-5 py-2">
-                                <div className="flex items-start gap-2.5">
-                                  <FileBadge doc={d} />
-                                  <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                      <Link to={kdocPath(d.id)} className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
-                                        {d.title}
-                                      </Link>
-                                      {convertWarns(d.convert_info) > 0 && <Badge tone="amber">{t("kupload.skippedBadge", { count: convertWarns(d.convert_info) })}</Badge>}
-                                      {d.convert_info?.edited && <Badge>{t("kupload.editedBadge")}</Badge>}
-                                    </div>
-                                    {d.source_name && <div className="text-xs text-neutral-500">{d.source_name}</div>}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-3 py-2 text-neutral-700">{d.folder || "—"}</td>
-                              <td className="px-3 py-2 text-right text-neutral-700">{d.lines}</td>
-                              <td className="px-3 py-2 text-right text-neutral-700">v{d.version}</td>
-                              <td className="px-5 py-2 whitespace-nowrap text-neutral-600">
-                                {formatTime(d.updated_at)} {d.updated_by_name && `· ${d.updated_by_name}`}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                  <DocList kb={kb} docs={docs} folder={folder} setFolder={setFolder} onChanged={detail.reload} />
                 </div>
               )}
               {tab === "search" && <SearchTab kb={kb} />}
-              {tab === "queries" && kb.can_edit && <QueriesTab kb={kb} />}
+              {tab === "queries" && kb.can_edit && <QueriesTab kb={kb} onUpload={() => setDialog("upload")} onChanged={detail.reload} />}
             </Card>
             {detail.data?.used_by && (
               <div className="mt-4">

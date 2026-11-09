@@ -249,6 +249,8 @@ export interface Citation {
   title?: string;
   /** ok 对得上；stale 对得上但文档已更新；mismatch 对不上；missing 文档不存在或没权限；unchecked 没能核对 */
   status?: "ok" | "stale" | "mismatch" | "missing" | "unchecked";
+  /** 引用的那一页前后有没收录的页（扫描页、乱码页）：页码 */
+  near_skipped?: number;
 }
 
 export type BoardBlock =

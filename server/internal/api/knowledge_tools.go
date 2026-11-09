@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -518,6 +519,36 @@ type kbVerifyResult struct {
 	Doc            int64  `json:"doc"`
 	Title          string `json:"title,omitempty"`
 	CurrentVersion int    `json:"current_version,omitempty"`
+	// 引用的那一页前后有没收录的页（PDF 扫描页、乱码页）：页码。答案可能漏了那一页的内容
+	NearSkipped int `json:"near_skipped,omitempty"`
+}
+
+var pdfPageHeading = regexp.MustCompile(`^## 第 (\d+) 页$`)
+
+// nearSkippedPage 看引用的第 line 行所在的页，前后一页有没有没收录的页；有就返回那一页的页码。
+func nearSkippedPage(d *store.KDoc, md string, line int) int {
+	var c kdocConvert
+	if len(d.ConvertInfo) == 0 || json.Unmarshal(d.ConvertInfo, &c) != nil || len(c.Skipped) == 0 {
+		return 0
+	}
+	page := 0
+	for i, l := range kb.Lines(md) {
+		if i+1 > line {
+			break
+		}
+		if m := pdfPageHeading.FindStringSubmatch(l); m != nil {
+			page, _ = strconv.Atoi(m[1])
+		}
+	}
+	if page == 0 {
+		return 0
+	}
+	for _, sp := range c.Skipped {
+		if sp.Page == page-1 || sp.Page == page+1 {
+			return sp.Page
+		}
+	}
+	return 0
 }
 
 func (s *Server) kbVerify(ctx context.Context, bases []*store.KBase, cites []kbCitation) json.RawMessage {
@@ -550,6 +581,7 @@ func (s *Server) kbVerify(ctx context.Context, bases []*store.KBase, cites []kbC
 			}
 			texts[key] = md
 		}
+		res.NearSkipped = nearSkippedPage(d, md, c.From)
 		switch {
 		case md == "" || !kb.VerifyQuote(md, c.From, c.To, c.Quote):
 			res.Status = "mismatch"

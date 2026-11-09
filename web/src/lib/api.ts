@@ -1117,6 +1117,19 @@ export interface KBase {
   can_edit: boolean;
   can_manage: boolean;
   readable: boolean;
+  /** 列表里才有：最近更新的几篇 */
+  recent?: { id: number; title: string; updated_at: string }[];
+  /** 维护者才有：待补文档有几条 */
+  gaps?: number;
+}
+
+/** 待补文档：员工（经 AI）想查却没查到的检索词。 */
+export interface KBGap {
+  key: string;
+  query: string;
+  count: number;
+  users: number;
+  last_at: string;
 }
 
 export interface KBQASettings {
@@ -1184,6 +1197,8 @@ export interface KDocDetail {
   versions: KDocVersion[];
   /** 文档格式，阅读视图按它显示分页线、工作表、每页卡片 */
   format: string;
+  /** 维护者才有：近 30 天被 AI 读过几次 */
+  reads_30d?: number;
 }
 
 export interface KBHit {
@@ -1359,6 +1374,9 @@ export const api = {
     for (const f of files) form.append("file", f, f.name);
     return request<{ results: KBUploadResult[] }>("POST", `/api/kb/${id}/docs`, undefined, { raw: { body: form } });
   },
+  kbGaps: (id: number) =>
+    request<{ gaps: KBGap[]; popular: { doc: number; title: string; reads: number; users: number }[]; days: number }>("GET", `/api/kb/${id}/gaps`),
+  ignoreKBGap: (id: number, key: string) => request<void>("POST", `/api/kb/${id}/gaps/ignore`, { key }),
   checkKBUpload: (id: number, folder: string, files: string[]) =>
     request<{ items: { file: string; doc: KDoc }[] }>("POST", `/api/kb/${id}/docs/check`, { folder, files }),
   reconvertKBDoc: (id: number, header: "" | "first" | "none") => request<KDoc>("POST", `/api/kb-docs/${id}/reconvert`, { header }),

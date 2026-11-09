@@ -213,6 +213,8 @@ func (s *Server) routes() []route {
 		prm("DELETE /api/kb/{id}", s.handleKBDelete, rbac.KnowledgeManage),
 		prm("POST /api/kb/{id}/docs", s.handleKBUpload, rbac.PortalView),
 		prm("POST /api/kb/{id}/docs/check", s.handleKBUploadCheck, rbac.PortalView),
+		prm("GET /api/kb/{id}/gaps", s.handleKBGaps, rbac.PortalView),
+		prm("POST /api/kb/{id}/gaps/ignore", s.handleKBGapIgnore, rbac.PortalView),
 		prm("GET /api/kb-docs/{id}", s.handleKDocDetail, rbac.PortalView),
 		prm("PATCH /api/kb-docs/{id}", s.handleKDocPatch, rbac.PortalView),
 		prm("DELETE /api/kb-docs/{id}", s.handleKDocDelete, rbac.PortalView),

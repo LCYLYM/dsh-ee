@@ -438,19 +438,33 @@ const citationBadges: Record<NonNullable<Citation["status"]>, { text: string; co
   unchecked: { text: "未核对", color: "inherit" },
 };
 
-/** 看板上的引用：编号、文档、行号与核对结果；点了在「原文」窗格打开。 */
+/** 引用编号的小标签：绿色对得上、红色对不上、灰色原文已更新或没核对。 */
+function citationChip(h: H, n: number, status: Citation["status"]) {
+  const color = status === "ok" ? "#15803d" : status === "mismatch" || status === "missing" ? "#b91c1c" : "var(--ee-muted)";
+  return h("span", {
+    "aria-hidden": true,
+    style: { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, fontSize: 10.5, fontWeight: 600,
+      color, border: `1px solid color-mix(in srgb, ${color} 45%, transparent)`, background: `color-mix(in srgb, ${color} 10%, transparent)`, boxSizing: "border-box" },
+  }, String(n));
+}
+
+/** 看板上的引用：编号、文档、行号与核对结果；点了在「原文」窗格打开。鼠标移上去能看到摘句。 */
 export function citationsView(h: H, items: Citation[], key: number, open?: (citation: Citation) => void, hrefOf?: (citation: Citation) => string | undefined) {
-  return h("ol", { key, style: { margin: 0, paddingLeft: 22, fontSize: 12, display: "grid", gap: 6 } },
+  return h("ol", { key, style: { margin: 0, padding: 0, listStyle: "none", fontSize: 12, display: "grid", gap: 8 } },
     ...items.map((item, i) => {
       const badge = citationBadges[item.status ?? "unchecked"];
       const where = `${item.title || `文档 ${item.doc}`} · 第 ${item.from === item.to ? item.from : `${item.from}–${item.to}`} 行`;
-      return h("li", { key: i, "data-citation": i + 1 },
-        h("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 } },
-          open ? h("button", { type: "button", onClick: () => open(item), title: "查看原文", className: "dshee-btn", style: { ...buttonStyle, padding: "1px 7px" } }, where)
-            : hrefOf?.(item) ? h("a", { href: hrefOf(item), target: "_blank", rel: "noopener noreferrer", title: "在 dsh-ee 网页上看原文", style: { color: "inherit", textDecoration: "underline" } }, `${where} ↗`)
-            : h("span", null, where),
-          h("span", { style: { color: badge.color, fontSize: 11, opacity: item.status === "unchecked" || !item.status ? 0.6 : 1 } }, badge.text)),
-        h("div", { style: { ...muted, marginTop: 2, whiteSpace: "pre-wrap" } }, `“${item.quote}”`));
+      const tip = `${where}\n“${item.quote}”`;
+      return h("li", { key: i, "data-citation": i + 1, style: { display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 8px", alignItems: "start" } },
+        citationChip(h, i + 1, item.status),
+        h("div", { style: { minWidth: 0 } },
+          h("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 } },
+            open ? h("button", { type: "button", onClick: () => open(item), title: tip, "aria-label": `查看原文：${where}`, className: "dshee-btn", style: { ...buttonStyle, padding: "1px 7px" } }, where)
+              : hrefOf?.(item) ? h("a", { href: hrefOf(item), target: "_blank", rel: "noopener noreferrer", title: `${tip}\n在 dsh-ee 网页上看原文`, style: { color: "inherit", textDecoration: "underline" } }, `${where} ↗`)
+              : h("span", { title: tip }, where),
+            h("span", { style: { color: badge.color, fontSize: 11, opacity: item.status === "unchecked" || !item.status ? 0.6 : 1 } }, badge.text),
+            item.near_skipped ? h("span", { title: "那一页是扫描页或乱码，没有收录进知识库；答案可能漏了那一页的内容，请看原件", style: { fontSize: 11, color: "#a16207" } }, `⚠ 第 ${item.near_skipped} 页没收录`) : null),
+          h("div", { style: { ...muted, marginTop: 2, whiteSpace: "pre-wrap" } }, `“${item.quote}”`)));
     }));
 }
 

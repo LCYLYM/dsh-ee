@@ -180,6 +180,8 @@ var agentExcluded = map[string]string{
 	"DELETE /api/kb/{id}":              "删除知识库只在网页上做",
 	"POST /api/kb/{id}/docs":           "上传文档在网页上做",
 	"POST /api/kb/{id}/docs/check":     "上传前查同名文档，网页上传时用",
+	"GET /api/kb/{id}/gaps":            "维护者在网页上看的待补文档",
+	"POST /api/kb/{id}/gaps/ignore":    "待补文档的忽略由维护者在网页上做",
 	"POST /api/kb-docs/{id}/reconvert": "按新的表头设置重新转换，在网页上由维护者做",
 	"GET /api/kb-docs/{id}":            "DSH 里读原文用 kb__read",
 	"PATCH /api/kb-docs/{id}":          "改文档只在网页上做，不让模型被文档里的内容诱导去改知识库",

@@ -150,11 +150,11 @@ test("面板：勾选知识库，点引用打开原文", () => {
   assert.deepEqual(boxes.map((box) => box.props.checked), [false, true]);
   boxes[0].props.onChange();
   assert.deepEqual(toggled, ["travel"]);
-  const cite = find(view, (node) => node.type === "button" && node.props?.title === "查看原文");
+  const cite = find(view, (node) => node.type === "button" && String(node.props?.["aria-label"] ?? "").startsWith("查看原文"));
   cite[0].props.onClick();
   assert.equal(opened[0].doc, 3);
   // 没有原文窗格时引用不能点
-  assert.equal(find(boardView(h, { type: "board" }, board), (node) => node.props?.title === "查看原文").length, 0);
+  assert.equal(find(boardView(h, { type: "board" }, board), (node) => String(node.props?.["aria-label"] ?? "").startsWith("查看原文")).length, 0);
 });
 
 test("原文窗格：高亮引用的行，提示旧版本，翻页按钮", () => {
@@ -206,4 +206,18 @@ test("打开知识问答工作台：问答面板占主区，原文另开一栏",
     { address: "dsh-resource://dsh-ee-workbench/kb-qa/qa", placement: {} },
     { address: "dsh-resource://dsh-ee-workbench/kb-qa/doc", placement: { preferNewPane: true } },
   ]);
+});
+
+test("引用：编号小标签按核对结果着色，鼠标移上去看到摘句；附近有没收录的页时提醒", () => {
+  const items = [
+    { doc: 3, from: 5, to: 6, quote: "600 元", title: "差旅办法", status: "ok" as const, near_skipped: 4 },
+    { doc: 3, from: 9, to: 9, quote: "编的", title: "差旅办法", status: "mismatch" as const },
+  ];
+  const view = boardView(h, { type: "board" }, { blocks: [{ type: "citations", items }] } as any, () => {});
+  const buttons = find(view, (node) => node.type === "button");
+  assert.match(buttons[0].props.title, /“600 元”/);
+  const text = texts(view).join("|");
+  assert.match(text, /⚠ 第 4 页没收录/);
+  assert.match(text, /✖ 对不上原文/);
+  assert.doesNotMatch(texts(find(view, (node) => node.props?.["data-citation"] === 2)).join(""), /没收录/);
 });

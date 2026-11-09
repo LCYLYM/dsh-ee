@@ -148,8 +148,8 @@ func TestKnowledge(t *testing.T) {
 	policy := "# 差旅管理办法\n\n## 住宿\n\n一线城市住宿标准每晚不超过 600 元。\n其他城市每晚不超过 400 元。\n\n## 交通\n\n乘坐高铁二等座。\n"
 	code, body = webs["carol"].upload("/api/kb/"+itoa(travel)+"/docs", map[string]string{"folder": "/行政/差旅/"}, map[string][]byte{
 		"差旅管理办法.md": []byte(policy),
-		"报销须知.docx":  testDocx(t, "报销须知", "酒店发票抬头写公司全称。", "住宿发票要写明入住日期。"),
-		"病毒.exe":     []byte("MZ"),
+		"报销须知.docx": testDocx(t, "报销须知", "酒店发票抬头写公司全称。", "住宿发票要写明入住日期。"),
+		"病毒.exe":    []byte("MZ"),
 	})
 	expect(t, "维护者上传", code, 201, body)
 	type uploadRes struct {
@@ -599,4 +599,118 @@ func TestKnowledgeUploadVersions(t *testing.T) {
 	note := decodeAs[struct{ Results []result }](t, body).Results[0].Doc.ID
 	code, body = admin.do("POST", "/api/kb-docs/"+itoa(note)+"/reconvert", map[string]any{}, nil)
 	expect(t, "没有原件", code, 400, body)
+}
+
+// 待补文档：没命中、之后也没读这个库的检索才算；忽略后不再出现；列表上有数量和最近更新的文档。
+func TestKnowledgeGaps(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	if _, err := api.Bootstrap(ctx, st, "admin", "admin-password-123"); err != nil {
+		t.Fatal(err)
+	}
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+	box, _ := secret.NewBox(key)
+	srv := api.New(st, box, api.Options{DataDir: t.TempDir()}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+	admin := newClient(t, ts.URL)
+	code, body := admin.do("POST", "/api/auth/login", map[string]string{"username": "admin", "password": "admin-password-123"}, nil)
+	expect(t, "管理员登录", code, 200, body)
+	code, body = admin.do("POST", "/api/kb", map[string]any{"slug": "hr", "title": "人事制度"}, nil)
+	expect(t, "建库", code, 201, body)
+	kbID := decodeAs[struct{ ID int64 }](t, body).ID
+	code, body = admin.upload("/api/kb/"+itoa(kbID)+"/docs", map[string]string{"title": "年假规定", "markdown": "# 年假规定\n\n每年 5 天年假。\n"}, nil)
+	expect(t, "新建文档", code, 201, body)
+	code, body = admin.do("POST", "/api/me/npm-tokens", map[string]any{"name": "dsh", "access": "read"}, nil)
+	expect(t, "接入令牌", code, 201, body)
+	agent := dshClient{t: t, base: ts.URL, token: decodeAs[struct{ Token string }](t, body).Token}
+
+	// 「休假」没命中，但接着换「年假」搜到并读了文档：不算（模型换说法重试）
+	agent.kbCall("search", map[string]any{"query": "休假"})
+	out, _, _ := agent.kbCall("search", map[string]any{"query": "年假"})
+	doc := out["hits"].([]any)[0].(map[string]any)["doc"]
+	agent.kbCall("read", map[string]any{"doc": doc})
+	// 下一个问题「火星 基地」没命中、之后也没读文档：算待补；搜两次、换个顺序也算同一条
+	agent.kbCall("search", map[string]any{"query": "火星 基地"})
+	agent.kbCall("search", map[string]any{"query": "基地 火星"})
+
+	code, body = admin.do("GET", "/api/kb/"+itoa(kbID)+"/gaps", nil, nil)
+	expect(t, "待补文档", code, 200, body)
+	type gapsResp struct {
+		Gaps []struct {
+			Key   string `json:"key"`
+			Count int    `json:"count"`
+			Users int    `json:"users"`
+		} `json:"gaps"`
+		Popular []struct {
+			Title string `json:"title"`
+			Reads int    `json:"reads"`
+		} `json:"popular"`
+	}
+	g := decodeAs[gapsResp](t, body)
+	if len(g.Gaps) != 1 || g.Gaps[0].Key != "基地 火星" || g.Gaps[0].Count != 2 || g.Gaps[0].Users != 1 {
+		t.Fatalf("待补 = %s", body)
+	}
+	if len(g.Popular) != 1 || g.Popular[0].Title != "年假规定" || g.Popular[0].Reads != 1 {
+		t.Fatalf("常被读 = %s", body)
+	}
+	code, body = admin.do("GET", "/api/kb", nil, nil)
+	if !strings.Contains(string(body), `"gaps":1`) || !strings.Contains(string(body), `"recent":[{"id":`) {
+		t.Fatalf("列表应有待补数量和最近更新：%s", body)
+	}
+
+	// 忽略
+	code, body = admin.do("POST", "/api/kb/"+itoa(kbID)+"/gaps/ignore", map[string]any{"key": "火星  基地"}, nil)
+	expect(t, "忽略", code, 204, body)
+	code, body = admin.do("GET", "/api/kb/"+itoa(kbID)+"/gaps", nil, nil)
+	if g := decodeAs[gapsResp](t, body); len(g.Gaps) != 0 {
+		t.Fatalf("忽略后 = %s", body)
+	}
+	// 普通员工看不到
+	code, body = admin.do("POST", "/api/admin/users", map[string]any{"username": "dave", "password": "dave-password-1"}, nil)
+	expect(t, "建用户", code, 201, body)
+	dave := newClient(t, ts.URL)
+	code, body = dave.do("POST", "/api/auth/login", map[string]string{"username": "dave", "password": "dave-password-1"}, nil)
+	expect(t, "登录", code, 200, body)
+	code, body = dave.do("GET", "/api/kb/"+itoa(kbID)+"/gaps", nil, nil)
+	expect(t, "员工看待补", code, 403, body)
+	code, body = dave.do("GET", "/api/kb", nil, nil)
+	if strings.Contains(string(body), `"gaps"`) || !strings.Contains(string(body), "年假规定") {
+		t.Fatalf("员工列表不该有待补，但有最近更新：%s", body)
+	}
+}
+
+// 网页表单提交的正文是 \r\n 换行，存的时候统一成 \n。
+func TestKnowledgeNewlines(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	if _, err := api.Bootstrap(ctx, st, "admin", "admin-password-123"); err != nil {
+		t.Fatal(err)
+	}
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+	box, _ := secret.NewBox(key)
+	srv := api.New(st, box, api.Options{DataDir: t.TempDir()}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+	admin := newClient(t, ts.URL)
+	code, body := admin.do("POST", "/api/auth/login", map[string]string{"username": "admin", "password": "admin-password-123"}, nil)
+	expect(t, "管理员登录", code, 200, body)
+	code, body = admin.do("POST", "/api/kb", map[string]any{"slug": "nl", "title": "换行"}, nil)
+	expect(t, "建库", code, 201, body)
+	kbID := decodeAs[struct{ ID int64 }](t, body).ID
+	code, body = admin.upload("/api/kb/"+itoa(kbID)+"/docs", map[string]string{"title": "说明", "markdown": "# 说明\r\n\r\n第一行\r\n第二行\r\n"}, nil)
+	expect(t, "新建", code, 201, body)
+	id := strings.Split(strings.Split(string(body), `"id":`)[1], ",")[0]
+	code, body = admin.do("GET", "/api/kb-docs/"+id, nil, nil)
+	if strings.Contains(string(body), `\r`) {
+		t.Fatalf("新建的正文不该有 \\r：%s", body)
+	}
+	code, body = admin.do("PATCH", "/api/kb-docs/"+id, map[string]any{"markdown": "# 说明\r\n\r\n第一行\r\n第二行改了\r\n"}, nil)
+	expect(t, "编辑", code, 200, body)
+	code, body = admin.do("GET", "/api/kb-docs/"+id, nil, nil)
+	if strings.Contains(string(body), `\r`) || !strings.Contains(string(body), "第二行改了") {
+		t.Fatalf("编辑后的正文 = %s", body)
+	}
 }
