@@ -247,9 +247,20 @@ export async function apply(ctx: any): Promise<void> {
     ctx.slots.inject("sidebar.brand.mark", () =>
       ctx.slots.inject("sidebar.brand.name", () =>
         ctx.slots.inject("conversation.hero.brand.mark", function* () {
-          yield ctx.slots.register({ name: "sidebar.brand.mark" }, EnterpriseBrandMark);
-          yield ctx.slots.register({ name: "sidebar.brand.name" }, EnterpriseBrandName);
-          yield ctx.slots.register({ name: "conversation.hero.brand.mark" }, EnterpriseHero);
+          // 宿主自带 brand-official 已占 priority 0；单个槽位取最小者渲染，-1 才能盖过它。
+          // 每个注册单独兜底，一个槽位冲突不拖死另外两个。
+          const brandSlots = [
+            ["sidebar.brand.mark", EnterpriseBrandMark],
+            ["sidebar.brand.name", EnterpriseBrandName],
+            ["conversation.hero.brand.mark", EnterpriseHero],
+          ] as const;
+          for (const [slotName, component] of brandSlots) {
+            try {
+              yield ctx.slots.register({ name: slotName, priority: -1 }, component);
+            } catch {
+              // 已有其它实现占住同一槽位同优先级时跳过，不阻断其余品牌位
+            }
+          }
         })));
   });
 }

@@ -22952,9 +22952,17 @@ async function apply(ctx) {
       });
     }
     ctx.slots.inject("sidebar.brand.mark", () => ctx.slots.inject("sidebar.brand.name", () => ctx.slots.inject("conversation.hero.brand.mark", function* () {
-      yield ctx.slots.register({ name: "sidebar.brand.mark" }, EnterpriseBrandMark);
-      yield ctx.slots.register({ name: "sidebar.brand.name" }, EnterpriseBrandName);
-      yield ctx.slots.register({ name: "conversation.hero.brand.mark" }, EnterpriseHero);
+      const brandSlots = [
+        ["sidebar.brand.mark", EnterpriseBrandMark],
+        ["sidebar.brand.name", EnterpriseBrandName],
+        ["conversation.hero.brand.mark", EnterpriseHero]
+      ];
+      for (const [slotName, component] of brandSlots) {
+        try {
+          yield ctx.slots.register({ name: slotName, priority: -1 }, component);
+        } catch {
+        }
+      }
     })));
   });
 }
