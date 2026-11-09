@@ -229,7 +229,14 @@ func TestKnowledge(t *testing.T) {
 		} `json:"apps"`
 	}
 	_ = json.Unmarshal(body, &cat)
-	if len(cat.Apps) != 1 || cat.Apps[0].Name != "kb-qa" || cat.Apps[0].Title != "知识问答" || cat.Apps[0].Workbench == nil || len(cat.Apps[0].Workbench.Panes) != 1 || cat.Apps[0].Workbench.Panes[0].Type != "panel" {
+	// 目录里还有别的系统应用（工作台），只看知识问答
+	qa := -1
+	for i, a := range cat.Apps {
+		if a.Name == "kb-qa" {
+			qa = i
+		}
+	}
+	if qa < 0 || cat.Apps[qa].Title != "知识问答" || cat.Apps[qa].Workbench == nil || len(cat.Apps[qa].Workbench.Panes) != 1 || cat.Apps[qa].Workbench.Panes[0].Type != "panel" {
 		t.Fatalf("应有预置的知识问答：%s", body)
 	}
 	code, body, _ = bob.do("GET", "/api/dsh/skills/kb-qa", nil, nil)
@@ -284,6 +291,39 @@ func TestKnowledge(t *testing.T) {
 	out, _, text = bob.kbCall("search", map[string]any{"query": `\d+ 元`, "mode": "regex", "kb": []string{"travel"}})
 	if out["total"].(float64) != 2 {
 		t.Fatalf("正则检索：%s", text)
+	}
+
+	// 标题对得上的文档：carol 看不到财务库的「薪酬说明」，标题匹配里也不能出现
+	out, _, text = bob.kbCall("search", map[string]any{"query": "差旅管理办法 高铁"})
+	if named, _ := out["docs"].([]any); len(named) != 1 || int64(named[0].(map[string]any)["doc"].(float64)) != policyDoc {
+		t.Fatalf("应列出标题对得上的文档：%s", text)
+	}
+	out, _, text = carol.kbCall("search", map[string]any{"query": "薪酬说明"})
+	if out["docs"] != nil || strings.Contains(text, `"doc":`+itoa(secretDoc)) {
+		t.Fatalf("carol 的标题匹配不应有财务文档：%s", text)
+	}
+	// 只在指定文档里搜；无权限的文档报错，不退回全库
+	out, _, text = bob.kbCall("search", map[string]any{"query": "住宿", "docs": []int64{docxDoc}})
+	if out["total"].(float64) != 1 || int64(out["hits"].([]any)[0].(map[string]any)["doc"].(float64)) != docxDoc {
+		t.Fatalf("限定文档：%s", text)
+	}
+	_, isErr, text = carol.kbCall("search", map[string]any{"query": "住宿", "docs": []int64{secretDoc}})
+	if !isErr || !strings.Contains(text, "不在所选的知识库里") {
+		t.Fatalf("carol 限定财务文档应报错：%s", text)
+	}
+	// 写错的正则按文字匹配
+	out, isErr, text = bob.kbCall("search", map[string]any{"query": "600 元(", "mode": "regex"})
+	if isErr || !strings.Contains(text, "已按普通文字匹配") {
+		t.Fatalf("错误的正则：%s", text)
+	}
+	// 在一篇里查词
+	out, isErr, text = bob.kbCall("read", map[string]any{"doc": policyDoc, "query": "一线城市 600"})
+	if isErr || out["matches"].(float64) != 1 || !strings.Contains(text, `5| 一线城市住宿标准每晚不超过 600 元。`) {
+		t.Fatalf("在文档里查词：%s", text)
+	}
+	out, _, text = bob.kbCall("read", map[string]any{"doc": policyDoc, "query": "火星"})
+	if out["matches"].(float64) != 0 || out["more"] == nil {
+		t.Fatalf("查不到时应提示：%s", text)
 	}
 
 	// 目录与阅读

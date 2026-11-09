@@ -2,6 +2,7 @@ package kb
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"regexp"
 	"slices"
@@ -97,7 +98,9 @@ type Query struct {
 	Bases []int64
 	// 只搜这些目录（前缀匹配）；空表示不限
 	Folder string
-	Limit  int
+	// 只搜这几篇文档；空表示不限。每篇都要在 Bases 里，否则报错
+	Docs  []int64
+	Limit int
 }
 
 // Hit 是一个命中的段。
@@ -122,7 +125,24 @@ type Result struct {
 	TermHits  map[string]int `json:"term_hits"`
 	Total     int            `json:"total"`
 	Truncated bool           `json:"truncated,omitempty"`
+	// 标题对得上的文档（检索词像在找某一篇时最有用）
+	Docs []DocHit `json:"docs,omitempty"`
+	// 给模型的说明，例如正则写错了、已按普通文字匹配
+	Note string `json:"note,omitempty"`
 }
+
+// DocHit 是一篇标题对得上的文档。
+type DocHit struct {
+	Base    int64  `json:"kb_id"`
+	Doc     int64  `json:"doc"`
+	Title   string `json:"title"`
+	Folder  string `json:"folder,omitempty"`
+	Version int    `json:"version"`
+	Lines   int    `json:"lines"`
+}
+
+// 标题对得上的文档最多列几篇
+const maxDocHits = 5
 
 const (
 	bm25K1 = 1.2
@@ -200,7 +220,44 @@ func intersect(a, b []int32) []int32 {
 }
 
 func (bi *baseIndex) inFolder(e *entry, folder string) bool {
-	return folder == "" || e.doc.Folder == folder || strings.HasPrefix(e.doc.Folder, strings.TrimSuffix(folder, "/")+"/")
+	return docInFolder(e.doc, folder)
+}
+
+func docInFolder(d *Doc, folder string) bool {
+	return folder == "" || d.Folder == folder || strings.HasPrefix(d.Folder, strings.TrimSuffix(folder, "/")+"/")
+}
+
+// scope 是一次检索的文档范围（目录和指定文档）。
+type scope struct {
+	folder string
+	docs   map[int64]bool
+}
+
+func (sc scope) has(d *Doc) bool {
+	return docInFolder(d, sc.folder) && (sc.docs == nil || sc.docs[d.ID])
+}
+
+// scopeOf 检查指定的文档都在所选的库里。
+func (ix *Index) scopeOf(q Query) (scope, error) {
+	sc := scope{folder: q.Folder}
+	if len(q.Docs) == 0 {
+		return sc, nil
+	}
+	sc.docs = map[int64]bool{}
+	for _, id := range q.Docs {
+		found := false
+		for _, base := range q.Bases {
+			if bi := ix.bases[base]; bi != nil && bi.docs[id] != nil {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return sc, &QueryError{fmt.Sprintf("没有文档 %d，或它不在所选的知识库里", id)}
+		}
+		sc.docs[id] = true
+	}
+	return sc, nil
 }
 
 type scored struct {
@@ -218,14 +275,19 @@ func (ix *Index) Search(ctx context.Context, q Query) (*Result, error) {
 	}
 	ix.mu.RLock()
 	defer ix.mu.RUnlock()
+	sc, err := ix.scopeOf(q)
+	if err != nil {
+		return nil, err
+	}
 	if q.Mode == "regex" {
-		return ix.searchRegex(ctx, q)
+		return ix.searchRegex(ctx, q, sc)
 	}
 	terms := Terms(q)
 	res := &Result{Hits: []Hit{}, TermHits: map[string]int{}}
 	if len(terms) == 0 {
 		return res, nil
 	}
+	res.Docs = ix.titleHits(q, sc, terms)
 	var all []*scored
 	for _, base := range q.Bases {
 		bi := ix.bases[base]
@@ -247,7 +309,7 @@ func (ix *Index) Search(ctx context.Context, q Query) (*Result, error) {
 					return nil, ctx.Err()
 				}
 				e := bi.entries[id]
-				if !bi.inFolder(e, q.Folder) {
+				if !sc.has(e.doc) {
 					continue
 				}
 				if c := strings.Count(e.flat, ft); c > 0 {
@@ -377,23 +439,98 @@ func replaceFold(text, term string) string {
 	}
 }
 
-// searchRegex 在原文里逐行匹配正则（不走索引），用来查条款号、金额、型号这类精确内容。
-func (ix *Index) searchRegex(ctx context.Context, q Query) (*Result, error) {
-	re, err := regexp.Compile("(?i)" + q.Text)
-	if err != nil {
-		return nil, &QueryError{"正则表达式写得不对：" + err.Error()}
+// titleHits 找标题对得上的文档：检索词都在标题里，或者整个标题出现在检索文字里（「差旅管理办法 住宿」）。
+func (ix *Index) titleHits(q Query, sc scope, terms []string) []DocHit {
+	whole := Flat(q.Text)
+	type cand struct {
+		d     *Doc
+		base  int64
+		exact bool
+		runes int
 	}
-	res := &Result{Hits: []Hit{}, TermHits: map[string]int{}}
+	var cands []cand
 	for _, base := range q.Bases {
 		bi := ix.bases[base]
 		if bi == nil {
 			continue
 		}
-		for _, e := range bi.entries {
+		for _, d := range bi.docs {
+			if !sc.has(d) {
+				continue
+			}
+			ft := Flat(d.Title)
+			n := utf8.RuneCountInString(ft)
+			if n >= 4 && strings.Contains(whole, ft) {
+				cands = append(cands, cand{d, base, true, n})
+				continue
+			}
+			all, size := true, 0
+			for _, t := range terms {
+				f := Flat(t)
+				size += utf8.RuneCountInString(f)
+				if !strings.Contains(ft, f) {
+					all = false
+					break
+				}
+			}
+			if all && size >= 2 {
+				cands = append(cands, cand{d, base, false, n})
+			}
+		}
+	}
+	// 整个标题被提到的排前面，其次标题短的（更像就是要找的那篇）
+	sort.Slice(cands, func(i, j int) bool {
+		a, b := cands[i], cands[j]
+		if a.exact != b.exact {
+			return a.exact
+		}
+		if a.exact && a.runes != b.runes {
+			return a.runes > b.runes
+		}
+		if a.runes != b.runes {
+			return a.runes < b.runes
+		}
+		return a.d.ID < b.d.ID
+	})
+	var out []DocHit
+	for _, c := range cands[:min(len(cands), maxDocHits)] {
+		out = append(out, DocHit{Base: c.base, Doc: c.d.ID, Title: c.d.Title, Folder: c.d.Folder, Version: c.d.Version, Lines: len(Lines(strings.TrimRight(c.d.Text, "\n")))})
+	}
+	return out
+}
+
+// searchRegex 在原文里逐行匹配正则，用来查条款号、金额、型号这类精确内容。
+// 先从正则里推出一定会出现的词，用索引缩小候选段，再逐行核对；推不出来时逐段扫。
+// 正则写错了就当普通文字匹配。
+func (ix *Index) searchRegex(ctx context.Context, q Query, sc scope) (*Result, error) {
+	res := &Result{Hits: []Hit{}, TermHits: map[string]int{}}
+	expr := q.Text
+	re, err := regexp.Compile("(?i)" + expr)
+	if err != nil {
+		expr = regexp.QuoteMeta(q.Text)
+		re = regexp.MustCompile("(?i)" + expr)
+		res.Note = "正则表达式写得不对（" + err.Error() + "），已按普通文字匹配"
+	}
+	nd := regexNeed("(?i)" + expr)
+	for _, base := range q.Bases {
+		bi := ix.bases[base]
+		if bi == nil {
+			continue
+		}
+		ids, narrowed := bi.match(nd)
+		n := len(bi.entries)
+		if narrowed {
+			n = len(ids)
+		}
+		for k := 0; k < n; k++ {
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
-			if !bi.inFolder(e, q.Folder) {
+			e := bi.entries[k]
+			if narrowed {
+				e = bi.entries[ids[k]]
+			}
+			if !sc.has(e.doc) {
 				continue
 			}
 			for i, l := range Lines(e.chunk.Text) {

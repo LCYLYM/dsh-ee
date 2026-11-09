@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -144,8 +145,11 @@ func TestSearchRegexAndLimit(t *testing.T) {
 	if res.Total != 3 || res.Hits[0].Line != 9 {
 		t.Fatalf("正则 = %+v", res)
 	}
-	if _, err := ix.Search(ctx, Query{Text: "(", Mode: "regex", Bases: []int64{1}}); err == nil {
-		t.Fatal("错误的正则应报错")
+	// 写错的正则按普通文字匹配，并说明一句
+	ix.Load(5, "r1", []*Doc{{ID: 50, Base: 5, Title: "F", Version: 1, Text: "见附件(一)。\n"}})
+	res, err = ix.Search(ctx, Query{Text: "(一", Mode: "regex", Bases: []int64{5}})
+	if err != nil || res.Total != 1 || res.Note == "" {
+		t.Fatalf("错误的正则应按文字匹配：%+v %v", res, err)
 	}
 	res, _ = ix.Search(ctx, Query{Text: "住宿", Bases: []int64{1, 2}, Limit: 1})
 	if len(res.Hits) != 1 || !res.Truncated || res.Total != 3 {
@@ -278,5 +282,141 @@ func TestConvertText(t *testing.T) {
 	}
 	if _, err := Convert("a.txt", []byte{0xff, 0xfe}); err == nil {
 		t.Fatal("非 UTF-8 应报错")
+	}
+}
+
+// 走索引的正则检索，结果要和逐段扫完全一样。
+func TestSearchRegexIndexed(t *testing.T) {
+	ix := NewIndex()
+	var docs []*Doc
+	texts := []string{
+		policy,
+		"# 报销须知\n\n住宿发票要写明入住日期。\n错误码 ERR404 表示找不到单据。\n",
+		"# 年假\n\n第十二条 年假可以跨年使用，最多顺延 3 个月。\n第十三条 病假需要医院证明。\n",
+		"# IT\n\nVPN 连不上时先重启客户端；Wi-Fi 密码见前台。\nThe VPN client v2.3 is required.\n",
+	}
+	for i, tx := range texts {
+		docs = append(docs, &Doc{ID: int64(100 + i), Base: 9, Title: fmt.Sprintf("D%d", i), Version: 1, Text: tx})
+	}
+	ix.Load(9, "r1", docs)
+	ctx := context.Background()
+	patterns := []string{
+		`住宿`, `差旅|年假`, `第十.条`, `第\d+条`, `ERR\d+`, `err404`, `(年假)?跨年`, `VPN.*客户端`, `v\d\.\d`,
+		`(住宿|交通).{0,10}标准`, `年假可以`, `病假需要医院`, `a?`, `^#`, `元$`, `[高飞]`, `Wi-Fi`, `client v2`, `顺延\s*3`, `不存在的词`,
+	}
+	for _, p := range patterns {
+		got, err := ix.Search(ctx, Query{Text: p, Mode: "regex", Bases: []int64{9}, Limit: 100})
+		if err != nil {
+			t.Fatalf("%s：%v", p, err)
+		}
+		re := regexp.MustCompile("(?i)" + p)
+		want := 0
+		for _, d := range docs {
+			for _, c := range Split(d.Text) {
+				for _, l := range Lines(c.Text) {
+					if re.MatchString(l) {
+						want++
+					}
+				}
+			}
+		}
+		if got.Total != want {
+			t.Errorf("%s：走索引命中 %d 行，逐行扫 %d 行", p, got.Total, want)
+		}
+	}
+}
+
+func TestRegexNeed(t *testing.T) {
+	ix := NewIndex()
+	ix.Load(1, "r1", []*Doc{
+		{ID: 1, Base: 1, Title: "A", Version: 1, Text: "差旅标准\n"},
+		{ID: 2, Base: 1, Title: "B", Version: 1, Text: "年假规定\n"},
+		{ID: 3, Base: 1, Title: "C", Version: 1, Text: "其他内容\n"},
+	})
+	bi := ix.bases[1]
+	for _, c := range []struct {
+		expr   string
+		narrow bool
+		n      int
+	}{
+		{"差旅", true, 1},
+		{"差旅|年假", true, 2},
+		{"差旅.*标准", true, 1},
+		{"第\\d+条", false, 0}, // 只有单字，推不出词
+		{"(差旅)?标准", true, 1}, // 「标准」一定要有
+		{"差旅|.", false, 0},
+	} {
+		ids, ok := bi.match(regexNeed("(?i)" + c.expr))
+		if ok != c.narrow || ok && len(ids) != c.n {
+			t.Errorf("%s：narrow=%v ids=%v", c.expr, ok, ids)
+		}
+	}
+}
+
+func TestSearchTitleAndDocs(t *testing.T) {
+	ix := NewIndex()
+	loadPolicy(ix)
+	ctx := context.Background()
+	// 整个标题出现在检索文字里
+	res, _ := ix.Search(ctx, Query{Text: "差旅管理办法 飞机", Bases: []int64{1, 2}})
+	if len(res.Docs) != 1 || res.Docs[0].Doc != 10 || res.Docs[0].Lines != 16 {
+		t.Fatalf("标题匹配 = %+v", res.Docs)
+	}
+	// 检索词都在标题里
+	res, _ = ix.Search(ctx, Query{Text: "薪酬", Bases: []int64{1, 2}})
+	if len(res.Docs) != 1 || res.Docs[0].Doc != 20 {
+		t.Fatalf("标题匹配 = %+v", res.Docs)
+	}
+	res, _ = ix.Search(ctx, Query{Text: "住宿", Bases: []int64{1, 2}})
+	if len(res.Docs) != 0 {
+		t.Fatalf("标题里没有「住宿」：%+v", res.Docs)
+	}
+	// 限定文档
+	res, err := ix.Search(ctx, Query{Text: "住宿", Bases: []int64{1, 2}, Docs: []int64{11, 20}})
+	if err != nil || res.Total != 2 {
+		t.Fatalf("限定文档 = %+v %v", res, err)
+	}
+	for _, h := range res.Hits {
+		if h.Doc == 10 {
+			t.Fatalf("搜到了范围外的文档：%+v", h)
+		}
+	}
+	res, err = ix.Search(ctx, Query{Text: `\d+ 元`, Mode: "regex", Bases: []int64{1, 2}, Docs: []int64{20}})
+	if err != nil || res.Total != 1 {
+		t.Fatalf("正则限定文档 = %+v %v", res, err)
+	}
+	// 文档不在所选的库里
+	if _, err := ix.Search(ctx, Query{Text: "住宿", Bases: []int64{1}, Docs: []int64{20}}); err == nil {
+		t.Fatal("库外的文档应报错")
+	}
+}
+
+// 约 10 万段的库上跑正则检索。
+func BenchmarkSearchRegex(b *testing.B) {
+	ix := NewIndex()
+	words := []string{"差旅", "住宿", "报销", "年假", "病假", "合同", "客户", "发票", "审批", "预算", "采购", "培训", "考勤", "加班", "设备"}
+	var docs []*Doc
+	for i := 0; i < 20000; i++ {
+		var tb strings.Builder
+		for s := 0; s < 5; s++ {
+			fmt.Fprintf(&tb, "## 第%d节\n\n", s+1)
+			for k := 0; k < 4; k++ {
+				fmt.Fprintf(&tb, "第%d条 %s和%s的规定，金额不超过 %d 元。\n", s*4+k+1, words[(i+s+k)%len(words)], words[(i*7+k)%len(words)], (i+k)%900+100)
+			}
+			tb.WriteString("\n")
+		}
+		docs = append(docs, &Doc{ID: int64(i + 1), Base: 1, Title: fmt.Sprintf("制度%d", i), Version: 1, Text: tb.String()})
+	}
+	docs[12345].Text += "\n错误码 ERR404 表示找不到单据。\n"
+	ix.Load(1, "r1", docs)
+	ctx := context.Background()
+	for _, p := range []string{`ERR\d+.*单据`, `年假|病假`, `第\d+条`} {
+		b.Run(p, func(b *testing.B) {
+			for b.Loop() {
+				if _, err := ix.Search(ctx, Query{Text: p, Mode: "regex", Bases: []int64{1}, Limit: 30}); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }

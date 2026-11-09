@@ -691,7 +691,7 @@ func (s *Server) handleKBSearch(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
-	res, err := s.kbSearch(r.Context(), bases, req.KBIDs, req.Query, req.Mode, req.Folder, 20)
+	res, err := s.kbSearch(r.Context(), bases, req.KBIDs, nil, req.Query, req.Mode, req.Folder, 20)
 	var qe *kb.QueryError
 	if errors.As(err, &qe) {
 		writeErr(w, http.StatusBadRequest, qe.Msg)
@@ -705,7 +705,7 @@ func (s *Server) handleKBSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 // kbSearch 在 bases 里（ids 不为空时只搜其中这几个）检索。
-func (s *Server) kbSearch(ctx context.Context, bases []*store.KBase, ids []int64, query, mode, folder string, limit int) (*kb.Result, error) {
+func (s *Server) kbSearch(ctx context.Context, bases []*store.KBase, ids, docs []int64, query, mode, folder string, limit int) (*kb.Result, error) {
 	if !slices.Contains([]string{"", "any", "all", "phrase", "regex"}, mode) {
 		return nil, &kb.QueryError{Msg: "mode 只能是 any、all、phrase 或 regex"}
 	}
@@ -724,7 +724,7 @@ func (s *Server) kbSearch(ctx context.Context, bases []*store.KBase, ids []int64
 	if err := s.kbSync(ctx, pick); err != nil {
 		return nil, err
 	}
-	q := kb.Query{Text: query, Mode: mode, Folder: folder, Limit: limit}
+	q := kb.Query{Text: query, Mode: mode, Folder: folder, Docs: docs, Limit: limit}
 	for _, b := range pick {
 		q.Bases = append(q.Bases, b.ID)
 	}
