@@ -244,23 +244,23 @@ export async function apply(ctx: any): Promise<void> {
         return () => { tag.remove(); };
       });
     }
+    // 宿主自带 brand-official 已占 priority 0；单个槽位取最小者渲染，-1 才能盖过它。
+    // 写法照官方品牌插件：侧栏两个位置绑在一起（它们总是一起渲染）；首屏位置单独一条，
+    // 不能把侧栏的注册挂在 hero 的 inject 里——在会话页打开时 hero 不渲染，侧栏会一直没有品牌。
+    const registerBrandSlot = function* (slotName: string, component: unknown) {
+      try {
+        yield ctx.slots.register({ name: slotName, priority: -1 }, component);
+      } catch {
+        // 已有其它实现占住同一槽位同优先级时跳过
+      }
+    };
     ctx.slots.inject("sidebar.brand.mark", () =>
-      ctx.slots.inject("sidebar.brand.name", () =>
-        ctx.slots.inject("conversation.hero.brand.mark", function* () {
-          // 宿主自带 brand-official 已占 priority 0；单个槽位取最小者渲染，-1 才能盖过它。
-          // 每个注册单独兜底，一个槽位冲突不拖死另外两个。
-          const brandSlots = [
-            ["sidebar.brand.mark", EnterpriseBrandMark],
-            ["sidebar.brand.name", EnterpriseBrandName],
-            ["conversation.hero.brand.mark", EnterpriseHero],
-          ] as const;
-          for (const [slotName, component] of brandSlots) {
-            try {
-              yield ctx.slots.register({ name: slotName, priority: -1 }, component);
-            } catch {
-              // 已有其它实现占住同一槽位同优先级时跳过，不阻断其余品牌位
-            }
-          }
-        })));
+      ctx.slots.inject("sidebar.brand.name", function* () {
+        yield* registerBrandSlot("sidebar.brand.mark", EnterpriseBrandMark);
+        yield* registerBrandSlot("sidebar.brand.name", EnterpriseBrandName);
+      }));
+    ctx.slots.inject("conversation.hero.brand.mark", function* () {
+      yield* registerBrandSlot("conversation.hero.brand.mark", EnterpriseHero);
+    });
   });
 }

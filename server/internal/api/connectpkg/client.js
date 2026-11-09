@@ -22951,19 +22951,19 @@ async function apply(ctx) {
         };
       });
     }
-    ctx.slots.inject("sidebar.brand.mark", () => ctx.slots.inject("sidebar.brand.name", () => ctx.slots.inject("conversation.hero.brand.mark", function* () {
-      const brandSlots = [
-        ["sidebar.brand.mark", EnterpriseBrandMark],
-        ["sidebar.brand.name", EnterpriseBrandName],
-        ["conversation.hero.brand.mark", EnterpriseHero]
-      ];
-      for (const [slotName, component] of brandSlots) {
-        try {
-          yield ctx.slots.register({ name: slotName, priority: -1 }, component);
-        } catch {
-        }
+    const registerBrandSlot = function* (slotName, component) {
+      try {
+        yield ctx.slots.register({ name: slotName, priority: -1 }, component);
+      } catch {
       }
-    })));
+    };
+    ctx.slots.inject("sidebar.brand.mark", () => ctx.slots.inject("sidebar.brand.name", function* () {
+      yield* registerBrandSlot("sidebar.brand.mark", EnterpriseBrandMark);
+      yield* registerBrandSlot("sidebar.brand.name", EnterpriseBrandName);
+    }));
+    ctx.slots.inject("conversation.hero.brand.mark", function* () {
+      yield* registerBrandSlot("conversation.hero.brand.mark", EnterpriseHero);
+    });
   });
 }
 return module.exports; } });
