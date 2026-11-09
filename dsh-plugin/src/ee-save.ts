@@ -14,21 +14,29 @@ export const EE_SAVE_PROMPT =
  * 所以命令放到 client.ts（有 sendToSession 能用的宿主会话服务）。
  */
 export function registerEeSave(ctx: DshContext): void {
-  const commands = ctx.get?.("commands") ?? (ctx as any).commands;
-  if (typeof commands?.register !== "function") return;
-  const dispose = commands.register({
-    name: "ee-save",
-    description: "把这段对话沉淀成能力（提示词 / 技能 / 应用草稿）",
-    handler: async () => {
-      const sessionId = currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
-      if (!sessionId) return { kind: "error", text: "没有当前会话" };
-      try {
-        await sendToSession(ctx, sessionId, EE_SAVE_PROMPT);
-      } catch (error) {
-        return { kind: "error", text: `发不出去：${(error as Error)?.message ?? error}` };
-      }
-      return { kind: "success", text: "已把提炼请求发给当前会话，接着按提示选类型就好。" };
-    },
+  // commands 是可选服务：没声明进 inject，直接 ctx.get / ctx.commands 会被宿主拒绝并拖死
+  // 后面的注册；用 ctx.inject 等它，服务不在或注册失败都只跳过 /ee-save。
+  ctx.inject?.(["commands"], (scoped: any) => {
+    const commands = scoped.commands;
+    if (typeof commands?.register !== "function") return;
+    try {
+      const dispose = commands.register({
+        name: "ee-save",
+        description: "把这段对话沉淀成能力（提示词 / 技能 / 应用草稿）",
+        handler: async () => {
+          const sessionId = currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
+          if (!sessionId) return { kind: "error", text: "没有当前会话" };
+          try {
+            await sendToSession(ctx, sessionId, EE_SAVE_PROMPT);
+          } catch (error) {
+            return { kind: "error", text: `发不出去：${(error as Error)?.message ?? error}` };
+          }
+          return { kind: "success", text: "已把提炼请求发给当前会话，接着按提示选类型就好。" };
+        },
+      });
+      scoped.effect?.(() => dispose);
+    } catch {
+      // /ee-save 注册失败（与宿主命令撞名或签名不符）时不能拖死后面的品牌接管
+    }
   });
-  ctx.effect?.(() => dispose);
 }
