@@ -302,3 +302,118 @@ func TestSnippetTableHeader(t *testing.T) {
 		t.Fatalf("命中表头本身时不用再带：%+v", res.Hits)
 	}
 }
+
+type pdfSpec struct {
+	lines   []string
+	image   bool // 整页一张图（扫描页）
+	garbled bool // 用一个 ToUnicode 映射到私用区的字体（乱码页）
+}
+
+// makePDFPages 手写一个多页 PDF。
+func makePDFPages(pages ...pdfSpec) []byte {
+	var objs []string
+	add := func(o string) int {
+		objs = append(objs, o)
+		return len(objs)
+	}
+	add("<< /Type /Catalog /Pages 2 0 R >>")
+	add("") // 页树，最后填
+	font := add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+	cmap := "/CIDInit /ProcSet findresource begin 12 dict begin begincmap /CMapName /X def 1 begincodespacerange <00> <FF> endcodespacerange 1 beginbfrange <20> <7E> <E000> endbfrange endcmap CMapName currentdict /CMap defineresource pop end end"
+	toUni := add(fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(cmap), cmap))
+	badFont := add(fmt.Sprintf("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /ToUnicode %d 0 R >>", toUni))
+	img := add("<< /Type /XObject /Subtype /Image /Width 300 /Height 300 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 0 >>\nstream\n\nendstream")
+	var kids []string
+	for _, p := range pages {
+		var c strings.Builder
+		if p.image {
+			c.WriteString("q 300 0 0 300 0 0 cm /Im1 Do Q\n")
+		}
+		f := "/F1"
+		if p.garbled {
+			f = "/F2"
+		}
+		if len(p.lines) > 0 {
+			fmt.Fprintf(&c, "BT %s 12 Tf\n", f)
+			for i, l := range p.lines {
+				fmt.Fprintf(&c, "1 0 0 1 72 %d Tm (%s) Tj\n", 750-i*16, l)
+			}
+			c.WriteString("ET\n")
+		}
+		content := add(fmt.Sprintf("<< /Length %d >>\nstream\n%sendstream", c.Len(), c.String()))
+		pg := add(fmt.Sprintf("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 %d 0 R /F2 %d 0 R >> /XObject << /Im1 %d 0 R >> >> /Contents %d 0 R >>", font, badFont, img, content))
+		kids = append(kids, fmt.Sprintf("%d 0 R", pg))
+	}
+	objs[1] = fmt.Sprintf("<< /Type /Pages /Kids [%s] /Count %d >>", strings.Join(kids, " "), len(kids))
+	var b bytes.Buffer
+	b.WriteString("%PDF-1.4\n")
+	offsets := make([]int, len(objs))
+	for i, o := range objs {
+		offsets[i] = b.Len()
+		fmt.Fprintf(&b, "%d 0 obj\n%s\nendobj\n", i+1, o)
+	}
+	xref := b.Len()
+	fmt.Fprintf(&b, "xref\n0 %d\n0000000000 65535 f \n", len(objs)+1)
+	for _, off := range offsets {
+		fmt.Fprintf(&b, "%010d 00000 n \n", off)
+	}
+	fmt.Fprintf(&b, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(objs)+1, xref)
+	return b.Bytes()
+}
+
+func TestConvertPDFPages(t *testing.T) {
+	body := func(n int, text string) pdfSpec {
+		return pdfSpec{lines: []string{"Galaxy Tech Internal", text, fmt.Sprintf("Section %c continues here.", 'A'+n), fmt.Sprintf("Page %d of 5", n)}}
+	}
+	data := makePDFPages(
+		body(1, "Travel policy: hotel limit is 600 per night."),
+		pdfSpec{image: true},
+		body(3, "Flights need approval from the manager."),
+		pdfSpec{garbled: true, lines: []string{"ABCDEFGHIJKLMNOPQRSTUVWXYZ ABCDEFGHIJKLMNOP"}},
+		body(5, "Reimburse within 30 days."),
+	)
+	out, err := Convert("policy.pdf", data, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	md := out.Markdown
+	for _, want := range []string{
+		"## 第 1 页\n\nTravel policy", "## 第 2 页\n\n> ⚠ 第 2 页是扫描页", "## 第 4 页\n\n> ⚠ 第 4 页抽出来的文字是乱码", "## 第 5 页\n\nReimburse",
+	} {
+		if !strings.Contains(md, want) {
+			t.Fatalf("缺少 %q：\n%s", want, md)
+		}
+	}
+	if strings.Contains(md, "Galaxy Tech Internal") || strings.Contains(md, "of 5") {
+		t.Fatalf("页眉页脚应去掉：\n%s", md)
+	}
+	if !strings.Contains(md, "Section B continues here.") {
+		t.Fatalf("正文不能当成页眉页脚去掉：\n%s", md)
+	}
+	want := []SkippedPage{{2, "scanned"}, {4, "garbled"}}
+	if out.Info.Pages != 5 || out.Info.HeaderFooter != 2 || fmt.Sprint(out.Info.Skipped) != fmt.Sprint(want) {
+		t.Fatalf("体检 = %+v", out.Info)
+	}
+	// 未收录的页在阅读视图里是提示块，检索时也搜不到乱码
+	ix := NewIndex()
+	ix.Load(1, "r", []*Doc{{ID: 1, Base: 1, Title: "p", Version: 1, Text: md}})
+	if res, _ := ix.Search(context.Background(), Query{Text: "hotel", Bases: []int64{1}}); res.Total != 1 {
+		t.Fatalf("文字页应能搜到：%+v", res)
+	}
+	if res, _ := ix.Search(context.Background(), Query{Text: "扫描页", Bases: []int64{1}}); res.Total != 0 {
+		t.Fatalf("占位提示不该被搜到：%+v", res)
+	}
+
+	// 全是扫描页：整份拒收，告诉人怎么办
+	if _, err := Convert("scan.pdf", makePDFPages(pdfSpec{image: true}, pdfSpec{image: true}), Options{}); err == nil || !strings.Contains(err.Error(), "扫描件") {
+		t.Fatalf("扫描件 = %v", err)
+	}
+	if _, err := Convert("bad.pdf", makePDFPages(pdfSpec{garbled: true, lines: []string{"ABCDEFGHIJKLMNOPQRSTUVWXYZ"}}), Options{}); err == nil || !strings.Contains(err.Error(), "乱码") {
+		t.Fatalf("乱码 = %v", err)
+	}
+	// 页数少于 3 页时不判断页眉页脚
+	out, _ = Convert("two.pdf", makePDFPages(body(1, "First page body text here."), body(2, "Second page body text.")), Options{})
+	if !strings.Contains(out.Markdown, "Galaxy Tech Internal") || out.Info.HeaderFooter != 0 {
+		t.Fatalf("两页时不该去页眉：\n%s", out.Markdown)
+	}
+}

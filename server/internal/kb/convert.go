@@ -508,6 +508,8 @@ func markdownTable(rows [][]string) string {
 // ---- PDF ----
 
 // convertPDF 按页抽文字层：同一行的文字拼起来，行距明显变大的地方断段。每页前面加「## 第 N 页」，方便引用时说清在哪一页。
+// 每页单独判断：扫描页（几乎没字、有大图）和乱码页（字体缺少编码映射）不收文字，正文里留一句说明；
+// 每页都重复的页眉页脚去掉。全部页都收不了时整份拒收。
 func convertPDF(data []byte) (out *Converted, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -521,28 +523,150 @@ func convertPDF(data []byte) (out *Converted, err error) {
 		}
 		return nil, errors.New("不是有效的 PDF 文件：" + err.Error())
 	}
-	var b strings.Builder
-	chars := 0
+	info := Info{Format: "pdf", Pages: r.NumPage()}
+	type page struct {
+		n     int
+		lines []string // 空字符串是段落之间的空行
+		skip  string   // scanned / garbled
+	}
+	var pages []*page
 	for i := 1; i <= r.NumPage(); i++ {
 		p := r.Page(i)
 		if p.V.IsNull() {
 			continue
 		}
-		rows, err := p.GetTextByRow()
-		if err != nil {
-			continue
+		text := ""
+		if rows, err := p.GetTextByRow(); err == nil {
+			text = pdfPageText(rows)
 		}
-		text := pdfPageText(rows)
-		if strings.TrimSpace(text) == "" {
-			continue
+		pg := &page{n: i}
+		switch {
+		case utf8.RuneCountInString(strings.Join(strings.Fields(text), "")) < 20 && pdfHasImage(p):
+			pg.skip = "scanned"
+		case strings.TrimSpace(text) == "":
+			continue // 空白页
+		case garbled(text):
+			pg.skip = "garbled"
+		default:
+			pg.lines = strings.Split(text, "\n")
 		}
-		chars += utf8.RuneCountInString(text)
-		fmt.Fprintf(&b, "## 第 %d 页\n\n%s\n\n", i, text)
+		pages = append(pages, pg)
 	}
-	if chars < 10 {
+	var textPages []*page
+	for _, pg := range pages {
+		if pg.skip == "" {
+			textPages = append(textPages, pg)
+		} else {
+			info.Skipped = append(info.Skipped, SkippedPage{Page: pg.n, Reason: pg.skip})
+		}
+	}
+	if len(textPages) == 0 {
+		switch {
+		case len(info.Skipped) > 0 && info.Skipped[0].Reason == "scanned":
+			return nil, errors.New("这份 PDF 是扫描件（没有文字层），暂不支持；有电子版的话请传电子版")
+		case len(info.Skipped) > 0:
+			return nil, errors.New("这份 PDF 抽出来的文字是乱码（字体缺少编码信息），请换一份电子版，或另存为 Word 再上传")
+		}
 		return nil, ErrNoText
 	}
-	return &Converted{Markdown: b.String(), Mime: "application/pdf"}, nil
+	// 页眉页脚：每页最上面、最下面两行，在一半以上的页里都出现（数字不算）就去掉
+	if len(textPages) >= 3 {
+		removed := map[string]bool{}
+		for _, top := range []bool{true, false} {
+			count := map[string]int{}
+			for _, pg := range textPages {
+				seen := map[string]bool{}
+				for _, k := range edgeLines(pg.lines, top) {
+					if key := edgeKey(pg.lines[k]); key != "" && !seen[key] {
+						seen[key] = true
+						count[key]++
+					}
+				}
+			}
+			for _, pg := range textPages {
+				for _, k := range edgeLines(pg.lines, top) {
+					if key := edgeKey(pg.lines[k]); key != "" && count[key]*2 > len(textPages) && count[key] >= 3 {
+						pg.lines[k] = "\x00"
+						removed[key] = true
+					}
+				}
+			}
+		}
+		info.HeaderFooter = len(removed)
+	}
+	var b strings.Builder
+	for _, pg := range pages {
+		fmt.Fprintf(&b, "## 第 %d 页\n\n", pg.n)
+		switch pg.skip {
+		case "scanned":
+			fmt.Fprintf(&b, "> ⚠ 第 %d 页是扫描页，没有收录文字，请看原件。\n\n", pg.n)
+			continue
+		case "garbled":
+			fmt.Fprintf(&b, "> ⚠ 第 %d 页抽出来的文字是乱码，没有收录，请看原件。\n\n", pg.n)
+			continue
+		}
+		var kept []string
+		for _, l := range pg.lines {
+			if l != "\x00" {
+				kept = append(kept, l)
+			}
+		}
+		b.WriteString(strings.Trim(strings.Join(kept, "\n"), "\n") + "\n\n")
+	}
+	return &Converted{Markdown: b.String(), Mime: "application/pdf", Info: info}, nil
+}
+
+// pdfHasImage 判断页面上有没有像扫描图那样的大图（宽 × 高至少 4 万像素）。
+func pdfHasImage(p pdf.Page) bool {
+	xo := p.Resources().Key("XObject")
+	for _, name := range xo.Keys() {
+		img := xo.Key(name)
+		if img.Key("Subtype").Name() == "Image" && img.Key("Width").Int64()*img.Key("Height").Int64() >= 40000 {
+			return true
+		}
+	}
+	return false
+}
+
+// garbled 判断抽出来的字是不是乱码：替换符、私用区、控制字符超过三成。
+// 字体缺少 ToUnicode 映射时，抽出来的就是这些字符。
+func garbled(text string) bool {
+	total, bad := 0, 0
+	for _, r := range text {
+		if unicode.IsSpace(r) {
+			continue
+		}
+		total++
+		if r == utf8.RuneError || r >= 0xE000 && r <= 0xF8FF || r >= 0xF0000 || unicode.IsControl(r) {
+			bad++
+		}
+	}
+	return total > 0 && bad*10 > total*3
+}
+
+// edgeLines 是一页最上面（top）或最下面两行有字的行的下标。
+func edgeLines(lines []string, top bool) []int {
+	var out []int
+	for i := range lines {
+		k := i
+		if !top {
+			k = len(lines) - 1 - i
+		}
+		if strings.TrimSpace(lines[k]) != "" && lines[k] != "\x00" {
+			out = append(out, k)
+			if len(out) == 2 {
+				break
+			}
+		}
+	}
+	return out
+}
+
+var digitRuns = regexp.MustCompile(`[0-9０-９]+`)
+
+// edgeKey 是比较页眉页脚用的：数字换成 #（「第 3 页 / 共 20 页」每页都不一样），去掉空白。
+func edgeKey(line string) string {
+	return digitRuns.ReplaceAllString(strings.Join(strings.Fields(line), ""), "#")
 }
 
 func pdfPageText(rows pdf.Rows) string {

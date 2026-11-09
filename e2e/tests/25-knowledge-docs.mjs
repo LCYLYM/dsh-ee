@@ -115,6 +115,38 @@ function pptx() {
   });
 }
 
+/** 多页 PDF：每页有页眉页脚；第 2 页是扫描页（只有一张大图）。 */
+function pdf() {
+  const objs = [];
+  const add = (o) => objs.push(o) && objs.length;
+  add("<< /Type /Catalog /Pages 2 0 R >>");
+  add("");
+  const font = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  const img = add("<< /Type /XObject /Subtype /Image /Width 300 /Height 300 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 0 >>\nstream\n\nendstream");
+  const bodies = ["Travel policy: hotel limit is 600 per night.", null, "Flights need approval from the manager.", "Reimburse within 30 days."];
+  const kids = bodies.map((text, i) => {
+    let c = "";
+    if (text === null) c = "q 300 0 0 300 0 0 cm /Im1 Do Q\n";
+    else {
+      const lines = ["Galaxy Tech Internal", text, `Section ${i + 1} details follow.`, `Page ${i + 1} of 4`];
+      c = "BT /F1 12 Tf\n" + lines.map((l, k) => `1 0 0 1 72 ${750 - k * 16} Tm (${l}) Tj\n`).join("") + "ET\n";
+    }
+    const content = add(`<< /Length ${c.length} >>\nstream\n${c}endstream`);
+    return add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${font} 0 R >> /XObject << /Im1 ${img} 0 R >> >> /Contents ${content} 0 R >>`);
+  });
+  objs[1] = `<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(" ")}] /Count ${kids.length} >>`;
+  let out = "%PDF-1.4\n";
+  const offsets = objs.map((o, i) => {
+    const at = out.length;
+    out += `${i + 1} 0 obj\n${o}\nendobj\n`;
+    return at;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("");
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, "latin1");
+}
+
 const policy = "# 报销须知\n\n## 发票\n\n住宿发票要写明入住日期和离店日期，\n酒店发票抬头写公司全称。\n\n## 时限\n\n出差回来 30 天内提交报销。\n";
 
 export default async function (t) {
@@ -136,15 +168,19 @@ export default async function (t) {
     { name: "年度目标.pptx", mimeType: "application/octet-stream", buffer: pptx() },
     { name: "报销须知.md", mimeType: "text/markdown", buffer: Buffer.from(policy) },
     { name: "旧制度.doc", mimeType: "application/msword", buffer: Buffer.from("x") },
+    { name: "travel.pdf", mimeType: "application/pdf", buffer: pdf() },
   ]);
   await dialog.getByText("新文档").first().waitFor();
-  await dialog.getByRole("button", { name: "上传 5 个文件" }).click();
+  await dialog.getByRole("button", { name: "上传 6 个文件" }).click();
   await dialog.getByText("补回 8 个条款编号 · 1 个表格").waitFor();
   await dialog.getByText("2 个工作表 · 62 行").waitFor();
   await dialog.getByText("收录 2 页幻灯片 · 1 页带备注").waitFor();
   await dialog.getByText("请在 Word 里另存为 .docx 后再上传").waitFor();
+  await dialog.getByText("收录 3 页").waitFor();
+  await dialog.getByText("第 2 页是扫描页，没有收录；员工问到这些页的内容会查不到").waitFor();
+  await dialog.getByText("去掉了每页都重复的页眉页脚").waitFor();
   await shot(admin, "kb2-upload-report");
-  step("上传 Word、Excel、PPT、Markdown 和一个旧版 .doc：每个文件一张体检卡，.doc 告诉人怎么办");
+  step("上传 Word、Excel、PPT、PDF、Markdown 和一个旧版 .doc：每个文件一张体检卡（PDF 说清第 2 页是扫描页），.doc 告诉人怎么办");
   await dialog.getByRole("button", { name: "完成" }).click();
   await admin.getByText("差旅管理办法").first().waitFor();
   await shot(admin, "kb2-doc-list");
@@ -159,8 +195,8 @@ export default async function (t) {
   await dialog.getByText("已更新为第 2 版").waitFor();
   await dialog.getByRole("button", { name: "完成" }).click();
   const detail = await api(admin, "GET", `/api/kb/${kbId}`);
-  assertEq(detail.data.docs.length, 4, "同名文件不新建文档");
-  step("再传一次「报销须知.md」：预检认出同名，默认更新成第 2 版，库里还是 4 篇");
+  assertEq(detail.data.docs.length, 5, "同名文件不新建文档");
+  step("再传一次「报销须知.md」：预检认出同名，默认更新成第 2 版，库里还是 5 篇");
 
   const docOf = (title) => detail.data.docs.find((d) => d.title === title);
 
@@ -199,6 +235,18 @@ export default async function (t) {
   await reader.getByText("备注：讲到这里先停一下").waitFor();
   await shot(admin, "kb2-read-pptx");
   step("PPT 文档页：每页一张卡片，备注在卡片底部");
+
+  // ---- PDF：分页线，扫描页是提示块，页眉页脚去掉了 ----
+  await admin.goto(`${BASE}/knowledge/docs/${docOf("travel").id}`);
+  await reader.getByRole("separator").first().waitFor();
+  assertEq(await reader.getByRole("separator").count(), 4, "四页四条分页线");
+  await reader.getByText("第 2 页是扫描页，没有收录文字，请看原件。").waitFor();
+  assert(!(await reader.getByText("Galaxy Tech Internal").count()), "页眉应去掉");
+  await shot(admin, "kb2-read-pdf");
+  step("PDF 文档页：每页一条分页线，扫描页显示成灰色提示，页眉页脚去掉了");
+  await admin.goto(`${BASE}/knowledge/${kbId}`);
+  await admin.getByText("1 页未收录").waitFor();
+  step("文档列表上这篇 PDF 标着「1 页未收录」");
 
   // ---- 引用：摘句精确标出来，滚到中间 ----
   const md = docOf("报销须知");

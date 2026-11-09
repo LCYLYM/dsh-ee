@@ -62,10 +62,11 @@ func (ix *Index) Load(base int64, rev string, docs []*Doc) {
 	for _, d := range docs {
 		bi.docs[d.ID] = d
 		for _, c := range Split(d.Text) {
-			e := &entry{doc: d, chunk: c, flat: Flat(c.Heading + "\n" + c.Text), heading: Flat(d.Title + c.Heading)}
+			body := withoutNotices(c.Text)
+			e := &entry{doc: d, chunk: c, flat: Flat(c.Heading + "\n" + body), heading: Flat(d.Title + c.Heading)}
 			id := int32(len(bi.entries))
 			bi.entries = append(bi.entries, e)
-			toks := Tokens(d.Title + " " + c.Heading + " " + c.Text)
+			toks := Tokens(d.Title + " " + c.Heading + " " + body)
 			e.length = len(toks)
 			bi.totalLen += e.length
 			seen := map[string]bool{}
@@ -80,6 +81,21 @@ func (ix *Index) Load(base int64, rev string, docs []*Doc) {
 	ix.mu.Lock()
 	ix.bases[base], ix.revs[base] = bi, rev
 	ix.mu.Unlock()
+}
+
+// withoutNotices 去掉转换时写进去的提示（「> ⚠ 第 2 页是扫描页……」），它们不是文档内容，不该被搜到。
+func withoutNotices(text string) string {
+	if !strings.Contains(text, "> ⚠") {
+		return text
+	}
+	lines := Lines(text)
+	kept := lines[:0:0]
+	for _, l := range lines {
+		if !strings.HasPrefix(strings.TrimSpace(l), "> ⚠") {
+			kept = append(kept, l)
+		}
+	}
+	return strings.Join(kept, "\n")
 }
 
 // Drop 把一个库移出索引。
