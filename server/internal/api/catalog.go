@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -554,28 +553,8 @@ func (s *Server) handleAdminTarball(w http.ResponseWriter, r *http.Request) {
 // POST /api/me/packages：网页上传 .tgz 发布。请求体是 tarball 本身（Content-Type: application/octet-stream，
 // 浏览器跨站表单发不出这种请求，配合 SameSite cookie 防 CSRF）。
 func (s *Server) handleUploadPackage(w http.ResponseWriter, r *http.Request) {
-	mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if mt != "application/octet-stream" && mt != "application/gzip" && mt != "application/x-gzip" {
-		writeErr(w, http.StatusUnsupportedMediaType, "请求体必须是 .tgz（application/octet-stream）")
-		return
-	}
-	raw, err := io.ReadAll(io.LimitReader(r.Body, s.registry.MaxTarball+1))
-	if err != nil {
-		writeErr(w, http.StatusBadRequest, "读取上传内容失败")
-		return
-	}
-	if int64(len(raw)) > s.registry.MaxTarball {
-		writeErr(w, http.StatusRequestEntityTooLarge, "tarball 太大")
-		return
-	}
-	info, err := registry.InspectTarball(bytes.NewReader(raw))
-	if err != nil {
-		writeErr(w, http.StatusBadRequest, "不是 npm pack 生成的 .tgz："+err.Error())
-		return
-	}
-	m, err := registry.ParseManifest(info.PackageJSON)
-	if err != nil || m.Name == "" || m.Version == "" {
-		writeErr(w, http.StatusBadRequest, "tarball 里的 package.json 缺少 name 或 version")
+	raw, info, m, ok := s.readPackageTarball(w, r)
+	if !ok {
 		return
 	}
 	tag := r.URL.Query().Get("tag")

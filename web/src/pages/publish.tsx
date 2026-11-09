@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router";
-import { UploadCloud } from "lucide-react";
+import { AlertTriangle, CheckCircle2, UploadCloud, XCircle } from "lucide-react";
 import { useStore } from "../lib/store";
-import { api, formatBytes } from "../lib/api";
+import { api, formatBytes, type PackageCheck } from "../lib/api";
+import { ScanList } from "../components/scan-list";
 import { useApi, useAction } from "../lib/use-api";
 import { StatusBadge } from "../components/status";
 import { pluginPath } from "../components/plugin-card";
@@ -110,7 +111,27 @@ function Upload({ onDone }: { onDone: () => void }) {
   const { busy, run } = useAction();
   const [file, setFile] = useState<File | null>(null);
   const [tag, setTag] = useState("latest");
+  const [checking, setChecking] = useState(false);
+  const [check, setCheck] = useState<PackageCheck | null>(null);
   const [result, setResult] = useState<{ name: string; version: string; status: string } | null>(null);
+  // 预检期间换了文件时，丢掉旧响应，避免把 A 的结果显示在 B 上。
+  const checkSeq = useRef(0);
+
+  const preflight = async () => {
+    if (!file) return;
+    const seq = ++checkSeq.current;
+    setChecking(true);
+    try {
+      const next = await api.checkPackage(file);
+      if (seq === checkSeq.current) setCheck(next);
+    } catch (error) {
+      if (seq === checkSeq.current) notify(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (seq === checkSeq.current) setChecking(false);
+    }
+  };
+
+  const scanFailed = check?.scan.some((item) => item.level === "fail") ?? false;
 
   const submit = async () => {
     if (!file) return;
@@ -118,6 +139,7 @@ function Upload({ onDone }: { onDone: () => void }) {
     if (!r.ok) return notify(r.error);
     setResult(r.value);
     setFile(null);
+    setCheck(null);
     notify(r.value.status === "pending" ? t("publish.submitted") : t("registry.publish.publishedNow", { name: `${r.value.name}@${r.value.version}` }));
     onDone();
     reloadPlugins();
@@ -140,7 +162,10 @@ function Upload({ onDone }: { onDone: () => void }) {
           accept=".tgz,application/gzip"
           className="hidden"
           onChange={(e) => {
+            checkSeq.current++;
+            setChecking(false);
             setFile(e.target.files?.[0] ?? null);
+            setCheck(null);
             setResult(null);
           }}
         />
@@ -148,9 +173,40 @@ function Upload({ onDone }: { onDone: () => void }) {
       <Field label={t("registry.publish.tag")} hint={t("registry.publish.tagHint")}>
         <input className={cx(inputCls, "w-40 font-mono")} value={tag} onChange={(e) => setTag(e.target.value)} />
       </Field>
-      <Button disabled={!file || busy} onClick={submit}>
-        {busy ? t("registry.publish.uploading") : t("publish.submit")}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" disabled={!file || busy || checking} onClick={preflight}>
+          {checking ? t("publish.checking") : t("publish.check")}
+        </Button>
+        <Button disabled={!file || busy || checking || (check !== null && !check.can_submit)} onClick={submit}>
+          {busy ? t("registry.publish.uploading") : t("publish.submit")}
+        </Button>
+      </div>
+      {check && (
+        <div className="space-y-3 rounded-lg border border-neutral-100 bg-neutral-50/60 p-4">
+          <div className="flex items-start gap-2 text-sm">
+            {!check.can_submit ? (
+              <XCircle size={17} className="mt-0.5 shrink-0 text-red-500" />
+            ) : scanFailed ? (
+              <AlertTriangle size={17} className="mt-0.5 shrink-0 text-amber-500" />
+            ) : (
+              <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-500" />
+            )}
+            <div>
+              <div className={check.can_submit ? "font-medium text-neutral-800" : "font-medium text-red-600"}>
+                {!check.can_submit
+                  ? t("publish.checkBlocked")
+                  : check.will_publish
+                    ? t("publish.checkPassed")
+                    : t("publish.checkReview")}
+              </div>
+              <div className="mt-0.5 text-xs text-neutral-500">{t("publish.checkHint")}</div>
+              {check.can_submit && scanFailed && <div className="mt-1 text-xs text-amber-700">{t("publish.checkScanFail")}</div>}
+            </div>
+          </div>
+          <ConflictList items={check.conflicts} />
+          <ScanList items={check.scan} />
+        </div>
+      )}
       {result && (
         <p className="text-sm text-neutral-700">
           {result.status === "pending"
@@ -159,6 +215,22 @@ function Upload({ onDone }: { onDone: () => void }) {
         </p>
       )}
     </div>
+  );
+}
+
+type DynT = (key: string, opts?: Record<string, unknown>) => string;
+
+/** 预检发现的发布冲突；服务端只给 key 和参数，这里按当前语言渲染。 */
+function ConflictList({ items }: { items: PackageCheck["conflicts"] }) {
+  const { t: typed } = useTranslation();
+  const t = typed as unknown as DynT;
+  if (!items.length) return null;
+  return (
+    <ul className="space-y-1 text-sm text-red-600">
+      {items.map((item, index) => (
+        <li key={`${item.key}-${index}`}>{t(`publish.conflict.${item.key}`, { ...item.params, defaultValue: item.key })}</li>
+      ))}
+    </ul>
   );
 }
 

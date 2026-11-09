@@ -284,6 +284,7 @@ func (s *Server) routes() []route {
 		prm("GET /api/catalog/{name...}", s.handleCatalogDetail, rbac.PortalView),
 		prm("GET /api/me/packages", s.handleMyPackages, rbac.RegistryPublish),
 		prm("POST /api/me/packages", s.handleUploadPackage, rbac.RegistryPublish),
+		prm("POST /api/me/packages/check", s.handleCheckPackage, rbac.RegistryPublish),
 		agt("POST /api/agent/packages", s.handleUploadPackage, rbac.RegistryPublish),
 		prm("POST /api/me/import-requests", s.handleImportRequest, rbac.RegistryPublish),
 		prm("GET /api/me/npm-tokens", s.handleMyNpmTokens, rbac.RegistryUse, rbac.RegistryPublish),

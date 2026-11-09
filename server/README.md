@@ -166,6 +166,7 @@ OceanBase 单机最低也要几 GB 内存，本地机器紧张时先用 TiDB 调
 | PUT | `/api/admin/settings` | 整份替换；按改动的段落校验权限（npm 源 / 上游段落也可由对应管理员修改） |
 | GET | `/api/catalog`、`/api/catalog/{包名}` | 能力市场：已上架的能力 / 详情（版本、检查结果、README） |
 | GET / POST | `/api/me/packages` | 我发布的包与各版本状态 / 网页发布（请求体是 `.tgz`，`Content-Type: application/octet-stream`） |
+| POST | `/api/me/packages/check` | 发布前预检：请求体同样是 `.tgz`，只解包并返回自动检查与发布冲突，不落库、不占用版本号 |
 | POST | `/api/me/import-requests` | 申请引入社区包 `{name, version?, reason}` |
 | GET / POST / DELETE | `/api/me/npm-tokens[/{id}]` | 我的 npm 令牌 / 新建 `{name, access: read\|publish}`（明文只返回一次）/ 吊销 |
 | GET | `/api/admin/packages[/{包名}]` | 全部能力（含各种状态）/ 详情 |
