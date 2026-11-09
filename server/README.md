@@ -67,6 +67,7 @@ DSH 的 `dsh plugin add` 在 profile 目录里转发给 pnpm，所以「能力�
 - **令牌**：统一 `ee_at_…` 令牌按 `registry:read` / `registry:publish` scope 控制 npm 权限；旧 `ee_npm_…` 只读 / 可发布令牌与 `npm login --auth-type=legacy` 继续支持。设置里「安装也需要令牌」关闭后匿名可装，发布总是要令牌。每次 tarball 下载记入 `npm_downloads`（安装审计与企业内热门）。
 - **接入脚本**：`curl -fsSL <dsh-ee>/setup.sh | sh`（Windows：`irm <dsh-ee>/setup.ps1 | iex`）通过设备确认后用 `npm config` 写好 registry、作用域与令牌；无浏览器环境用 `sh -s -- --token <令牌>`。
 - **DSH 插件索引**：`GET /index/dsh-index.json`，按 dshfind 的 `dsh-index.mjs` 同一口径生成并自检（读端任何一条违规就整份拒收）。只含已上架插件的元数据，**不需要令牌**（DSH 请求索引源时不一定能带认证头）；下载 tarball 仍然要令牌。
+- **插件作者指南**：`package.json` / `dsh.bundle` / 发布前预检 / 常见失败见 [docs/plugin-authors.md](../docs/plugin-authors.md)。
 
 不支持：`npm unpublish`（返回 405，请在网页下架）、npm 的 web 登录、组织与团队权限、漏洞审计（`/-/npm/v1/security/*` 返回空结果）、部门级可见范围（P1）。
 
