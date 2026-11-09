@@ -157,8 +157,10 @@ export async function apply(ctx: any): Promise<void> {
     const org = brand?.name || "企业";
     const brandStore = createBrandStore(brand, readBrand);
     ctx.effect(() => brandStore.start());
-    // 配色与 logo 无关，不需要接管品牌位置：交给 DSH 的主题服务按设计变量覆盖，改了就跟着变
-    ctx.inject(["theme"], (themeCtx: any) => {
+    // 配色与 logo 无关，不需要接管品牌位置：交给 DSH 的主题服务按设计变量覆盖，改了就跟着变。
+    // 主题服务不存在或拒绝注入时不能拖死后面的品牌槽位注册，单独兜底。
+    try {
+      ctx.inject(["theme"], (themeCtx: any) => {
       let applied = "";
       let dispose: (() => void) | undefined;
       const sync = () => {
@@ -178,7 +180,10 @@ export async function apply(ctx: any): Promise<void> {
       sync();
       const off = brandStore.subscribe(sync);
       themeCtx.effect(() => () => { off(); dispose?.(); });
-    });
+      });
+    } catch {
+      // 宿主没有主题服务或 inject 被拒：跳过配色，继续注册品牌位置
+    }
 
     const EnterprisePanel = () => {
       const state = useOverview(remote);

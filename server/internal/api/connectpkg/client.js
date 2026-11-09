@@ -22864,29 +22864,32 @@ async function apply(ctx) {
     const org = brand?.name || "\u4F01\u4E1A";
     const brandStore = createBrandStore(brand, readBrand);
     ctx.effect(() => brandStore.start());
-    ctx.inject(["theme"], (themeCtx) => {
-      let applied = "";
-      let dispose;
-      const sync = () => {
-        const tokens = themeOverrides(brandStore.get());
-        const key = JSON.stringify(tokens ?? null);
-        if (key === applied) return;
-        applied = key;
-        dispose?.();
-        dispose = void 0;
-        if (!tokens) return;
-        try {
-          dispose = themeCtx.theme.overrideTokens("dsh-ee-brand", tokens);
-        } catch {
-        }
-      };
-      sync();
-      const off = brandStore.subscribe(sync);
-      themeCtx.effect(() => () => {
-        off();
-        dispose?.();
+    try {
+      ctx.inject(["theme"], (themeCtx) => {
+        let applied = "";
+        let dispose;
+        const sync = () => {
+          const tokens = themeOverrides(brandStore.get());
+          const key = JSON.stringify(tokens ?? null);
+          if (key === applied) return;
+          applied = key;
+          dispose?.();
+          dispose = void 0;
+          if (!tokens) return;
+          try {
+            dispose = themeCtx.theme.overrideTokens("dsh-ee-brand", tokens);
+          } catch {
+          }
+        };
+        sync();
+        const off = brandStore.subscribe(sync);
+        themeCtx.effect(() => () => {
+          off();
+          dispose?.();
+        });
       });
-    });
+    } catch {
+    }
     const EnterprisePanel = () => {
       const state = useOverview(remote);
       const [notice, setNotice] = (0, import_react4.useState)("");
