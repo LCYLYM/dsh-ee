@@ -7,18 +7,10 @@ import { PageLink } from "../lib/menus";
 import { LangSwitch } from "../components/lang-switch";
 import { ThemeToggle } from "../components/theme-toggle";
 import { LandingHeroScene } from "../components/landing-hero-scene";
-import { Backdrop, Globe, HoverArrow, Ribbon } from "../components/landing-graphics";
+import { Backdrop, Globe, HoverArrow } from "../components/landing-graphics";
 import { FeatureGrid } from "../components/landing-features";
 import { cx } from "../components/ui";
 import { useTranslation } from "react-i18next";
-
-/** 图里可点的四类企业资产：点哪一类，dsh-ee 与 DSH 两栏就换成它真实走过的那条链。 */
-const sources = [
-  { key: "skill", pkg: "@acme/skill-expense-policy" },
-  { key: "system", pkg: "@acme/conn-crm" },
-  { key: "data", pkg: "@acme/kb-metrics" },
-  { key: "context", pkg: "@acme/dsh-wiki-memory" },
-] as const;
 
 /** 进入视口时依次浮现；脚本没跑或用户要求减少动效时内容直接可见。 */
 function useReveal() {
@@ -279,9 +271,6 @@ export default function Landing() {
   useReveal();
   return (
     <div className="lp relative min-h-screen overflow-x-clip">
-      {/* 首屏飘带：从右上角铺进来，压在顶栏后面 */}
-      <Ribbon className="pointer-events-none absolute top-0 right-0 h-[620px] w-full opacity-35 sm:opacity-60 lg:h-[760px] lg:w-[72%] lg:opacity-100" />
-
       <header
         className={cx(
           "sticky top-0 z-20 transition-[background-color,box-shadow] duration-200",
@@ -302,9 +291,9 @@ export default function Landing() {
           </nav>
           <nav className="ml-auto flex items-center gap-4">
             <LangSwitch
-              className={cx("hidden rounded-full px-2.5 sm:inline-flex", onTop && "bg-white/70 backdrop-blur dark:bg-black/30")}
+              className={cx("hidden rounded-full px-2.5 sm:inline-flex", onTop && "bg-white/70 backdrop-blur dark:bg-white/10 dark:[&_select]:text-white/90")}
             />
-            <ThemeToggle className={cx("rounded-full!", onTop && "bg-white/70 backdrop-blur dark:bg-black/30")} />
+            <ThemeToggle className={cx("rounded-full!", onTop && "bg-white/70 backdrop-blur dark:bg-white/10")} />
           </nav>
           <span className="hidden sm:block">
             <Pill to="/go" tone="navy" className="py-1.5! dark:bg-white! dark:text-[#0a2540]!">
@@ -316,16 +305,19 @@ export default function Landing() {
 
       <main className="relative">
         {/* 首屏 */}
-        <section className="relative">
-          <div className={cx(shell, "relative pt-14 pb-16 sm:pt-20 lg:pt-24")}>
-            <h1 data-reveal className="max-w-3xl text-[clamp(2rem,4.4vw,3.5rem)] leading-[1.16] font-semibold tracking-[-0.02em] text-lp-ink">
-              {t("landing.heroLine1")}
-              <br />
-              <span className="bg-[linear-gradient(100deg,#4d6bfe_10%,#8b5cf6_55%,#e8618c_95%)] bg-clip-text text-transparent dark:bg-[linear-gradient(100deg,#80e9ff,#a5b8fc_45%,#f0a6ff)]">
-                {t("landing.heroLine2")}
-              </span>
-            </h1>
-            <div data-reveal className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-3" style={delay(90)}>
+        <section className="lp-hero-bg relative -mt-16 overflow-hidden border-b border-lp-line pt-16">
+          <div aria-hidden className="lp-hero-dots pointer-events-none absolute inset-0" />
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            <div className={cx(shell, "h-full")}>
+              <div className="h-full w-px -translate-x-4 bg-[linear-gradient(to_bottom,transparent,var(--hub-guide)_20%,var(--hub-guide)_80%,transparent)] sm:-translate-x-6" />
+            </div>
+          </div>
+          <div className={cx(shell, "relative flex flex-col gap-5 pt-6 pb-6 sm:pt-8 lg:flex-row lg:items-end lg:justify-between lg:gap-10 lg:pt-10")}>
+            <div data-reveal className="max-w-2xl">
+              <h1 className="text-[clamp(1.35rem,2.2vw,1.85rem)] leading-tight font-semibold tracking-[-0.015em] text-lp-ink">{t("landing.heroLine1")}</h1>
+              <p className="mt-2 text-[15px] leading-relaxed text-lp-muted">{t("landing.heroLead")}</p>
+            </div>
+            <div data-reveal className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3" style={delay(90)}>
               <Pill to="/go" tone="accent">
                 {t("landing.enter")}
               </Pill>
@@ -334,8 +326,8 @@ export default function Landing() {
               </Pill>
             </div>
           </div>
-          <div className="relative pb-24">
-            <LandingHeroScene sources={sources} />
+          <div className="relative pb-10">
+            <LandingHeroScene />
           </div>
         </section>
 

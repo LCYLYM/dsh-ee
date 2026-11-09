@@ -172,6 +172,79 @@ svg .scene-fade { animation-name: scene-fade-in; }
   to { transform: scale(3.2); opacity: 0; }
 }
 
+/* 首屏枢纽图的配色：浅色是白底蓝线，深色是海军蓝底青线；背景是渐隐的点阵加品牌色光晕 */
+.lp {
+  --hub-base: #f6f9fc;
+  --hub-glow1: rgb(77 107 254 / 0.12);
+  --hub-glow2: rgb(139 92 246 / 0.1);
+  --hub-dots: rgb(77 107 254 / 0.16);
+  --hub-guide: rgb(77 107 254 / 0.25);
+  --hub-panel: rgb(255 255 255 / 0.85);
+  --hub-panel-ring: #e3e8ee;
+  --hub-chip: #eef2fb;
+  --hub-chip-on: #e3ebff;
+  --hub-chip-ink: #0a2540;
+  --hub-tile: #ffffff;
+  --hub-tile-hover: #f6f9fc;
+  --hub-tile-ring: #e3e8ee;
+  --hub-label: #6b7c93;
+  --hub-line: rgb(77 107 254 / 0.4);
+  --hub-hot: #0ea5e9;
+  --hub-hot-glow: rgb(14 165 233 / 0.35);
+  --hub-placeholder: rgb(77 107 254 / 0.3);
+}
+.dark .lp {
+  --hub-base: #0a1530;
+  --hub-glow1: rgb(77 107 254 / 0.22);
+  --hub-glow2: rgb(139 92 246 / 0.16);
+  --hub-dots: rgb(126 148 250 / 0.22);
+  --hub-guide: rgb(126 148 250 / 0.3);
+  --hub-panel: rgb(18 31 71 / 0.8);
+  --hub-panel-ring: rgb(255 255 255 / 0.06);
+  --hub-chip: #1b2a5c;
+  --hub-chip-on: #2a3d7a;
+  --hub-chip-ink: #ffffff;
+  --hub-tile: #101d42;
+  --hub-tile-hover: #15244f;
+  --hub-tile-ring: rgb(255 255 255 / 0.1);
+  --hub-label: #8fa3c7;
+  --hub-line: rgb(126 148 250 / 0.45);
+  --hub-hot: #80e9ff;
+  --hub-hot-glow: rgb(128 233 255 / 0.4);
+  --hub-placeholder: rgb(126 148 250 / 0.35);
+}
+.lp-hero-bg {
+  background:
+    radial-gradient(60% 50% at 50% 70%, var(--hub-glow1), transparent 70%),
+    radial-gradient(40% 35% at 85% 10%, var(--hub-glow2), transparent 70%),
+    var(--hub-base);
+}
+.lp-hero-dots {
+  background-image: radial-gradient(circle, var(--hub-dots) 1px, transparent 1.2px);
+  background-size: 14px 14px;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 30%, black 80%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 30%, black 80%, transparent 100%);
+  animation: lp-dots 40s linear infinite;
+}
+@keyframes lp-dots { to { background-position: 140px 70px; } }
+/* 中心节点：缓慢呼吸，组装时外扩一圈光环 */
+.hub-breathe { animation: hub-breathe 4s ease-in-out infinite; }
+@keyframes hub-breathe {
+  0%, 100% { box-shadow: 0 20px 50px -10px rgb(77 107 254 / 0.6), 0 0 0 0 rgb(128 233 255 / 0); }
+  50% { box-shadow: 0 20px 60px -6px rgb(77 107 254 / 0.85), 0 0 40px 2px rgb(128 233 255 / 0.18); }
+}
+/* 案例标签的自动播放进度条：走满即切到下一个，悬停时暂停 */
+.hub-progress { animation: hub-progress var(--dur, 9600ms) linear forwards; transform-origin: left; }
+@keyframes hub-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.hub-ping { animation: hub-ping 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+@keyframes hub-ping {
+  from { transform: scale(1); opacity: 0.9; }
+  to { transform: scale(1.35); opacity: 0; }
+}
+
 /* Stripe 式悬停箭头：平时是 ›，悬停时伸出箭杆 */
 .lp-arrow { margin-left: 0.4em; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; }
 .lp-arrow .lp-arrow-line { opacity: 0; transition: opacity 0.15s ease; }
@@ -208,7 +281,7 @@ svg .scene-fade { animation-name: scene-fade-in; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dash-flow, .caret, .status-dot, .lp-mesh, .lp-band, .lp-arc, .lp-ping { animation: none; }
+  .dash-flow, .caret, .status-dot, .lp-mesh, .lp-band, .lp-arc, .lp-ping, .lp-hero-dots, .hub-breathe, .hub-ping { animation: none; }
   .draw-once { stroke-dashoffset: 0; animation: none; }
   .scene-fade, .scene-card { opacity: 1; animation: none; }
 }
