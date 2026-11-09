@@ -626,7 +626,7 @@ func (s *Server) handleKDocDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"doc": d, "kb": kbItemOf(v, b), "version": text.Version, "markdown": text.Markdown,
-		"outline": kb.Outline(text.Markdown), "versions": vs,
+		"outline": kb.Outline(text.Markdown), "versions": vs, "format": docFormat(d),
 	})
 }
 
@@ -752,6 +752,19 @@ func (s *Server) handleKDocReplace(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit(r, auditKBDocEdit, "kb:"+b.Slug+"/"+strconv.FormatInt(d.ID, 10), map[string]any{"file": origin.SourceName, "version": updated.Version})
 	writeJSON(w, http.StatusOK, updated)
+}
+
+// docFormat 是文档的格式（pdf、docx、xlsx……），阅读视图按它显示分页线、工作表、每页卡片；网页新建的是 md。
+func docFormat(d *store.KDoc) string {
+	var c kdocConvert
+	if len(d.ConvertInfo) > 0 && json.Unmarshal(d.ConvertInfo, &c) == nil && c.Format != "" {
+		return c.Format
+	}
+	switch ext := strings.TrimPrefix(strings.ToLower(path.Ext(d.SourceName)), "."); ext {
+	case "pdf", "docx", "xlsx", "csv", "pptx", "txt":
+		return ext
+	}
+	return "md"
 }
 
 // savedHeader 是维护者上次给这篇文档选的表头设置。

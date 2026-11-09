@@ -166,11 +166,23 @@ test("原文窗格：高亮引用的行，提示旧版本，翻页按钮", () =>
     value: { title: "差旅办法", version: 1, total_lines: 6, from: 4, to: 6, stale: "这是第 1 版，文档已经更新到第 2 版", text: "4| ## 住宿\n5| 一线城市 600 元\n6| 其他 400 元" },
   }, handlers);
   const text = texts(view).join("");
-  assert.match(text, /第 1 版 · 共 6 行/);
+  assert.match(text, /第 1 版 · 第 4～6 行 \/ 共 6 行/);
   assert.match(text, /高亮的是引用时的版本/);
+  // 阅读视图：标题正常排版，引用的段落高亮，摘句精确标出来
+  assert.equal(find(view, (node) => node.type === "h2").length, 1);
   const hits = find(view, (node) => node.props?.["data-kb-hit"] === "1");
   assert.equal(hits.length, 1);
-  assert.deepEqual(texts(hits[0]), ["5", "一线城市 600 元"]);
+  assert.equal(texts(hits[0]).join(""), "一线城市 600 元");
+  assert.deepEqual(find(view, (node) => node.type === "mark").map((node) => texts(node).join("")), ["600 元"]);
+  assert.doesNotMatch(text, /引用的原文/);
+  // 原文视图：带行号
+  const rawView = kbDocView(h, { doc: 3, from: 5, to: 6, quote: "600 元" }, {
+    status: "ready",
+    value: { title: "差旅办法", version: 1, total_lines: 6, from: 4, to: 6, text: "4| ## 住宿\n5| 一线城市 600 元\n6| 其他 400 元" },
+  }, { ...handlers, raw: true, toggleRaw: () => {} });
+  const rawHits = find(rawView, (node) => node.props?.["data-kb-hit"] === "1");
+  assert.deepEqual(texts(rawHits[0]), ["5", "一线城市 600 元"]);
+  assert.match(texts(rawView).join(""), /阅读视图/);
   const [prev, next] = find(view, (node) => node.type === "button");
   assert.equal(next.props.disabled, true);
   assert.equal(prev.props.disabled, false);

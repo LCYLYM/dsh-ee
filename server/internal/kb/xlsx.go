@@ -269,6 +269,10 @@ func sheetsMarkdown(sheets []sheet, withHeading bool, opt Options, info *Info) s
 				size += n
 				end++
 			}
+			// 剩下的行不多了就并进这一段，别留一段只有一两行的
+			if rest := len(rows) - end; rest > 0 && rest <= 5 {
+				end = len(rows)
+			}
 			fmt.Fprintf(&b, "%s 第 %d～%d 行\n\n", level, rowNo[start], rowNo[end-1])
 			b.WriteString(markdownTable(append([][]string{head}, rows[start:end]...)) + "\n")
 			start = end

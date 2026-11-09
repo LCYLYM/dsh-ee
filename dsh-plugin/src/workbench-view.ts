@@ -1,5 +1,6 @@
 // 业务工作台的界面：纯函数，createElement 作参数（照 status-view.ts），方便单测。
 // 颜色都从 currentColor 混出来，跟随 DSH 的亮色 / 暗色主题；只有图表序列用固定的几种颜色。
+import { computeMarks, docView, parseBlocks } from "./kb-doc-render.js";
 import { chartSeries, checkForm, checklistItems, formatDelta, formatValue, getPath, parseDocLines, rowWriteOf, statusTone, tableRows, type Board, type Citation, type KBaseItem, type WorkbenchAction, type WorkbenchPane, type WorkbenchWidget, type WidgetWidth } from "./workbench.js";
 
 type H = (...args: any[]) => any;
@@ -566,11 +567,31 @@ export interface DocPaneHandlers {
   page: (delta: number) => void;
   ask: () => void;
   asking: boolean;
+  /** 看「原文」（带行号的 Markdown）还是「阅读」视图；不传就只有阅读视图 */
+  raw?: boolean;
+  toggleRaw?: () => void;
 }
 
-/** 知识库原文：带行号，引用的几行高亮（data-kb-hit 标在第一行上，方便滚过去）。 */
+/** 原文视图：等宽字体、左边是行号，引用的几行底色高亮。 */
+function rawDocLines(h: H, lines: { n: number; text: string }[], target: DocTarget) {
+  let marked = false;
+  return h("div", { style: { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, lineHeight: 1.6 } },
+    ...lines.map((line) => {
+      const hit = line.n >= target.from && line.n <= target.to;
+      const first = hit && !marked;
+      if (first) marked = true;
+      return h("div", { key: line.n, "data-kb-hit": first ? "1" : undefined, style: { display: "grid", gridTemplateColumns: "3.5em 1fr", gap: 8, background: hit ? "color-mix(in srgb, #facc15 28%, transparent)" : "transparent", borderRadius: 3 } },
+        h("span", { style: { textAlign: "right", opacity: 0.45, userSelect: "none" } }, String(line.n)),
+        h("span", { style: { whiteSpace: "pre-wrap", overflowWrap: "anywhere" } }, line.text || " "));
+    }));
+}
+
+/**
+ * 知识库原文：默认是阅读视图（标题、表格正常排版，引用的段落左边一条竖线、摘句精确标出来），可以切到带行号的原文。
+ * data-kb-hit 标在第一处高亮上，方便滚过去。
+ */
 export function kbDocView(h: H, target: DocTarget | undefined, state: WidgetState | undefined, handlers: DocPaneHandlers) {
-  const wrap = (...children: any[]) => h("div", { "data-dsh-ee-ui": "kb-doc", style: { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } }, ...children);
+  const wrap = (...children: any[]) => h("div", { "data-dsh-ee-ui": "kb-doc", style: { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } }, ...children);
   if (!target) return wrap(h("div", { style: muted }, "点「答案与出处」里的引用，会在这里打开原文。"));
   const note = stateNote(h, state);
   if (note) return wrap(h("strong", null, target.title || `文档 ${target.doc}`), note);
@@ -579,24 +600,27 @@ export function kbDocView(h: H, target: DocTarget | undefined, state: WidgetStat
   const total = Number(value.total_lines) || 0;
   const from = Number(value.from) || 1;
   const to = Number(value.to) || from;
-  let marked = false;
+  const highlight = { from: target.from, to: target.to, quote: target.quote };
+  let body: any;
+  let quoteFound = true;
+  if (handlers.raw) {
+    body = rawDocLines(h, lines, target);
+  } else {
+    const blocks = parseBlocks(lines);
+    const marks = computeMarks(blocks, highlight);
+    quoteFound = !target.quote || [...marks.values()].some((m) => m.ranges.length > 0);
+    body = docView(h, blocks, marks, { format: value.format, highlight });
+  }
   return wrap(
     h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 } },
-      h("strong", null, value.title || target.title || `文档 ${target.doc}`),
-      h("span", { style: muted }, `第 ${value.version ?? "?"} 版 · 共 ${total} 行`)),
+      h("strong", { style: { fontSize: 14 } }, value.title || target.title || `文档 ${target.doc}`),
+      h("span", { style: { ...muted, whiteSpace: "nowrap" } }, `第 ${value.version ?? "?"} 版 · 第 ${from}～${to} 行 / 共 ${total} 行`)),
     value.stale ? h("div", { role: "status", style: { fontSize: 12, color: "#a16207" } }, `${value.stale}；高亮的是引用时的版本。`) : null,
     h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
       button(h, "上一页", () => handlers.page(-1), from <= 1, "prev"),
       button(h, "下一页", () => handlers.page(1), total > 0 && to >= total, "next"),
-      button(h, "在这篇里继续问", handlers.ask, handlers.asking, "ask")),
-    h("div", { style: { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, lineHeight: 1.6 } },
-      ...lines.map((line) => {
-        const hit = line.n >= target.from && line.n <= target.to;
-        const first = hit && !marked;
-        if (first) marked = true;
-        return h("div", { key: line.n, "data-kb-hit": first ? "1" : undefined, style: { display: "grid", gridTemplateColumns: "3.5em 1fr", gap: 8, background: hit ? "color-mix(in srgb, #facc15 28%, transparent)" : "transparent", borderRadius: 3 } },
-          h("span", { style: { textAlign: "right", opacity: 0.45, userSelect: "none" } }, String(line.n)),
-          h("span", { style: { whiteSpace: "pre-wrap", overflowWrap: "anywhere" } }, line.text || " "));
-      })),
-    target.quote ? h("div", { style: muted }, `引用的原文：“${target.quote}”`) : null);
+      button(h, "在这篇里继续问", handlers.ask, handlers.asking, "ask"),
+      handlers.toggleRaw ? button(h, handlers.raw ? "阅读视图" : "看原文（带行号）", handlers.toggleRaw, false, "raw") : null),
+    body,
+    target.quote && (handlers.raw || !quoteFound) ? h("div", { style: muted }, `引用的原文：“${target.quote}”`) : null);
 }

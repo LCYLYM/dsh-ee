@@ -1142,6 +1142,28 @@ export interface KDoc {
   created_at: string;
   updated_at: string;
   has_original: boolean;
+  /** 转换体检；网页新建的文档没有 */
+  convert_info?: KDocConvert;
+}
+
+/** 转换体检：跟员工能不能查到有关的事（服务端 kb.Info）。 */
+export interface KDocConvert {
+  format: "md" | "txt" | "docx" | "pdf" | "xlsx" | "csv" | "pptx" | string;
+  pages?: number;
+  skipped?: { page: number; reason: "scanned" | "garbled" | string }[];
+  header_footer?: number;
+  numbering?: number;
+  tables?: number;
+  sheets?: number;
+  hidden_sheets?: number;
+  rows?: number;
+  header?: "first" | "letters" | "mixed";
+  encoding?: string;
+  notes?: number;
+  /** 维护者选的表头设置：first / none，空表示自动判断 */
+  header_option?: "" | "first" | "none";
+  /** 正文在网页上改过 */
+  edited?: boolean;
 }
 
 export interface KDocVersion {
@@ -1160,6 +1182,8 @@ export interface KDocDetail {
   markdown: string;
   outline: { level: number; title: string; line: number }[] | null;
   versions: KDocVersion[];
+  /** 文档格式，阅读视图按它显示分页线、工作表、每页卡片 */
+  format: string;
 }
 
 export interface KBHit {
@@ -1182,6 +1206,9 @@ export interface KBSearchResult {
   term_hits: Record<string, number>;
   total: number;
   truncated?: boolean;
+  /** 标题对得上的文档 */
+  docs?: { kb_id: number; doc: number; title: string; folder?: string; version: number; lines: number }[];
+  note?: string;
 }
 
 export interface KBQuery {
@@ -1200,6 +1227,8 @@ export interface KBUploadResult {
   file: string;
   doc?: KDoc;
   error?: string;
+  /** 同目录下有同名文档，更新成了它的新版本 */
+  updated?: boolean;
 }
 
 export const api = {
@@ -1321,12 +1350,18 @@ export const api = {
   patchKB: (id: number, p: Partial<{ title: string; description: string; scope: Scope; maintainers: KBMaintainers }>) => request<KBase>("PATCH", `/api/kb/${id}`, p),
   deleteKB: (id: number) => request<void>("DELETE", `/api/kb/${id}`),
   saveKBSettings: (s: KBQASettings) => request<KBQASettings>("PUT", "/api/kb/settings", s),
-  uploadKBDocs: (id: number, files: File[], folder: string) => {
+  /** asNew：同名时另存为新文档的文件名；其它同名文件更新成新版本 */
+  uploadKBDocs: (id: number, files: File[], folder: string, opts: { asNew?: string[]; header?: string } = {}) => {
     const form = new FormData();
     form.set("folder", folder);
+    if (opts.header) form.set("header", opts.header);
+    for (const n of opts.asNew ?? []) form.append("new", n);
     for (const f of files) form.append("file", f, f.name);
     return request<{ results: KBUploadResult[] }>("POST", `/api/kb/${id}/docs`, undefined, { raw: { body: form } });
   },
+  checkKBUpload: (id: number, folder: string, files: string[]) =>
+    request<{ items: { file: string; doc: KDoc }[] }>("POST", `/api/kb/${id}/docs/check`, { folder, files }),
+  reconvertKBDoc: (id: number, header: "" | "first" | "none") => request<KDoc>("POST", `/api/kb-docs/${id}/reconvert`, { header }),
   createKBDoc: (id: number, title: string, markdown: string, folder: string) => {
     const form = new FormData();
     form.set("folder", folder);

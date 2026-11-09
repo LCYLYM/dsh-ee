@@ -410,7 +410,7 @@ func (s *Server) kbRead(ctx context.Context, v viewer, bases []*store.KBase, a k
 	}
 	s.recordKQuery(ctx, store.KQuery{UserID: v.user.ID, Tool: "read", Query: strconv.Itoa(from) + "-" + strconv.Itoa(to), Bases: []int64{b.ID}, Docs: []int64{d.ID}, Hits: 1})
 	out := map[string]any{"kb": b.Slug, "doc": d.ID, "title": d.Title, "folder": d.Folder, "version": text.Version, "current_version": d.Version,
-		"total_lines": len(lines), "from": from, "to": to, "note": kbNote, "text": body.String()}
+		"total_lines": len(lines), "from": from, "to": to, "note": kbNote, "text": body.String(), "format": docFormat(d)}
 	if to < len(lines) {
 		out["more"] = fmt.Sprintf("后面还有 %d 行，继续读用 from=%d", len(lines)-to, to+1)
 	}
@@ -446,7 +446,7 @@ func (s *Server) kbReadFind(ctx context.Context, v viewer, b *store.KBase, d *st
 	}
 	s.recordKQuery(ctx, store.KQuery{UserID: v.user.ID, Tool: "read", Query: query, Bases: []int64{b.ID}, Docs: []int64{d.ID}, Hits: matched})
 	out := map[string]any{"kb": b.Slug, "doc": d.ID, "title": d.Title, "folder": d.Folder, "version": text.Version, "current_version": d.Version,
-		"total_lines": len(lines), "query": query, "matches": matched, "spans": shown, "note": kbNote, "text": body.String()}
+		"total_lines": len(lines), "query": query, "matches": matched, "spans": shown, "note": kbNote, "text": body.String(), "format": docFormat(d)}
 	switch {
 	case matched == 0:
 		out["more"] = "这篇里没有同时含有这些词的地方；少写几个词、换个说法，或用 kb__browse 看大纲"

@@ -245,7 +245,8 @@ test("没有原文窗格时，看板上的出处是 dsh-ee 网页链接，带版
   const h = (type: any, props: any, ...children: any[]) => ({ type, props: props ?? {}, children });
   const view = citationsView(h, [{ doc: 12, version: 3, from: 5, to: 12, quote: "住宿 550 元", title: "差旅费管理办法" }], 0, undefined, (c) => kbDocUrl("https://ee.example.com", c));
   const text = JSON.stringify(view);
-  assert.match(text, /"type":"a","props":\{"href":"https:\/\/ee\.example\.com\/knowledge\/docs\/12\?v=3#L5-12","target":"_blank"/);
+  // 带上摘句，网页的阅读视图里能精确标出来
+  assert.match(text, /"type":"a","props":\{"href":"https:\/\/ee\.example\.com\/knowledge\/docs\/12\?v=3&q=%E4%BD%8F%E5%AE%BF\+550\+%E5%85%83#L5-12","target":"_blank"/);
 });
 
 // ---- 工作台组件升级：图表、清单、详情卡、四种状态 ----

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, FilePlus, MoreHorizontal, Sparkles, Upload } from "lucide-react";
-import { api, formatTime, type KBase, type KBMaintainers, type KBSearchResult, type KBUploadResult, type Scope } from "../lib/api";
+import { api, formatTime, type KBase, type KBMaintainers, type KBSearchResult, type KDoc, type Scope } from "../lib/api";
 import { useAction, useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
 import { useConfirm } from "../lib/confirm";
@@ -16,78 +16,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { kdocPath, QueryTable } from "./knowledge";
 import { UsedByCard } from "../components/used-by";
+import { filesFromDrop, UploadDialog, type QueuedFile } from "../components/kb-upload";
+import { convertWarns } from "../components/kb-convert";
 import { useAuth } from "../lib/auth";
 import { useMenus } from "../lib/menus";
 
 type Tab = "docs" | "search" | "queries";
 type Mode = "any" | "all" | "phrase" | "regex";
-
-function UploadDialog({ kb, open, onOpenChange, onDone }: { kb: KBase; open: boolean; onOpenChange: (v: boolean) => void; onDone: () => void }) {
-  const { t } = useTranslation();
-  const { notify } = useStore();
-  const [folder, setFolder] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
-  const [results, setResults] = useState<KBUploadResult[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const { busy, run } = useAction();
-  useEffect(() => {
-    if (open) {
-      setFiles([]);
-      setResults(null);
-      setError(null);
-    }
-  }, [open]);
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t("kbase.uploadTitle")}</DialogTitle>
-          <DialogDescription>{kb.title}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <Field label={t("kbase.uploadFolder")} hint={t("kbase.uploadFolderHint")}>
-            <input className={inputCls} value={folder} onChange={(e) => setFolder(e.target.value)} />
-          </Field>
-          <Field label={t("kbase.uploadFiles")} hint={t("kbase.uploadFilesHint")}>
-            <input type="file" multiple accept=".pdf,.docx,.md,.markdown,.txt" className="block w-full text-sm" onChange={(e) => setFiles([...(e.target.files ?? [])])} />
-          </Field>
-          {results && (
-            <ul className="max-h-48 space-y-1 overflow-auto text-sm">
-              {results.map((r, i) => (
-                <li key={i} className={r.error ? "text-red-600" : "text-neutral-800"}>
-                  {r.file}
-                  {r.error ? `：${r.error}` : " ✓"}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <ErrorNote>{error}</ErrorNote>
-        <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            disabled={busy || files.length === 0}
-            onClick={async () => {
-              setError(null);
-              const r = await run(() => api.uploadKBDocs(kb.id, files, folder));
-              if (!r.ok) return setError(r.error);
-              const ok = r.value.results.filter((x) => x.doc).length;
-              const failed = r.value.results.length - ok;
-              setResults(r.value.results);
-              notify(failed ? `${t("kbase.uploadDone", { ok })}，${t("kbase.uploadSomeFailed", { failed })}` : t("kbase.uploadDone", { ok }));
-              onDone();
-              if (!failed) onOpenChange(false);
-            }}
-          >
-            {t("kbase.uploadSubmit")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function NewDocDialog({ kb, open, onOpenChange, onCreated }: { kb: KBase; open: boolean; onOpenChange: (v: boolean) => void; onCreated: (id: number) => void }) {
   const { t } = useTranslation();
@@ -342,6 +277,27 @@ function QueriesTab({ kb }: { kb: KBase }) {
   );
 }
 
+const fileKinds: Record<string, { label: string; cls: string }> = {
+  pdf: { label: "PDF", cls: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300" },
+  docx: { label: "W", cls: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" },
+  xlsx: { label: "X", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
+  csv: { label: "CSV", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
+  pptx: { label: "P", cls: "bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" },
+  txt: { label: "TXT", cls: "bg-neutral-100 text-neutral-600" },
+  md: { label: "MD", cls: "bg-neutral-100 text-neutral-600" },
+};
+
+/** 文件类型的小方块：一眼看出是 PDF、Word 还是 Excel。 */
+function FileBadge({ doc }: { doc: KDoc }) {
+  const ext = doc.convert_info?.format || doc.source_name.split(".").pop()?.toLowerCase() || "md";
+  const k = fileKinds[ext] ?? fileKinds.md;
+  return (
+    <span aria-hidden className={cx("mt-0.5 inline-flex h-6 w-7 shrink-0 items-center justify-center rounded text-[10px] font-bold tracking-tight", k.cls)}>
+      {k.label}
+    </span>
+  );
+}
+
 export default function KnowledgeBase() {
   const { t } = useTranslation();
   const { id } = useParams();
@@ -356,6 +312,9 @@ export default function KnowledgeBase() {
   const [folder, setFolder] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [dialog, setDialog] = useState<"upload" | "new" | "info" | "access" | null>(null);
+  // 拖到文档列表上的文件：打开上传窗口，目标目录是当前选的目录
+  const [dropped, setDropped] = useState<QueuedFile[] | undefined>(undefined);
+  const [dragging, setDragging] = useState(false);
   const kb = detail.data?.kb;
   const docs = detail.data?.docs ?? [];
   const folders = useMemo(() => [...new Set(docs.map((d) => d.folder))].sort(), [docs]);
@@ -454,7 +413,29 @@ export default function KnowledgeBase() {
             </div>
             <Card>
               {tab === "docs" && (
-                <div>
+                <div
+                  className="relative"
+                  onDragOver={(e) => {
+                    if (!kb.can_edit || !e.dataTransfer.types.includes("Files")) return;
+                    e.preventDefault();
+                    setDragging(true);
+                  }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false);
+                  }}
+                  onDrop={async (e) => {
+                    if (!kb.can_edit) return;
+                    e.preventDefault();
+                    setDragging(false);
+                    setDropped(await filesFromDrop(e.dataTransfer));
+                    setDialog("upload");
+                  }}
+                >
+                  {dragging && (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-brand-400 bg-brand-50/80 text-sm font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-200">
+                      {t("kupload.dropHere", { folder: folder || t("kbase.folderRoot") })}
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-2 px-5 pt-4 pb-3">
                     <select className={cx(inputBase, "h-9")} value={folder ?? "\u0000"} onChange={(e) => setFolder(e.target.value === "\u0000" ? null : e.target.value)}>
                       <option value={"\u0000"}>{t("kbase.folderAll")}</option>
@@ -484,10 +465,19 @@ export default function KnowledgeBase() {
                           {shown.map((d) => (
                             <tr key={d.id} className="border-b border-neutral-50 last:border-0">
                               <td className="px-5 py-2">
-                                <Link to={kdocPath(d.id)} className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
-                                  {d.title}
-                                </Link>
-                                {d.source_name && <div className="text-xs text-neutral-500">{d.source_name}</div>}
+                                <div className="flex items-start gap-2.5">
+                                  <FileBadge doc={d} />
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <Link to={kdocPath(d.id)} className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
+                                        {d.title}
+                                      </Link>
+                                      {convertWarns(d.convert_info) > 0 && <Badge tone="amber">{t("kupload.skippedBadge", { count: convertWarns(d.convert_info) })}</Badge>}
+                                      {d.convert_info?.edited && <Badge>{t("kupload.editedBadge")}</Badge>}
+                                    </div>
+                                    {d.source_name && <div className="text-xs text-neutral-500">{d.source_name}</div>}
+                                  </div>
+                                </div>
                               </td>
                               <td className="px-3 py-2 text-neutral-700">{d.folder || "—"}</td>
                               <td className="px-3 py-2 text-right text-neutral-700">{d.lines}</td>
@@ -511,7 +501,17 @@ export default function KnowledgeBase() {
                 <UsedByCard apps={detail.data.used_by} />
               </div>
             )}
-            <UploadDialog kb={kb} open={dialog === "upload"} onOpenChange={(v) => setDialog(v ? "upload" : null)} onDone={detail.reload} />
+            <UploadDialog
+              kb={kb}
+              open={dialog === "upload"}
+              initial={dropped}
+              initialFolder={folder ?? ""}
+              onOpenChange={(v) => {
+                setDialog(v ? "upload" : null);
+                if (!v) setDropped(undefined);
+              }}
+              onDone={detail.reload}
+            />
             <NewDocDialog kb={kb} open={dialog === "new"} onOpenChange={(v) => setDialog(v ? "new" : null)} onCreated={(doc) => navigate(kdocPath(doc))} />
             <InfoDialog kb={kb} open={dialog === "info"} onOpenChange={(v) => setDialog(v ? "info" : null)} onSaved={detail.reload} />
             <AccessDialog kb={kb} open={dialog === "access"} onOpenChange={(v) => setDialog(v ? "access" : null)} onSaved={detail.reload} />

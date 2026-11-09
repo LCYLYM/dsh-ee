@@ -273,6 +273,7 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
     const [target, setTarget] = useState<DocTarget | undefined>(docTargets.get(app.name));
     const [range, setRange] = useState<{ from: number; to: number } | undefined>(target ? docWindow(target.from) : undefined);
     const [state, setState] = useState<WidgetState | undefined>(undefined);
+    const [raw, setRaw] = useState(false);
     const { sending, notice, send } = useSending();
     const scrolled = useRef("");
     useEffect(() => docTargets.subscribe(() => {
@@ -311,6 +312,8 @@ export function registerWorkbench(ctx: any, deps: WorkbenchDeps) {
         return { from, to: from + size - 1 };
       }),
       asking: sending.has("ask"),
+      raw,
+      toggleRaw: () => setRaw((v: boolean) => !v),
       ask: () => {
         if (!target) return;
         const title = value?.title || target.title || `文档 ${target.doc}`;

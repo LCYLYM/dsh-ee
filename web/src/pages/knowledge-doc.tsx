@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Download, MoreHorizontal } from "lucide-react";
-import { api, formatTime, type KDocDetail } from "../lib/api";
+import { api, formatTime, type KDocConvert, type KDocDetail } from "../lib/api";
 import { useAction, useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
 import { useConfirm } from "../lib/confirm";
 import { LoadState, ErrorNote } from "../components/api-ui";
-import { Badge, Button, Card, CardHeader, cx, Field, inputCls } from "../components/ui";
+import { Badge, Button, Card, CardHeader, cx, Field, inputCls, Segmented } from "../components/ui";
+import { KBReader } from "../components/kb-reader";
+import { ConvertNotes, convertLines } from "../components/kb-convert";
+import { KB_ACCEPT } from "../components/kb-upload";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { kbPath } from "./knowledge";
@@ -114,7 +117,7 @@ function ReplaceDialog({ d, open, onOpenChange, onSaved }: { d: KDocDetail; open
           <DialogTitle>{t("kdoc.replace")}</DialogTitle>
           <DialogDescription>{t("kdoc.replaceHint")}</DialogDescription>
         </DialogHeader>
-        <input type="file" accept=".pdf,.docx,.md,.markdown,.txt" className="block w-full text-sm" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <input type="file" accept={KB_ACCEPT} className="block w-full text-sm" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         <ErrorNote>{error}</ErrorNote>
         <DialogFooter>
           <Button variant="secondary" onClick={() => onOpenChange(false)}>
@@ -138,6 +141,108 @@ function ReplaceDialog({ d, open, onOpenChange, onSaved }: { d: KDocDetail; open
   );
 }
 
+/** 转换情况：收录了什么、哪几页没收录；Excel / CSV 可以改表头设置后重新转换。 */
+function ConvertCard({ d, canEdit, onDone }: { d: KDocDetail; canEdit: boolean; onDone: (version: number) => void }) {
+  const { t } = useTranslation();
+  const confirm = useConfirm();
+  const { notify } = useStore();
+  const { busy, run } = useAction();
+  const info: KDocConvert | undefined = d.doc.convert_info;
+  const [header, setHeader] = useState<"" | "first" | "none">(info?.header_option ?? "");
+  useEffect(() => setHeader(info?.header_option ?? ""), [info?.header_option]);
+  const sheet = info?.format === "xlsx" || info?.format === "csv";
+  // 没什么可说的（例如 Markdown）就不显示
+  if (!info || (convertLines(t, info).length === 0 && !(sheet && canEdit))) return null;
+  return (
+    <Card>
+      <CardHeader title={t("kdoc.convertTitle")} />
+      <div className="space-y-3 px-5 pb-4">
+        <ConvertNotes info={info} />
+        {sheet && canEdit && d.doc.has_original && (
+          <div className="space-y-2 border-t border-neutral-100 pt-3">
+            <div className="text-xs font-medium text-neutral-600">{t("kdoc.headerSetting")}</div>
+            <div role="radiogroup" aria-label={t("kdoc.headerSetting")} className="space-y-1">
+              {([
+                ["", t("kdoc.headerAuto")],
+                ["first", t("kdoc.headerFirst")],
+                ["none", t("kdoc.headerNone")],
+              ] as const).map(([v, label]) => (
+                <label key={v} className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
+                  <input type="radio" name="kb-header" className="accent-brand-600" checked={header === v} onChange={() => setHeader(v)} />
+                  {label}
+                </label>
+              ))}
+            </div>
+            {header !== (info.header_option ?? "") && (
+              <Button
+                size="sm"
+                disabled={busy}
+                onClick={async () => {
+                  if (info.edited && !(await confirm({ kind: "restore", description: t("kdoc.reconvertEdited") }))) return;
+                  const r = await run(() => api.reconvertKBDoc(d.doc.id, header));
+                  if (!r.ok) return notify(r.error);
+                  notify(r.value.version !== d.doc.version ? t("kdoc.reconverted", { version: r.value.version }) : t("kdoc.reconvertSame"));
+                  onDone(r.value.version);
+                }}
+              >
+                {t("kdoc.reconvert")}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/** 大纲：滚动时高亮当前所在的标题；点标题滚过去（不改地址里的高亮）。 */
+function Outline({ outline, onJump }: { outline: { level: number; title: string; line: number }[]; onJump: (line: number) => void }) {
+  const { t } = useTranslation();
+  const [active, setActive] = useState<number | null>(null);
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      let cur: number | null = null;
+      for (const h of outline) {
+        const el = document.querySelector(`[data-line="${h.line}"]`);
+        if (!el) continue;
+        if (el.getBoundingClientRect().top <= 140) cur = h.line;
+        else break;
+      }
+      setActive(cur);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [outline]);
+  return (
+    <ul className="max-h-[60vh] space-y-0.5 overflow-auto px-3 pb-4 text-sm">
+      {outline.map((h) => (
+        <li key={h.line} style={{ paddingLeft: (h.level - 1) * 12 }}>
+          <button
+            onClick={() => onJump(h.line)}
+            aria-current={active === h.line ? "location" : undefined}
+            title={active === h.line ? t("kdoc.outlineHere") : undefined}
+            className={cx(
+              "w-full truncate rounded px-2 py-0.5 text-left transition",
+              active === h.line ? "bg-brand-50 font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-200" : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900",
+            )}
+          >
+            {h.title}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function KnowledgeDoc() {
   const { t } = useTranslation();
   const { id } = useParams();
@@ -157,7 +262,12 @@ export default function KnowledgeDoc() {
   const [dialog, setDialog] = useState<"rename" | "replace" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { busy, run } = useAction();
-  const highlight = hashRange(location.hash);
+  const range = hashRange(location.hash);
+  // ?q=：引用的原文摘句（DSH 里的出处链接带着），阅读视图里精确标出来
+  const quote = new URLSearchParams(location.search).get("q") ?? undefined;
+  const highlight = range ? { ...range, quote } : null;
+  const [view, setView] = useState<"read" | "raw">("read");
+  const [jump, setJump] = useState<number | undefined>(undefined);
   const d = detail.data;
   const canEdit = !!d?.kb.can_edit;
   const viewingOld = !!d && d.version !== d.doc.version;
@@ -278,8 +388,8 @@ export default function KnowledgeDoc() {
               </div>
             )}
 
-            <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
-              <Card className="min-w-0 p-4">
+            <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+              <Card className="min-w-0 p-4 sm:p-6">
                 {editing ? (
                   <div className="space-y-3">
                     <textarea className={cx(inputCls, "h-[60vh] py-2 font-mono text-xs")} value={draft} onChange={(e) => setDraft(e.target.value)} />
@@ -297,22 +407,47 @@ export default function KnowledgeDoc() {
                     </div>
                   </div>
                 ) : (
-                  <Lines markdown={d.markdown} highlight={highlight} />
+                  <>
+                    <div className="mb-4 flex justify-end">
+                      <Segmented
+                        value={view}
+                        onChange={setView}
+                        options={[
+                          { value: "read", label: t("kdoc.viewRead") },
+                          { value: "raw", label: t("kdoc.viewRaw") },
+                        ]}
+                      />
+                    </div>
+                    {view === "read" ? (
+                      <div className="px-1 sm:px-3">
+                        <KBReader markdown={d.markdown} format={d.format} highlight={highlight} jump={jump} />
+                      </div>
+                    ) : (
+                      <Lines markdown={d.markdown} highlight={range} />
+                    )}
+                  </>
                 )}
               </Card>
-              <div className="space-y-6">
-                {(d.outline?.length ?? 0) > 0 && (
+              <div className="space-y-6 lg:sticky lg:top-20 lg:self-start">
+                <ConvertCard
+                  d={d}
+                  canEdit={canEdit}
+                  onDone={() => {
+                    setVersion(undefined);
+                    detail.reload();
+                  }}
+                />
+                {(d.outline?.length ?? 0) >= 3 && (
                   <Card>
                     <CardHeader title={t("kdoc.outline")} />
-                    <ul className="max-h-80 space-y-1 overflow-auto px-5 pb-4 text-sm">
-                      {d.outline!.map((h) => (
-                        <li key={h.line} style={{ paddingLeft: (h.level - 1) * 12 }}>
-                          <a href={`#L${h.line}`} className="text-neutral-700 hover:text-neutral-900 hover:underline">
-                            {h.title}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
+                    <Outline
+                      outline={d.outline!}
+                      onJump={(line) => {
+                        setJump(undefined);
+                        requestAnimationFrame(() => setJump(line));
+                        if (view === "raw") document.querySelector(`[data-line="${line}"]`)?.scrollIntoView({ block: "start" });
+                      }}
+                    />
                   </Card>
                 )}
                 <Card>

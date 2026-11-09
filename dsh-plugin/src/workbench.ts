@@ -332,11 +332,15 @@ export function docWindow(from: number): { from: number; to: number } {
 }
 
 /** 知识库原文在 dsh-ee 网页上的地址，引用的几行会高亮；不知道 dsh-ee 地址时返回 undefined。 */
-export function kbDocUrl(base: string, citation: Pick<Citation, "doc" | "version" | "from" | "to">): string | undefined {
+export function kbDocUrl(base: string, citation: Pick<Citation, "doc" | "version" | "from" | "to"> & { quote?: string }): string | undefined {
   if (!base || !Number.isInteger(citation.doc)) return undefined;
-  const version = citation.version && Number.isInteger(citation.version) && citation.version > 0 ? `?v=${citation.version}` : "";
+  const params = new URLSearchParams();
+  if (citation.version && Number.isInteger(citation.version) && citation.version > 0) params.set("v", String(citation.version));
+  // 摘句：网页的阅读视图里把这句话精确标出来；太长的截断，地址别太长
+  if (citation.quote?.trim()) params.set("q", [...citation.quote.trim()].slice(0, 200).join(""));
+  const query = params.toString() ? `?${params}` : "";
   const lines = citation.from === citation.to ? `#L${citation.from}` : `#L${citation.from}-${citation.to}`;
-  return `${base}/knowledge/docs/${citation.doc}${version}${lines}`;
+  return `${base}/knowledge/docs/${citation.doc}${query}${lines}`;
 }
 
 /** 写表的行按钮：改字段还是删除；不写表的按钮返回 undefined（照常发给 AI）。 */

@@ -21465,9 +21465,12 @@ function docWindow(from) {
 }
 function kbDocUrl(base, citation) {
   if (!base || !Number.isInteger(citation.doc)) return void 0;
-  const version2 = citation.version && Number.isInteger(citation.version) && citation.version > 0 ? `?v=${citation.version}` : "";
+  const params = new URLSearchParams();
+  if (citation.version && Number.isInteger(citation.version) && citation.version > 0) params.set("v", String(citation.version));
+  if (citation.quote?.trim()) params.set("q", [...citation.quote.trim()].slice(0, 200).join(""));
+  const query = params.toString() ? `?${params}` : "";
   const lines = citation.from === citation.to ? `#L${citation.from}` : `#L${citation.from}-${citation.to}`;
-  return `${base}/knowledge/docs/${citation.doc}${version2}${lines}`;
+  return `${base}/knowledge/docs/${citation.doc}${query}${lines}`;
 }
 function rowWriteOf(action) {
   if (!action.table) return void 0;
@@ -21537,6 +21540,440 @@ async function openWorkbench(ctx, app, sessionId, force = false) {
     }
   }
   return opened > 0;
+}
+
+// src/kb-doc-render.ts
+var tableSep = /^\|(\s*:?-{3,}:?\s*\|)+\s*$/;
+var listItem = /^(\s*)([-*+]|\d{1,3}[.)])\s+(.*)$/;
+var headingRe = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
+function splitRow(line) {
+  let s = line.trim();
+  if (s.startsWith("|")) s = s.slice(1);
+  if (s.endsWith("|") && !s.endsWith("\\|")) s = s.slice(0, -1);
+  const cells = [];
+  let cur = "";
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === "\\" && s[i + 1] === "|") {
+      cur += "|";
+      i++;
+    } else if (s[i] === "|") {
+      cells.push(cur.trim());
+      cur = "";
+    } else cur += s[i];
+  }
+  cells.push(cur.trim());
+  return cells;
+}
+function parseBlocks(lines) {
+  const out = [];
+  let i = 0;
+  const isTableStart = (k) => k + 1 < lines.length && lines[k].text.trim().startsWith("|") && tableSep.test(lines[k + 1].text.trim());
+  while (i < lines.length) {
+    const line = lines[i];
+    const t = line.text;
+    if (t.trim() === "") {
+      i++;
+      continue;
+    }
+    if (t.trim().startsWith("```")) {
+      const code = [line];
+      i++;
+      while (i < lines.length) {
+        code.push(lines[i]);
+        if (lines[i++].text.trim().startsWith("```")) break;
+      }
+      out.push({ kind: "code", lines: code });
+      continue;
+    }
+    const hm = headingRe.exec(t);
+    if (hm) {
+      out.push({ kind: "heading", level: hm[1].length, text: hm[2], line });
+      i++;
+      continue;
+    }
+    if (isTableStart(i)) {
+      const head = splitRow(t);
+      const rows = [];
+      i += 2;
+      while (i < lines.length && lines[i].text.trim().startsWith("|")) {
+        rows.push({ cells: splitRow(lines[i].text), line: lines[i] });
+        i++;
+      }
+      out.push({ kind: "table", head, headLine: line, rows });
+      continue;
+    }
+    if (t.trim().startsWith("|")) {
+      const rows = [];
+      while (i < lines.length && lines[i].text.trim().startsWith("|") && !isTableStart(i)) {
+        if (!tableSep.test(lines[i].text.trim())) rows.push({ cells: splitRow(lines[i].text), line: lines[i] });
+        i++;
+      }
+      out.push({ kind: "table", head: [], rows });
+      continue;
+    }
+    if (t.trimStart().startsWith(">")) {
+      const ql = [];
+      const texts = [];
+      while (i < lines.length && lines[i].text.trimStart().startsWith(">")) {
+        ql.push(lines[i]);
+        texts.push(lines[i].text.trimStart().replace(/^>\s?/, ""));
+        i++;
+      }
+      out.push({ kind: "quote", notice: /^\s*⚠/.test(texts[0] ?? ""), lines: ql, texts });
+      continue;
+    }
+    const lm = listItem.exec(t);
+    if (lm) {
+      const items = [];
+      const ordered = /\d/.test(lm[2]);
+      while (i < lines.length) {
+        const m = listItem.exec(lines[i].text);
+        if (!m || /\d/.test(m[2]) !== ordered) break;
+        items.push({ marker: m[2], line: lines[i], text: m[3], indent: Math.min(3, Math.floor(m[1].replace(/\t/g, "  ").length / 2)) });
+        i++;
+      }
+      out.push({ kind: "list", ordered, items });
+      continue;
+    }
+    const para = [];
+    while (i < lines.length) {
+      const x = lines[i].text;
+      if (x.trim() === "" || headingRe.test(x) || x.trim().startsWith("```") || x.trimStart().startsWith(">") || listItem.test(x) || isTableStart(i)) break;
+      para.push(lines[i]);
+      i++;
+    }
+    if (para.length === 0) {
+      para.push(line);
+      i++;
+    }
+    out.push({ kind: "para", lines: para });
+  }
+  return out;
+}
+var inlineRe = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/g;
+function inlineSegs(text) {
+  const out = [];
+  let last = 0;
+  for (const m of text.matchAll(inlineRe)) {
+    const at = m.index ?? 0;
+    if (at > last) out.push({ text: text.slice(last, at) });
+    const tok = m[0];
+    if (tok.startsWith("**")) out.push({ text: tok.slice(2, -2), bold: true });
+    else if (tok.startsWith("`")) out.push({ text: tok.slice(1, -1), code: true });
+    else {
+      const lm = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(tok);
+      out.push({ text: lm[1], href: safeHref(lm[2]) });
+    }
+    last = at + tok.length;
+  }
+  if (last < text.length) out.push({ text: text.slice(last) });
+  return out;
+}
+function safeHref(href) {
+  return /^(https?:\/\/|\/|#)/i.test(href) ? href : void 0;
+}
+function plainOf(text) {
+  return inlineSegs(text).map((s) => s.text).join("");
+}
+function linePlain(blocks) {
+  const m = /* @__PURE__ */ new Map();
+  for (const b of blocks) {
+    switch (b.kind) {
+      case "heading":
+        m.set(b.line.n, { text: plainOf(b.text), table: false });
+        break;
+      case "para":
+      case "code":
+        for (const l of b.lines) m.set(l.n, { text: b.kind === "para" ? plainOf(l.text) : l.text, table: false });
+        break;
+      case "list":
+        for (const it of b.items) m.set(it.line.n, { text: plainOf(it.text), table: false });
+        break;
+      case "quote":
+        b.lines.forEach((l, k) => m.set(l.n, { text: plainOf(b.texts[k]), table: false }));
+        break;
+      case "table":
+        if (b.headLine) m.set(b.headLine.n, { text: b.head.map(plainOf).join(" "), table: true });
+        for (const r of b.rows) m.set(r.line.n, { text: r.cells.map(plainOf).join(" "), table: true });
+        break;
+    }
+  }
+  return m;
+}
+var fold = (c) => c.toLowerCase().replace(/[！-～]/g, (x) => String.fromCharCode(x.charCodeAt(0) - 65248));
+var skippable = (c) => /[\s\p{P}\p{S}]/u.test(c);
+function computeMarks(blocks, hl) {
+  const out = /* @__PURE__ */ new Map();
+  if (!hl) return out;
+  const plain = linePlain(blocks);
+  const wholeRange = () => {
+    for (const n of plain.keys()) if (n >= hl.from && n <= hl.to) out.set(n, { ranges: [], whole: true });
+  };
+  const quote = (hl.quote ?? "").replace(/\.\.\./g, "\u2026");
+  if (!quote.trim()) {
+    wholeRange();
+    return out;
+  }
+  const nums = [...plain.keys()].filter((n) => n >= hl.from - 2 && n <= hl.to + 2).sort((a, b) => a - b);
+  let hay = "";
+  const at = [];
+  for (const n of nums) {
+    const text = plain.get(n).text;
+    for (let i = 0; i < text.length; i++) {
+      if (skippable(text[i])) continue;
+      hay += fold(text[i]);
+      at.push({ n, i });
+    }
+  }
+  const parts = quote.split("\u2026").map((p) => [...p].filter((c) => !skippable(c)).map(fold).join("")).filter(Boolean);
+  if (parts.join("").length < 2) {
+    wholeRange();
+    return out;
+  }
+  let pos = 0;
+  const found = [];
+  for (const p of parts) {
+    const k = hay.indexOf(p, pos);
+    if (k < 0) {
+      wholeRange();
+      return out;
+    }
+    found.push([k, k + p.length]);
+    pos = k + p.length;
+  }
+  const hitChars = /* @__PURE__ */ new Map();
+  for (const [s, e] of found) {
+    for (let k = s; k < e; k++) {
+      const { n, i } = at[k];
+      if (!hitChars.has(n)) hitChars.set(n, /* @__PURE__ */ new Set());
+      hitChars.get(n).add(i);
+    }
+  }
+  for (const [n, set2] of hitChars) {
+    const text = plain.get(n).text;
+    const idx = [...set2].sort((a, b) => a - b);
+    const ranges = [];
+    for (const i of idx) {
+      const prev = ranges[ranges.length - 1];
+      if (prev && [...text.slice(prev[1], i)].every(skippable)) prev[1] = i + 1;
+      else ranges.push([i, i + 1]);
+    }
+    out.set(n, { ranges, whole: plain.get(n).table || void 0 });
+  }
+  return out;
+}
+var docCss = [
+  ".kbr{--kbr-accent:var(--ee-accent,#4d6bfe);--kbr-muted:var(--ee-muted,color-mix(in srgb,currentColor 60%,transparent));--kbr-border:var(--ee-border,color-mix(in srgb,currentColor 10%,transparent));--kbr-soft:var(--ee-soft,color-mix(in srgb,currentColor 4%,transparent));",
+  "font-size:14px;line-height:1.75;padding-left:2.6em;position:relative;overflow-wrap:anywhere}",
+  ".kbr-ln{position:relative;scroll-margin-top:96px}",
+  ".kbr-ln::before{content:attr(data-line);position:absolute;left:-2.9em;width:2.3em;text-align:right;font:11px/inherit ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--kbr-muted);opacity:0;transition:opacity .12s;pointer-events:none;user-select:none}",
+  ".kbr-ln:hover::before,.kbr-hit::before{opacity:1}",
+  ".kbr-hit{background:color-mix(in srgb,var(--kbr-accent) 7%,transparent);box-shadow:inset 3px 0 0 var(--kbr-accent);border-radius:2px}",
+  ".kbr-mark{background:color-mix(in srgb,#facc15 45%,transparent);color:inherit;border-radius:2px;padding:0 1px}",
+  ".kbr h1,.kbr h2,.kbr h3,.kbr h4,.kbr h5,.kbr h6{margin:1.4em 0 .5em;line-height:1.4;font-weight:600}",
+  ".kbr h1{font-size:1.45em}.kbr h2{font-size:1.2em}.kbr h3{font-size:1.06em}.kbr h4,.kbr h5,.kbr h6{font-size:1em}",
+  ".kbr>:first-child{margin-top:0}",
+  ".kbr p{margin:0 0 .9em}",
+  ".kbr ul,.kbr ol{margin:0 0 .9em;padding-left:1.4em}",
+  ".kbr code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--kbr-soft);padding:1px 4px;border-radius:4px}",
+  ".kbr pre{font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--kbr-soft);padding:10px 12px;border-radius:8px;overflow-x:auto;margin:0 0 .9em}",
+  ".kbr a{color:var(--kbr-accent);text-decoration:underline;text-underline-offset:2px}",
+  ".kbr blockquote{margin:0 0 .9em;padding:2px 12px;border-left:3px solid var(--kbr-border);color:var(--kbr-muted)}",
+  ".kbr-notice{margin:0 0 .9em;padding:12px 14px;border:1px dashed color-mix(in srgb,currentColor 22%,transparent);border-radius:10px;background:var(--kbr-soft);color:var(--kbr-muted);font-size:13px}",
+  ".kbr-table{overflow-x:auto;margin:0 0 1em;border:1px solid var(--kbr-border);border-radius:8px}",
+  ".kbr table{border-collapse:collapse;width:100%;font-size:13px;line-height:1.5}",
+  ".kbr th{text-align:left;font-weight:600;background:var(--kbr-soft);white-space:nowrap}",
+  ".kbr th,.kbr td{padding:6px 10px;border-bottom:1px solid var(--kbr-border);vertical-align:top}",
+  ".kbr tbody tr:nth-child(even) td{background:color-mix(in srgb,currentColor 2%,transparent)}",
+  ".kbr tbody tr:last-child td{border-bottom:0}",
+  ".kbr td.kbr-num,.kbr th.kbr-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}",
+  ".kbr tr.kbr-ln::before{content:none}",
+  ".kbr tr.kbr-hit td{background:color-mix(in srgb,var(--kbr-accent) 9%,transparent)!important}",
+  ".kbr tr.kbr-hit td:first-child{box-shadow:inset 3px 0 0 var(--kbr-accent)}",
+  ".kbr-page{display:flex;align-items:center;gap:10px;margin:1.6em 0 1em;color:var(--kbr-muted);font-size:12px}",
+  ".kbr-page::after{content:'';flex:1;border-top:1px solid var(--kbr-border)}",
+  ".kbr-page span{border:1px solid var(--kbr-border);border-radius:999px;padding:1px 9px;background:var(--kbr-soft)}",
+  ".kbr>.kbr-page:first-child{margin-top:0}",
+  ".kbr-slide{border:1px solid var(--kbr-border);border-radius:12px;padding:14px 18px 6px;margin:0 0 14px;background:var(--ee-card-bg,transparent)}",
+  ".kbr-slide-no{font-size:11.5px;color:var(--kbr-muted);margin-bottom:2px}",
+  ".kbr-slide h2{margin:0 0 .6em;font-size:1.12em}",
+  ".kbr-notes{color:var(--kbr-muted);font-size:13px;border-top:1px dashed var(--kbr-border);padding-top:6px}",
+  ".kbr-rows{font-size:12px;font-weight:500;color:var(--kbr-muted);margin:1.2em 0 .4em}",
+  ".kbr-sheet{font-size:1.15em;font-weight:600;margin:1.4em 0 .6em;display:flex;align-items:center;gap:8px}",
+  ".kbr-sheet::before{content:'';width:10px;height:10px;border-radius:2px;background:#16a34a}"
+].join("");
+var numberCell = /^[-+]?[¥$€£]?\s*[\d,]+(\.\d+)?\s*%?$/;
+function numericColumns(rows, width) {
+  return Array.from({ length: width }, (_, j) => {
+    let filled = 0;
+    let num = 0;
+    for (const r of rows) {
+      const c = (r[j] ?? "").trim();
+      if (!c) continue;
+      filled++;
+      if (numberCell.test(c)) num++;
+    }
+    return filled > 0 && num / filled >= 0.8;
+  });
+}
+function inline(h, text, marks, keyBase) {
+  const segs = inlineSegs(text);
+  const ranges = marks?.ranges ?? [];
+  const out = [];
+  let pos = 0;
+  segs.forEach((seg, si) => {
+    const pieces = [];
+    let start = 0;
+    const end = seg.text.length;
+    const cuts = /* @__PURE__ */ new Set([0, end]);
+    for (const [s, e] of ranges) {
+      if (e <= pos || s >= pos + end) continue;
+      cuts.add(Math.max(0, s - pos));
+      cuts.add(Math.min(end, e - pos));
+    }
+    const sorted = [...cuts].sort((a, b) => a - b);
+    for (let k = 0; k + 1 < sorted.length; k++) {
+      start = sorted[k];
+      const stop = sorted[k + 1];
+      if (stop <= start) continue;
+      const abs = pos + start;
+      pieces.push({ text: seg.text.slice(start, stop), mark: ranges.some(([s, e]) => abs >= s && abs < e) });
+    }
+    pieces.forEach((p, pi) => {
+      const key = `${keyBase}:${si}:${pi}`;
+      let node2 = p.text;
+      if (seg.code) node2 = h("code", { key: `${key}c` }, node2);
+      if (seg.bold) node2 = h("strong", { key: `${key}b` }, node2);
+      if (seg.href) node2 = h("a", { key: `${key}a`, href: seg.href, target: seg.href.startsWith("#") ? void 0 : "_blank", rel: "noreferrer" }, node2);
+      if (p.mark) node2 = h("mark", { key: `${key}m`, className: "kbr-mark" }, node2);
+      out.push(typeof node2 === "string" ? h("span", { key }, node2) : node2);
+    });
+    pos += end;
+  });
+  return out;
+}
+function lineProps(n, ctx, extra = "") {
+  const hit = !!ctx.hl && n >= ctx.hl.from && n <= ctx.hl.to || !!ctx.marks.get(n)?.whole;
+  const first = hit && !ctx.hitDone;
+  if (first) ctx.hitDone = true;
+  return { key: `L${n}`, id: `L${n}`, "data-line": String(n), className: `kbr-ln${hit ? " kbr-hit" : ""}${extra ? " " + extra : ""}`, "data-kb-hit": first ? "1" : void 0 };
+}
+var pageHeading = /^第\s*(\d+)\s*页(?:\s+(.*))?$/;
+var rowsHeading = /^第\s*\d+\s*～\s*\d+\s*行$/;
+function blockView(h, b, ctx, opt) {
+  const marks = ctx.marks;
+  switch (b.kind) {
+    case "heading": {
+      const n = b.line.n;
+      const pm = pageHeading.exec(b.text);
+      if (opt.format === "pdf" && b.level === 2 && pm) {
+        return h("div", { ...lineProps(n, ctx, "kbr-page"), role: "separator" }, h("span", null, `\u7B2C ${pm[1]} \u9875`));
+      }
+      if ((opt.format === "xlsx" || opt.format === "csv") && rowsHeading.test(b.text)) {
+        return h("div", lineProps(n, ctx, "kbr-rows"), b.text);
+      }
+      if (opt.format === "xlsx" && b.level === 1) {
+        if (opt.sheet) return h("span", lineProps(n, ctx));
+        return h("div", lineProps(n, ctx, "kbr-sheet"), inline(h, b.text, marks.get(n), `h${n}`));
+      }
+      return h(`h${Math.min(6, b.level)}`, lineProps(n, ctx), inline(h, b.text, marks.get(n), `h${n}`));
+    }
+    case "para": {
+      const notes = opt.format === "pptx" && b.lines[0]?.text.startsWith("\u5907\u6CE8\uFF1A");
+      return h(
+        "p",
+        { key: `p${b.lines[0].n}`, className: notes ? "kbr-notes" : void 0 },
+        ...b.lines.map((l) => h("span", { ...lineProps(l.n, ctx), style: { display: "block" } }, inline(h, l.text, marks.get(l.n), `p${l.n}`)))
+      );
+    }
+    case "list": {
+      const tag = b.ordered ? "ol" : "ul";
+      const start = b.ordered ? Number.parseInt(b.items[0].marker, 10) : void 0;
+      return h(
+        tag,
+        { key: `l${b.items[0].line.n}`, start: start && start !== 1 ? start : void 0 },
+        ...b.items.map((it) => h("li", { ...lineProps(it.line.n, ctx), style: it.indent ? { marginLeft: `${it.indent * 1.2}em` } : void 0 }, inline(h, it.text, marks.get(it.line.n), `li${it.line.n}`)))
+      );
+    }
+    case "quote": {
+      if (b.notice) {
+        return h(
+          "div",
+          { key: `q${b.lines[0].n}`, className: "kbr-notice", role: "note" },
+          ...b.lines.map((l, k) => h("span", { ...lineProps(l.n, ctx), style: { display: "block" } }, inline(h, b.texts[k], marks.get(l.n), `q${l.n}`)))
+        );
+      }
+      return h(
+        "blockquote",
+        { key: `q${b.lines[0].n}` },
+        ...b.lines.map((l, k) => h("span", { ...lineProps(l.n, ctx), style: { display: "block" } }, inline(h, b.texts[k], marks.get(l.n), `q${l.n}`)))
+      );
+    }
+    case "code":
+      return h("pre", { key: `c${b.lines[0].n}` }, ...b.lines.map((l) => h("span", { ...lineProps(l.n, ctx), style: { display: "block" } }, l.text || " ")));
+    case "table": {
+      const width = Math.max(b.head.length, ...b.rows.map((r) => r.cells.length));
+      const num = numericColumns(b.rows.map((r) => r.cells), width);
+      const cell2 = (tag, text, j, n) => h(tag, { key: `${tag}${n}:${j}`, className: num[j] ? "kbr-num" : void 0 }, inline(h, text, void 0, `t${n}:${j}`));
+      const first = b.headLine?.n ?? b.rows[0]?.line.n ?? 0;
+      return h(
+        "div",
+        { key: `t${first}`, className: "kbr-table" },
+        h(
+          "table",
+          null,
+          b.headLine ? h("thead", null, h("tr", lineProps(b.headLine.n, ctx), ...Array.from({ length: width }, (_, j) => cell2("th", b.head[j] ?? "", j, b.headLine.n)))) : null,
+          h("tbody", null, ...b.rows.map((r) => h("tr", lineProps(r.line.n, ctx), ...Array.from({ length: width }, (_, j) => cell2("td", r.cells[j] ?? "", j, r.line.n)))))
+        )
+      );
+    }
+  }
+  return null;
+}
+function sheetBlocks(blocks, sheet) {
+  if (!sheet) return blocks;
+  const out = [];
+  let on = false;
+  for (const b of blocks) {
+    if (b.kind === "heading" && b.level === 1) on = b.text === sheet;
+    if (on) out.push(b);
+  }
+  return out;
+}
+function docView(h, blocks, marks, opt = {}) {
+  const shown = sheetBlocks(blocks, opt.sheet);
+  const ctx = { marks, hl: opt.highlight, hitDone: false };
+  const children = [h("style", { key: "css" }, docCss)];
+  if (opt.format === "pptx") {
+    let slide = null;
+    let slideKey = "";
+    let slideNo = "";
+    const flush = () => {
+      if (slide) children.push(h("section", { key: slideKey, className: "kbr-slide", "aria-label": slideNo }, ...slide));
+      slide = null;
+    };
+    shown.forEach((b, i) => {
+      const pm = b.kind === "heading" && b.level === 2 ? pageHeading.exec(b.text) : null;
+      if (pm) {
+        flush();
+        slideKey = `s${b.kind === "heading" ? b.line.n : i}`;
+        slideNo = `\u7B2C ${pm[1]} \u9875`;
+        const n = b.line.n;
+        slide = [
+          h("div", { key: "no", className: "kbr-slide-no" }, slideNo),
+          pm[2] ? h("h2", lineProps(n, ctx), inline(h, pm[2], marks.get(n), `h${n}`)) : h("span", lineProps(n, ctx))
+        ];
+        return;
+      }
+      const v = blockView(h, b, ctx, opt);
+      if (slide) slide.push(v);
+      else children.push(v);
+    });
+    flush();
+  } else {
+    shown.forEach((b) => children.push(blockView(h, b, ctx, opt)));
+  }
+  return h("div", { className: "kbr", "data-dsh-ee-ui": "kb-read" }, ...children);
 }
 
 // src/workbench-view.ts
@@ -21967,7 +22404,7 @@ function actionsView(h, index, widget, handlers) {
     )
   );
 }
-function inline(h, text) {
+function inline2(h, text) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
   return parts.map((part, i) => part.startsWith("**") && part.endsWith("**") && part.length > 4 ? h("strong", { key: i, style: { fontWeight: 600 } }, part.slice(2, -2)) : part);
 }
@@ -21976,7 +22413,7 @@ function markdownView(h, widget) {
   let list = [];
   const flush = () => {
     if (!list.length) return;
-    blocks.push(h("ul", { key: `l${blocks.length}`, style: { margin: 0, paddingLeft: 18, display: "grid", gap: 3 } }, ...list.map((item, i) => h("li", { key: i }, ...inline(h, item)))));
+    blocks.push(h("ul", { key: `l${blocks.length}`, style: { margin: 0, paddingLeft: 18, display: "grid", gap: 3 } }, ...list.map((item, i) => h("li", { key: i }, ...inline2(h, item)))));
     list = [];
   };
   for (const line of (widget.text ?? "").split("\n")) {
@@ -21986,7 +22423,7 @@ function markdownView(h, widget) {
       continue;
     }
     flush();
-    if (line.trim()) blocks.push(h("p", { key: `p${blocks.length}`, style: { margin: 0 } }, ...inline(h, line)));
+    if (line.trim()) blocks.push(h("p", { key: `p${blocks.length}`, style: { margin: 0 } }, ...inline2(h, line)));
   }
   flush();
   return h("section", { className: "dshee-card", style: card }, widget.title ? header(h, widget) : null, h("div", { style: { display: "grid", gap: 6, fontSize: 12.5, lineHeight: 1.7, color: "color-mix(in srgb, currentColor 85%, transparent)" } }, ...blocks));
@@ -22138,8 +22575,26 @@ function panelView(h, pane, state, handlers) {
 function missingPaneView(h) {
   return h("div", { style: { padding: 16, fontSize: 13, opacity: 0.7 } }, "\u8FD9\u4E2A\u5DE5\u4F5C\u53F0\u5DF2\u7ECF\u4E0D\u53EF\u7528\uFF1A\u5E94\u7528\u53EF\u80FD\u5DF2\u505C\u7528\uFF0C\u6216\u8005\u5DE5\u4F5C\u53F0\u914D\u7F6E\u6539\u4E86\u3002\u53EF\u4EE5\u5173\u6389\u8FD9\u4E2A\u6807\u7B7E\u9875\u3002");
 }
+function rawDocLines(h, lines, target) {
+  let marked = false;
+  return h(
+    "div",
+    { style: { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, lineHeight: 1.6 } },
+    ...lines.map((line) => {
+      const hit = line.n >= target.from && line.n <= target.to;
+      const first = hit && !marked;
+      if (first) marked = true;
+      return h(
+        "div",
+        { key: line.n, "data-kb-hit": first ? "1" : void 0, style: { display: "grid", gridTemplateColumns: "3.5em 1fr", gap: 8, background: hit ? "color-mix(in srgb, #facc15 28%, transparent)" : "transparent", borderRadius: 3 } },
+        h("span", { style: { textAlign: "right", opacity: 0.45, userSelect: "none" } }, String(line.n)),
+        h("span", { style: { whiteSpace: "pre-wrap", overflowWrap: "anywhere" } }, line.text || " ")
+      );
+    })
+  );
+}
 function kbDocView(h, target, state, handlers) {
-  const wrap = (...children) => h("div", { "data-dsh-ee-ui": "kb-doc", style: { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } }, ...children);
+  const wrap = (...children) => h("div", { "data-dsh-ee-ui": "kb-doc", style: { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, padding: 12, fontSize: 13, overflowY: "auto", height: "100%", boxSizing: "border-box", alignContent: "start" } }, ...children);
   if (!target) return wrap(h("div", { style: muted }, "\u70B9\u300C\u7B54\u6848\u4E0E\u51FA\u5904\u300D\u91CC\u7684\u5F15\u7528\uFF0C\u4F1A\u5728\u8FD9\u91CC\u6253\u5F00\u539F\u6587\u3002"));
   const note = stateNote(h, state);
   if (note) return wrap(h("strong", null, target.title || `\u6587\u6863 ${target.doc}`), note);
@@ -22148,13 +22603,23 @@ function kbDocView(h, target, state, handlers) {
   const total = Number(value.total_lines) || 0;
   const from = Number(value.from) || 1;
   const to = Number(value.to) || from;
-  let marked = false;
+  const highlight = { from: target.from, to: target.to, quote: target.quote };
+  let body;
+  let quoteFound = true;
+  if (handlers.raw) {
+    body = rawDocLines(h, lines, target);
+  } else {
+    const blocks = parseBlocks(lines);
+    const marks = computeMarks(blocks, highlight);
+    quoteFound = !target.quote || [...marks.values()].some((m) => m.ranges.length > 0);
+    body = docView(h, blocks, marks, { format: value.format, highlight });
+  }
   return wrap(
     h(
       "div",
       { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 } },
-      h("strong", null, value.title || target.title || `\u6587\u6863 ${target.doc}`),
-      h("span", { style: muted }, `\u7B2C ${value.version ?? "?"} \u7248 \xB7 \u5171 ${total} \u884C`)
+      h("strong", { style: { fontSize: 14 } }, value.title || target.title || `\u6587\u6863 ${target.doc}`),
+      h("span", { style: { ...muted, whiteSpace: "nowrap" } }, `\u7B2C ${value.version ?? "?"} \u7248 \xB7 \u7B2C ${from}\uFF5E${to} \u884C / \u5171 ${total} \u884C`)
     ),
     value.stale ? h("div", { role: "status", style: { fontSize: 12, color: "#a16207" } }, `${value.stale}\uFF1B\u9AD8\u4EAE\u7684\u662F\u5F15\u7528\u65F6\u7684\u7248\u672C\u3002`) : null,
     h(
@@ -22162,24 +22627,11 @@ function kbDocView(h, target, state, handlers) {
       { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
       button2(h, "\u4E0A\u4E00\u9875", () => handlers.page(-1), from <= 1, "prev"),
       button2(h, "\u4E0B\u4E00\u9875", () => handlers.page(1), total > 0 && to >= total, "next"),
-      button2(h, "\u5728\u8FD9\u7BC7\u91CC\u7EE7\u7EED\u95EE", handlers.ask, handlers.asking, "ask")
+      button2(h, "\u5728\u8FD9\u7BC7\u91CC\u7EE7\u7EED\u95EE", handlers.ask, handlers.asking, "ask"),
+      handlers.toggleRaw ? button2(h, handlers.raw ? "\u9605\u8BFB\u89C6\u56FE" : "\u770B\u539F\u6587\uFF08\u5E26\u884C\u53F7\uFF09", handlers.toggleRaw, false, "raw") : null
     ),
-    h(
-      "div",
-      { style: { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, lineHeight: 1.6 } },
-      ...lines.map((line) => {
-        const hit = line.n >= target.from && line.n <= target.to;
-        const first = hit && !marked;
-        if (first) marked = true;
-        return h(
-          "div",
-          { key: line.n, "data-kb-hit": first ? "1" : void 0, style: { display: "grid", gridTemplateColumns: "3.5em 1fr", gap: 8, background: hit ? "color-mix(in srgb, #facc15 28%, transparent)" : "transparent", borderRadius: 3 } },
-          h("span", { style: { textAlign: "right", opacity: 0.45, userSelect: "none" } }, String(line.n)),
-          h("span", { style: { whiteSpace: "pre-wrap", overflowWrap: "anywhere" } }, line.text || " ")
-        );
-      })
-    ),
-    target.quote ? h("div", { style: muted }, `\u5F15\u7528\u7684\u539F\u6587\uFF1A\u201C${target.quote}\u201D`) : null
+    body,
+    target.quote && (handlers.raw || !quoteFound) ? h("div", { style: muted }, `\u5F15\u7528\u7684\u539F\u6587\uFF1A\u201C${target.quote}\u201D`) : null
   );
 }
 
@@ -22417,6 +22869,7 @@ function registerWorkbench(ctx, deps) {
     const [target, setTarget] = (0, import_react2.useState)(docTargets.get(app.name));
     const [range, setRange] = (0, import_react2.useState)(target ? docWindow(target.from) : void 0);
     const [state, setState] = (0, import_react2.useState)(void 0);
+    const [raw, setRaw] = (0, import_react2.useState)(false);
     const { sending, notice, send } = useSending();
     const scrolled = (0, import_react2.useRef)("");
     (0, import_react2.useEffect)(() => docTargets.subscribe(() => {
@@ -22428,9 +22881,9 @@ function registerWorkbench(ctx, deps) {
       if (!target || !range) return;
       let live = true;
       setState({ status: "loading" });
-      remote.kbDoc({ doc: target.doc, version: target.version, from: range.from, to: range.to }).then((raw) => {
+      remote.kbDoc({ doc: target.doc, version: target.version, from: range.from, to: range.to }).then((raw2) => {
         if (!live) return;
-        const result = unwrapRemote2(raw);
+        const result = unwrapRemote2(raw2);
         setState(result?.forbidden ? { status: "forbidden" } : result?.error ? { status: "error", error: String(result.error) } : { status: "ready", value: result?.value });
       }).catch((error62) => {
         if (live) setState({ status: "error", error: error62 instanceof Error ? error62.message : "\u7F51\u7EDC\u9519\u8BEF" });
@@ -22456,6 +22909,8 @@ function registerWorkbench(ctx, deps) {
         return { from, to: from + size - 1 };
       }),
       asking: sending.has("ask"),
+      raw,
+      toggleRaw: () => setRaw((v) => !v),
       ask: () => {
         if (!target) return;
         const title = value?.title || target.title || `\u6587\u6863 ${target.doc}`;
