@@ -28,7 +28,7 @@ export default async function (t) {
 
   // ---- 知识库 → 问答应用草稿 ----
   await page.goto(`${BASE}/knowledge/${kb.data.id}`);
-  await page.getByRole("button", { name: "用这个库做问答应用" }).click();
+  await page.getByRole("button", { name: "用这个库做问答应用" }).first().click();
   await page.waitForURL(/knowledge=/);
   const preview = page.locator("[data-studio-preview]");
   await preview.getByText("能问什么").waitFor();

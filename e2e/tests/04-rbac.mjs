@@ -55,9 +55,9 @@ export default async function (t) {
     await page.getByRole("button", { name: "退出登录" }).click();
     await page.waitForURL(/\/login/);
     await login(page, uname, "qa-password-12");
-    const nav = await side();
-    assert(nav.includes("额度分配") && nav.includes("用户"), "侧边栏缺少额度分配 / 用户：" + nav);
-    assert(!nav.includes("角色与权限") && !nav.includes("我的工作台"), "侧边栏出现了无权页面：" + nav);
+    const sideText = await side();
+    assert(sideText.includes("额度分配") && sideText.includes("用户"), "侧边栏缺少额度分配 / 用户：" + sideText);
+    assert(!sideText.includes("角色与权限") && !sideText.includes("我的工作台"), "侧边栏出现了无权页面：" + sideText);
     step("新用户侧边栏只有用户、额度分配");
     await shot(page, "rbac-limited");
     await page.goto(`${BASE}/admin/roles`);
