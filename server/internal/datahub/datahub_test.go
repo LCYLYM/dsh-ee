@@ -71,6 +71,39 @@ func TestParseAndInfer(t *testing.T) {
 	}
 }
 
+// 长得像数字的编号（工号、身份证号、银行卡号、订单号）要按文本原样保存：
+// number 列是 DOUBLE，前导零会丢，超过 15 位的末几位会被改写。
+func TestInferKeepsIdentifiersAsText(t *testing.T) {
+	s, err := ParseCSV([]byte("工号,身份证号,订单号,手机,金额,折扣,人数\n" +
+		"00123,110101199003078515,2026111000000123456,13800138000,\"1,200.50\",0.85,0\n" +
+		"10456,110101198512120037,2026111000000123457,13900139000,-300,0.9,12\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, rows := Infer(s)
+	want := []Column{{"工号", "text"}, {"身份证号", "text"}, {"订单号", "text"}, {"手机", "number"}, {"金额", "number"}, {"折扣", "number"}, {"人数", "number"}}
+	if !reflect.DeepEqual(cols, want) {
+		t.Fatalf("推断列类型：%v", cols)
+	}
+	if !reflect.DeepEqual(rows[0], []any{"00123", "110101199003078515", "2026111000000123456", 13800138000.0, 1200.5, 0.85, 0.0}) {
+		t.Fatalf("编号应原样保存，数值照常转换：%v", rows[0])
+	}
+	// 同一列里只要有一个编号，整列都是文本（不能一半数字一半文本）
+	if rows[1][0] != "10456" {
+		t.Fatalf("工号列应整列是文本：%v", rows[1])
+	}
+	// 追加到以前建成 number 的列：不再悄悄改写，提示重新上传
+	old := []Column{{"工号", "number"}}
+	more, _ := ParseCSV([]byte("工号\n00789\n"))
+	if _, err := Align(old, more); err == nil || !strings.Contains(err.Error(), "替换") {
+		t.Fatalf("往 number 列追加编号应该报错并提示替换：%v", err)
+	}
+	ok, _ := ParseCSV([]byte("工号\n789\n"))
+	if rows, err := Align(old, ok); err != nil || rows[0][0] != 789.0 {
+		t.Fatalf("正常数值照常追加：%v %v", rows, err)
+	}
+}
+
 func TestParseXLSX(t *testing.T) {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)

@@ -334,7 +334,27 @@ var (
 	dateRe   = regexp.MustCompile(`^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$`)
 )
 
-// Infer 按内容推断每列的类型：全是数字的是 number，全是日期的是 date，其余是 text；空单元格不影响判断。
+// numeric 判断一个单元格能不能当数值存。长得像数字、其实是编号的不行：number 列是 DOUBLE，
+// 前导零会丢（工号 00123 → 123），超过 15 位有效数字的末几位会被改写（18 位身份证号、银行卡号、订单号）。
+func numeric(v string) bool {
+	if !numberRe.MatchString(v) {
+		return false
+	}
+	digits := strings.TrimLeft(v, "+-")
+	if len(digits) > 1 && digits[0] == '0' && digits[1] != '.' {
+		return false
+	}
+	n := 0
+	for _, c := range digits {
+		if c >= '0' && c <= '9' {
+			n++
+		}
+	}
+	return n <= 15
+}
+
+// Infer 按内容推断每列的类型：全是数值的是 number，全是日期的是 date，其余是 text；空单元格不影响判断。
+// 一列里只要有一个值是编号（见 numeric），整列按 text 原样保存。
 // 返回列定义和转换好的行（number 是 float64，date 是 2006-01-02，空是 nil）。
 func Infer(s *Sheet) ([]Column, [][]any) {
 	cols := make([]Column, len(s.Header))
@@ -346,7 +366,7 @@ func Infer(s *Sheet) ([]Column, [][]any) {
 				continue
 			}
 			any = true
-			if number && !numberRe.MatchString(v) {
+			if number && !numeric(v) {
 				number = false
 			}
 			if date && !dateRe.MatchString(v) {
@@ -416,6 +436,9 @@ func Align(existing []Column, s *Sheet) ([][]any, error) {
 			case "number":
 				if !numberRe.MatchString(v) {
 					return nil, fmt.Errorf("第 %d 行「%s」应该是数字：%s", ri+2, c.Name, v)
+				}
+				if !numeric(v) {
+					return nil, fmt.Errorf("第 %d 行「%s」的 %s 是编号（有前导零或超过 15 位），按数值存会被改写；请用「替换」重新上传整张表，这一列会按文本保存", ri+2, c.Name, v)
 				}
 				f, _ := strconv.ParseFloat(strings.ReplaceAll(v, ",", ""), 64)
 				line[i] = f
