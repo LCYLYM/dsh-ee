@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Upload, X } from "lucide-react";
+import { AppWindow, ArrowLeft, Upload, X } from "lucide-react";
 import { api, type AssetKind, type AssetSpec, type ConnTestResult, type Delivery, type Scope } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useStore } from "../lib/store";
@@ -16,6 +16,7 @@ import { PageLink } from "../lib/menus";
 import { parseWorkbench, WorkbenchField, workbenchText } from "../components/workbench-editor";
 import { parseTables, TablesField, tablesText as tablesToText } from "../components/app-data";
 import { LivePreview } from "../components/live-preview";
+import { AppAgentGuide } from "../components/app-agent-guide";
 
 const KINDS: AssetKind[] = ["skill", "prompt", "app", "connection"];
 const textareaCls = "w-full rounded-md border border-neutral-300 bg-card px-3 py-2 text-sm outline-none placeholder:text-neutral-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
@@ -157,18 +158,56 @@ function ConnectionFields({ spec, set, secret, setSecret, secretHint }: { spec: 
   );
 }
 
-export default function AssetEditorRoute({ forceKind }: { forceKind?: AssetKind }) {
+export default function AssetEditorRoute({ forceKind, tabs }: { forceKind?: AssetKind; tabs?: ReactNode }) {
   const { id } = useParams();
   const [params] = useSearchParams();
-  return <AssetEditor key={`${id ?? "new"}:${forceKind ?? params.get("kind") ?? ""}:${params.get("from") ?? ""}:${params.get("knowledge") ?? ""}:${params.get("connection") ?? ""}`} forceKind={forceKind} />;
+  return <AssetEditor key={`${id ?? "new"}:${forceKind ?? params.get("kind") ?? ""}:${params.get("from") ?? ""}:${params.get("knowledge") ?? ""}:${params.get("connection") ?? ""}`} forceKind={forceKind} tabs={tabs} />;
 }
 
-/** 「造 → 新建应用」：固定为应用的编辑器；?from=<id> 从样板复制，?knowledge=<库>、?connection=<连接> 先生成一份草稿。 */
+type NewMode = "agent" | "manual";
+
+/**
+ * 「造 → 新建应用」：默认是「让 AI 帮我做」，给一段发到 DSH 的提示词；「手动配置」是固定为应用的编辑器。
+ * ?from=<id> 从样板复制，?knowledge=<库>、?connection=<连接> 先生成一份草稿，这几种直接进手动配置；?mode= 记住所在页签。
+ */
 export function AppNew() {
-  return <AssetEditorRoute forceKind="app" />;
+  const { t } = useTranslation();
+  const [params, setParams] = useSearchParams();
+  const seeded = params.has("from") || params.has("knowledge") || params.has("connection");
+  const mode: NewMode = params.get("mode") === "manual" || params.get("mode") === "agent" ? (params.get("mode") as NewMode) : seeded ? "manual" : "agent";
+  const setMode = (m: NewMode) =>
+    setParams(
+      (p) => {
+        const n = new URLSearchParams(p);
+        n.set("mode", m);
+        return n;
+      },
+      { replace: true },
+    );
+  const tabs = (
+    <div className="mb-5">
+      <Segmented value={mode} onChange={setMode} options={[{ value: "agent", label: t("appAgent.tabAgent") }, { value: "manual", label: t("appAgent.tabManual") }]} />
+    </div>
+  );
+  // 两个页签都挂着，来回切换不丢已经填的内容
+  return (
+    <>
+    <div hidden={mode !== "manual"}>
+      <AssetEditorRoute forceKind="app" tabs={tabs} />
+    </div>
+    <div hidden={mode !== "agent"} className="max-w-[1400px]">
+      <PageLink page="build" className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
+        <ArrowLeft size={14} /> {t("asset.back")}
+      </PageLink>
+      <PageHeader title={t("editor.newApp")} desc={t("hub.tabHints.app")} actions={<AppWindow size={28} strokeWidth={1.4} className="text-neutral-400" />} />
+      {tabs}
+      <AppAgentGuide onManual={() => setMode("manual")} />
+    </div>
+    </>
+  );
 }
 
-function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
+function AssetEditor({ forceKind, tabs }: { forceKind?: AssetKind; tabs?: ReactNode }) {
   const { t } = useTranslation();
   const { id } = useParams();
   const [params] = useSearchParams();
@@ -340,6 +379,7 @@ function AssetEditor({ forceKind }: { forceKind?: AssetKind }) {
         <ArrowLeft size={14} /> {t("asset.back")}
       </PageLink>
       <PageHeader title={title} desc={t(`hub.tabHints.${kind}`)} actions={<Icon size={28} strokeWidth={1.4} className="text-neutral-400" />} />
+      {!editing && tabs}
       {(draft.data?.notes.length ?? 0) > 0 && (
         <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <div className="font-medium">{t("studio.draftNotes")}</div>
