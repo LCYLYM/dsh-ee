@@ -17,7 +17,7 @@ import (
 func TestSetupEnvPowerShell(t *testing.T) {
 	dir := t.TempDir()
 	envFile := filepath.Join(dir, ".env")
-	if err := os.WriteFile(envFile, []byte("KEEP=1\r\n"+connectTokenEnv+"=old\r\n"), 0o600); err != nil {
+	if err := os.WriteFile(envFile, []byte("KEEP=1\r\n# 中文注释\r\n"+connectTokenEnv+"=old\r\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	script := "$DshDir = " + psQuote(dir) + "\n" +
@@ -42,8 +42,8 @@ func TestSetupEnvPowerShell(t *testing.T) {
 		t.Fatalf(".env 不应带 UTF-8 BOM：%x", data[:3])
 	}
 	got := strings.ReplaceAll(string(data), "\r\n", "\n")
-	if !strings.Contains(got, "KEEP=1\n") {
-		t.Fatalf("原有变量应保留：%q", got)
+	if !strings.Contains(got, "KEEP=1\n") || !strings.Contains(got, "# 中文注释\n") {
+		t.Fatalf("原有内容（含中文注释）应逐字节保留：%q", got)
 	}
 	if strings.Count(got, connectTokenEnv+"=") != 1 || !strings.Contains(got, connectTokenEnv+"=tok-123\n") {
 		t.Fatalf("令牌应被替换且只出现一次：%q", got)
