@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/hikariming/dsh-ee/server/internal/mcp"
@@ -211,6 +214,13 @@ func (s *Server) callConnectionTool(ctx context.Context, a *store.Asset, t *stor
 	if err != nil {
 		call.Error = err.Error()
 		result = mcp.TextResult("调用 "+a.Title+" 失败："+err.Error(), true)
+		if !t.ReadOnly && outcomeUnknown(err) {
+			// 请求已经发出去了，只是没等到回复：对方可能已经执行。
+			// 若照常说"失败"，模型会很自然地重试，写操作就可能做两遍（重复建单、重复发消息）。
+			call.Error = "结果不确定：" + err.Error()
+			result = mcp.TextResult("调用 "+a.Title+" 的结果不确定：请求已经发出，但没有等到回复（"+err.Error()+"）。"+
+				"对方系统可能已经执行了这次操作。请先用查询类工具确认是否已经生效，不要直接重试；确认不了就把情况告诉用户。", true)
+		}
 	} else if isErrorResult(result) {
 		call.OK = false
 		call.Error = "上游返回错误"
@@ -219,6 +229,20 @@ func (s *Server) callConnectionTool(ctx context.Context, a *store.Asset, t *stor
 		s.log.Warn("记录连接调用失败", "err", rerr)
 	}
 	return result
+}
+
+// outcomeUnknown 判断错误是否发生在请求发出之后、拿到回复之前（超时、连接被断开）。
+// 连不上（拨号失败）说明请求根本没发出去，不算。
+func outcomeUnknown(err error) bool {
+	var op *net.OpError
+	if errors.As(err, &op) && op.Op == "dial" {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, syscall.ECONNRESET) {
+		return true
+	}
+	var ne net.Error
+	return errors.As(err, &ne) && ne.Timeout()
 }
 
 func isErrorResult(raw json.RawMessage) bool {
