@@ -6,11 +6,16 @@ import { api, formatBytes, formatTime, type ImportResult, type SyncJob } from ".
 import { useApi, useAction } from "../../lib/use-api";
 import { LoadState } from "../../components/api-ui";
 import { StatusBadge } from "../../components/status";
-import { Badge, Button, Card, cx, Field, PageHeader, Segmented, Toggle } from "../../components/ui";
+import { Badge, Button, Card, cx, Field, inputCls, PageHeader, Segmented, Toggle } from "../../components/ui";
 import { useTranslation } from "react-i18next";
 import { DatePicker } from "@/components/pickers";
 
 type RankBy = "stars" | "score";
+
+const packageName = /^(@[A-Za-z0-9][A-Za-z0-9._~-]*\/)?[A-Za-z0-9_][A-Za-z0-9._~-]*$/;
+function isPackageName(name: string): boolean {
+  return packageName.test(name) && !name.includes("..");
+}
 
 export default function AdminUpstream() {
   const { t } = useTranslation();
@@ -69,6 +74,7 @@ function Online() {
   const [minScore, setMinScore] = useState(scoring.minPreloadScore);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [publish, setPublish] = useState(false);
+  const [manual, setManual] = useState("");
   const [job, setJob] = useJob(() => {
     feed.reload();
     jobs.reload();
@@ -88,7 +94,15 @@ function Online() {
     [all, cats, scoring.upstream, minScore, rankBy, topN],
   );
   const fresh = ranked.filter((c) => !c.local_version);
-  const selected = picked.size ? ranked.filter((c) => picked.has(c.name)) : fresh;
+  const manualEntries = useMemo(
+    () => Array.from(new Set(manual.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean))),
+    [manual],
+  );
+  const manualNames = useMemo(() => manualEntries.filter(isPackageName), [manualEntries]);
+  const manualInvalid = manualEntries.length - manualNames.length;
+  // 手动输入包名时不要默认把“未入库的全部”也带上；只同步勾选的和手动输入的。
+  const selected = picked.size ? ranked.filter((c) => picked.has(c.name)) : manualEntries.length ? [] : fresh;
+  const syncNames = useMemo(() => Array.from(new Set([...selected.map((c) => c.name), ...manualNames])), [selected, manualNames]);
 
   const toggle = (name: string) =>
     setPicked((s) => {
@@ -99,10 +113,12 @@ function Online() {
     });
 
   const start = async () => {
-    const r = await run(() => api.syncUpstream(selected.map((c) => c.name), publish));
+    if (syncNames.length > 500) return notify(t("upstreamAdmin.tooMany"));
+    const r = await run(() => api.syncUpstream(syncNames, publish));
     if (!r.ok) return notify(r.error);
     setJob(r.value);
     setPicked(new Set());
+    setManual("");
   };
 
   const checkUpdates = async () => {
@@ -182,11 +198,28 @@ function Online() {
 
       <div className="space-y-4">
         {job && <JobCard job={job} />}
+        <Card className="space-y-3 p-4">
+          <Field label={t("upstreamAdmin.manualNames")} hint={t("upstreamAdmin.manualNamesHint")}>
+            <textarea
+              className={cx(inputCls, "h-20 py-2 font-mono")}
+              value={manual}
+              onChange={(e) => setManual(e.target.value)}
+              placeholder={"dsh-clinic\n@perrylink/dsh-claim-check"}
+            />
+          </Field>
+          {manualInvalid > 0 && <p className="text-xs text-amber-700">{t("upstreamAdmin.manualInvalid", { count: manualInvalid })}</p>}
+        </Card>
         <Card className="flex flex-wrap items-center gap-4 p-4">
           <div className="text-sm">
             <span className="font-medium text-neutral-800">
-              {t("upstreamAdmin.willSync", { count: selected.length })}
-              {picked.size ? t("upstreamAdmin.manual") : t("upstreamAdmin.allUnmirrored")}
+              {t("upstreamAdmin.willSync", { count: syncNames.length })}
+              {picked.size && manualEntries.length
+                ? t("upstreamAdmin.manualAndPasted")
+                : picked.size
+                  ? t("upstreamAdmin.manual")
+                  : manualEntries.length
+                    ? t("upstreamAdmin.manualOnly")
+                    : t("upstreamAdmin.allUnmirrored")}
             </span>
             <span className="ml-2 text-neutral-500">{t("registry.upstream.feedCount", { count: all.length, at: feed.data?.fetched_at ? formatTime(feed.data.fetched_at) : "—" })}</span>
           </div>
@@ -194,7 +227,7 @@ function Online() {
             <Button variant="secondary" size="sm" disabled={feed.loading} onClick={() => api.upstreamFeed(true).then(() => feed.reload())}>
               <RefreshCw size={14} /> {t("registry.upstream.refreshFeed")}
             </Button>
-            <Button disabled={!selected.length || busy || job?.status === "running"} onClick={start}>
+            <Button disabled={!syncNames.length || busy || job?.status === "running"} onClick={start}>
               {t("upstreamAdmin.startSync")}
             </Button>
           </div>
