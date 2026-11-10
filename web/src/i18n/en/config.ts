@@ -129,6 +129,7 @@ export default {
     desc: "Changes are saved to the server automatically and apply to everyone.",
     resetDone: "Settings restored to defaults",
     reset: "Restore defaults",
+    resetConfirm: "Restore default settings? Organization name, base URL, brand, connection, upstream, review mode, and all other settings will be replaced; current changes will be lost.",
     basics: "Basics",
     orgName: "Organization name",
     baseUrl: "Base URL",
