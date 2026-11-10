@@ -6,7 +6,7 @@ export default {
     title: "Brand & appearance",
     desc: "Make DSH look like your company's own tool: sidebar name, logo, home title, and color theme.",
     enabled: "Enable company branding",
-    enabledDesc: "Keep the official brand and colors when off. When on, the connect plugin takes over the brand slots and applies the colors.",
+    enabledDesc: "Keep the official brand and colors when off. When on, the connect plugin replaces DSH's logo and name and applies the colors; employees don't need to update the plugin, it takes effect within a minute.",
     name: "Sidebar name",
     nameHint: "1–24 characters, shown at the top left of the DSH sidebar. Do not use the full DeepSeek Harness name.",
     heroTitle: "Home title",

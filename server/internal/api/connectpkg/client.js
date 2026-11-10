@@ -19963,18 +19963,25 @@ function createBrandStore(initial, read) {
   let current = initial;
   let key = brandKey(initial);
   let inflight = false;
+  let reader = read;
   const listeners2 = /* @__PURE__ */ new Set();
+  const set2 = (next) => {
+    const nextKey = brandKey(next);
+    if (!next || nextKey === key) return;
+    current = next;
+    key = nextKey;
+    for (const listener of [...listeners2]) {
+      try {
+        listener();
+      } catch {
+      }
+    }
+  };
   const refresh = async () => {
-    if (inflight) return;
+    if (inflight || !reader) return;
     inflight = true;
     try {
-      const next = await read();
-      const nextKey = brandKey(next);
-      if (next && nextKey !== key) {
-        current = next;
-        key = nextKey;
-        for (const listener of listeners2) listener();
-      }
+      set2(await reader());
     } catch {
     } finally {
       inflight = false;
@@ -19988,8 +19995,13 @@ function createBrandStore(initial, read) {
   };
   return {
     get: () => current,
+    set: set2,
     refresh,
     subscribe,
+    /** 连上 dsh-ee 以后接上读取函数。 */
+    setReader: (next) => {
+      reader = next;
+    },
     /** 在组件里读品牌，并在品牌变化时重绘。 */
     use: (useState5, useEffect4) => {
       const [, setTick] = useState5(0);
@@ -20007,6 +20019,147 @@ function createBrandStore(initial, read) {
         if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
       };
     }
+  };
+}
+var CACHE_KEY = "dsh-ee:brand";
+function loadCachedBrand(storage = globalThis.localStorage) {
+  try {
+    const raw = storage?.getItem(CACHE_KEY);
+    if (!raw) return void 0;
+    const brand = JSON.parse(raw);
+    if (!brand || typeof brand !== "object" || typeof brand.enabled !== "boolean" || typeof brand.name !== "string") return void 0;
+    return brand;
+  } catch {
+    return void 0;
+  }
+}
+function saveCachedBrand(brand, storage = globalThis.localStorage) {
+  try {
+    storage?.setItem(CACHE_KEY, JSON.stringify(brand));
+  } catch {
+  }
+}
+function safeRender(render, fallback) {
+  try {
+    return render();
+  } catch (error62) {
+    if (typeof console !== "undefined") console.warn("[dsh-ee] \u54C1\u724C\u7EC4\u4EF6\u6E32\u67D3\u5931\u8D25\uFF0C\u6539\u7528\u9996\u5B57\u6BCD", error62);
+    try {
+      return fallback();
+    } catch {
+      return null;
+    }
+  }
+}
+function pageBranding(doc, brand) {
+  if (!brand.enabled || !brand.name) return () => {
+  };
+  const restoreTitle = doc.title;
+  const apply2 = () => {
+    if (doc.title !== brand.name) doc.title = brand.name;
+  };
+  apply2();
+  const titleNode = doc.querySelector("title");
+  const MO = doc.defaultView?.MutationObserver;
+  const observer = titleNode && MO ? new MO(apply2) : void 0;
+  observer?.observe(titleNode, { childList: true, characterData: true, subtree: true });
+  let icon;
+  const hidden = [];
+  if (brand.logo_url) {
+    for (const el of doc.querySelectorAll('link[rel~="icon"]')) {
+      hidden.push({ el, rel: el.getAttribute("rel") || "icon" });
+      el.setAttribute("rel", "dsh-ee-hidden-icon");
+    }
+    icon = doc.createElement("link");
+    icon.rel = "icon";
+    icon.href = brand.logo_url;
+    icon.dataset.dshEe = "brand";
+    doc.head.appendChild(icon);
+  }
+  return () => {
+    observer?.disconnect();
+    icon?.remove();
+    for (const h of hidden) h.el.setAttribute("rel", h.rel);
+    if (doc.title === brand.name) doc.title = restoreTitle;
+  };
+}
+
+// src/brand-client.ts
+var BRAND_PRIORITY = -1e3;
+var BRAND_SLOTS = ["sidebar.brand.mark", "sidebar.brand.name", "conversation.hero.brand.mark"];
+var initials = (brand) => ({ ...brand, logo_url: "" });
+function registerBrand(ctx, store, react, doc = typeof document !== "undefined" ? document : void 0) {
+  const { createElement: createElement5, useState: useState5, useEffect: useEffect4 } = react;
+  const Mark = (props) => {
+    const brand = store.use(useState5, useEffect4);
+    return safeRender(() => brandMark(createElement5, brand, props), () => brandMark(createElement5, initials(brand), props));
+  };
+  const Name = () => {
+    const brand = store.use(useState5, useEffect4);
+    return safeRender(() => brandName(createElement5, brand), () => createElement5("span", null, brand.name));
+  };
+  const Hero = (props) => {
+    const brand = store.use(useState5, useEffect4);
+    return safeRender(() => heroBrand(createElement5, brand, props), () => brandMark(createElement5, initials(brand), props));
+  };
+  const components = {
+    "sidebar.brand.mark": Mark,
+    "sidebar.brand.name": Name,
+    "conversation.hero.brand.mark": Hero
+  };
+  let seats = [];
+  const occupy = () => {
+    for (const name of BRAND_SLOTS) {
+      try {
+        const dispose = ctx.slots.inject(name, () => ctx.slots.register({ name, priority: BRAND_PRIORITY }, components[name]));
+        if (typeof dispose === "function") seats.push(dispose);
+      } catch (error62) {
+        console.warn(`[dsh-ee] \u5360\u7528\u54C1\u724C\u4F4D\u7F6E ${name} \u5931\u8D25`, error62);
+      }
+    }
+  };
+  const vacate = () => {
+    for (const dispose of seats.splice(0)) {
+      try {
+        dispose();
+      } catch {
+      }
+    }
+  };
+  let occupied = false;
+  let heroCss;
+  let undoPage = () => {
+  };
+  const sync = () => {
+    const brand = store.get();
+    const on = !!brand?.enabled;
+    if (on && !occupied) occupy();
+    if (!on && occupied) vacate();
+    occupied = on;
+    if (!doc) return;
+    const hideTitle = on && !!(brand.title ?? "").trim();
+    if (hideTitle && !heroCss) {
+      heroCss = doc.createElement("style");
+      heroCss.dataset.plugin = "dsh-ee-brand";
+      heroCss.textContent = HERO_TITLE_CSS;
+      doc.head.appendChild(heroCss);
+    } else if (!hideTitle && heroCss) {
+      heroCss.remove();
+      heroCss = void 0;
+    }
+    undoPage();
+    undoPage = on ? pageBranding(doc, brand) : () => {
+    };
+  };
+  sync();
+  const off = store.subscribe(sync);
+  return () => {
+    off();
+    vacate();
+    occupied = false;
+    heroCss?.remove();
+    heroCss = void 0;
+    undoPage();
   };
 }
 
@@ -23255,7 +23408,6 @@ var clientRemote = createTypertRemoteInfo({
     "dshEE/vote": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => external_exports.any() }, invocation: { kind: "direct" } }
   }
 }, external_exports);
-var TAKEOVER = String("__DSH_EE_BRAND_TAKEOVER__") === "true";
 function unwrapRemote(result) {
   if (result && typeof result === "object") {
     if (result.error) throw new Error(typeof result.error === "string" ? result.error : result.error.message || "\u4F01\u4E1A\u8FDC\u7A0B\u8C03\u7528\u5931\u8D25");
@@ -23321,6 +23473,9 @@ function createOverviewStore(remote) {
   return { use, refresh: () => refresh(), pollLogin, onLogin };
 }
 async function apply(ctx) {
+  const brandStore = createBrandStore(loadCachedBrand() ?? { enabled: false, name: "", logo_url: "", revision: "" });
+  ctx.effect(() => brandStore.subscribe(() => saveCachedBrand(brandStore.get())));
+  ctx.effect(() => registerBrand(ctx, brandStore, { createElement: import_react4.createElement, useState: import_react4.useState, useEffect: import_react4.useEffect }));
   await ctx.remote.$mount(clientRemote);
   ctx.inject(["remote.dshEE"], async (remoteCtx) => {
     const remote = remoteCtx.remote.dshEE;
@@ -23345,14 +23500,9 @@ async function apply(ctx) {
       remote.brand(),
       new Promise((_, reject) => setTimeout(() => reject(new Error("\u8BFB\u53D6\u4F01\u4E1A\u54C1\u724C\u8D85\u65F6")), 1e4))
     ]));
-    let brand;
-    try {
-      brand = await readBrand();
-    } catch {
-      brand = { enabled: true, name: "\u4F01\u4E1A", logo_url: "", revision: "" };
-    }
-    const org = brand?.name || "\u4F01\u4E1A";
-    const brandStore = createBrandStore(brand, readBrand);
+    brandStore.setReader(readBrand);
+    await brandStore.refresh();
+    const org = brandStore.get().name || "\u4F01\u4E1A";
     ctx.effect(() => brandStore.start());
     try {
       ctx.inject(["theme"], (themeCtx) => {
@@ -23425,38 +23575,6 @@ async function apply(ctx) {
       return enterpriseHeader(import_react4.createElement, state.data, state.failed, onClick);
     };
     registerEnterpriseStatus(ctx, org, EnterprisePanel, EnterpriseHeader);
-    if (!TAKEOVER) return;
-    const shown = (current) => {
-      if (!current || current.enabled === false) return { enabled: false, name: current?.name || org, logo_url: "", revision: "" };
-      return { ...current, name: current.name || org };
-    };
-    const EnterpriseBrandMark = (props) => brandMark(import_react4.createElement, shown(brandStore.use(import_react4.useState, import_react4.useEffect)), props);
-    const EnterpriseBrandName = () => brandName(import_react4.createElement, shown(brandStore.use(import_react4.useState, import_react4.useEffect)));
-    const EnterpriseHero = (props) => heroBrand(import_react4.createElement, shown(brandStore.use(import_react4.useState, import_react4.useEffect)), props);
-    if (typeof document !== "undefined") {
-      ctx.effect(() => {
-        const tag = document.createElement("style");
-        tag.dataset.plugin = "dsh-ee-brand";
-        tag.textContent = HERO_TITLE_CSS;
-        document.head.appendChild(tag);
-        return () => {
-          tag.remove();
-        };
-      });
-    }
-    const registerBrandSlot = function* (slotName, component) {
-      try {
-        yield ctx.slots.register({ name: slotName, priority: -1 }, component);
-      } catch {
-      }
-    };
-    ctx.slots.inject("sidebar.brand.mark", () => ctx.slots.inject("sidebar.brand.name", function* () {
-      yield* registerBrandSlot("sidebar.brand.mark", EnterpriseBrandMark);
-      yield* registerBrandSlot("sidebar.brand.name", EnterpriseBrandName);
-    }));
-    ctx.slots.inject("conversation.hero.brand.mark", function* () {
-      yield* registerBrandSlot("conversation.hero.brand.mark", EnterpriseHero);
-    });
   });
 }
 return module.exports; } });

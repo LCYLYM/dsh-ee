@@ -100,22 +100,34 @@ export function brandKey(brand: BrandViewData | undefined): string {
 /** 管理员在网页上改了品牌后，DSH 不用重启：每分钟（以及窗口回到前台时）重读一次，有变化就重绘。 */
 export const BRAND_POLL_MS = 60_000;
 
-export function createBrandStore(initial: BrandViewData, read: () => Promise<BrandViewData>) {
+/**
+ * 品牌状态。read 可以晚点再给：插件一启动就先用上次缓存的品牌注册界面，连上 dsh-ee 以后再读最新的。
+ * 每次读到新内容都通知订阅者（界面重绘、主题重设、写缓存）。
+ */
+export function createBrandStore(initial: BrandViewData, read?: () => Promise<BrandViewData>) {
   let current = initial;
   let key = brandKey(initial);
   let inflight = false;
+  let reader = read;
   const listeners = new Set<() => void>();
+  const set = (next: BrandViewData) => {
+    const nextKey = brandKey(next);
+    if (!next || nextKey === key) return;
+    current = next;
+    key = nextKey;
+    for (const listener of [...listeners]) {
+      try {
+        listener();
+      } catch {
+        // 一个订阅者出错不影响其它
+      }
+    }
+  };
   const refresh = async () => {
-    if (inflight) return;
+    if (inflight || !reader) return;
     inflight = true;
     try {
-      const next = await read();
-      const nextKey = brandKey(next);
-      if (next && nextKey !== key) {
-        current = next;
-        key = nextKey;
-        for (const listener of listeners) listener();
-      }
+      set(await reader());
     } catch {
       // 读不到时保持上一次的品牌
     } finally {
@@ -128,8 +140,11 @@ export function createBrandStore(initial: BrandViewData, read: () => Promise<Bra
   };
   return {
     get: () => current,
+    set,
     refresh,
     subscribe,
+    /** 连上 dsh-ee 以后接上读取函数。 */
+    setReader: (next: () => Promise<BrandViewData>) => { reader = next; },
     /** 在组件里读品牌，并在品牌变化时重绘。 */
     use: (useState: (v: number) => [number, (fn: (n: number) => number) => void], useEffect: (fn: () => () => void, deps: unknown[]) => void) => {
       const [, setTick] = useState(0);
@@ -145,5 +160,81 @@ export function createBrandStore(initial: BrandViewData, read: () => Promise<Bra
         if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
       };
     },
+  };
+}
+
+export type BrandStore = ReturnType<typeof createBrandStore>;
+
+const CACHE_KEY = "dsh-ee:brand";
+
+/** 上次读到的品牌（存在浏览器本地）：DSH 一打开就显示企业 logo，不先闪一下 DSH 的鱼。 */
+export function loadCachedBrand(storage: Pick<Storage, "getItem"> | undefined = globalThis.localStorage): BrandViewData | undefined {
+  try {
+    const raw = storage?.getItem(CACHE_KEY);
+    if (!raw) return undefined;
+    const brand = JSON.parse(raw);
+    if (!brand || typeof brand !== "object" || typeof brand.enabled !== "boolean" || typeof brand.name !== "string") return undefined;
+    return brand as BrandViewData;
+  } catch {
+    return undefined;
+  }
+}
+
+export function saveCachedBrand(brand: BrandViewData, storage: Pick<Storage, "setItem"> | undefined = globalThis.localStorage): void {
+  try {
+    storage?.setItem(CACHE_KEY, JSON.stringify(brand));
+  } catch {
+    // 本地存储不可用（隐私模式、配额满）时不缓存
+  }
+}
+
+/**
+ * 包一层防护：品牌组件渲染出错时显示企业名称首字母，而不是抛出去——
+ * 宿主会撤下出错的组件、退回 DSH 自带的鱼，企业 logo 就「悄悄换不掉」了。
+ */
+export function safeRender(render: () => any, fallback: () => any): any {
+  try {
+    return render();
+  } catch (error) {
+    if (typeof console !== "undefined") console.warn("[dsh-ee] 品牌组件渲染失败，改用首字母", error);
+    try {
+      return fallback();
+    } catch {
+      return null;
+    }
+  }
+}
+
+/** 品牌开启时浏览器标签页（Desktop 是窗口标题）显示企业名称，图标换成企业 logo。 */
+export function pageBranding(doc: Document, brand: BrandViewData): () => void {
+  if (!brand.enabled || !brand.name) return () => {};
+  const restoreTitle = doc.title;
+  const apply = () => {
+    if (doc.title !== brand.name) doc.title = brand.name;
+  };
+  apply();
+  // DSH 切换会话时会改标题，改回来
+  const titleNode = doc.querySelector("title");
+  const MO = (doc.defaultView as any)?.MutationObserver;
+  const observer = titleNode && MO ? new MO(apply) : undefined;
+  observer?.observe(titleNode, { childList: true, characterData: true, subtree: true });
+  let icon: HTMLLinkElement | undefined;
+  const hidden: { el: Element; rel: string }[] = [];
+  if (brand.logo_url) {
+    for (const el of doc.querySelectorAll('link[rel~="icon"]')) {
+      hidden.push({ el, rel: el.getAttribute("rel") || "icon" });
+      el.setAttribute("rel", "dsh-ee-hidden-icon");
+    }
+    icon = doc.createElement("link");
+    icon.rel = "icon";
+    icon.href = brand.logo_url;
+    icon.dataset.dshEe = "brand";
+    doc.head.appendChild(icon);
+  }
+  return () => {
+    observer?.disconnect();
+    icon?.remove();
+    for (const h of hidden) h.el.setAttribute("rel", h.rel);
+    if (doc.title === brand.name) doc.title = restoreTitle;
   };
 }

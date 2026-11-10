@@ -4,7 +4,7 @@ export default {
     title: "品牌与外观",
     desc: "把 DSH 换成企业自己的样子：侧栏名称、logo、首屏标题和整套配色。",
     enabled: "启用企业品牌",
-    enabledDesc: "关闭后保留官方品牌和配色；启用后由企业接入插件接管品牌位置并应用配色。",
+    enabledDesc: "关闭后保留官方品牌和配色；启用后由企业接入插件接管 DSH 的 logo、名称并应用配色，员工不用更新插件，一分钟内生效。",
     name: "侧栏名称",
     nameHint: "1～24 个字符，显示在 DSH 侧栏左上角；不能使用 DeepSeek Harness 全名。",
     heroTitle: "首屏标题",

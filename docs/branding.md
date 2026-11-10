@@ -52,7 +52,10 @@ span:has([data-dsh-ee-hero-title]) + span:not(:has([data-dsh-ee-hero-title])) { 
 
 - 品牌数据随 `/api/dsh/catalog` 下发（`brand.title`、`brand.logo_shape`、`brand.theme`，旧版插件忽略这些字段），改动会让目录 ETag 变化。
 - 接入插件浏览器部分每 60 秒、以及窗口回到前台时重读一次品牌；内容变了就重绘品牌位置、重设配色，**不用重启 DSH**。
-- 配色不需要接管品牌位置，只要 `brand.enabled`；logo、名称、标题仍要求发布插件时品牌已开启（关掉官方品牌插件）。
+- logo、名称、首屏标题：接入插件一启动就用 `priority: -1000` 占住 `sidebar.brand.mark`、`sidebar.brand.name`、`conversation.hero.brand.mark` 三个单值槽位（同一槽位数值最小的渲染，官方品牌插件和外壳兜底都在 0），**不关掉官方品牌插件**。接不接管由运行时读到的 `brand.enabled` 决定：开启时占住、关闭时撤下，员工不用更新插件（2026-11-10 之前是在生成插件包时写死的，先装插件后开品牌就一直换不掉）。
+- 插件把上次读到的品牌存在浏览器本地，DSH 一打开就是企业 logo；品牌组件渲染出错时显示企业名称首字母，不会被宿主撤下、退回 DSH 的鱼。
+- 品牌开启时，浏览器标签页（Desktop 是窗口）标题换成企业名称、图标换成企业 logo；设了首屏标题才藏起 DSH 自带的那行。
+- 代码在 `dsh-plugin/src/brand-client.ts`。写法参考社区品牌插件 dsh-ui-custom、dsh-plugin-brand-custom。
 
 ## 5. 让 Agent 调
 

@@ -100,9 +100,8 @@ func (s *Server) buildConnect(ctx context.Context, base, version string) (string
 		fmt.Fprintf(&p, "      config:\n        indexes:\n          - %s\n", yamlQuote(base+"/index/dsh-index.json"))
 		p.WriteString("    - id: ui-plugin-market\n      name: '@deepseek-ai/dsh-client-ui-plugin-market'\n")
 	}
-	if set.Brand.Enabled {
-		p.WriteString("- id: ui-brand-official\n  disabled: true\n")
-	}
+	// 企业品牌不再关掉官方品牌插件：接入插件在运行时按品牌设置用更小的 priority 盖过它（见 dsh-plugin/src/brand-client.ts），
+	// 插件包内容也就不随品牌开关变化，管理员开关品牌不用员工更新插件。
 	// 有微应用的工作台要嵌网页时，打开官方浏览器标签页；没有就不动员工的 DSH 设置
 	web, err := s.anyLiveWebPane(ctx)
 	if err != nil {
@@ -152,7 +151,6 @@ dsh-ee：%s
 		connectTokenEnv, base)
 
 	clientJS := bytes.ReplaceAll(connectClientJS, []byte("__DSH_EE_PACKAGE__"), []byte(pkg))
-	clientJS = bytes.ReplaceAll(clientJS, []byte("__DSH_EE_BRAND_TAKEOVER__"), []byte(strconv.FormatBool(set.Brand.Enabled)))
 	files := map[string][]byte{"index.js": connectIndexJS, "client.js": clientJS, "cordis.patch.yml": patch, "README.md": []byte(readme)}
 	h := sha256.New()
 	for _, name := range []string{"index.js", "client.js", "cordis.patch.yml", "README.md"} {

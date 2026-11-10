@@ -1,7 +1,8 @@
 import { createElement, useEffect, useState } from "react";
 import { createTypertRemoteInfo } from "@deepseek-ai/dsh-typert-protocol";
 import { z } from "zod";
-import { brandMark, brandName, createBrandStore, heroBrand, HERO_TITLE_CSS, themeOverrides, type BrandViewData } from "./brand-view.js";
+import { createBrandStore, loadCachedBrand, saveCachedBrand, themeOverrides, type BrandViewData } from "./brand-view.js";
+import { registerBrand } from "./brand-client.js";
 import type { EnterpriseOverview, OverviewFailure } from "./overview.js";
 import { enterpriseHeader, enterprisePanel, enterpriseTabId, registerEnterpriseStatus, type DoctorViewData } from "./status-view.js";
 import { registerApps } from "./apps-client.js";
@@ -46,10 +47,6 @@ const clientRemote = createTypertRemoteInfo({
     "dshEE/vote": { service: "dshEE", parameters: [jsonParameter("request")], result: { mode: "strict", typeSymbol: "unknown", create: () => z.any() }, invocation: { kind: "direct" } },
   },
 }, z);
-
-// 安装插件时，dsh-ee 是否已在补丁里关掉官方品牌插件（由服务端在生成包时替换）。
-// 只有关掉了才能接管品牌位置，否则会与官方品牌插件冲突；之后品牌开关怎么变，都不影响这个判断。
-const TAKEOVER = String("__DSH_EE_BRAND_TAKEOVER__") === "true";
 
 function unwrapRemote(result: any): any {
   if (result && typeof result === "object") {
@@ -125,6 +122,12 @@ function createOverviewStore(remote: any) {
 }
 
 export async function apply(ctx: any): Promise<void> {
+  // 品牌最先注册、只依赖 slots：先用上次缓存的品牌（DSH 一打开就是企业 logo），连上 dsh-ee 后再换成最新的。
+  // 不能排在远程服务和其它功能后面——前面任何一步卡住或出错，logo 就会一直是 DSH 自带的鱼。
+  const brandStore = createBrandStore(loadCachedBrand() ?? { enabled: false, name: "", logo_url: "", revision: "" });
+  ctx.effect(() => brandStore.subscribe(() => saveCachedBrand(brandStore.get())));
+  ctx.effect(() => registerBrand(ctx, brandStore, { createElement, useState, useEffect }));
+
   await ctx.remote.$mount(clientRemote);
   ctx.inject(["remote.dshEE"], async (remoteCtx: any) => {
     const remote = remoteCtx.remote.dshEE;
@@ -148,14 +151,9 @@ export async function apply(ctx: any): Promise<void> {
       remote.brand(),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error("读取企业品牌超时")), 10_000)),
     ]));
-    let brand: BrandViewData;
-    try {
-      brand = await readBrand();
-    } catch {
-      brand = { enabled: true, name: "企业", logo_url: "", revision: "" };
-    }
-    const org = brand?.name || "企业";
-    const brandStore = createBrandStore(brand, readBrand);
+    brandStore.setReader(readBrand);
+    await brandStore.refresh();
+    const org = brandStore.get().name || "企业";
     ctx.effect(() => brandStore.start());
     // 配色与 logo 无关，不需要接管品牌位置：交给 DSH 的主题服务按设计变量覆盖，改了就跟着变。
     // 主题服务不存在或拒绝注入时不能拖死后面的品牌槽位注册，单独兜底。
@@ -230,42 +228,5 @@ export async function apply(ctx: any): Promise<void> {
       return enterpriseHeader(createElement, state.data, state.failed, onClick);
     };
     registerEnterpriseStatus(ctx, org, EnterprisePanel, EnterpriseHeader);
-
-    if (!TAKEOVER) return;
-    // 品牌在运行时被关闭或取不到时，显示中性的首字母图标与名称，而不是官方 logo。
-    const shown = (current: BrandViewData): BrandViewData => {
-      if (!current || current.enabled === false) return { enabled: false, name: current?.name || org, logo_url: "", revision: "" };
-      return { ...current, name: current.name || org };
-    };
-    const EnterpriseBrandMark = (props: { size?: number }) => brandMark(createElement, shown(brandStore.use(useState, useEffect)), props);
-    const EnterpriseBrandName = () => brandName(createElement, shown(brandStore.use(useState, useEffect)));
-    const EnterpriseHero = (props: { size?: number }) => heroBrand(createElement, shown(brandStore.use(useState, useEffect)), props);
-    if (typeof document !== "undefined") {
-      ctx.effect(() => {
-        const tag = document.createElement("style");
-        tag.dataset.plugin = "dsh-ee-brand";
-        tag.textContent = HERO_TITLE_CSS;
-        document.head.appendChild(tag);
-        return () => { tag.remove(); };
-      });
-    }
-    // 宿主自带 brand-official 已占 priority 0；单个槽位取最小者渲染，-1 才能盖过它。
-    // 写法照官方品牌插件：侧栏两个位置绑在一起（它们总是一起渲染）；首屏位置单独一条，
-    // 不能把侧栏的注册挂在 hero 的 inject 里——在会话页打开时 hero 不渲染，侧栏会一直没有品牌。
-    const registerBrandSlot = function* (slotName: string, component: unknown) {
-      try {
-        yield ctx.slots.register({ name: slotName, priority: -1 }, component);
-      } catch {
-        // 已有其它实现占住同一槽位同优先级时跳过
-      }
-    };
-    ctx.slots.inject("sidebar.brand.mark", () =>
-      ctx.slots.inject("sidebar.brand.name", function* () {
-        yield* registerBrandSlot("sidebar.brand.mark", EnterpriseBrandMark);
-        yield* registerBrandSlot("sidebar.brand.name", EnterpriseBrandName);
-      }));
-    ctx.slots.inject("conversation.hero.brand.mark", function* () {
-      yield* registerBrandSlot("conversation.hero.brand.mark", EnterpriseHero);
-    });
   });
 }
