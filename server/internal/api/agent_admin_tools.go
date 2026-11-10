@@ -721,7 +721,7 @@ func adminSpecs() map[string]*agentSpec {
 			},
 		},
 		"POST /api/admin/review": {
-			Tool: "ee_review", Action: "decide_package", Summary: "通过 / 驳回 / 下架 / 恢复一个插件（version 为空作用于整个包）", En: "Review a plugin", Effect: dg,
+			Tool: "ee_review", Action: "decide_package", Summary: "通过 / 驳回 / 下架 / 恢复一个插件（version 为空作用于整个包；整包恢复只恢复上过架的版本）", En: "Review a plugin", Effect: dg,
 			Params: []agentParam{{Name: "name", Type: "string", Required: true}, {Name: "version", Type: "string"}, {Name: "decision", Type: "string", Required: true, Enum: []string{"approve", "reject", "unpublish", "restore"}, As: "action"}, {Name: "note", Type: "string"}},
 			Preview: func(_ context.Context, _ *Server, _ *Principal, args map[string]any) (string, error) {
 				v := fmt.Sprint(args["version"])

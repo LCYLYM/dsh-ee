@@ -133,7 +133,7 @@ export default function AdminPlugins() {
                           {t("pluginsAdmin.yank")}
                         </Button>
                       )}
-                      {(p.status === "unpublished" || p.status === "rejected") && (
+                      {p.status === "unpublished" && (
                         <Button variant="secondary" size="sm" disabled={busy} onClick={() => act(p.name, "", "restore")}>
                           {t("pluginsAdmin.restore")}
                         </Button>
