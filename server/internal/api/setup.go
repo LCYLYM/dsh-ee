@@ -313,12 +313,25 @@ function Setup-DshEE {
     Write-Host '已按 DSH_EE_GLOBAL_NPMRC=1 同时写入 ~/.npmrc'
   }
 ` + s.connectPowerShell(r) + `}
-Setup-DshEE
+` + setupTokenArgPowerShell() + `Setup-DshEE -Token $tokenArg
 `
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	// 不加 BOM：iwr | iex 会把 BOM 当成脚本的第一个字符；iwr 按 Content-Type 的 charset 解码
 	_, _ = w.Write([]byte(script))
+}
+
+// setupTokenArgPowerShell 把命令行上的 -Token 传进 Setup-DshEE。
+// irm | iex 不能传参；但 CI / 旧流程会用 `powershell -File setup.ps1 -Token x`，
+// 这种写法参数只在脚本级 $args 里，不会自动进函数参数。
+func setupTokenArgPowerShell() string {
+	return `$tokenArg = ''
+for ($i = 0; $i -lt $args.Count; $i++) {
+  $arg = [string]$args[$i]
+  if ($arg -eq '-Token' -and ($i + 1) -lt $args.Count) { $tokenArg = [string]$args[$i + 1]; break }
+  if ($arg -like '-Token=*') { $tokenArg = $arg.Substring(7); break }
+}
+`
 }
 
 // connectShell 是 setup.sh 的后半段：保存手动令牌或提示待导入文件，再装接入插件。
