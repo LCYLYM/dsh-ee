@@ -39,9 +39,8 @@ func (s *Server) handleDshFeedback(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	f := &store.Feedback{UserID: v.user.ID, AssetID: assetID, SessionRef: req.Session, MessageRef: req.Message, Vote: req.Vote}
-	if req.Note = strings.TrimSpace(req.Note); len(req.Note) > 500 {
-		req.Note = req.Note[:500]
-	}
+	// 按字符截断：列是字符长度，按字节切会把中文截成半个字符。
+	req.Note = truncate(req.Note, 500)
 	f.Note = req.Note
 	ctx := context.WithoutCancel(r.Context())
 	if err := s.store.RecordFeedback(ctx, f); err != nil {

@@ -63,8 +63,8 @@ func (s *Store) RecordUnanswered(ctx context.Context, assetID int64, kb, signal,
 	if question == "" {
 		return nil
 	}
-	if len(question) > 160 {
-		question = question[:160]
+	if len([]rune(question)) > 160 {
+		question = truncateRunes(question, 160)
 	}
 	if kb == "" {
 		kb = "-"
