@@ -104,7 +104,9 @@ export default async function (t) {
     await admin.getByText("每次 12 分钟").first().waitFor();
     await shot(admin, "report-monthly");
     const rep = await api(admin, "GET", `/api/admin/report/monthly?month=${month}&tz=480`);
-    assert(rep.data.report.active_users >= 1 && rep.data.params.minutesPerAppRun === 12, "报告数据：" + JSON.stringify(rep.data.report).slice(0, 300));
+    // 隔离模式下这个库是全新的，没有其它测试留下的调用记录；这里只断言报告结构、
+    // 用户数（admin + 刚通过 OIDC 登录的用户）和估算参数，不依赖前面的测试数据。
+    assert(rep.data.report.users >= 1 && rep.data.params.minutesPerAppRun === 12, "报告数据：" + JSON.stringify(rep.data.report).slice(0, 300));
     step("管理总览「导出月度报告」：可打印的报告页，估算参数可调");
   } finally {
     await api(admin, "PUT", "/api/admin/auth/oidc", { enabled: false, preset: "custom", name: "企业统一登录", issuer: "", clientId: "", clientSecret: "", scopes: "profile email", usernameClaim: "preferred_username", nameClaim: "name", emailClaim: "email", departmentClaim: "", groupsClaim: "groups", roleMappings: [], autoCreate: true });

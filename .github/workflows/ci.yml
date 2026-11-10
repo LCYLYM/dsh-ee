@@ -71,6 +71,9 @@ jobs:
     env:
       ADMIN_PW: e2e-admin-password-1
       E2E_BASE: http://127.0.0.1:8080
+      E2E_MANAGED: "1"
+      E2E_BIN: ${{ github.workspace }}/dist/dsh-ee
+      E2E_DSN: root:@tcp(127.0.0.1:4000)/
       CHROME: /usr/bin/google-chrome
     steps:
       - uses: actions/checkout@v5
@@ -92,22 +95,10 @@ jobs:
         run: |
           for i in $(seq 1 60); do mysql -h127.0.0.1 -P4000 -uroot -e 'select 1' >/dev/null 2>&1 && exit 0; sleep 2; done
           exit 1
-      - name: 启动 dsh-ee
-        run: |
-          mkdir -p /tmp/dsh-ee
-          DSH_EE_DSN='root:@tcp(127.0.0.1:4000)/dsh_ee' \
-          DSH_EE_SECRET_KEY="$(openssl rand -base64 32)" \
-          DSH_EE_BOOTSTRAP_ADMIN_PASSWORD="$ADMIN_PW" \
-          DSH_EE_DATA_DIR=/tmp/dsh-ee/data \
-            nohup ./dist/dsh-ee > /tmp/dsh-ee/server.log 2>&1 &
-          for i in $(seq 1 60); do curl -fs "$E2E_BASE/healthz" && exit 0; sleep 1; done
-          cat /tmp/dsh-ee/server.log && exit 1
       - run: npm ci --no-audit --no-fund
         working-directory: e2e
       - run: node run.mjs
         working-directory: e2e
-      - if: failure()
-        run: tail -200 /tmp/dsh-ee/server.log
       - if: always()
         uses: actions/upload-artifact@v4
         with:
