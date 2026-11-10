@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -161,6 +162,12 @@ func TestWorkbench(t *testing.T) {
 		} `json:"apps"`
 	}
 	_ = json.Unmarshal(raw, &cat)
+	cat.Apps = slices.DeleteFunc(cat.Apps, func(a struct {
+		Name      string          `json:"name"`
+		Workbench json.RawMessage `json:"workbench"`
+	}) bool {
+		return a.Name == systemHomeApp // 系统应用，home_test 单独测
+	})
 	if len(cat.Apps) != 1 || !strings.Contains(string(cat.Apps[0].Workbench), `"tool":"lookup"`) || !strings.Contains(string(cat.Apps[0].Workbench), `"crm-web"`) {
 		t.Fatalf("目录应原样带上工作台：%s", raw)
 	}

@@ -118,32 +118,43 @@ func (d dshClient) toolNames() []string {
 	r := d.rpc("tools/list", nil)
 	var out []string
 	for _, t := range r["result"].(map[string]any)["tools"].([]any) {
-		out = append(out, t.(map[string]any)["name"].(string))
+		name := t.(map[string]any)["name"].(string)
+		if strings.HasPrefix(name, "home__") { // 系统应用「工作台」的只读工具，home_test 单独测
+			continue
+		}
+		out = append(out, name)
 	}
 	slices.Sort(out)
 	return out
 }
 
+// systemHomeApp 是系统应用「工作台」的标识（api.workbenchHomeName），它对所有人都会下发。
+const systemHomeApp = "workbench"
+
+type catalogSkill struct {
+	Name           string `json:"name"`
+	Title          string `json:"title"`
+	Kind           string `json:"kind"`
+	Description    string `json:"description"`
+	ModelInvocable bool   `json:"model_invocable"`
+	UserInvocable  bool   `json:"user_invocable"`
+	Version        int    `json:"version"`
+}
+
+type catalogApp struct {
+	Name        string   `json:"name"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Icon        string   `json:"icon"`
+	Starters    []string `json:"starters"`
+	Launch      string   `json:"launch"`
+	Version     int      `json:"version"`
+	Missing     []string `json:"missing"`
+}
+
 type catalog struct {
-	Skills []struct {
-		Name           string `json:"name"`
-		Title          string `json:"title"`
-		Kind           string `json:"kind"`
-		Description    string `json:"description"`
-		ModelInvocable bool   `json:"model_invocable"`
-		UserInvocable  bool   `json:"user_invocable"`
-		Version        int    `json:"version"`
-	} `json:"skills"`
-	Apps []struct {
-		Name        string   `json:"name"`
-		Title       string   `json:"title"`
-		Description string   `json:"description"`
-		Icon        string   `json:"icon"`
-		Starters    []string `json:"starters"`
-		Launch      string   `json:"launch"`
-		Version     int      `json:"version"`
-		Missing     []string `json:"missing"`
-	} `json:"apps"`
+	Skills   []catalogSkill `json:"skills"`
+	Apps     []catalogApp   `json:"apps"`
 	Required []struct {
 		Name   string `json:"name"`
 		Reason string `json:"reason"`
@@ -168,6 +179,9 @@ func (d dshClient) catalog() catalog {
 	}
 	var c catalog
 	_ = json.Unmarshal(body, &c)
+	// 系统应用「工作台」对所有人都会下发（home_test 单独测它），这里去掉，断言只看测试自己建的。
+	c.Skills = slices.DeleteFunc(c.Skills, func(e catalogSkill) bool { return e.Name == systemHomeApp })
+	c.Apps = slices.DeleteFunc(c.Apps, func(e catalogApp) bool { return e.Name == systemHomeApp })
 	return c
 }
 
