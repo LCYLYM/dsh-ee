@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { BookOpen, Download, ExternalLink, FolderPlus, MessageSquare, Plus, Search, Upload, SearchX, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, formatTime, type KBase, type KBQASettings, type KBQuery, type KBSearchResult, type Scope } from "../lib/api";
+import { copyText } from "../lib/clipboard";
 import { useAction, useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
 import { scopeSummary } from "../lib/hub";
@@ -208,12 +209,8 @@ function KnowledgeSearch({ qaTitle }: { qaTitle: string }) {
   const named = (result?.data.docs ?? []).filter((d) => !groups.has(d.doc));
   const askInDSH = async () => {
     const text = `/kb-qa ${query.trim()}`;
-    try {
-      await navigator.clipboard.writeText(text);
-      notify(t("knowledge.askCopied", { name: qaTitle }));
-    } catch {
-      notify(text);
-    }
+    if (await copyText(text)) notify(t("knowledge.askCopied", { name: qaTitle }));
+    else notify(text);
   };
   return (
     <Card className="mb-6 p-5">
