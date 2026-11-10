@@ -10,6 +10,8 @@
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 
+**在线演示：[demo.hikariming.com](https://demo.hikariming.com/)**
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.zh-CN.png">
   <img alt="dsh-ee：企业现有系统与资产接入 dsh-ee，组装成微应用，在员工本机的 DSH 里运行" src="docs/images/hero-light.zh-CN.png">

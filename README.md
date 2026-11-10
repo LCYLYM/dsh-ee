@@ -11,6 +11,8 @@ English · [简体中文](./README.zh-CN.md)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 
+**Live demo: [demo.hikariming.com](https://demo.hikariming.com/)**
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
   <img alt="dsh-ee: existing systems and company assets flow into dsh-ee, get assembled into micro-apps, and run in each employee's DSH" src="docs/images/hero-light.png">
