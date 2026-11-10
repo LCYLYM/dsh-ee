@@ -63,9 +63,9 @@ export async function closeBrowser() {
  * 新开一个浏览器上下文。页面报错、5xx 都记下来，测试结束时由 run.mjs 判失败。
  * lang 固定界面语言（默认简体中文，选择器按中文写）。
  */
-export async function newPage(t, { lang = "zh-CN", locale, viewport = { width: 1440, height: 1000 } } = {}) {
+export async function newPage(t, { lang = "zh-CN", locale, viewport = { width: 1440, height: 1000 }, userAgent } = {}) {
   const b = await getBrowser();
-  const ctx = await b.newContext({ viewport, locale: locale ?? lang });
+  const ctx = await b.newContext({ viewport, locale: locale ?? lang, ...(userAgent ? { userAgent } : {}) });
   if (lang) await ctx.addInitScript((v) => localStorage.setItem("dsh-ee:lang", v), lang);
   const page = await ctx.newPage();
   page.on("pageerror", (e) => t.errors.push("pageerror: " + e.message));

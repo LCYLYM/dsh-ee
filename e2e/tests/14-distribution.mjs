@@ -49,7 +49,12 @@ export default async function (t) {
   const username = `distribution-${tag}`;
   const password = "distribution-password-1";
   assertEq((await api(admin, "POST", "/api/admin/users", { username, password })).status, 201, "创建员工");
-  const employee = await newPage(t);
+  // CI 的 Chrome 跑在 Linux 上，默认会看到「Windows 即将支持」；
+  // 这个测试验证的是 Mac 安装包，所以显式伪装成 Mac，且去掉 UA-CH 避免推断成 x64。
+  const employee = await newPage(t, { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36" });
+  await employee.addInitScript(() => {
+    Object.defineProperty(navigator, "userAgentData", { get: () => undefined });
+  });
   await login(employee, username, password);
   await employee.goto(`${BASE}/dsh`);
   await employee.getByRole("heading", { name: "① 下载 DSH Desktop" }).waitFor();
