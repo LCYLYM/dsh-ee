@@ -127,6 +127,7 @@ export default {
     desc: "修改后自动保存到服务端，对所有人生效。",
     resetDone: "已恢复默认设置",
     reset: "恢复默认",
+    resetConfirm: "恢复默认设置？企业名称、访问地址、品牌、接入方式、上游源、审核模式等全部设置都会被替换，当前修改会丢失。",
     basics: "基本信息",
     orgName: "企业名称",
     baseUrl: "访问地址",

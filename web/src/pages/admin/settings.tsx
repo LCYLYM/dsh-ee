@@ -6,6 +6,7 @@ import { Button, Card, cx, Field, inputBase, inputCls, PageHeader, Segmented, To
 import { DemoSettings } from "../../components/demo-import";
 import ConnectSettings from "./connect-settings";
 import { PageLink, useMenus } from "../../lib/menus";
+import { useConfirm } from "../../lib/confirm";
 import { Trans, useTranslation } from "react-i18next";
 
 /** 设置页的一节。id 用于页内目录与全局搜索定位（lib/search-index.ts）。 */
@@ -24,6 +25,7 @@ export function Section({ id, title, desc, children }: { id?: string; title: str
 export default function AdminSettings() {
   const { t } = useTranslation();
   const { settings: s, updateSettings, resetSettings, notify } = useStore();
+  const confirm = useConfirm();
   const set = <K extends keyof Settings>(key: K, patch: Partial<Settings[K]> | Settings[K]) =>
     updateSettings((cur) => ({
       ...cur,
@@ -39,7 +41,8 @@ export default function AdminSettings() {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => {
+            onClick={async () => {
+              if (!(await confirm({ kind: "reset", description: t("settingsAdmin.resetConfirm") }))) return;
               resetSettings();
               notify(t("settingsAdmin.resetDone"));
             }}
