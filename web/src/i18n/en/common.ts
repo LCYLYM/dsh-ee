@@ -37,6 +37,12 @@ export default {
     },
     demo: "This is a public demo shared by everyone. Don't enter real keys or data.",
     demoReset: "This is a public demo shared by everyone, reset {{reset}}. Don't enter real keys or data.",
+    demoNext: {
+      left: "Next reset in {{left}} ({{time}})",
+      hm: "{{h}} h {{m}} min",
+      m: "{{m}} min",
+      soon: "Resetting in a moment. Anything you're doing now may be lost.",
+    },
     language: "Language",
     theme: {
       label: "Theme: {{mode}}",

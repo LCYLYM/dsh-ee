@@ -41,8 +41,10 @@ type Config struct {
 	DataReadDSN string
 	// 公开演示站（DSH_EE_DEMO_MODE）：登录页显示初始管理员账号，关掉改密码等会把别人锁在外面的操作，
 	// 对外请求只许连本机。DemoReset 是给访客看的重置周期说明，如「每 6 小时」。
-	DemoMode  bool
-	DemoReset string
+	// DemoResetEvery 是实际的重置间隔（和 crontab 一致），用来在登录页算下次重置的时间点；0 表示不显示。
+	DemoMode       bool
+	DemoReset      string
+	DemoResetEvery time.Duration
 }
 
 func Load() (*Config, error) {
@@ -98,6 +100,16 @@ func Load() (*Config, error) {
 		c.DemoMode = b
 	}
 	c.DemoReset = strings.TrimSpace(os.Getenv("DSH_EE_DEMO_RESET"))
+	if v := os.Getenv("DSH_EE_DEMO_RESET_EVERY"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("DSH_EE_DEMO_RESET_EVERY: %w", err)
+		}
+		if d < time.Minute || d > 24*time.Hour {
+			return nil, errors.New("DSH_EE_DEMO_RESET_EVERY 要在 1m 到 24h 之间")
+		}
+		c.DemoResetEvery = d
+	}
 	if c.DemoMode && c.BootstrapAdminPassword == "" {
 		return nil, errors.New("DSH_EE_DEMO_MODE 需要同时设置 DSH_EE_BOOTSTRAP_ADMIN_PASSWORD：登录页要把演示账号显示出来")
 	}

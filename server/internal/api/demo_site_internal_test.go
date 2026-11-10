@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 )
 
 // 演示站的对外请求只能连 dsh-ee 自己监听的端口；正常部署不受影响。
@@ -49,6 +50,29 @@ func TestDemoSiteBlockedRoutesExist(t *testing.T) {
 	for p := range demoSiteBlocked {
 		if !have[p] {
 			t.Errorf("demoSiteBlocked 里的 %q 不在路由表里", p)
+		}
+	}
+}
+
+// 下次重置按 cron「0 */N * * *」对齐：当地零点起每隔 N 一次，跨天回到零点。
+func TestNextDemoReset(t *testing.T) {
+	loc := time.FixedZone("UTC+9", 9*3600)
+	at := func(h, m int) time.Time { return time.Date(2026, 11, 10, h, m, 0, 0, loc) }
+	cases := []struct {
+		now   time.Time
+		every time.Duration
+		want  time.Time
+	}{
+		{at(15, 45), 6 * time.Hour, at(18, 0)},
+		{at(18, 0), 6 * time.Hour, at(0, 0).AddDate(0, 0, 1)},
+		{at(23, 59), 6 * time.Hour, at(0, 0).AddDate(0, 0, 1)},
+		{at(0, 0), 6 * time.Hour, at(6, 0)},
+		{at(21, 30), 5 * time.Hour, at(0, 0).AddDate(0, 0, 1)}, // 0,5,10,15,20 点，20 点之后是第二天零点
+		{at(10, 7), 30 * time.Minute, at(10, 30)},
+	}
+	for _, c := range cases {
+		if got := nextDemoReset(c.now, c.every); !got.Equal(c.want) {
+			t.Errorf("now=%s every=%s：得到 %s，应为 %s", c.now.Format("15:04"), c.every, got, c.want)
 		}
 	}
 }
