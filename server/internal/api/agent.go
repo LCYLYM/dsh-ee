@@ -727,8 +727,14 @@ func (s *Server) agentForward(orig *http.Request, p *Principal, act *agentAction
 		return agentError("内部错误：" + err.Error())
 	}
 	req.RemoteAddr = orig.RemoteAddr
-	if xff := orig.Header.Values("X-Forwarded-For"); len(xff) > 0 {
-		req.Header["X-Forwarded-For"] = xff
+	// 内部转发仍是一次 HTTP 请求：保留 Host/TLS 与代理头，
+	// 否则 publicBase 会生成 "http://" 这种没有 host 的绝对链接。
+	req.Host = orig.Host
+	req.TLS = orig.TLS
+	for _, h := range []string{"X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto"} {
+		if v := orig.Header.Values(h); len(v) > 0 {
+			req.Header[h] = v
+		}
 	}
 	if rd.Len() > 0 {
 		req.Header.Set("Content-Type", "application/json")
