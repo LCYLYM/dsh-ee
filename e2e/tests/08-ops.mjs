@@ -49,7 +49,7 @@ export default async function (t) {
   await shot(emp, "ops-workbench-empty");
 
   // LDAP：连不上的地址 → 逐步结果里第一步失败；不保存
-  await page.goto(`${BASE}/admin/settings`);
+  await page.goto(`${BASE}/admin/auth`);
   await page.getByText("开启 LDAP 登录").waitFor();
   await page.getByLabel("目录地址").fill("ldap://127.0.0.1:1");
   await page.getByLabel(/^服务账号(?!密码)/).fill("cn=svc,dc=acme,dc=local");

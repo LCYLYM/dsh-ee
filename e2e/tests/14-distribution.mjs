@@ -11,7 +11,7 @@ export default async function (t) {
   const version = `9.9.9-e2e-${tag}`;
   const file = `desktop-${tag}.zip`;
   const content = Buffer.from(`desktop-e2e-${tag}`);
-  const dataDir = process.env.E2E_DATA_DIR || "/tmp/dsh-ee-e2e/data";
+  const dataDir = process.env.E2E_DATA_DIR || "/tmp/dsh-ee/data";
   const localPath = path.join(dataDir, "dsh-releases", "mac-arm64", file);
   fs.mkdirSync(path.dirname(localPath), { recursive: true });
   fs.writeFileSync(localPath, content);
@@ -30,8 +30,8 @@ export default async function (t) {
     cwd: path.resolve(testDir, "../../server"),
     env: {
       ...process.env,
-      E2E_DSN: process.env.E2E_DSN || "root:@tcp(127.0.0.1:4001)/",
-      E2E_DB: process.env.E2E_DB || "dsh_ee_e2e",
+      E2E_DSN: process.env.E2E_DSN || "root:@tcp(127.0.0.1:4000)/",
+      E2E_DB: process.env.E2E_DB || "dsh_ee",
       E2E_RELEASE: JSON.stringify(release),
     },
     stdio: "pipe",

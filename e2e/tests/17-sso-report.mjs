@@ -59,7 +59,7 @@ export default async function (t) {
   const idp = await fakeIdP({ sub: `sub-${tag}`, username, name: "单点 测试", department: "研发部", groups: ["/xinghe/dev"] });
   try {
     // ---- 系统设置：配置企业统一登录 ----
-    await admin.goto(`${BASE}/admin/settings`);
+    await admin.goto(`${BASE}/admin/auth`);
     await admin.getByText("开启企业统一登录").waitFor();
     await admin.locator("text=开启企业统一登录").locator("xpath=../..").getByRole("switch").click();
     await admin.getByRole("button", { name: "Keycloak", exact: true }).click();
