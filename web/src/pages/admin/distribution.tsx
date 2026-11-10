@@ -147,6 +147,7 @@ export default function AdminDistribution() {
         <div className="space-y-6">
           <ReleaseTable target="mac-arm64" title={t("distributionAdmin.arm64")} rows={rows} busy={busy} act={run} />
           <ReleaseTable target="mac-x64" title={t("distributionAdmin.x64")} rows={rows} busy={busy} act={run} />
+          <ReleaseTable target="win-x64" title={t("distributionAdmin.windows")} rows={rows} busy={busy} act={run} />
         </div>
       </LoadState>
     </div>

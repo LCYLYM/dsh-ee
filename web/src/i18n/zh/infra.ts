@@ -68,7 +68,7 @@ export default {
     recommend: "设为推荐",
     done: { mirror: "已开始下载", recommend: "已设为推荐", delete: "已删除本地安装包" },
     title: "DSH 分发",
-    desc: "同步 DeepSeek 官方 macOS 安装包，校验后提供给员工下载。每个芯片架构可设置一个推荐版本。",
+    desc: "同步 DeepSeek 官方 macOS / Windows 安装包，校验后提供给员工下载。每个芯片架构可设置一个推荐版本。",
     disabledNote: "DSH 分发当前已关闭，员工门户不显示下载入口。可在<link>系统设置</link>中开启。",
     empty: "尚未同步到版本，请点右上角「立即检查」。",
     autoSync: "自动同步",
@@ -78,5 +78,6 @@ export default {
     offerDmgDesc: "官方没有哈希，员工页会注明未经官方校验",
     arm64: "Apple 芯片（mac-arm64）",
     x64: "Intel（mac-x64）",
+    windows: "Windows（win-x64）",
   },
 };

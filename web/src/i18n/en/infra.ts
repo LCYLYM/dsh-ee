@@ -70,7 +70,7 @@ export default {
     recommend: "Set as recommended",
     done: { mirror: "Download started", recommend: "Recommended version updated", delete: "Local installer deleted" },
     title: "DSH distribution",
-    desc: "Sync official DeepSeek macOS installers, verify them, and offer them to employees. Each chip architecture can have one recommended version.",
+    desc: "Sync official DeepSeek macOS / Windows installers, verify them, and offer them to employees. Each chip architecture can have one recommended version.",
     disabledNote: "DSH distribution is off, so the employee portal shows no download link. Turn it on in <link>Settings</link>.",
     empty: "No releases yet. Select Check now above.",
     autoSync: "Automatic sync",
@@ -80,5 +80,6 @@ export default {
     offerDmgDesc: "No official hash is available; the employee page will show a warning",
     arm64: "Apple silicon (mac-arm64)",
     x64: "Intel (mac-x64)",
+    windows: "Windows (win-x64)",
   },
 } satisfies Messages<typeof zh>;

@@ -57,11 +57,23 @@ func newReleaseFixture(t *testing.T, mode string) *releaseFixture {
 	f.manifestSHA = base64.StdEncoding.EncodeToString(fullSum[:])
 	f.manifestSize = int64(len(f.content))
 	f.upstream = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/feeds/mac-arm64/nightly-mac.yml", "/feeds/mac-x64/nightly-mac.yml":
+		// 每个平台一个 feed：macOS 是 nightly-mac.yml，Windows 是 nightly.yml。
+		if rest, ok := strings.CutPrefix(r.URL.Path, "/feeds/"); ok {
+			target, _, ok := strings.Cut(rest, "/")
+			if !ok {
+				http.NotFound(w, r)
+				return
+			}
+			asset := "/bin/dsh.zip"
+			if target == "win-x64" {
+				asset = "/bin/dsh-win.exe"
+			}
 			w.Header().Set("Content-Type", "text/yaml")
-			_, _ = fmt.Fprintf(w, "version: 1.2.3\nfiles:\n  - url: '%s/bin/dsh.zip'\n    sha512: '%s'\n    size: %d\nreleaseDate: '2026-11-02T12:00:00Z'\n", f.upstream.URL, f.manifestSHA, f.manifestSize)
-		case "/bin/dsh.zip", "/desktop/dsh.dmg":
+			_, _ = fmt.Fprintf(w, "version: 1.2.3\nfiles:\n  - url: '%s%s'\n    sha512: '%s'\n    size: %d\nreleaseDate: '2026-11-02T12:00:00Z'\n", f.upstream.URL, asset, f.manifestSHA, f.manifestSize)
+			return
+		}
+		switch r.URL.Path {
+		case "/bin/dsh.zip", "/bin/dsh-win.exe", "/desktop/dsh.dmg":
 			f.downloads.Add(1)
 			_, _ = w.Write(f.content)
 		default:
@@ -70,10 +82,16 @@ func newReleaseFixture(t *testing.T, mode string) *releaseFixture {
 	}))
 	t.Cleanup(f.upstream.Close)
 	s := New(st, nil, Options{DataDir: t.TempDir()}, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	for target, feed := range s.releaseFeeds {
-		_ = feed
-		s.releaseFeeds[target] = f.upstream.URL + "/feeds/" + target + "/nightly-mac.yml"
-		s.releaseDMGs[target] = f.upstream.URL + "/desktop/dsh.dmg"
+	for target := range s.releaseFeeds {
+		feed := "nightly-mac.yml"
+		if target == "win-x64" {
+			feed = "nightly.yml"
+		}
+		s.releaseFeeds[target] = f.upstream.URL + "/feeds/" + target + "/" + feed
+		// 只有 macOS 有官方 DMG，测试里也只给它准备下载地址
+		if s.releaseDMGs[target] != "" {
+			s.releaseDMGs[target] = f.upstream.URL + "/desktop/dsh.dmg"
+		}
 	}
 	set := store.DefaultSettings()
 	set.Distribution.AutoSync = mode
@@ -107,13 +125,18 @@ func TestDshReleaseNotifyDoesNotDownload(t *testing.T) {
 		t.Fatalf("notify 模式不应下载安装包：%d", f.downloads.Load())
 	}
 	items, err := f.st.ListDshReleases(context.Background(), "")
-	if err != nil || len(items) != 2 {
-		t.Fatalf("应记录两个 Mac target：%d %v", len(items), err)
+	if err != nil || len(items) != 3 {
+		t.Fatalf("应记录三个平台的 target：%d %v", len(items), err)
 	}
+	kinds := map[string]string{}
 	for _, r := range items {
-		if r.State != store.ReleaseAvailable || r.Kind != "zip" || r.SHA512 == "" {
+		if r.State != store.ReleaseAvailable || r.SHA512 == "" {
 			t.Fatalf("清单记录不对：%+v", r)
 		}
+		kinds[r.Target] = r.Kind
+	}
+	if kinds["mac-arm64"] != "zip" || kinds["mac-x64"] != "zip" || kinds["win-x64"] != "exe" {
+		t.Fatalf("安装包类型应按后缀区分：%v", kinds)
 	}
 }
 
@@ -262,6 +285,26 @@ func TestDshReleaseDMGHash(t *testing.T) {
 	}
 	if r.State != store.ReleaseMirrored || r.Size != int64(len(f.content)) || r.SHA512 != f.manifestSHA {
 		t.Fatalf("DMG 应自行计算大小和 sha512：%+v", r)
+	}
+}
+
+func TestDshReleaseWindowsHasNoDmg(t *testing.T) {
+	f := newReleaseFixture(t, "mirror")
+	f.setMode(t, "mirror", true)
+	if err := f.s.syncDshReleases(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	items, err := f.st.ListDshReleases(context.Background(), "win-x64")
+	if err != nil || len(items) != 1 {
+		t.Fatalf("Windows 只应有一个安装包（没有 DMG）：%v %v", items, err)
+	}
+	r := items[0]
+	if r.Kind != "exe" || r.State != store.ReleaseMirrored || r.SHA512 != f.manifestSHA {
+		t.Fatalf("Windows 安装包：%+v", r)
+	}
+	// 来自官方清单的安装包（zip / exe）都算已校验，只有 DMG 是例外
+	if ok, _ := publicDshRelease(r, "http://ee")["verified"].(bool); !ok {
+		t.Fatal("exe 的哈希来自官方清单，应标记为已验证")
 	}
 }
 
