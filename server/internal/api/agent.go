@@ -130,6 +130,7 @@ var agentExcluded = map[string]string{
 	"PUT /api/admin/report/params":              "报告的估算参数由管理员在报告页上调",
 	"POST /api/auth/login":                      "登录由人完成",
 	"POST /api/auth/demo-login":                 "演示站访客在登录页上点选身份",
+	"GET /demo/intro/{lang}":                    "演示站首页的介绍视频",
 	"POST /api/auth/logout":                     "会话由网页管理",
 	"POST /api/auth/password":                   "凭据只在网页上由本人操作",
 	"POST /api/device/code":                     "设备登录协议入口",

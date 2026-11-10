@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -26,6 +29,8 @@ type DemoSite struct {
 	Reset string
 	// 实际的重置间隔，和 crontab 一致（如 6h 对应 0 */6 * * *）；用来给访客算下次重置时间。0 表示不算
 	ResetEvery time.Duration
+	// 介绍视频所在目录（intro-zh.mp4、intro-en.mp4），首页播放；空则不显示
+	VideoDir string
 	// dsh-ee 自己监听的端口：对外请求只许连本机的这个端口（示例连接就是连自己）
 	selfPort string
 }
@@ -138,6 +143,8 @@ type demoSiteInfo struct {
 	NextReset *time.Time `json:"next_reset,omitempty"`
 	// 登录页上的场景卡片：以哪位示例员工的身份、打开哪个应用、问什么
 	Personas []demoGuideStep `json:"personas"`
+	// 有介绍视频的语言（zh / en），首页按界面语言挑一个播放；没有就不给
+	Videos []string `json:"videos,omitempty"`
 }
 
 // nextDemoReset 按 cron「0 */N * * *」的规律算下次重置：从当地零点起每隔 every 一次，到第二天零点重新对齐。
@@ -158,7 +165,7 @@ func (s *Server) demoSiteInfo() *demoSiteInfo {
 	if d == nil {
 		return nil
 	}
-	info := &demoSiteInfo{Username: d.Username, Password: d.Password, Reset: d.Reset, Personas: demoGuide()}
+	info := &demoSiteInfo{Username: d.Username, Password: d.Password, Reset: d.Reset, Personas: demoGuide(), Videos: d.videos()}
 	if d.ResetEvery > 0 {
 		next := nextDemoReset(time.Now(), d.ResetEvery)
 		info.NextReset = &next
@@ -212,4 +219,40 @@ func isDemoUser(name string) bool {
 		}
 	}
 	return false
+}
+
+// demoVideoLangs 是介绍视频的语言，文件名 intro-<语言>.mp4。
+var demoVideoLangs = []string{"zh", "en"}
+
+// videos 返回目录里实际有的介绍视频语言。
+func (d *DemoSite) videos() []string {
+	if d.VideoDir == "" {
+		return nil
+	}
+	var out []string
+	for _, l := range demoVideoLangs {
+		if st, err := os.Stat(filepath.Join(d.VideoDir, "intro-"+l+".mp4")); err == nil && st.Mode().IsRegular() {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// handleDemoVideo 播放演示站首页的介绍视频。只认固定的文件名，不拼访客给的路径；
+// http.ServeFile 支持 Range，拖进度条、手机播放都要用到。正常部署 404。
+func (s *Server) handleDemoVideo(w http.ResponseWriter, r *http.Request) {
+	d := s.opts.DemoSite
+	lang := r.PathValue("lang")
+	if d == nil || d.VideoDir == "" || !slices.Contains(demoVideoLangs, lang) {
+		http.NotFound(w, r)
+		return
+	}
+	file := filepath.Join(d.VideoDir, "intro-"+lang+".mp4")
+	if st, err := os.Stat(file); err != nil || !st.Mode().IsRegular() {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "video/mp4")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	http.ServeFile(w, r, file)
 }

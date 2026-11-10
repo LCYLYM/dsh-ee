@@ -13,6 +13,8 @@
 - 所有对外请求只许连 dsh-ee 自己（示例连接就是连自己），按解析后的 IP 判断；
   试连别的地址、云主机元数据接口都会被拒。
 - 建应用、知识库、数据中台、管理模式这些照常可用，重置以后就清掉了。
+- 设了 `DSH_EE_DEMO_VIDEO_DIR` 时，首页首屏播放这个目录里的 `intro-zh.mp4` / `intro-en.mp4`（按界面语言挑），
+  由 dsh-ee 直接从磁盘读，不打进二进制。视频怎么生成、怎么压缩见 [promo/README.md](../../promo/README.md)。
 
 被关掉的接口在 `server/internal/api/demo_site.go` 的 `demoSiteBlocked` 里。
 

@@ -26,10 +26,24 @@ ffmpeg -i out/intro-zh.mp4 -vf "fps=8,scale=720:-1:flags=lanczos,split[a][b];[a]
 ffmpeg -i out/intro-en.mp4 -vf "（同上）" ../docs/images/intro.gif
 ```
 
+## 放到演示站首页
+
+演示站首页播放的是压缩过的版本（约 3 MB，`faststart` 让浏览器边下边播）：
+
+```sh
+mkdir -p ~/dsh-ee-demo/video
+for l in zh en; do
+  ffmpeg -i out/intro-$l.mp4 -an -c:v libx264 -preset slow -crf 27 -pix_fmt yuv420p -movflags +faststart ~/dsh-ee-demo/video/intro-$l.mp4
+done
+```
+
+再在 `~/dsh-ee-demo/demo.env` 里设 `DSH_EE_DEMO_VIDEO_DIR=$HOME/dsh-ee-demo/video`，`demo.sh reset`。
+
 ## 重新截图
 
 界面改版后重截：
 
 1. 起一个演示模式的 dsh-ee（`DSH_EE_DEMO_MODE=1`），用管理员导入示例公司。
 2. 用演示员工周航走一遍设备登录，用拿到的令牌经 `/mcp` 调几次 `demo-crm__*` 工具，让「最近调用」有内容。
-3. `BASE=http://127.0.0.1:8097 ADMIN_PASSWORD=… CHROME=<chromium 路径> node scripts/shots.mjs`（用 `e2e/` 里装好的 playwright-core）。
+3. 截图的机器要有 emoji 字体，不然应用图标是空方框（没有 root 的话可以把 NotoColorEmoji.ttf 放进 `~/.local/share/fonts`）。
+4. `BASE=http://127.0.0.1:8097 ADMIN_PASSWORD=… CHROME=<chromium 路径> node scripts/shots.mjs`（用 `e2e/` 里装好的 playwright-core）。
