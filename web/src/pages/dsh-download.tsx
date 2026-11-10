@@ -81,8 +81,12 @@ export default function DshDownload() {
   const { connected, timedOut } = useConnection();
   const arch = useArchitecture();
   const isMac = /Mac/i.test(navigator.userAgent);
-  const targets: DshTarget[] = arch === "arm" ? ["mac-arm64"] : arch === "x64" ? ["mac-x64"] : ["mac-arm64", "mac-x64"];
+  const isWindows = /Win/i.test(navigator.userAgent);
+  const macTargets: DshTarget[] = arch === "arm" ? ["mac-arm64"] : arch === "x64" ? ["mac-x64"] : ["mac-arm64", "mac-x64"];
+  // 只有 macOS 分芯片架构；Windows 只有一个 x64 安装包。
+  const targets: DshTarget[] = isMac ? macTargets : isWindows ? ["win-x64"] : [];
   const releases = data?.releases ?? [];
+  const rows = releases.filter((r) => targets.includes(r.target));
 
   if (data && !data.enabled) return <Card className="p-12 text-center text-sm text-neutral-500">{t("download.disabled")}</Card>;
 
@@ -91,24 +95,24 @@ export default function DshDownload() {
       <PageHeader title={t("download.title")} desc={t("download.desc")} />
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
         <div className="space-y-6">
-          {!isMac ? (
+          {!isMac && !isWindows ? (
             <Card className="p-12 text-center">
               <Monitor className="mx-auto mb-3 text-neutral-400" size={28} />
-              <p className="text-sm text-neutral-500">{t("download.windowsSoon")}</p>
+              <p className="text-sm text-neutral-500">{t("download.otherPlatform")}</p>
             </Card>
           ) : (
             <>
               <Card className="overflow-hidden">
                 <div className="flex items-start gap-3 px-5 py-5">
-                  <Apple className="mt-0.5 text-neutral-700" size={22} />
+                  {isMac ? <Apple className="mt-0.5 text-neutral-700" size={22} /> : <Monitor className="mt-0.5 text-neutral-700" size={22} />}
                   <div>
                     <h2 className="font-semibold text-neutral-900">{t("download.stepDownload")}</h2>
-                    <p className="mt-1 text-sm text-neutral-500">{t("download.unzip")}</p>
-                    {arch === "unknown" && <p className="mt-1 text-sm text-neutral-500">{t("download.chooseChip")}</p>}
+                    <p className="mt-1 text-sm text-neutral-500">{isMac ? t("download.unzip") : t("download.winInstall")}</p>
+                    {isMac && arch === "unknown" && <p className="mt-1 text-sm text-neutral-500">{t("download.chooseChip")}</p>}
                   </div>
                 </div>
-                {targets.map((target) => releases.filter((r) => r.target === target).map((r) => <DownloadRow key={r.id} release={r} title={t(`download.target.${target}`)} />))}
-                {!releases.length && <div className="border-t border-neutral-100 px-5 py-8 text-center text-sm text-neutral-500">{t("download.empty")}</div>}
+                {rows.map((r) => <DownloadRow key={r.id} release={r} title={t(`download.target.${r.target}`)} />)}
+                {!rows.length && <div className="border-t border-neutral-100 px-5 py-8 text-center text-sm text-neutral-500">{t("download.empty")}</div>}
                 <div className="flex items-center gap-2 border-t border-neutral-100 bg-neutral-50 px-5 py-3 text-xs text-neutral-500">
                   <ShieldCheck size={14} /> {t("download.hashNote")}
                 </div>
@@ -118,7 +122,7 @@ export default function DshDownload() {
                 <CheckCircle2 className="mt-0.5 text-neutral-700" size={22} />
                 <div>
                   <h2 className="font-semibold text-neutral-900">{t("download.stepOpen")}</h2>
-                  <p className="mt-1 text-sm text-neutral-500">{t("download.openDesc")}</p>
+                  <p className="mt-1 text-sm text-neutral-500">{isMac ? t("download.openDesc") : t("download.winQuitDesc")}</p>
                 </div>
               </Card>
 
@@ -130,7 +134,7 @@ export default function DshDownload() {
                     <p className="mt-1 text-sm text-neutral-500">{t("download.commandDesc")}</p>
                   </div>
                 </div>
-                <CopyBox text={`curl -fsSL ${baseUrl}/setup.sh | sh`} />
+                <CopyBox text={isMac ? `curl -fsSL ${baseUrl}/setup.sh | sh` : `irm ${baseUrl}/setup.ps1 | iex`} />
               </Card>
 
               <Card className="p-5">

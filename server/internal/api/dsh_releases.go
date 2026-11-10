@@ -26,12 +26,24 @@ var (
 	dshReleaseFeedURLs = map[string]string{
 		"mac-arm64": "https://download.deepseek.com/dsh-desk/feeds/mac-arm64/nightly-mac.yml",
 		"mac-x64":   "https://download.deepseek.com/dsh-desk/feeds/mac-x64/nightly-mac.yml",
+		"win-x64":   "https://download.deepseek.com/dsh-desk/feeds/win-x64/nightly.yml",
 	}
+	// DMG 是 macOS 专有的补充安装包（官方不提供哈希），没有对应 feed 的平台不会出现在这里。
 	dshReleaseDMGURLs = map[string]string{
 		"mac-arm64": "https://download.deepseek.com/desktop/dsh-latest-macos-arm64.dmg",
 		"mac-x64":   "https://download.deepseek.com/desktop/dsh-latest-macos-x64.dmg",
 	}
 )
+
+// releaseKind 按官方安装包文件名判断类型：Windows 是 exe，macOS 是 zip。
+// 认不出来的后缀按 zip 处理，免得新平台漏进来时整批同步失败。
+func releaseKind(file string) string {
+	switch strings.ToLower(path.Ext(file)) {
+	case ".exe", ".msi":
+		return "exe"
+	}
+	return "zip"
+}
 
 func (s *Server) initDshReleases() {
 	s.releaseFeeds = map[string]string{}
@@ -111,7 +123,9 @@ func (s *Server) fetchDshManifest(ctx context.Context, target string) (*dshManif
 	return &m, nil
 }
 
-func (s *Server) zipFromManifest(target string, m *dshManifest) (*store.DshRelease, error) {
+// assetFromManifest 从清单生成「官方给了哈希」的安装包：macOS 是 zip，Windows 是 exe。
+// 类型按安装包文件名后缀判断，不写死，加了新平台不用再改这里。
+func (s *Server) assetFromManifest(target string, m *dshManifest) (*store.DshRelease, error) {
 	if m.Version == "" || m.ReleaseDate == "" {
 		return nil, errors.New("清单缺少版本或发布日期")
 	}
@@ -119,7 +133,7 @@ func (s *Server) zipFromManifest(target string, m *dshManifest) (*store.DshRelea
 	if err != nil {
 		return nil, fmt.Errorf("发布日期格式错误：%w", err)
 	}
-	r := &store.DshRelease{Target: target, Kind: "zip", Version: m.Version, ReleasedAt: releasedAt, State: store.ReleaseAvailable}
+	r := &store.DshRelease{Target: target, Version: m.Version, ReleasedAt: releasedAt, State: store.ReleaseAvailable}
 	if len(m.Files) > 0 {
 		r.UpstreamURL, r.SHA512, r.Size = m.Files[0].URL, m.Files[0].SHA512, m.Files[0].Size
 	}
@@ -138,6 +152,7 @@ func (s *Server) zipFromManifest(target string, m *dshManifest) (*store.DshRelea
 	}
 	u, _ := url.Parse(r.UpstreamURL)
 	r.File = path.Base(u.Path)
+	r.Kind = releaseKind(r.File)
 	if _, err := s.releasePartPath(r); err != nil {
 		return nil, err
 	}
@@ -145,15 +160,18 @@ func (s *Server) zipFromManifest(target string, m *dshManifest) (*store.DshRelea
 }
 
 func (s *Server) dmgFromManifest(target string, m *dshManifest) (*store.DshRelease, error) {
+	if s.releaseDMGs[target] == "" {
+		return nil, errors.New("该平台没有官方 DMG")
+	}
 	r := &store.DshRelease{Target: target, Kind: "dmg", Version: m.Version, State: store.ReleaseAvailable, UpstreamURL: s.releaseDMGs[target]}
 	if !s.releaseURLAllowed(r.UpstreamURL) {
 		return nil, errors.New("DMG 地址不在官方白名单")
 	}
-	zip, err := s.zipFromManifest(target, m)
+	asset, err := s.assetFromManifest(target, m)
 	if err != nil {
 		return nil, err
 	}
-	r.ReleasedAt = zip.ReleasedAt
+	r.ReleasedAt = asset.ReleasedAt
 	// 官方 DMG 地址固定不变，本地文件名带上版本号，免得新版本覆盖旧版本。
 	r.File = fmt.Sprintf("deepseek-harness-%s-%s.dmg", m.Version, target)
 	if _, err := s.releasePartPath(r); err != nil {
@@ -194,14 +212,14 @@ func (s *Server) syncDshReleases(ctx context.Context) error {
 			errs = append(errs, fmt.Errorf("%s：%w", target, err))
 			continue
 		}
-		zip, err := s.zipFromManifest(target, m)
+		asset, err := s.assetFromManifest(target, m)
 		if err == nil {
-			err = s.upsertDshRelease(ctx, zip)
+			err = s.upsertDshRelease(ctx, asset)
 		}
 		if err != nil {
-			errs = append(errs, fmt.Errorf("%s zip：%w", target, err))
+			errs = append(errs, fmt.Errorf("%s 安装包：%w", target, err))
 		}
-		if set.Distribution.OfferDmg {
+		if set.Distribution.OfferDmg && s.releaseDMGs[target] != "" {
 			dmg, dmgErr := s.dmgFromManifest(target, m)
 			if dmgErr == nil {
 				dmgErr = s.upsertDshRelease(ctx, dmg)

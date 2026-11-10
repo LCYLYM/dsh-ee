@@ -51,13 +51,13 @@ export interface Plugin {
   submittedAt?: number;
 }
 
-export type DshTarget = "mac-arm64" | "mac-x64";
+export type DshTarget = "mac-arm64" | "mac-x64" | "win-x64";
 export type DshReleaseState = "available" | "downloading" | "mirrored" | "failed" | "removed";
 
 export interface DshRelease {
   id: number;
   target: DshTarget;
-  kind: "zip" | "dmg";
+  kind: "zip" | "dmg" | "exe";
   version: string;
   released_at: string;
   size: number;
