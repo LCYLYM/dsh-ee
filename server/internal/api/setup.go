@@ -385,15 +385,14 @@ echo "以后在 $BASE/hub 启用新的能力，DSH 会自动同步，不用再�
 `
 }
 
-// connectPowerShell 是 setup.ps1 的后半段。
-func (s *Server) connectPowerShell(r *http.Request) string {
-	pkg, market := s.connectSetup(r)
-	tail := `
+// setupEnvPowerShell 是 setup.ps1 里写 .env 的那段；独立出来，Windows 测试可以直接执行它。
+func setupEnvPowerShell() string {
+	return `
   $EnvFile = Join-Path $DshDir '.env'
   if (-not $DeviceLogin) {
     New-Item -ItemType Directory -Force -Path $DshDir | Out-Null
     $lines = @()
-    if (Test-Path $EnvFile) { $lines = Get-Content $EnvFile | Where-Object { $_ -notmatch '^` + connectTokenEnv + `=' } }
+    if (Test-Path $EnvFile) { $lines = @(Get-Content $EnvFile | Where-Object { $_ -notmatch '^` + connectTokenEnv + `=' }) }
     $lines += "` + connectTokenEnv + `=$Token"
     # .NET 默认写无 BOM 的 UTF-8；Set-Content -Encoding utf8 在 PowerShell 5 会加 BOM，
     # Node 的 process.loadEnvFile 会把 BOM 当成变量名的一部分，DSHEE_TOKEN 就读不到。
@@ -408,6 +407,13 @@ func (s *Server) connectPowerShell(r *http.Request) string {
     }
   }
 `
+}
+
+// connectPowerShell 是 setup.ps1 的后半段。
+func (s *Server) connectPowerShell(r *http.Request) string {
+	pkg, market := s.connectSetup(r)
+	tail := setupEnvPowerShell()
+
 	if pkg == "" {
 		tail += `  Write-Host ''
   Write-Host '管理员还没有发布 DSH 接入插件；发布后重新运行本脚本即可接入企业技能与系统。'
