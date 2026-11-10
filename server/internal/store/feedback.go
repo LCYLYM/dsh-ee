@@ -70,8 +70,8 @@ func (s *Store) RecordUnanswered(ctx context.Context, assetID int64, kb, signal,
 		kb = "-"
 	}
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO unanswered (asset_id, kb, signal, question, count, last_at) VALUES (?, ?, ?, ?, 1, ?)
-		 ON DUPLICATE KEY UPDATE count = count + 1, last_at = VALUES(last_at)`,
+		"INSERT INTO unanswered (asset_id, kb, `signal`, question, count, last_at) VALUES (?, ?, ?, ?, 1, ?)"+
+			" ON DUPLICATE KEY UPDATE count = count + 1, last_at = VALUES(last_at)",
 		assetID, kb, signal, question, now())
 	return err
 }
@@ -82,7 +82,7 @@ func (s *Store) UnansweredFor(ctx context.Context, assetID int64, limit int) ([]
 		limit = 10
 	}
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, asset_id, kb, signal, question, count, last_at FROM unanswered WHERE asset_id = ? ORDER BY last_at DESC LIMIT ?",
+		"SELECT id, asset_id, kb, `signal`, question, count, last_at FROM unanswered WHERE asset_id = ? ORDER BY last_at DESC LIMIT ?",
 		assetID, limit)
 	if err != nil {
 		return nil, err
