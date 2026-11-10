@@ -12,6 +12,7 @@ import { useLabels } from "../lib/labels";
 import { pluginPath } from "../components/plugin-card";
 import { LoadState, ErrorNote } from "../components/api-ui";
 import { AppDataPanel } from "../components/app-data";
+import { AppMap } from "../components/app-map";
 import { AppDepsCard } from "../components/access-requests";
 import { UsedByCard } from "../components/used-by";
 import { ScopeDialog, useScopeOptions } from "../components/scope-dialog";
@@ -330,6 +331,7 @@ function AssetDetail() {
 
           {a.kind === "app" && (
             <>
+              <AppMap a={a} deps={d.deps} bySlug={bySlug} />
               {(a.spec.highlights?.length ?? 0) > 0 && (
                 <Card className="p-5">
                   <h2 className="mb-3 font-medium text-neutral-900">{t("asset.highlights")}</h2>
