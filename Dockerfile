@@ -7,8 +7,8 @@ RUN corepack enable
 COPY web/package.json web/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY web/ ./
-# 网页版应用和 DSH 共用接入插件里的工作台渲染
-COPY dsh-plugin/src/workbench.ts dsh-plugin/src/workbench-view.ts /src/dsh-plugin/src/
+# 网页版应用和 DSH 共用接入插件里的工作台渲染（含 kb-doc-render 等被 workbench-view 引用的模块）
+COPY dsh-plugin/src/ /src/dsh-plugin/src/
 RUN pnpm build
 
 FROM golang:1.27-alpine AS server
