@@ -52,21 +52,30 @@ export default async function (t) {
     await page.getByRole("dialog").waitFor({ state: "hidden" });
     step("在弹窗中选择默认模型");
 
-    // 需要密钥的几步做完：可以交给 Agent，生成提示词并等待 DSH 登录
-    await agentStart.click();
+    // 需要密钥的几步做完：可以交给 Agent。但前面的测试可能已经把「员工额度」和
+    // 「接入插件」做完了——必做项一齐，保存后页面直接离开清单去「开始使用」，那边
+    // 同样给出提示词与接入码；还停在 /go 时才需要点「生成提示词」。
+    const clicked = await Promise.race([
+      agentStart.click().then(() => true).catch(() => false),
+      page.waitForURL((u) => u.pathname !== "/go").then(() => false).catch(() => false),
+    ]);
     await page.locator("pre").filter({ hasText: "plugin_manager" }).waitFor();
     await page.getByText("等待 DSH 发起登录").waitFor();
     await shot(page, "onboarding-agent");
-    step("交给 Agent：发布接入插件并给出提示词");
+    step(clicked ? "交给 Agent：发布接入插件并给出提示词" : "必做项已齐自动离开清单，开始使用页给出提示词与接入码");
 
-    await page.locator("li").filter({ hasText: "员工额度" }).getByRole("button", { name: "去处理" }).click();
-    assertEq(await page.getByRole("dialog").getByLabel("员工账号").inputValue(), "new", "默认新建普通员工，不选超级管理员");
-    await page.getByRole("dialog").getByLabel("员工账号").selectOption("new");
-    await page.getByRole("dialog").getByLabel("用户名").fill(`guide-${tag}`);
-    await page.getByRole("dialog").getByLabel("初始密码").fill("guide-password-1");
-    await page.getByRole("dialog").getByLabel("部门").fill("测试部");
-    await page.getByRole("button", { name: "保存并继续" }).click();
-    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    const quotaBtn = page.locator("li").filter({ hasText: "员工额度" }).getByRole("button", { name: "去处理" });
+    if (await quotaBtn.count()) {
+      await quotaBtn.click();
+      assertEq(await page.getByRole("dialog").getByLabel("员工账号").inputValue(), "new", "默认新建普通员工，不选超级管理员");
+      await page.getByRole("dialog").getByLabel("员工账号").selectOption("new");
+      await page.getByRole("dialog").getByLabel("用户名").fill(`guide-${tag}`);
+      await page.getByRole("dialog").getByLabel("初始密码").fill("guide-password-1");
+      await page.getByRole("dialog").getByLabel("部门").fill("测试部");
+      await page.getByRole("button", { name: "保存并继续" }).click();
+      await page.getByRole("dialog").waitFor({ state: "hidden" });
+      step("在弹窗中分配员工额度");
+    }
     const publish = page.getByRole("button", { name: "发布接入插件" });
     if (await publish.count()) await publish.click();
     // 必做项齐了自动离开清单；管理员自己的 DSH 还没接入，先到「开始使用」，点「以后再说」进工作台
@@ -74,7 +83,7 @@ export default async function (t) {
     if (new URL(page.url()).pathname === "/get-started") await page.getByRole("button", { name: "以后再说" }).click();
     // 默认首页是「用」分组的第一项「企业应用」
     await page.waitForURL(`${BASE}/apps`);
-    step("全程不离开 /go，弹窗配置完成后自动离开清单进入企业应用");
+    step("清单配置完成后自动离开 /go 进入企业应用");
   } finally {
     upstream.close();
   }
