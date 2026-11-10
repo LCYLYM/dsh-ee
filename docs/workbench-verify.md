@@ -222,6 +222,8 @@ DEEPSEEK_API_KEY=sk-... LIVE_ROUNDS=3 npm run test:m3-live
 
 **M8 反馈与答不上来的问题**：每条助手消息尾的 👍👎（`conversation.chat.assistant-actions` 槽位；没有该槽位的旧宿主直接不出按钮，看板文字反馈是备选方案）打到 `POST /api/dsh/feedback`，带会话绑定的应用、消息 id 和 👎 时的可选原因。应用详情显示反馈汇总（👍/👎/近 30 天）和「答不上来的问题」——👎、app__ 工具报错、kb 检索为空三类信号按归一化文本合并计数，只有问题文本和次数，看不到是谁。
 
+**M9 `/ee-save` 的投递修复（2026-11-10，待真实 DSH 复验）**：原先注册在宿主的 `commands` 上，处理函数在 `command/run` 与 `command/done` 之间执行，这期间用 `sendSession` 排进去的消息在 0.2.2-rc.1 上不会开启模型回合。现在改成客户端 `commandUi` 的 `action` 命令（与上游 `/feedback` 同一种写法），在客户端直接把提炼请求发进当前会话；宿主拒收时退回填进输入框。插件单测 `test/ee-save.test.ts` 通过；`run-m6-9.mjs` 因本机内存不足没跑完，M9-1 仍待复验。
+
 **M9 `/ee-save`**：DSH 里 `/ee-save` 把提炼请求作为消息发进当前会话（模型本来就有全文），模型先建议类型（提示词 / 技能 / 应用）、员工确认后用 `ee_hub` `for_me` 建好并给网页链接；说明里注明来自一次对话。「我分享的能力被多少人用」沿用 ee_me overview 的 contributions。
 
 待 Mac 真机验证：

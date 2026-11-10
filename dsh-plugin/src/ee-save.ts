@@ -1,5 +1,5 @@
 import type { DshContext } from "./dsh.js";
-import { currentSessionOf, sendToSession } from "./host-session.js";
+import { fillInput, sendToSession } from "./host-session.js";
 
 // /ee-save 提炼请求的正文；e2e 场景按这段文本比对（e2e/dsh/scenarios/run-m6-9.mjs）。
 export const EE_SAVE_PROMPT =
@@ -9,34 +9,44 @@ export const EE_SAVE_PROMPT =
   "3. 建好后给我网页上的详情链接（<dsh-ee 地址>/assets/<id>），我想继续改范围或内容就去网页。\n" +
   "注意：这个能力会把我们对话的摘要发到 dsh-ee 保存。";
 
+/** 把提炼请求发进会话；宿主拒收时退回填进输入框，员工按回车就能发。返回是否发出去了。 */
+export async function deliverEeSave(ctx: DshContext, sessionId: string): Promise<"sent" | "filled" | "failed"> {
+  try {
+    await sendToSession(ctx, sessionId, EE_SAVE_PROMPT);
+    return "sent";
+  } catch {
+    // 发送失败的原因宿主已记在会话的 promptError 里；这里只换一条能走通的路
+    return fillInput(ctx, EE_SAVE_PROMPT) ? "filled" : "failed";
+  }
+}
+
 /**
- * 在渲染端注册 /ee-save：host 端的命令注册拿不到 sessions/conversation，
- * 所以命令放到 client.ts（有 sendToSession 能用的宿主会话服务）。
+ * 在渲染端注册 /ee-save。
+ *
+ * 用客户端的 commandUi（`ui.kind: "action"`），不用宿主的 commands：宿主命令在 command/run 与
+ * command/done 之间执行，期间用 sendSession 排进去的消息在 0.2.2 上不会开启模型回合（M9 验证时发现）。
+ * action 在客户端直接跑，等于员工自己发了一条消息。commandUi 不存在的旧宿主上没有 /ee-save。
  */
 export function registerEeSave(ctx: DshContext): void {
-  // commands 是可选服务：没声明进 inject，直接 ctx.get / ctx.commands 会被宿主拒绝并拖死
-  // 后面的注册；用 ctx.inject 等它，服务不在或注册失败都只跳过 /ee-save。
-  ctx.inject?.(["commands"], (scoped: any) => {
-    const commands = scoped.commands;
-    if (typeof commands?.register !== "function") return;
+  ctx.inject?.(["commandUi"], (scoped: any) => {
+    const commandUi = scoped.commandUi ?? scoped.get?.("commandUi");
+    if (typeof commandUi?.register !== "function") return;
     try {
-      const dispose = commands.register({
+      const dispose = commandUi.register({
         name: "ee-save",
-        description: "把这段对话沉淀成能力（提示词 / 技能 / 应用草稿）",
-        handler: async () => {
-          const sessionId = currentSessionOf(ctx.sessions?.list?.getSnapshot?.());
-          if (!sessionId) return { kind: "error", text: "没有当前会话" };
-          try {
-            await sendToSession(ctx, sessionId, EE_SAVE_PROMPT);
-          } catch (error) {
-            return { kind: "error", text: `发不出去：${(error as Error)?.message ?? error}` };
-          }
-          return { kind: "success", text: "已把提炼请求发给当前会话，接着按提示选类型就好。" };
+        label: () => "ee-save",
+        description: () => "把这段对话沉淀成能力（提示词 / 技能 / 应用草稿）",
+        available: (session: any) => typeof session?.sessionId === "string" && session.sessionId !== "",
+        ui: {
+          kind: "action",
+          run: (session: any) => {
+            void deliverEeSave(ctx, session.sessionId);
+          },
         },
       });
       scoped.effect?.(() => dispose);
     } catch {
-      // /ee-save 注册失败（与宿主命令撞名或签名不符）时不能拖死后面的品牌接管
+      // 与宿主命令撞名时 commandUi 会抛错；/ee-save 注册失败不能拖死后面的品牌接管
     }
   });
 }
