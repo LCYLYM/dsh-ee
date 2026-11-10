@@ -7,6 +7,7 @@
 #   deploy/demo/demo.sh stop     全部停掉
 #   deploy/demo/demo.sh reset    停掉、清空数据、重新启动并导入示例内容
 #   deploy/demo/demo.sh status   看各进程是否在跑
+#   deploy/demo/demo.sh stats    按天看访客点了多少次场景卡片、打开了多少次应用、接入了多少次 DSH
 #
 # crontab 示例（每 6 小时重置一次，开机自动起）：
 #   0 */6 * * * /path/to/deploy/demo/demo.sh reset >> $HOME/dsh-ee-demo/logs/reset.log 2>&1
@@ -42,6 +43,8 @@ load_env() {
 	export DSH_EE_DATA_DIR=$DEMO_HOME/data
 	export DSH_EE_DEMO_MODE=1
 	export DSH_EE_DB_WAIT=${DSH_EE_DB_WAIT:-2m}
+	# 访问统计放在 logs 下、不在轮换的名单里：重置清的是数据库和数据目录，这个文件一直留着
+	export DSH_EE_DEMO_STATS_FILE=${DSH_EE_DEMO_STATS_FILE:-$LOGS/stats.jsonl}
 }
 
 cmd_init() {
@@ -192,11 +195,18 @@ cmd_status() {
 	fi
 }
 
+cmd_stats() {
+	[[ -s $DSH_EE_DEMO_STATS_FILE ]] || { echo "还没有统计（$DSH_EE_DEMO_STATS_FILE）"; return; }
+	# 每行 {"event":"persona","t":"2026-11-11T08:00:00Z","what":"zhou.hang"}：按天、按动作数次数
+	sed -E 's/.*"event":"([^"]*)".*"t":"([0-9-]{10}).*/\2 \1/' "$DSH_EE_DEMO_STATS_FILE" | sort | uniq -c
+}
+
 case ${1:-} in
 init) cmd_init ;;
 start) load_env; mkdir -p "$RUN" "$LOGS"; start_tidb; start_dsh; start_tunnel ;;
 stop) load_env; stop_one cloudflared; stop_one dsh-ee; stop_one tidb ;;
 reset) load_env; mkdir -p "$RUN" "$LOGS"; cmd_reset ;;
 status) load_env; cmd_status ;;
-*) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+stats) load_env; cmd_stats ;;
+*) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

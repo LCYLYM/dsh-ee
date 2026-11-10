@@ -31,11 +31,12 @@ func TestDemoSite(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(videoDir, "intro-zh.mp4"), []byte("0123456789"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	statsFile := filepath.Join(t.TempDir(), "stats.jsonl")
 	ts := httptest.NewUnstartedServer(nil)
 	srv := api.New(st, box, api.Options{
 		DataDir:  t.TempDir(),
 		Addr:     ts.Listener.Addr().String(),
-		DemoSite: &api.DemoSite{Username: "admin", Password: "admin-password-123", Reset: "每 6 小时", ResetEvery: 6 * time.Hour, VideoDir: videoDir},
+		DemoSite: &api.DemoSite{Username: "admin", Password: "admin-password-123", Reset: "每 6 小时", ResetEvery: 6 * time.Hour, VideoDir: videoDir, StatsFile: statsFile},
 	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	ts.Config.Handler = srv.Handler()
 	ts.Start()
@@ -130,6 +131,28 @@ func TestDemoSite(t *testing.T) {
 	code, body = visitor.do("GET", "/api/me/apps/"+personas[0].App+"/web", nil, nil)
 	if code == 404 {
 		t.Fatalf("示例员工应能打开 %s 的网页版：%s", personas[0].App, body)
+	}
+	// 用自己的 DSH 接上来：设备码登录走完算一次接入
+	code, body = anon.do("POST", "/api/device/code", map[string]any{"client_name": "MacBook"}, nil)
+	expect(t, "申请设备码", code, 200, body)
+	device := decodeAs[struct {
+		DeviceCode string `json:"device_code"`
+		UserCode   string `json:"user_code"`
+	}](t, body)
+	code, body = visitor.do("POST", "/api/device/"+device.UserCode, map[string]any{"approve": true}, nil)
+	expect(t, "确认设备登录", code, 200, body)
+	code, body = anon.do("POST", "/api/device/token", map[string]string{"device_code": device.DeviceCode}, nil)
+	expect(t, "换设备令牌", code, 200, body)
+	// 统计：点了哪张场景卡片、打开了哪个应用、接入了一次 DSH，各记一行；不记访客的任何信息
+	raw, _ := os.ReadFile(statsFile)
+	var events []map[string]string
+	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		events = append(events, decodeAs[map[string]string](t, []byte(line)))
+	}
+	if len(events) != 3 || events[0]["event"] != "persona" || events[0]["what"] != personas[0].Username ||
+		events[1]["event"] != "app_open" || events[1]["what"] != personas[0].App ||
+		events[2]["event"] != "dsh_connect" || len(events[0]) != 3 {
+		t.Fatalf("统计应是场景卡片、应用打开、DSH 接入各一行，每行只有时间、事件、对象：%s", raw)
 	}
 
 	// 试连别的地址：哪怕同在本机、只是端口不同，也被拦在拨号这一步

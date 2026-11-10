@@ -178,5 +178,5 @@ func demoSite(cfg *config.Config) *api.DemoSite {
 	if !cfg.DemoMode {
 		return nil
 	}
-	return &api.DemoSite{Username: cfg.BootstrapAdmin, Password: cfg.BootstrapAdminPassword, Reset: cfg.DemoReset, ResetEvery: cfg.DemoResetEvery, VideoDir: cfg.DemoVideoDir}
+	return &api.DemoSite{Username: cfg.BootstrapAdmin, Password: cfg.BootstrapAdminPassword, Reset: cfg.DemoReset, ResetEvery: cfg.DemoResetEvery, VideoDir: cfg.DemoVideoDir, StatsFile: cfg.DemoStatsFile}
 }
