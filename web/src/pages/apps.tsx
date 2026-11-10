@@ -128,7 +128,6 @@ export default function Apps() {
     <div>
       <PageHeader
         title={t("apps.title")}
-        desc={t("apps.desc")}
         actions={
           <>
             <Segmented

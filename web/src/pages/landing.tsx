@@ -318,9 +318,6 @@ export default function Landing() {
               <p className="mt-2 text-[15px] leading-relaxed text-lp-muted">{t("landing.heroLead")}</p>
             </div>
             <div data-reveal className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3" style={delay(90)}>
-              <Pill to="/go" tone="accent">
-                {t("landing.enter")}
-              </Pill>
               <Pill href="#how" tone="ghost">
                 {t("landing.seeHow")}
               </Pill>

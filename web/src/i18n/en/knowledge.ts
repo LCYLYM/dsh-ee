@@ -4,7 +4,6 @@ import type { Messages } from "../types";
 export default {
   knowledge: {
     title: "Knowledge base",
-    desc: "Your company's policies, handbooks and documents. Open Knowledge Q&A in DSH to ask questions; answers come with sources you can open.",
     create: "New knowledge base",
     empty: "There's no knowledge base you can search yet.",
     emptyManage: "No knowledge bases yet. Create one and upload PDF, Word, Excel or PowerPoint files to start asking in DSH.",

@@ -49,7 +49,6 @@ export default {
     openNav: "Open navigation",
     closeNav: "Close navigation",
     off: "Off",
-    footer: "dsh-ee · The market, reviews, npm registry, upstream preload, accounts and model access use the real backend, as do the capability hub (skills, prompts, connections, micro-apps), analytics, the audit log and LDAP sign-in",
     noPages: "No pages available yet",
     noPagesHint: "Ask an administrator to assign a role to your account.",
     notFound: "Page not found, or you don't have access",

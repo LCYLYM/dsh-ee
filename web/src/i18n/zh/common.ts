@@ -47,7 +47,6 @@ export default {
     openNav: "打开导航",
     closeNav: "关闭导航",
     off: "已关闭",
-    footer: "dsh-ee · 能力市场、审核、npm 源、上游预载、账号与模型接入已接真实后端；能力中心（技能、提示词、企业连接、微应用）、运营数据、审计日志与 LDAP 登录也已接入",
     noPages: "还没有可访问的页面",
     noPagesHint: "请联系管理员为你的账号分配角色。",
     notFound: "页面不存在，或你没有访问权限",

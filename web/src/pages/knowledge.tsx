@@ -340,7 +340,6 @@ export default function Knowledge() {
     <div>
       <PageHeader
         title={t("knowledge.title")}
-        desc={t("knowledge.desc")}
         actions={
           manage && (
             <Button onClick={() => setCreating(true)}>

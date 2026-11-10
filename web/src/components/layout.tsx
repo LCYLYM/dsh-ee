@@ -278,9 +278,7 @@ export function AppLayout() {
           )}
           <Outlet />
         </main>
-        <footer className="mx-auto max-w-[1240px] px-4 pb-8 text-xs text-neutral-500 sm:px-8">
-          {t("shell.footer")}
-        </footer>
+        <footer className="mx-auto max-w-[1240px] px-4 pb-8 text-xs text-neutral-500 sm:px-8" />
       </div>
     </div>
   );

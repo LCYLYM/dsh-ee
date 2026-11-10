@@ -46,7 +46,6 @@ export default {
   },
   apps: {
     title: "企业应用",
-    desc: "你能用的企业应用：报销、入职、查客户……启用后在 DSH 首屏的「企业应用」里点开，或输入 /名字 打开。",
     meta: "{{owner}} 维护 · {{department}} · 近 14 天使用 {{uses}} 次",
     dependsOn: "用到的能力",
     starters: "可以这样问",

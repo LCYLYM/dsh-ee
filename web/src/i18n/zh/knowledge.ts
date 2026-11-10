@@ -2,7 +2,6 @@
 export default {
   knowledge: {
     title: "知识库",
-    desc: "企业的制度、手册和资料。在 DSH 里打开「知识问答」直接提问，答案带出处，点出处能看原文。",
     create: "新建知识库",
     empty: "还没有你能查的知识库。",
     emptyManage: "还没有知识库。新建一个，上传 PDF、Word、Excel 或 PPT 文档就能在 DSH 里问答。",

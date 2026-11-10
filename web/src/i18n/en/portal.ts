@@ -48,7 +48,6 @@ export default {
   },
   apps: {
     title: "Company apps",
-    desc: "Apps you can use: expenses, onboarding, customer lookups… Once enabled, open one from Company apps on the DSH home screen, or type /name.",
     meta: "Maintained by {{owner}} · {{department}} · {{uses}} uses in 14 days",
     dependsOn: "Uses",
     starters: "Try asking",
