@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -25,11 +27,15 @@ func TestDemoSite(t *testing.T) {
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)
 	box, _ := secret.NewBox(key)
+	videoDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(videoDir, "intro-zh.mp4"), []byte("0123456789"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	ts := httptest.NewUnstartedServer(nil)
 	srv := api.New(st, box, api.Options{
 		DataDir:  t.TempDir(),
 		Addr:     ts.Listener.Addr().String(),
-		DemoSite: &api.DemoSite{Username: "admin", Password: "admin-password-123", Reset: "每 6 小时", ResetEvery: 6 * time.Hour},
+		DemoSite: &api.DemoSite{Username: "admin", Password: "admin-password-123", Reset: "每 6 小时", ResetEvery: 6 * time.Hour, VideoDir: videoDir},
 	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	ts.Config.Handler = srv.Handler()
 	ts.Start()
@@ -73,6 +79,28 @@ func TestDemoSite(t *testing.T) {
 	}](t, body).Items {
 		if it.Result != "created" {
 			t.Fatalf("%s %s 没建成：%s %s", it.Kind, it.Slug, it.Result, it.Error)
+		}
+	}
+
+	// 首页介绍视频：只给目录里有的语言；支持 Range；别的文件名一律 404
+	_, body = anon.do("GET", "/api/auth/methods", nil, nil)
+	if v := decodeAs[struct{ Demo struct{ Videos []string } }](t, body).Demo.Videos; len(v) != 1 || v[0] != "zh" {
+		t.Fatalf("应只给出有文件的视频语言：%s", body)
+	}
+	req, _ := http.NewRequest("GET", ts.URL+"/demo/intro/zh", nil)
+	req.Header.Set("Range", "bytes=2-4")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	part, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusPartialContent || string(part) != "234" || resp.Header.Get("Content-Type") != "video/mp4" {
+		t.Fatalf("视频应支持 Range：%d %q %s", resp.StatusCode, part, resp.Header.Get("Content-Type"))
+	}
+	for _, path := range []string{"/demo/intro/en", "/demo/intro/..%2fintro-zh.mp4", "/demo/intro/zh.mp4"} {
+		if code, _ := anon.do("GET", path, nil, nil); code != 404 {
+			t.Fatalf("%s 应为 404，实际 %d", path, code)
 		}
 	}
 

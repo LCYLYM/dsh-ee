@@ -45,6 +45,9 @@ type Config struct {
 	DemoMode       bool
 	DemoReset      string
 	DemoResetEvery time.Duration
+	// DemoVideoDir：放介绍视频 intro-zh.mp4、intro-en.mp4 的目录，演示站首页播放；空则不显示。
+	// 视频不打进二进制，免得每个部署都背着它。
+	DemoVideoDir string
 }
 
 func Load() (*Config, error) {
@@ -100,6 +103,7 @@ func Load() (*Config, error) {
 		c.DemoMode = b
 	}
 	c.DemoReset = strings.TrimSpace(os.Getenv("DSH_EE_DEMO_RESET"))
+	c.DemoVideoDir = strings.TrimSpace(os.Getenv("DSH_EE_DEMO_VIDEO_DIR"))
 	if v := os.Getenv("DSH_EE_DEMO_RESET_EVERY"); v != "" {
 		d, err := time.ParseDuration(v)
 		if err != nil {
