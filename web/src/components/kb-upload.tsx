@@ -115,10 +115,14 @@ export function UploadDialog({ kb, open, onOpenChange, onDone, initial, initialF
       const groups = new Map<string, Row[]>();
       for (const r of next) groups.set(r.folder, [...(groups.get(r.folder) ?? []), r]);
       for (const [f, list] of groups) {
-        const res = await api.checkKBUpload(kb.id, f, list.map((r) => r.file.name));
-        for (const it of res.items) {
-          const row = list.find((r) => r.file.name === it.file);
-          if (row) row.same = it.doc;
+        // 服务端一次最多 50 个；和上传一样分批，否则同目录 51 个文件预检直接 400。
+        for (let i = 0; i < list.length; i += 50) {
+          const part = list.slice(i, i + 50);
+          const res = await api.checkKBUpload(kb.id, f, part.map((r) => r.file.name));
+          for (const it of res.items) {
+            const row = part.find((r) => r.file.name === it.file);
+            if (row) row.same = it.doc;
+          }
         }
       }
       setRows([...next]);
