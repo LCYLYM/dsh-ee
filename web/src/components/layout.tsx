@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { Tip } from "@/components/tip";
 import { CommandPalette, useHashFocus, useSearchShortcut } from "./command-palette";
 import { entryOf, rememberSpace, rememberedSpace, spaceOfPath, splitSpaces, type NavSpace } from "../lib/nav-space";
+import { DemoResetCountdown } from "./demo-reset";
 
 
 /** 个别页面在侧边栏上的附加状态（计数、已关闭、按设置隐藏），按 page_key 挂接。 */
@@ -275,6 +276,14 @@ export function AppLayout() {
           {demo && (
             <Notice role="status" className="mb-5">
               {demo.reset ? t("shell.demoReset", { reset: demo.reset }) : t("shell.demo")}
+              {demo.next_reset && (
+                <>
+                  {" "}
+                  <span className="font-medium">
+                    <DemoResetCountdown at={demo.next_reset} />
+                  </span>
+                </>
+              )}
             </Notice>
           )}
           {user?.limited && (

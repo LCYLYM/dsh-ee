@@ -21,6 +21,8 @@ type DemoSite struct {
 	Password string
 	// 给访客看的重置周期说明，如「每 6 小时」；空则不显示
 	Reset string
+	// 实际的重置间隔，和 crontab 一致（如 6h 对应 0 */6 * * *）；用来给访客算下次重置时间。0 表示不算
+	ResetEvery time.Duration
 	// dsh-ee 自己监听的端口：对外请求只许连本机的这个端口（示例连接就是连自己）
 	selfPort string
 }
@@ -103,6 +105,20 @@ type demoSiteInfo struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Reset    string `json:"reset,omitempty"`
+	// 下次重置的时间点；没配 ResetEvery 时不给
+	NextReset *time.Time `json:"next_reset,omitempty"`
+}
+
+// nextDemoReset 按 cron「0 */N * * *」的规律算下次重置：从当地零点起每隔 every 一次，到第二天零点重新对齐。
+// 用服务器本地时区，和 cron 一致。
+func nextDemoReset(now time.Time, every time.Duration) time.Time {
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	tomorrow := midnight.AddDate(0, 0, 1)
+	next := midnight.Add((now.Sub(midnight)/every + 1) * every)
+	if next.After(tomorrow) {
+		next = tomorrow
+	}
+	return next
 }
 
 // demoSiteInfo 给登录页和页面顶部的提示条用；正常部署返回 nil。
@@ -111,5 +127,10 @@ func (s *Server) demoSiteInfo() *demoSiteInfo {
 	if d == nil {
 		return nil
 	}
-	return &demoSiteInfo{Username: d.Username, Password: d.Password, Reset: d.Reset}
+	info := &demoSiteInfo{Username: d.Username, Password: d.Password, Reset: d.Reset}
+	if d.ResetEvery > 0 {
+		next := nextDemoReset(time.Now(), d.ResetEvery)
+		info.NextReset = &next
+	}
+	return info
 }

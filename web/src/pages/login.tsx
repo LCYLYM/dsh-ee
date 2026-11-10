@@ -8,6 +8,7 @@ import { Button, buttonCls, inputCls, Notice, PasswordInput, Spinner } from "../
 import { ErrorNote } from "../components/api-ui";
 import { LangSwitch } from "../components/lang-switch";
 import { ThemeToggle } from "../components/theme-toggle";
+import { DemoResetCountdown } from "../components/demo-reset";
 import { useTranslation } from "react-i18next";
 
 /** 只允许站内相对路径，防止 next 参数被拿来做开放重定向。 */
@@ -74,6 +75,11 @@ export default function Login() {
             <p className="font-medium">{t("login.demo.title")}</p>
             <p className="mt-1 font-mono text-[13px]">{t("login.demo.account", { username: demo.username, password: demo.password })}</p>
             {demo.reset && <p className="mt-1">{t("login.demo.reset", { reset: demo.reset })}</p>}
+            {demo.next_reset && (
+              <p className="mt-1 font-medium">
+                <DemoResetCountdown at={demo.next_reset} />
+              </p>
+            )}
             <Button
               type="button"
               size="sm"

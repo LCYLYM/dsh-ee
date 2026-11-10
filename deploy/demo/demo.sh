@@ -73,6 +73,8 @@ CF_TUNNEL_CONFIG=
 
 # 给访客看的重置周期，和 crontab 保持一致
 DSH_EE_DEMO_RESET="每 6 小时"
+# 实际的重置间隔（对应 crontab 的 0 */6 * * *），登录页据此显示「下次重置：还剩多久」；留空不显示
+DSH_EE_DEMO_RESET_EVERY=6h
 ENV
 	log "已生成 $ENV_FILE，检查一下 DSH_EE_BIN / TIDB_BIN / DSH_EE_PUBLIC_URL 再 $0 reset"
 }
