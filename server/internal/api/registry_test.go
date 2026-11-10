@@ -642,4 +642,32 @@ func TestRegistry(t *testing.T) {
 			t.Fatalf("审核队列里应有 alice 申请的插件：%s", body)
 		}
 	})
+
+	// 插件藏在依赖里：员工申请引入一个普通包，它依赖的社区插件不能跟着直接上架
+	t.Run("依赖里的插件也要审核", func(t *testing.T) {
+		up.add(t, pluginPkg("dsh-plugin-hidden", "1.0.0", map[string]any{"dependencies": map[string]any{"is-number": "^7.0.0"}}), bundleFile)
+		up.add(t, map[string]any{"name": "carrier", "version": "1.0.0", "license": "MIT",
+			"dependencies": map[string]any{"dsh-plugin-hidden": "^1.0.0", "left-pad": "^1.0.0"}}, nil)
+		code, body := alice.do("POST", "/api/me/import-requests", map[string]string{"name": "carrier", "reason": "顺带一个插件"}, nil)
+		expect(t, "申请引入", code, 202, body)
+		if j := waitJob(t, admin, decodeAs[store.SyncJob](t, body).ID); j.Status != "succeeded" {
+			t.Fatalf("申请引入失败：%+v", j)
+		}
+		if v, err := st.GetVersion(ctx, "dsh-plugin-hidden", "1.0.0"); err != nil || v.Status != store.StatusPending {
+			t.Fatalf("依赖里的插件应待审核：%+v %v", v, err)
+		}
+		// 插件自己的普通依赖照常镜像，审核通过后才装得上
+		if v, err := st.GetVersion(ctx, "is-number", "7.0.0"); err != nil || v.Status != store.StatusPublished {
+			t.Fatalf("插件的普通依赖应直接可用：%+v %v", v, err)
+		}
+		code, body = anon.do("GET", "/index/dsh-index.json", nil, nil)
+		expect(t, "插件索引", code, 200, body)
+		if strings.Contains(string(body), "dsh-plugin-hidden") {
+			t.Fatalf("没审核的插件不能出现在插件索引里：%s", body)
+		}
+		code, body = admin.do("GET", "/api/admin/review", nil, nil)
+		if !strings.Contains(string(body), "dsh-plugin-hidden") {
+			t.Fatalf("审核队列里应有依赖带进来的插件：%s", body)
+		}
+	})
 }
