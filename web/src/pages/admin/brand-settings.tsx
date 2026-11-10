@@ -5,6 +5,7 @@ import { api } from "../../lib/api";
 import { useStore } from "../../lib/store";
 import type { BrandColor, BrandColorKey, BrandLogoShape, Settings } from "../../lib/types";
 import { Button, cx, Field, inputBase, inputCls, Segmented, ToggleRow } from "../../components/ui";
+import { ImageCropDialog, needsCrop } from "../../components/image-crop";
 
 type Brand = Settings["brand"];
 type TextKey = keyof (typeof import("../../i18n/zh/config"))["default"]["brandAdmin"];
@@ -275,6 +276,7 @@ export default function BrandSettings() {
       else delete colors[k];
       return { ...cur, brand: { ...cur.brand, theme: { ...cur.brand.theme, preset: "custom", colors } } };
     });
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const upload = async (file?: File) => {
     if (!file) return;
     setBusy(true);
@@ -286,7 +288,14 @@ export default function BrandSettings() {
       notify(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+      setCropFile(null);
     }
+  };
+  const pick = (file?: File) => {
+    // SVG 是矢量不用裁；位图先裁成正方形 PNG 再上传，不再要求原图必须是正方形
+    if (!file) return;
+    if (needsCrop(file)) setCropFile(file);
+    else void upload(file);
   };
   const preset = brand.theme.preset;
   return (
@@ -308,8 +317,9 @@ export default function BrandSettings() {
         </div>
         <div className="space-y-3">
           <Field label={t("brandAdmin.logo")} hint={t("brandAdmin.logoHint")}>
-            <input aria-label={t("brandAdmin.logo")} type="file" accept="image/png,image/svg+xml" disabled={busy} onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }} />
+            <input aria-label={t("brandAdmin.logo")} type="file" accept="image/*" disabled={busy} onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
           </Field>
+          <ImageCropDialog file={cropFile} busy={busy} onDone={(f) => void upload(f)} onCancel={() => setCropFile(null)} />
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-neutral-700">{t("brandAdmin.logoShape")}</span>
             <Segmented<BrandLogoShape>
