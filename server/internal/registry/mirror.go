@@ -189,7 +189,12 @@ func (s *Service) syncRoot(ctx context.Context, jb *job, root SyncRoot, params S
 	}
 	jb.logf("· %s@%s（%s）", root.Name, version, nv.Status)
 
-	c := &closure{s: s, ctx: ctx, base: base, scopes: set.CompanyScopes(), jb: jb, seen: map[string]bool{root.Name + "@" + version: true}}
+	// 依赖里的插件和根包过同一道审核门：否则员工申请引入一个普通包，它依赖的社区插件会不经审核直接上架
+	depPlugin := store.StatusPublished
+	if pluginNeedsReview(set) {
+		depPlugin = params.RootStatus
+	}
+	c := &closure{s: s, ctx: ctx, base: base, scopes: set.CompanyScopes(), jb: jb, pluginStatus: depPlugin, seen: map[string]bool{root.Name + "@" + version: true}}
 	c.sem = make(chan struct{}, mirrorWorkers)
 	c.walk(uv.Parsed)
 	c.wg.Wait()
@@ -214,8 +219,10 @@ type closure struct {
 	base   string
 	scopes []string
 	jb     *job
-	sem    chan struct{}
-	wg     sync.WaitGroup
+	// 依赖里遇到插件时入库的状态（普通依赖总是直接可用）
+	pluginStatus string
+	sem          chan struct{}
+	wg           sync.WaitGroup
 
 	mu         sync.Mutex
 	seen       map[string]bool
@@ -286,11 +293,18 @@ func (c *closure) visit(name, spec string) *Manifest {
 		c.fail(key)
 		return nil
 	}
-	nv, err := c.s.mirror(c.ctx, name, uv, store.StatusPublished, nil, false)
+	status := store.StatusPublished
+	if uv.Parsed.IsPlugin {
+		status = c.pluginStatus
+	}
+	nv, err := c.s.mirror(c.ctx, name, uv, status, nil, false)
 	if err != nil {
 		c.fail(key)
 		c.jb.logf("  ✘ %s：%v", key, err)
 		return nil
+	}
+	if nv.IsPlugin && nv.Status != store.StatusPublished {
+		c.jb.logf("  · 依赖 %s 是插件（%s），审核通过后才能安装", key, nv.Status)
 	}
 	if len(doc.DistTags) > 0 {
 		if pkg, err := c.s.store.GetPackage(c.ctx, name); err == nil && pkg.Origin == store.OriginUpstream {
