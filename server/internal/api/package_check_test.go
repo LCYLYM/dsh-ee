@@ -145,6 +145,11 @@ func TestPackagePreflight(t *testing.T) {
 		if !conflictKeys(r)["scope"] {
 			t.Fatalf("缺少 scope 冲突：%+v", r.Conflicts)
 		}
+		for _, c := range r.Conflicts {
+			if c.Key == "scope" && c.Params["scope"] != "@company" {
+				t.Fatalf("scope 参数应与企业作用域一致：%+v", c.Params)
+			}
+		}
 	})
 
 	t.Run("已存在的版本会阻塞", func(t *testing.T) {

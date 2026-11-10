@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"strings"
 
 	"github.com/hikariming/dsh-ee/server/internal/rbac"
 	"github.com/hikariming/dsh-ee/server/internal/registry"
@@ -111,7 +112,7 @@ func (s *Server) packageConflicts(ctx context.Context, m *registry.Manifest, use
 	if !validName {
 		out = append(out, packageConflict{Key: "name", Params: map[string]any{"name": m.Name}})
 	} else if !registry.InScopes(m.Name, scopes) {
-		out = append(out, packageConflict{Key: "scope", Params: map[string]any{"scope": scopes[0]}})
+		out = append(out, packageConflict{Key: "scope", Params: map[string]any{"scope": scopeConflictParam(scopes)}})
 	}
 	if !registry.ValidVersion(m.Version) {
 		out = append(out, packageConflict{Key: "version", Params: map[string]any{"version": m.Version}})
@@ -142,4 +143,10 @@ func (s *Server) packageConflicts(ctx context.Context, m *registry.Manifest, use
 		return nil, err
 	}
 	return out, nil
+}
+
+// scopeConflictParam 与 registry.Publish 拒绝文案里的作用域列表一致：全部作用域用顿号拼接。
+// 空列表时返回空串，避免直接取 scopes[0] 越界 panic。
+func scopeConflictParam(scopes []string) string {
+	return strings.Join(scopes, "、")
 }
