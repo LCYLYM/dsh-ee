@@ -49,7 +49,7 @@ type connectState struct {
 }
 
 // connectPackage 是接入插件的包名。
-func connectPackage(set *store.AppSettings) string { return set.Scope + "/dsh-connect" }
+func connectPackage(set *store.AppSettings) string { return set.Scope + "/" + registry.ConnectName }
 
 // connectBase 是写进插件的 dsh-ee 地址：系统设置里的访问地址，其次启动参数 DSH_EE_PUBLIC_URL，
 // 再次按当前请求推断（后台任务没有请求，就不生成）。
