@@ -169,7 +169,7 @@ func indexPlugin(p *store.NpmPackage, versions []*store.NpmVersion, installs int
 	if a := plainText(p.Author); a != "" {
 		ip.Author = a
 	}
-	if icon := iconURL(p.Icon); icon != "" {
+	if icon := iconURLFor(p.Icon, portalBase); icon != "" {
 		ip.Icon = icon
 	}
 	if portalBase != "" {

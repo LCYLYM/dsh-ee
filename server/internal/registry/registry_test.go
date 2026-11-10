@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 	"unicode/utf8"
+
+	"github.com/hikariming/dsh-ee/server/internal/store"
 )
 
 // tgz 按固定顺序写入：package/ 下的文件在前（第一个条目决定包根目录），其余按名字排序。
@@ -208,6 +210,20 @@ func TestAssertIndex(t *testing.T) {
 	}
 }
 
+func TestIndexPluginDropsCrossOriginHTTPIcon(t *testing.T) {
+	versions := []*store.NpmVersion{{Version: "1.0.0", CreatedAt: time.Unix(1, 0)}}
+	p := &store.NpmPackage{Name: "@acme/icon", Icon: "http://other.example/icon.png"}
+	ip := indexPlugin(p, versions, 0, "https://portal.example")
+	if ip == nil || ip.Icon != "" {
+		t.Fatalf("跨源 http 图标应省略：%+v", ip)
+	}
+	p.Icon = "https://cdn.example/icon.png"
+	ip = indexPlugin(p, versions, 0, "https://portal.example")
+	if ip == nil || ip.Icon != "https://cdn.example/icon.png" {
+		t.Fatalf("https 图标应保留：%+v", ip)
+	}
+}
+
 func TestRepoAndURL(t *testing.T) {
 	for in, want := range map[string]string{
 		"git+https://github.com/a/b.git": "https://github.com/a/b",
@@ -226,6 +242,17 @@ func TestRepoAndURL(t *testing.T) {
 	}
 	if iconURL("https://avatars.githubusercontent.com/x?s=96") == "" || iconURL("https://u:p@x.com/a.png") != "" {
 		t.Error("iconURL 应允许 query、拒绝凭据")
+	}
+	for _, tc := range []struct{ raw, base, want string }{
+		{"https://cdn.example/x.png", "https://portal.example", "https://cdn.example/x.png"},
+		{"http://portal.example/icon.png", "http://portal.example", "http://portal.example/icon.png"},
+		{"http://portal.example/icon.png", "https://portal.example", ""},
+		{"http://other.example/icon.png", "https://portal.example", ""},
+		{"http://portal.example/icon.png", "", ""},
+	} {
+		if got := iconURLFor(tc.raw, tc.base); got != tc.want {
+			t.Errorf("iconURLFor(%q, %q) = %q, want %q", tc.raw, tc.base, got, tc.want)
+		}
 	}
 }
 

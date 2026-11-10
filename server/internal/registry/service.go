@@ -540,12 +540,25 @@ func httpURL(raw string) string {
 }
 
 // iconURL 是图标地址：允许 query（GitHub 头像是 …?s=96），不允许凭据与 fragment。
-func iconURL(raw string) string {
+func iconURL(raw string) string { return iconURLFor(raw, "") }
+
+// iconURLFor 按 DSH 插件市场索引读端的规则保留图标：
+// 只允许 https，或与索引同源的 http；否则整个索引会被 DSH 拒收。
+func iconURLFor(raw, base string) string {
 	u := webURL(raw)
 	if u == nil || u.Fragment != "" {
 		return ""
 	}
-	return u.String()
+	if u.Scheme == "https" {
+		return u.String()
+	}
+	if u.Scheme == "http" {
+		b, err := url.Parse(base)
+		if err == nil && b.Scheme == "http" && b.Host == u.Host {
+			return u.String()
+		}
+	}
+	return ""
 }
 
 func webURL(raw string) *url.URL {
