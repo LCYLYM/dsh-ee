@@ -7,7 +7,7 @@ import { useAction, useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
 import { useConfirm } from "../lib/confirm";
 import { LoadState, ErrorNote } from "../components/api-ui";
-import { Badge, Button, Card, CardHeader, cx, Field, inputCls, Segmented } from "../components/ui";
+import { Badge, Button, Card, CardHeader, cx, Field, inputCls, Segmented, Notice } from "../components/ui";
 import { KBReader } from "../components/kb-reader";
 import { ConvertNotes, convertLines } from "../components/kb-convert";
 import { KB_ACCEPT } from "../components/kb-upload";
@@ -217,10 +217,10 @@ function EditImpact({ before, after, reads }: { before: string; after: string; r
   const { added, removed } = lineChanges(before, after);
   if (added === 0 && removed === 0) return <p className="text-sm text-neutral-500">{t("kdoc.noChanges")}</p>;
   return (
-    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+    <Notice tone="warn">
       <span className="font-medium">{t("kdoc.changes", { added, removed })}</span>
       {reads ? ` · ${t("kdoc.impact", { count: reads })}` : ` · ${t("kdoc.impactNone")}`}
-    </div>
+    </Notice>
   );
 }
 
@@ -409,12 +409,14 @@ export default function KnowledgeDoc() {
             </div>
 
             {viewingOld && !editing && (
-              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-                {t("kdoc.viewing", { version: d.version, current: d.doc.version })}
-                <Button size="sm" variant="secondary" onClick={() => setVersion(undefined)}>
-                  {t("kdoc.backToCurrent")}
-                </Button>
-              </div>
+              <Notice tone="warn" className="mb-4">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  {t("kdoc.viewing", { version: d.version, current: d.doc.version })}
+                  <Button size="sm" variant="secondary" onClick={() => setVersion(undefined)}>
+                    {t("kdoc.backToCurrent")}
+                  </Button>
+                </div>
+              </Notice>
             )}
 
             <div className="grid gap-6 lg:grid-cols-[1fr_280px]">

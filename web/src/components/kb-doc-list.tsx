@@ -278,7 +278,7 @@ export function DocList({ kb, docs, folder, setFolder, onChanged }: { kb: KBase;
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="tbl">
               <thead>
                 <tr className="border-y border-neutral-100 text-left text-xs text-neutral-500 dark:border-neutral-800">
                   {kb.can_edit && (
@@ -291,10 +291,10 @@ export function DocList({ kb, docs, folder, setFolder, onChanged }: { kb: KBase;
                       />
                     </th>
                   )}
-                  <th className={cx("py-2 pr-3 font-normal", kb.can_edit ? "pl-2" : "pl-5")}>{t("kbase.colTitle")}</th>
-                  <th className="px-3 py-2 text-right font-normal">{t("kbase.colLines")}</th>
-                  <th className="px-3 py-2 text-right font-normal">{t("kbase.colVersion")}</th>
-                  <th className="px-5 py-2 font-normal">{t("kbase.colUpdated")}</th>
+                  <th className={cx("py-2 pr-3", kb.can_edit ? "pl-2" : "pl-5")}>{t("kbase.colTitle")}</th>
+                  <th className="px-3 py-2 text-right">{t("kbase.colLines")}</th>
+                  <th className="px-3 py-2 text-right">{t("kbase.colVersion")}</th>
+                  <th className="px-5 py-2">{t("kbase.colUpdated")}</th>
                 </tr>
               </thead>
               <tbody>

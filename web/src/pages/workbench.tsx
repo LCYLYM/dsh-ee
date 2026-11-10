@@ -8,7 +8,7 @@ import { useAuth } from "../lib/auth";
 import { api, formatTokens, type MyOverview, type MyQuota } from "../lib/api";
 import { useApi } from "../lib/use-api";
 import { pluginPath } from "../components/plugin-card";
-import { Badge, Button, Card, CardHeader, PluginIcon, Stat, StatStrip } from "../components/ui";
+import { Badge, Button, Card, CardHeader, PluginIcon, Stat, StatStrip, buttonCls } from "../components/ui";
 import { HoverArrow, Ribbon } from "../components/landing-graphics";
 import { BuildStateBadge } from "./build";
 import { AccessRequestsCard } from "../components/access-requests";
@@ -67,7 +67,7 @@ export default function Workbench() {
           <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
             <PageLink
               page="apps"
-              className="inline-flex h-9 items-center rounded-full bg-brand-500 px-4 text-sm font-semibold text-white shadow-card transition-colors hover:bg-brand-600"
+              className={buttonCls("primary", "md", "rounded-full")}
             >
               {t("workbench.browseAll", { count: allApps.length })}
               <HoverArrow />
@@ -191,7 +191,7 @@ export default function Workbench() {
           <div className="mt-auto px-5 pb-5">
             <PageLink
               page="app-new"
-              className="flex h-9 items-center justify-center rounded-md border border-neutral-200 text-sm font-semibold text-neutral-800 shadow-card hover:bg-neutral-50"
+              className={buttonCls("secondary", "md", "w-full")}
             >
               {t("workbench.shareNew")}
             </PageLink>

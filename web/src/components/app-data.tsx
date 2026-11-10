@@ -154,12 +154,12 @@ function TableData({ slug, table, admin, onChanged }: { slug: string; table: App
             <p className="py-4 text-center text-sm text-neutral-500">{t("appData.noRows")}</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="tbl">
                 <thead>
                   <tr className="border-b border-neutral-200 text-left text-xs text-neutral-500">
-                    {fields.map((f) => <th key={f.name} className="px-2 py-1.5 font-medium whitespace-nowrap">{f.title}</th>)}
-                    {ownerColumn && <th className="px-2 py-1.5 font-medium whitespace-nowrap">{t("appData.owner")}</th>}
-                    <th className="px-2 py-1.5 font-medium whitespace-nowrap">{t("appData.createdAt")}</th>
+                    {fields.map((f) => <th key={f.name} className="px-2 py-1.5 whitespace-nowrap">{f.title}</th>)}
+                    {ownerColumn && <th className="px-2 py-1.5 whitespace-nowrap">{t("appData.owner")}</th>}
+                    <th className="px-2 py-1.5 whitespace-nowrap">{t("appData.createdAt")}</th>
                     <th />
                   </tr>
                 </thead>

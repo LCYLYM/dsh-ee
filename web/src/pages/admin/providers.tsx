@@ -366,13 +366,13 @@ function ProviderCard({ p, models, onChanged }: { p: Provider; models: Model[]; 
         )}
         {models.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs text-neutral-600">
+            <table className="tbl">
+              <thead>
                 <tr>
-                  <th className="px-5 py-2 font-normal">{t("providers.colPublic")}</th>
-                  <th className="px-5 py-2 font-normal">{t("providers.colUpstream")}</th>
-                  <th className="px-5 py-2 font-normal">{t("providers.colDisplay")}</th>
-                  <th className="px-5 py-2 font-normal">{t("providers.colEnabled")}</th>
+                  <th className="px-5 py-2">{t("providers.colPublic")}</th>
+                  <th className="px-5 py-2">{t("providers.colUpstream")}</th>
+                  <th className="px-5 py-2">{t("providers.colDisplay")}</th>
+                  <th className="px-5 py-2">{t("providers.colEnabled")}</th>
                   <th className="px-5 py-2" />
                 </tr>
               </thead>
@@ -415,11 +415,11 @@ function Routing({ providers, models }: { providers: Provider[]; models: Model[]
     <Card className="mb-4">
       <CardHeader title={t("providers.available")} aside={t("providers.availableCount", { count: rows.length })} />
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs text-neutral-600">
+        <table className="tbl">
+          <thead>
             <tr>
-              <th className="px-5 py-2 font-normal">{t("providers.colModel")}</th>
-              <th className="px-5 py-2 font-normal">{t("providers.colRoutes")}</th>
+              <th className="px-5 py-2">{t("providers.colModel")}</th>
+              <th className="px-5 py-2">{t("providers.colRoutes")}</th>
             </tr>
           </thead>
           <tbody>

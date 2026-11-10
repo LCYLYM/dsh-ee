@@ -10,7 +10,7 @@ import { assetPath } from "../lib/hub";
 import { pluginPath } from "../components/plugin-card";
 import { LoadState } from "../components/api-ui";
 import { useMenus } from "../lib/menus";
-import { Badge, Button, Card, cx, PageHeader, Segmented } from "../components/ui";
+import { Badge, Button, Card, cx, PageHeader, Segmented, cardHover } from "../components/ui";
 
 type Filter = "all" | "enabled";
 
@@ -35,7 +35,7 @@ function AppCard({ a, bySlug, busy, onToggle }: { a: HubAsset; bySlug: Map<strin
     ...(can("plugins.manage") ? (a.spec.plugins ?? []) : []).map((p) => ({ key: "p:" + p, label: plugins.find((x) => x.name === p)?.title ?? p, to: pluginPath(p), kind: t("hub.tabs.plugin") })),
   ];
   return (
-    <Card className="flex h-full flex-col p-4 transition hover:border-neutral-300">
+    <Card className={cx("flex h-full flex-col p-4", cardHover)}>
       <div className="flex gap-3">
         <AppIcon icon={a.spec.icon} title={a.spec.title} />
         <div className="min-w-0">

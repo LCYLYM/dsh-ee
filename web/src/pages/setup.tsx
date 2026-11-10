@@ -6,7 +6,7 @@ import { api, formatTime } from "../lib/api";
 import { useApi, useAction } from "../lib/use-api";
 import { useConfirm } from "../lib/confirm";
 import { LoadState } from "../components/api-ui";
-import { Badge, Button, Card, CardHeader, CopyBox, cx, inputBase, PageHeader, Segmented } from "../components/ui";
+import { Badge, Button, Card, CardHeader, CopyBox, cx, inputBase, PageHeader, Segmented, Notice } from "../components/ui";
 import { useTranslation } from "react-i18next";
 
 type Mode = "unix" | "windows" | "manual";
@@ -116,10 +116,7 @@ export default function Setup() {
         )}
       </div>
 
-      <Card className="mt-8 flex gap-3 border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-        <Info size={18} className="mt-0.5 shrink-0" />
-        <div>{t("setup.coexist")}</div>
-      </Card>
+      <Notice tone="warn" className="mt-8">{t("setup.coexist")}</Notice>
     </div>
   );
 }
@@ -158,13 +155,13 @@ function Tokens({ onCreated }: { onCreated: (token: string) => void }) {
       <p className="px-5 text-sm text-neutral-600">{t("setup.tokenDesc")}</p>
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
         {(data ?? []).length > 0 && (
-          <table className="mt-3 w-full text-sm">
-            <thead className="text-left text-xs text-neutral-600">
+          <div className="overflow-x-auto"><table className="tbl mt-3">
+            <thead>
               <tr>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colName")}</th>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colAccess")}</th>
-                <th className="px-5 py-2 font-normal">{t("registry.setup.prefix")}</th>
-                <th className="px-5 py-2 text-right font-normal">{t("registryAdmin.colLastUsed")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colName")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colAccess")}</th>
+                <th className="px-5 py-2">{t("registry.setup.prefix")}</th>
+                <th className="px-5 py-2 text-right">{t("registryAdmin.colLastUsed")}</th>
                 <th className="px-5 py-2" />
               </tr>
             </thead>
@@ -195,7 +192,7 @@ function Tokens({ onCreated }: { onCreated: (token: string) => void }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </LoadState>
       <div className="mt-3 border-t border-neutral-100 px-5 py-4">

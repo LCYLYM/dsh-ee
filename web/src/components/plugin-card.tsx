@@ -3,7 +3,7 @@ import { Building2, Download, WifiOff } from "lucide-react";
 import { categoryLabel, kindOf } from "../lib/catalog";
 import { useScoring } from "../lib/store";
 import type { Plugin } from "../lib/types";
-import { Badge, Card, PluginIcon, Rating, ScoreBadge } from "./ui";
+import { Badge, Card, PluginIcon, Rating, ScoreBadge, cardHover, cx } from "./ui";
 import { useTranslation } from "react-i18next";
 
 export function pluginPath(name: string) {
@@ -15,7 +15,7 @@ export function PluginCard({ p }: { p: Plugin }) {
   const { t } = useTranslation();
   return (
     <Link to={pluginPath(p.name)}>
-      <Card className="flex h-full flex-col p-4 transition hover:border-neutral-300">
+      <Card className={cx("flex h-full flex-col p-4", cardHover)}>
         <div className="flex gap-3">
           <PluginIcon name={p.name} icon={p.icon} />
           <div className="min-w-0">

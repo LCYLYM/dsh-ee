@@ -16,7 +16,7 @@ import { AppMap } from "../components/app-map";
 import { AppDepsCard } from "../components/access-requests";
 import { UsedByCard } from "../components/used-by";
 import { ScopeDialog, useScopeOptions } from "../components/scope-dialog";
-import { Badge, Button, Card, CardHeader, cx, inputCls, Toggle } from "../components/ui";
+import { Badge, Button, Card, CardHeader, cx, inputCls, Toggle, Empty } from "../components/ui";
 import { statusBadge } from "../components/status";
 import { PageLink, useMenus } from "../lib/menus";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
@@ -162,7 +162,7 @@ function AssetDetail() {
   if (!a) {
     return (
       <LoadState loading={detail.loading} error={detail.error} onRetry={detail.reload}>
-        <Card className="p-12 text-center text-sm text-neutral-600">{t("asset.notFound")}</Card>
+        <Card><Empty>{t("asset.notFound")}</Empty></Card>
       </LoadState>
     );
   }
@@ -221,7 +221,7 @@ function AssetDetail() {
           </div>
           <p className="mt-3 text-sm text-neutral-700">{a.spec.description}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {a.available && a.delivery === "optional" && (
             <Button variant={a.subscribed ? "secondary" : "primary"} disabled={busy} onClick={toggleSub}>
               {a.subscribed ? t("hub.disable") : t("hub.enable")}
@@ -452,7 +452,7 @@ function AssetDetail() {
               {d.calls.length === 0 ? (
                 <p className="px-5 pb-5 text-sm text-neutral-600">{t("asset.noCalls")}</p>
               ) : (
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto"><table className="tbl">
                   <tbody>
                     {d.calls.map((c, i) => (
                       <tr key={i} className="border-t border-neutral-100">
@@ -467,7 +467,7 @@ function AssetDetail() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               )}
             </Card>
           )}

@@ -7,7 +7,7 @@ import { useApi } from "../lib/use-api";
 import { assetPath } from "../lib/hub";
 import { useMenus } from "../lib/menus";
 import { LoadState } from "../components/api-ui";
-import { Badge, Button, Card, PageHeader } from "../components/ui";
+import { Badge, Button, Card, PageHeader, Empty } from "../components/ui";
 
 function TemplateCard({ a, onCopy }: { a: HubAsset; onCopy: () => void }) {
   const { t } = useTranslation();
@@ -63,7 +63,7 @@ export default function Templates() {
       <LoadState loading={hub.loading && !hub.data} error={hub.data ? null : hub.error} onRetry={hub.reload}>
         <h2 className="mb-3 text-base font-medium text-neutral-900">{t("templates.templates")}</h2>
         {templates.length === 0 ? (
-          <Card className="mb-8 px-5 py-8 text-center text-sm text-neutral-600">{t("templates.templatesEmpty")}</Card>
+          <Card className="mb-8"><Empty>{t("templates.templatesEmpty")}</Empty></Card>
         ) : (
           <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {templates.map((a) => (
@@ -73,7 +73,7 @@ export default function Templates() {
         )}
         <h2 className="mb-3 text-base font-medium text-neutral-900">{t("templates.company")}</h2>
         {company.length === 0 ? (
-          <Card className="px-5 py-8 text-center text-sm text-neutral-600">{t("templates.companyEmpty")}</Card>
+          <Card><Empty>{t("templates.companyEmpty")}</Empty></Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {company.map((a) => (

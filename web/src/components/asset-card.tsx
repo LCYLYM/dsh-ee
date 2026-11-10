@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Activity, Building2 } from "lucide-react";
 import type { HubAsset } from "../lib/api";
 import { assetPath, assetState, KIND_ICONS } from "../lib/hub";
-import { Badge, Button, Card } from "./ui";
+import { Badge, Button, Card, cardHover, cx } from "./ui";
 
 const STATE_TONE = { unpublished: "red", notLive: "slate", pending: "amber", outOfScope: "slate" } as const;
 const STATE_KEY = { unpublished: "hub.unpublishedBadge", notLive: "hub.notLiveBadge", pending: "hub.pendingBadge", outOfScope: "hub.outOfScopeBadge" } as const;
@@ -15,7 +15,7 @@ export function AssetCard({ a, busy, onToggle }: { a: HubAsset; busy?: boolean; 
   const state = assetState(a);
   const canToggle = onToggle && a.available && a.delivery === "optional";
   return (
-    <Card className="flex h-full flex-col p-4 transition hover:border-neutral-300">
+    <Card className={cx("flex h-full flex-col p-4", cardHover)}>
       <Link to={assetPath(a.id)} className="flex flex-1 flex-col">
         <div className="flex gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-700">

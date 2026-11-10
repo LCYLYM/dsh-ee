@@ -93,12 +93,12 @@ export default function AdminRegistry() {
       <Card className="mt-4">
         <CardHeader title={t("registryAdmin.routes")} aside={t("registryAdmin.routesOrder")} />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs text-neutral-600">
+          <table className="tbl">
+            <thead>
               <tr>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colPackage")}</th>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colTarget")}</th>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colRule")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colPackage")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colTarget")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colRule")}</th>
                 <th className="px-5 py-2" />
               </tr>
             </thead>
@@ -217,14 +217,14 @@ function TokensCard({ requireToken, onRequireToken }: { requireToken: boolean; o
       </div>
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs text-neutral-600">
+          <table className="tbl">
+            <thead>
               <tr>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colName")}</th>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colOwner")}</th>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colAccess")}</th>
-                <th className="px-5 py-2 text-right font-normal">{t("registryAdmin.colCreated")}</th>
-                <th className="px-5 py-2 text-right font-normal">{t("registryAdmin.colLastUsed")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colName")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colOwner")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colAccess")}</th>
+                <th className="px-5 py-2 text-right">{t("registryAdmin.colCreated")}</th>
+                <th className="px-5 py-2 text-right">{t("registryAdmin.colLastUsed")}</th>
                 <th className="px-5 py-2" />
               </tr>
             </thead>

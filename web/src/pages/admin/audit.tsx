@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, formatTime, type AuditLog } from "../../lib/api";
 import { AUDIT_CATEGORIES, auditAction, auditActor, auditDetail, auditTone } from "../../lib/audit";
-import { Badge, Button, Card, cx, inputBase, PageHeader } from "../../components/ui";
+import { Badge, Button, Card, cx, inputBase, PageHeader, Empty } from "../../components/ui";
 import { Combobox } from "../../components/pickers";
 import { LoadState } from "../../components/api-ui";
 
@@ -49,16 +49,16 @@ export default function AdminAudit() {
   return (
     <div>
       <PageHeader title={t("auditLog.title")} desc={t("auditLog.desc")} />
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-2.5">
         <input
-          className={cx(inputBase, "w-64")}
+          className={cx(inputBase, "w-full sm:w-64")}
           placeholder={t("auditLog.search")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           aria-label={t("auditLog.search")}
         />
         <Combobox
-          className="w-48"
+          className="w-full sm:w-48"
           value={category}
           onChange={setCategory}
           allowEmpty
@@ -68,7 +68,7 @@ export default function AdminAudit() {
           options={AUDIT_CATEGORIES.map((c) => ({ value: c, label: t(`auditLog.categories.${c}`) }))}
         />
         <Combobox
-          className="w-40"
+          className="w-full sm:w-40"
           value={via}
           onChange={setVia}
           allowEmpty
@@ -81,19 +81,19 @@ export default function AdminAudit() {
       <Card>
         <LoadState loading={loading && logs.length === 0} error={logs.length === 0 ? error : null} onRetry={() => load()}>
           {logs.length === 0 ? (
-            <div className="px-5 py-8 text-sm text-neutral-600">{t("auditLog.empty")}</div>
+            <Empty>{t("auditLog.empty")}</Empty>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs text-neutral-600">
+              <table className="tbl">
+                <thead>
                   <tr>
-                    <th className="px-5 py-2.5 font-normal whitespace-nowrap">{t("auditLog.colTime")}</th>
-                    <th className="px-5 py-2.5 font-normal">{t("auditLog.colActor")}</th>
-                    <th className="px-5 py-2.5 font-normal">{t("auditLog.colAction")}</th>
-                    <th className="px-5 py-2.5 font-normal">{t("auditLog.colSource")}</th>
-                    <th className="px-5 py-2.5 font-normal">{t("auditLog.colTarget")}</th>
-                    <th className="px-5 py-2.5 font-normal">{t("auditLog.colDetail")}</th>
-                    <th className="px-5 py-2.5 font-normal">{t("auditLog.colIp")}</th>
+                    <th className="px-5 py-2.5 whitespace-nowrap">{t("auditLog.colTime")}</th>
+                    <th className="px-5 py-2.5">{t("auditLog.colActor")}</th>
+                    <th className="px-5 py-2.5">{t("auditLog.colAction")}</th>
+                    <th className="px-5 py-2.5">{t("auditLog.colSource")}</th>
+                    <th className="px-5 py-2.5">{t("auditLog.colTarget")}</th>
+                    <th className="px-5 py-2.5">{t("auditLog.colDetail")}</th>
+                    <th className="px-5 py-2.5">{t("auditLog.colIp")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -126,7 +126,7 @@ export default function AdminAudit() {
               {t("auditLog.loadMore")}
             </Button>
           ) : (
-            <span className="text-sm text-neutral-600">{t("auditLog.noMore")}</span>
+            <span className="text-[13px] text-neutral-500">{t("auditLog.noMore")}</span>
           )}
         </div>
       )}

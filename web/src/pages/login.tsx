@@ -4,7 +4,8 @@ import { WhaleMark } from "../components/whale-mark";
 import { useAuth } from "../lib/auth";
 import { api } from "../lib/api";
 import { useApi } from "../lib/use-api";
-import { Button, inputCls, PasswordInput } from "../components/ui";
+import { Button, buttonCls, inputCls, Notice, PasswordInput, Spinner } from "../components/ui";
+import { ErrorNote } from "../components/api-ui";
 import { LangSwitch } from "../components/lang-switch";
 import { ThemeToggle } from "../components/theme-toggle";
 import { useTranslation } from "react-i18next";
@@ -53,25 +54,23 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-50 px-4">
-      <Link to="/" className="mb-8 flex items-center gap-2.5">
-        <WhaleMark size={36} className="text-brand-500" />
-        <span className="text-lg font-semibold text-neutral-900">dsh-ee</span>
+    <div className="auth-bg relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-10">
+      <div aria-hidden className="auth-stripe pointer-events-none absolute inset-x-0 top-0 h-[52vh] min-h-80 dark:opacity-80" />
+      <Link to="/" className="relative mb-7 flex items-center gap-2.5 rounded-md text-white">
+        <WhaleMark size={36} />
+        <span className="text-xl font-bold tracking-[-0.01em]">dsh-ee</span>
       </Link>
-      <form onSubmit={submit} className="w-full max-w-sm rounded-lg border border-neutral-200/80 bg-card p-6">
-        <h1 className="text-xl font-semibold text-neutral-900">{t("login.title")}</h1>
-        <p className="mt-1 text-sm text-neutral-600">{ldap ? t("login.ldapHint") : t("login.subtitle")}</p>
+      <form onSubmit={submit} className="relative w-full max-w-[400px] rounded-xl bg-card p-7 shadow-modal sm:p-8">
+        <h1 className="text-[22px] leading-7 font-bold tracking-[-0.02em] text-neutral-900">{t("login.title")}</h1>
+        <p className="mt-1.5 text-sm leading-6 text-neutral-600">{ldap ? t("login.ldapHint") : t("login.subtitle")}</p>
         {(reauth || handoffExpired) && (
-          <p role="status" className="mt-4 rounded-md bg-brand-50 px-3 py-2 text-sm text-neutral-800">
+          <Notice role="status" className="mt-4">
             {t(reauth ? "login.reauth" : "login.handoffExpired")}
-          </p>
+          </Notice>
         )}
         {sso && (
           <>
-            <a
-              href={`/api/auth/oidc/start?next=${encodeURIComponent(next)}`}
-              className="mt-6 flex h-10 w-full items-center justify-center rounded-md bg-brand-500 text-sm font-semibold text-white shadow-card hover:bg-brand-600"
-            >
+            <a href={`/api/auth/oidc/start?next=${encodeURIComponent(next)}`} className={buttonCls("primary", "lg", "mt-6 w-full")}>
               {t("ssoLogin.button", { name: sso.name })}
             </a>
             <div className="mt-5 flex items-center gap-3 text-xs text-neutral-500">
@@ -83,7 +82,7 @@ export default function Login() {
         )}
         <div className={sso ? "mt-4 space-y-4" : "mt-6 space-y-4"}>
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-neutral-800">{t("login.username")}</span>
+            <span className="mb-1.5 block text-[13px] font-medium text-neutral-700">{t("login.username")}</span>
             <input
               className={inputCls}
               autoComplete="username"
@@ -94,7 +93,7 @@ export default function Login() {
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-neutral-800">{t("login.password")}</span>
+            <span className="mb-1.5 block text-[13px] font-medium text-neutral-700">{t("login.password")}</span>
             <PasswordInput
               label={t("login.password")}
               className={inputCls}
@@ -106,16 +105,17 @@ export default function Login() {
           </label>
         </div>
         {(error ?? bootError ?? ssoError) && (
-          <p role="alert" className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-500/15 dark:text-red-300">
-            {error ?? bootError ?? t("ssoLogin.failed", { error: ssoError })}
-          </p>
+          <div className="mt-4">
+            <ErrorNote>{error ?? bootError ?? t("ssoLogin.failed", { error: ssoError })}</ErrorNote>
+          </div>
         )}
-        <Button type="submit" variant={sso ? "secondary" : "primary"} className="mt-6 w-full" disabled={busy || !username || !password}>
+        <Button type="submit" size="lg" variant={sso ? "secondary" : "primary"} className="mt-6 w-full" disabled={busy || !username || !password}>
+          {busy && <Spinner />}
           {busy ? t("login.submitting") : t("login.submit")}
         </Button>
       </form>
-      <p className="mt-6 text-xs text-neutral-500">{ldap ? t("login.ldapForgot") : t("login.forgot")}</p>
-      <div className="mt-3 flex items-center justify-center gap-2">
+      <p className="relative mt-6 text-center text-[13px] text-neutral-500">{ldap ? t("login.ldapForgot") : t("login.forgot")}</p>
+      <div className="relative mt-3 flex items-center justify-center gap-2">
         <LangSwitch />
         <ThemeToggle />
       </div>

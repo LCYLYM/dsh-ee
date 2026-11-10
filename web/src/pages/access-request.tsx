@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { api, formatTime } from "../lib/api";
 import { useAction, useApi } from "../lib/use-api";
 import { ErrorNote, LoadState } from "../components/api-ui";
-import { Badge, Button, Card, cx, inputCls } from "../components/ui";
+import { Badge, Button, Card, cx, inputCls, Notice } from "../components/ui";
 import { PageLink } from "../lib/menus";
 
 /**
@@ -48,23 +48,23 @@ export default function AccessRequestPage() {
               {d.description && <p className="mt-1 text-sm text-neutral-600">{d.description}</p>}
             </div>
             {d.allowed ? (
-              <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              <Notice tone="success">
                 {t("requests.alreadyAllowed")}{" "}
                 {d.id && (
                   <Link className="font-medium underline" to={d.kind === "knowledge" ? `/knowledge/${d.id}` : `/assets/${d.id}`}>
                     {t("requests.openIt")}
                   </Link>
                 )}
-              </p>
+              </Notice>
             ) : d.request?.status === "pending" ? (
-              <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{t("requests.pendingSince", { time: formatTime(d.request.created_at) })}</p>
+              <Notice tone="warn">{t("requests.pendingSince", { time: formatTime(d.request.created_at) })}</Notice>
             ) : (
               <>
                 {d.request?.status === "rejected" && (
-                  <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+                  <Notice tone="danger">
                     {t("requests.lastRejected")}
                     {d.request.note ? t("requests.rejectedNote", { note: d.request.note }) : ""}
-                  </p>
+                  </Notice>
                 )}
                 <p className="text-sm text-neutral-700">{d.app ? t("requests.forApp", { app: d.app.title }) : t("requests.dialogDesc")}</p>
                 <textarea

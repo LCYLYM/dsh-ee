@@ -11,7 +11,7 @@ import { ErrorNote, LoadState } from "../components/api-ui";
 import { ScopeEditor } from "../components/scope-editor";
 import { useScopeOptions } from "../components/scope-dialog";
 import { Combobox } from "../components/pickers";
-import { Badge, Button, Card, cx, Field, inputBase, inputCls, PageHeader, PasswordInput, Segmented, ToggleRow } from "../components/ui";
+import { Badge, Button, Card, cx, Field, inputBase, inputCls, PageHeader, PasswordInput, Segmented, ToggleRow, Notice } from "../components/ui";
 import { PageLink } from "../lib/menus";
 import { parseWorkbench, WorkbenchField, workbenchText } from "../components/workbench-editor";
 import { parseTables, TablesField, tablesText as tablesToText } from "../components/app-data";
@@ -381,10 +381,10 @@ function AssetEditor({ forceKind, tabs }: { forceKind?: AssetKind; tabs?: ReactN
       <PageHeader title={title} desc={t(`hub.tabHints.${kind}`)} actions={<Icon size={28} strokeWidth={1.4} className="text-neutral-400" />} />
       {!editing && tabs}
       {(draft.data?.notes.length ?? 0) > 0 && (
-        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <Notice tone="warn" className="mb-4">
           <div className="font-medium">{t("studio.draftNotes")}</div>
           <ul className="mt-1 list-disc pl-5">{draft.data!.notes.map((n) => <li key={n}>{n}</li>)}</ul>
-        </div>
+        </Notice>
       )}
 
       <div className={kind === "app" ? "grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)]" : ""}>

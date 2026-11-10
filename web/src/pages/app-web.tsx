@@ -7,7 +7,7 @@ import { useApi } from "../lib/use-api";
 import { useAuth } from "../lib/auth";
 import { LoadState } from "../components/api-ui";
 import { AppDataPanel } from "../components/app-data";
-import { Card, cx } from "../components/ui";
+import { Card, cx, Notice, Empty, tabCls } from "../components/ui";
 import { WhaleMark } from "../components/whale-mark";
 import { LivePane } from "../components/live-pane";
 import type { WorkbenchPane } from "../lib/workbench-render";
@@ -56,7 +56,7 @@ function AppWeb({ app }: { app: WebApp }) {
             <h1 className="truncate text-[15px] font-semibold tracking-tight text-neutral-900">{app.title}</h1>
             <p className="truncate text-xs text-neutral-500">{user?.display_name || user?.username}</p>
           </div>
-          {app.admin && <Link to={`/assets/${app.asset_id}`} className="rounded-md px-2.5 py-1 text-xs font-medium text-brand-600 transition-colors hover:bg-brand-50">{t("appWeb.manage")}</Link>}
+          {app.admin && <Link to={`/assets/${app.asset_id}`} className="rounded-md px-2.5 py-1 text-xs font-medium text-brand-600 transition-colors hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-500/15">{t("appWeb.manage")}</Link>}
         </div>
         {tabs.length > 1 && (
           <nav className="mx-auto flex max-w-6xl gap-5 overflow-x-auto px-4 sm:px-6">
@@ -65,7 +65,7 @@ function AppWeb({ app }: { app: WebApp }) {
                 key={x.id}
                 type="button"
                 onClick={() => setTab(x.id)}
-                className={cx("-mb-px border-b-2 py-2 text-sm whitespace-nowrap transition-colors", tab === x.id ? "border-brand-500 font-medium text-neutral-900" : "border-transparent text-neutral-500 hover:text-neutral-800")}
+                className={tabCls(tab === x.id)}
               >
                 {x.title}
               </button>
@@ -74,7 +74,7 @@ function AppWeb({ app }: { app: WebApp }) {
         )}
       </header>
       <main className="mx-auto max-w-6xl px-2 py-4 sm:px-4 sm:py-6">
-        {!app.web && <p className="mx-2 mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 sm:mx-3.5">{t("appWeb.previewOnly")}</p>}
+        {!app.web && <Notice tone="warn" className="mx-2 mb-3 sm:mx-3.5">{t("appWeb.previewOnly")}</Notice>}
         {first && (app.description || (app.highlights?.length ?? 0) > 0) && (
           <section className="mx-2 mb-1 sm:mx-3.5">
             {app.description && <p className="max-w-3xl text-sm leading-relaxed text-neutral-600">{app.description}</p>}
@@ -91,7 +91,7 @@ function AppWeb({ app }: { app: WebApp }) {
           </section>
         )}
         {/* 网页的类型里 source.connection 是可选的（表数据源没有），接口返回的就是插件渲染认的那份配置 */}
-        {pane ? <WebPane key={pane.id} app={app} pane={pane as unknown as WorkbenchPane} /> : tab === "@data" ? <div className="px-2 sm:px-3.5"><AppDataPanel slug={app.slug} /></div> : <Card className="mx-2 p-8 text-center text-sm text-neutral-500">{t("appWeb.noPanel")}</Card>}
+        {pane ? <WebPane key={pane.id} app={app} pane={pane as unknown as WorkbenchPane} /> : tab === "@data" ? <div className="px-2 sm:px-3.5"><AppDataPanel slug={app.slug} /></div> : <Card className="mx-2"><Empty>{t("appWeb.noPanel")}</Empty></Card>}
       </main>
     </>
   );

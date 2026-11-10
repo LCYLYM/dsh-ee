@@ -11,7 +11,7 @@ import { PageLink, useMenus } from "../lib/menus";
 import { ImportAppButton } from "../components/app-import";
 import { LoadState } from "../components/api-ui";
 import { ScopeDialog, useScopeOptions } from "../components/scope-dialog";
-import { Badge, Button, Card, PageHeader, Segmented } from "../components/ui";
+import { Badge, Button, Card, PageHeader, Segmented, buttonCls } from "../components/ui";
 
 const STATE_TONE: Record<BuildState, "green" | "brand" | "amber" | "red" | "slate"> = {
   self: "slate",
@@ -137,10 +137,10 @@ export default function Build() {
             <p>{tab === "apps" ? t("build.empty") : t("build.emptyOthers")}</p>
             {tab === "apps" && can("registry.publish") && (
               <div className="mt-4 flex justify-center gap-2">
-                <PageLink page="templates" className="inline-flex h-9 items-center rounded-md border border-neutral-200 px-3 text-sm font-semibold text-neutral-800 shadow-card hover:bg-neutral-50">
+                <PageLink page="templates" className={buttonCls("secondary")}>
                   {t("build.fromTemplate")}
                 </PageLink>
-                <PageLink page="app-new" className="inline-flex h-9 items-center rounded-md bg-brand-500 px-3 text-sm font-semibold text-white shadow-card hover:bg-brand-600">
+                <PageLink page="app-new" className={buttonCls("primary")}>
                   {t("build.newApp")}
                 </PageLink>
               </div>

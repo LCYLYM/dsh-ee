@@ -9,7 +9,7 @@ import { useApi, useAction } from "../../lib/use-api";
 import { useScoring, useStore } from "../../lib/store";
 import { LoadState } from "../../components/api-ui";
 import { ScanList, scanWarnings } from "../../components/scan-list";
-import { Badge, Button, Card, cx, inputCls, PageHeader, PluginIcon, ScoreBadge, Segmented } from "../../components/ui";
+import { Badge, Button, Card, cx, inputCls, PageHeader, PluginIcon, ScoreBadge, Segmented, Empty } from "../../components/ui";
 import { useTranslation } from "react-i18next";
 
 function ago(iso: string) {
@@ -109,7 +109,7 @@ function AssetReview({ q }: { q: ReturnType<typeof useApi<AssetReviewItem[]>> })
   return (
     <LoadState loading={q.loading && !q.data} error={q.error} onRetry={q.reload}>
       {queue.length === 0 ? (
-        <Card className="p-12 text-center text-sm text-neutral-500">{t("reviewAssets.empty")}</Card>
+        <Card><Empty>{t("reviewAssets.empty")}</Empty></Card>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
           <Card className="h-fit divide-y divide-neutral-100">
@@ -204,7 +204,7 @@ function ScopeReview({ q }: { q: ReturnType<typeof useApi<ScopeReviewItem[]>> })
   return (
     <LoadState loading={q.loading && !q.data} error={q.error} onRetry={q.reload}>
       {queue.length === 0 ? (
-        <Card className="p-12 text-center text-sm text-neutral-500">{t("scopeReview.empty")}</Card>
+        <Card><Empty>{t("scopeReview.empty")}</Empty></Card>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
           <Card className="h-fit divide-y divide-neutral-100">
@@ -296,7 +296,7 @@ function PluginReview({ q }: { q: ReturnType<typeof useApi<ReviewItem[]>> }) {
     <div>
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
         {queue.length === 0 ? (
-          <Card className="p-12 text-center text-sm text-neutral-500">{t("review.empty")}</Card>
+          <Card><Empty>{t("review.empty")}</Empty></Card>
         ) : (
           <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
             <Card className="h-fit divide-y divide-neutral-100">

@@ -11,7 +11,7 @@ import { LoadState, ErrorNote } from "../components/api-ui";
 import { ScopeEditor } from "../components/scope-editor";
 import { useScopeOptions } from "../components/scope-dialog";
 import { MaintainersEditor, Snippet } from "../components/kb-access";
-import { Badge, Button, Card, cx, Field, inputBase, inputCls, Segmented, Toggle } from "../components/ui";
+import { Badge, Button, Card, cx, Field, inputBase, inputCls, Segmented, Toggle, Notice } from "../components/ui";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { kdocPath, QueryTable } from "./knowledge";
@@ -272,7 +272,7 @@ function QueriesTab({ kb, onUpload, onChanged }: { kb: KBase; onUpload: () => vo
         <p className="mt-0.5 text-sm text-neutral-600">{t("kbase.gapsHint")}</p>
         <LoadState loading={gaps.loading && !gaps.data} error={gaps.data ? null : gaps.error} onRetry={gaps.reload}>
           {gaps.data && gaps.data.gaps.length === 0 ? (
-            <p className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200">{t("kbase.gapsEmpty", { days })}</p>
+            <Notice tone="success" className="mt-3">{t("kbase.gapsEmpty", { days })}</Notice>
           ) : (
             <ul className="mt-3 space-y-2">
               {gaps.data?.gaps.map((g) => (
@@ -404,14 +404,14 @@ export default function KnowledgeBase() {
                   </div>
                 </dl>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
               {kb.readable && can("registry.publish") && (
                 <Button variant="secondary" onClick={() => navigate(`${pathOf("app-new")}?knowledge=${encodeURIComponent(kb.slug)}`)}>
                   <Sparkles size={15} /> {t("studio.makeAppFromKB")}
                 </Button>
               )}
               {kb.can_edit && (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button onClick={() => setDialog("upload")}>
                     <Upload size={15} /> {t("kbase.upload")}
                   </Button>
@@ -454,7 +454,7 @@ export default function KnowledgeBase() {
               </div>
             </div>
             {kb.readable && kb.docs > 0 && can("registry.publish") && (detail.data?.used_by?.length ?? 0) === 0 && (
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-100 bg-brand-50/60 px-4 py-3 dark:border-brand-500/20 dark:bg-brand-500/10">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-200/80 bg-brand-50/70 px-4 py-3 dark:border-brand-400/25 dark:bg-brand-500/10">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-neutral-900">{t("kbase.noAppTitle")}</div>
                   <p className="text-sm text-neutral-600">{t("kbase.noAppHint")}</p>

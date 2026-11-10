@@ -6,7 +6,7 @@ import { useStore } from "../../lib/store";
 import { useConfirm } from "@/lib/confirm";
 import { Combobox } from "@/components/pickers";
 import { ErrorNote, LoadState } from "../../components/api-ui";
-import { Badge, Button, Card, CardHeader, CopyBox, Field, inputBase, inputCls, PageHeader, cx } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, CopyBox, Field, inputBase, inputCls, PageHeader, cx, Empty } from "../../components/ui";
 
 const scopes: TokenScope[] = ["models", "registry:read", "registry:publish", "hub", "connections", "agent"];
 type BulkMode = "department" | "user" | "device";
@@ -106,8 +106,8 @@ export default function AdminTokens() {
           <input aria-label={t("tokens.departmentFilter")} className={inputBase} value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} placeholder={t("tokens.departmentFilter")} />
         </div>
         <LoadState loading={loading && !data} error={error} onRetry={reload}>
-          <div className="overflow-x-auto"><table className="w-full text-sm">
-            <thead className="text-left text-xs text-neutral-600"><tr><th className="px-5 py-2 font-normal">{t("tokens.name")}</th><th className="px-5 py-2 font-normal">{t("tokens.owner")}</th><th className="px-5 py-2 font-normal">{t("tokens.source")}</th><th className="px-5 py-2 font-normal">{t("tokens.scopesTitle")}</th><th className="px-5 py-2 text-right font-normal">{t("tokens.usage")}</th><th className="px-5 py-2 text-right font-normal">{t("tokens.lastUsed")}</th><th className="px-5 py-2 font-normal">{t("tokens.status")}</th></tr></thead>
+          <div className="overflow-x-auto"><table className="tbl">
+            <thead><tr><th className="px-5 py-2">{t("tokens.name")}</th><th className="px-5 py-2">{t("tokens.owner")}</th><th className="px-5 py-2">{t("tokens.source")}</th><th className="px-5 py-2">{t("tokens.scopesTitle")}</th><th className="px-5 py-2 text-right">{t("tokens.usage")}</th><th className="px-5 py-2 text-right">{t("tokens.lastUsed")}</th><th className="px-5 py-2">{t("tokens.status")}</th></tr></thead>
             <tbody>{list.map((token) => {
               const revoked = !!token.revoked_at;
               return <tr key={token.id} className="border-t border-neutral-100 align-top">
@@ -121,7 +121,7 @@ export default function AdminTokens() {
               </tr>;
             })}</tbody>
           </table></div>
-          {list.length === 0 && <p className="px-5 pb-6 text-sm text-neutral-600">{t("tokens.empty")}</p>}
+          {list.length === 0 && <Empty compact>{t("tokens.empty")}</Empty>}
         </LoadState>
       </Card>
     </div>

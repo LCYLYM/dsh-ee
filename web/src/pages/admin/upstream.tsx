@@ -6,7 +6,7 @@ import { api, formatBytes, formatTime, type ImportResult, type SyncJob } from ".
 import { useApi, useAction } from "../../lib/use-api";
 import { LoadState } from "../../components/api-ui";
 import { StatusBadge } from "../../components/status";
-import { Badge, Button, Card, cx, Field, inputCls, PageHeader, Segmented, Toggle } from "../../components/ui";
+import { Badge, Button, Card, cx, Field, inputCls, PageHeader, Segmented, Toggle, buttonCls } from "../../components/ui";
 import { useTranslation } from "react-i18next";
 import { DatePicker } from "@/components/pickers";
 
@@ -223,7 +223,7 @@ function Online() {
             </span>
             <span className="ml-2 text-neutral-500">{t("registry.upstream.feedCount", { count: all.length, at: feed.data?.fetched_at ? formatTime(feed.data.fetched_at) : "—" })}</span>
           </div>
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             <Button variant="secondary" size="sm" disabled={feed.loading} onClick={() => api.upstreamFeed(true).then(() => feed.reload())}>
               <RefreshCw size={14} /> {t("registry.upstream.refreshFeed")}
             </Button>
@@ -240,16 +240,16 @@ function Online() {
             </Card>
           ) : (
             <Card className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b border-neutral-100 text-left text-xs text-neutral-500">
+              <table className="tbl">
+                <thead>
                   <tr>
                     <th className="w-10 px-4 py-2.5" />
-                    <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colPlugin")}</th>
-                    <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colCategory")}</th>
-                    <th className="px-4 py-2.5 text-right font-normal">Star</th>
-                    {scoring.upstream && <th className="px-4 py-2.5 text-right font-normal">{t("upstreamAdmin.colScore")}</th>}
-                    <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colDeps")}</th>
-                    <th className="px-4 py-2.5 font-normal">{t("upstreamAdmin.colStatus")}</th>
+                    <th className="px-4 py-2.5">{t("upstreamAdmin.colPlugin")}</th>
+                    <th className="px-4 py-2.5">{t("upstreamAdmin.colCategory")}</th>
+                    <th className="px-4 py-2.5 text-right">Star</th>
+                    {scoring.upstream && <th className="px-4 py-2.5 text-right">{t("upstreamAdmin.colScore")}</th>}
+                    <th className="px-4 py-2.5">{t("upstreamAdmin.colDeps")}</th>
+                    <th className="px-4 py-2.5">{t("upstreamAdmin.colStatus")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
@@ -344,14 +344,14 @@ function JobHistory({ jobs, onPick, kinds }: { jobs: SyncJob[]; onPick: (j: Sync
   return (
     <Card>
       <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">{t("upstreamAdmin.history")}</div>
-      <table className="w-full text-sm">
-        <thead className="text-left text-xs text-neutral-500">
+      <div className="overflow-x-auto"><table className="tbl">
+        <thead>
           <tr>
-            <th className="px-5 py-2 font-normal">{t("registry.jobs.colKind")}</th>
-            <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colResult")}</th>
-            <th className="px-5 py-2 font-normal">{t("registry.jobs.colCount")}</th>
-            <th className="px-5 py-2 font-normal">{t("upstreamAdmin.colSize")}</th>
-            <th className="px-5 py-2 font-normal">{t("registry.jobs.colStarted")}</th>
+            <th className="px-5 py-2">{t("registry.jobs.colKind")}</th>
+            <th className="px-5 py-2">{t("upstreamAdmin.colResult")}</th>
+            <th className="px-5 py-2">{t("registry.jobs.colCount")}</th>
+            <th className="px-5 py-2">{t("upstreamAdmin.colSize")}</th>
+            <th className="px-5 py-2">{t("registry.jobs.colStarted")}</th>
             <th className="px-5 py-2" />
           </tr>
         </thead>
@@ -375,7 +375,7 @@ function JobHistory({ jobs, onPick, kinds }: { jobs: SyncJob[]; onPick: (j: Sync
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </Card>
   );
 }
@@ -439,7 +439,7 @@ function Offline() {
           </Field>
           <a
             href={api.exportUrl(exportSince || undefined)}
-            className="mt-4 inline-flex h-9 items-center rounded-md border border-neutral-300 bg-card px-3 text-sm text-neutral-800 hover:bg-neutral-50"
+            className={buttonCls("secondary", "md", "mt-4")}
           >
             {t("upstreamAdmin.generate")}
           </a>

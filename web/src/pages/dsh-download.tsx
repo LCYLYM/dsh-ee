@@ -5,7 +5,7 @@ import { api, formatBytes, formatTime } from "../lib/api";
 import { useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
 import type { DshClient, DshRelease, DshTarget } from "../lib/types";
-import { Badge, Card, CopyBox, PageHeader } from "../components/ui";
+import { Badge, Card, CopyBox, PageHeader, Empty, buttonCls } from "../components/ui";
 import { LoadState } from "../components/api-ui";
 import { PageLink } from "../lib/menus";
 
@@ -38,7 +38,7 @@ function DownloadRow({ release, title }: { release: DshRelease; title: string })
         </div>
         <div className="mt-1 text-xs text-neutral-500">{release.verified ? t("download.officialVerified") : t("download.unverifiedDmg")}</div>
       </div>
-      <a href={release.download_url} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-brand-500 px-4 text-sm font-semibold text-white shadow-card hover:bg-brand-600">
+      <a href={release.download_url} className={buttonCls("primary")}>
         <Download size={14} /> {t("download.download")}
       </a>
     </div>
@@ -88,7 +88,7 @@ export default function DshDownload() {
   const releases = data?.releases ?? [];
   const rows = releases.filter((r) => targets.includes(r.target));
 
-  if (data && !data.enabled) return <Card className="p-12 text-center text-sm text-neutral-500">{t("download.disabled")}</Card>;
+  if (data && !data.enabled) return <Card><Empty>{t("download.disabled")}</Empty></Card>;
 
   return (
     <div>

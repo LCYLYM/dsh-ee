@@ -10,7 +10,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { useLabels } from "../lib/labels";
 import { MenuIcon } from "../lib/icons";
 import type { Menu } from "../lib/api";
-import { cx } from "./ui";
+import { cx, Notice } from "./ui";
 import { useTranslation } from "react-i18next";
 import { Tip } from "@/components/tip";
 import { CommandPalette, useHashFocus, useSearchShortcut } from "./command-palette";
@@ -39,14 +39,14 @@ function NavEntry({ m, onNavigate }: { m: Menu; onNavigate: () => void }) {
   const { t } = useTranslation();
   const title = useMenuTitle()(m);
   if (extras.hidden) return null;
-  const cls = "group flex h-8 items-center gap-2.5 rounded-md px-3 text-sm font-medium transition-colors";
-  const idle = "text-neutral-600 hover:bg-neutral-100/70 hover:text-neutral-900";
+  const cls = "group flex h-[34px] items-center gap-2.5 rounded-md px-3 text-sm font-medium transition-colors lg:h-8";
+  const idle = "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900";
   if (m.kind === "link") {
     return (
       <a href={m.path} target="_blank" rel="noreferrer" onClick={onNavigate} className={cx(cls, idle)}>
-        <MenuIcon name={m.icon || "ExternalLink"} className="text-neutral-400 group-hover:text-neutral-600" />
-        {title}
-        <ExternalLink size={12} className="ml-auto text-neutral-400" />
+        <MenuIcon name={m.icon || "ExternalLink"} className="shrink-0 text-neutral-400 group-hover:text-neutral-600" />
+        <span className="truncate">{title}</span>
+        <ExternalLink size={12} className="ml-auto shrink-0 text-neutral-400" />
       </a>
     );
   }
@@ -59,11 +59,11 @@ function NavEntry({ m, onNavigate }: { m: Menu; onNavigate: () => void }) {
         cx(cls, isActive ? "active bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-200" : idle)
       }
     >
-      <MenuIcon name={m.icon} className="text-neutral-400 group-hover:text-neutral-600 group-[.active]:text-brand-500 dark:group-[.active]:text-brand-300" />
+      <MenuIcon name={m.icon} className="shrink-0 text-neutral-400 transition-colors group-hover:text-neutral-600 group-[.active]:text-brand-500 dark:group-[.active]:text-brand-300" />
       <span className="truncate">{title}</span>
-      {extras.off && <span className="text-xs font-normal text-neutral-500">{t("shell.off")}</span>}
+      {extras.off && <span className="shrink-0 rounded bg-neutral-100 px-1 text-[11px] leading-4 font-normal text-neutral-500">{t("shell.off")}</span>}
       {!!extras.count && (
-        <span className="ml-auto rounded-full bg-[#ff5996]/12 px-2 text-xs leading-5 font-semibold text-[#d1236c] tabular-nums dark:bg-[#ff5996]/20 dark:text-[#ff8fb8]">{extras.count}</span>
+        <span className="ml-auto min-w-5 shrink-0 rounded-full bg-brand-500 px-1.5 text-center text-[11px] leading-5 font-semibold text-white tabular-nums">{extras.count}</span>
       )}
     </NavLink>
   );
@@ -90,7 +90,7 @@ function SpaceSwitch({ onNavigate }: { onNavigate: () => void }) {
   const { t } = useTranslation();
   if (!spaces.work.length || !spaces.admin.length) return null;
   return (
-    <div className="mx-1 mb-4 grid grid-cols-2 rounded-lg bg-neutral-100 p-0.5 text-sm" role="tablist" aria-label={t("nav.admin")}>
+    <div className="mx-1 mb-5 grid grid-cols-2 rounded-lg bg-neutral-100 p-0.5 text-sm ring-1 ring-neutral-200/60 ring-inset" role="tablist" aria-label={t("nav.admin")}>
       {(["work", "admin"] as const).map((s) => {
         const active = s === space;
         return (
@@ -109,8 +109,8 @@ function SpaceSwitch({ onNavigate }: { onNavigate: () => void }) {
               }
             }}
             className={cx(
-              "rounded-md py-1.5 font-medium transition",
-              active ? "bg-card text-neutral-900 shadow-card ring-1 ring-neutral-200/70" : "text-neutral-500 hover:text-neutral-900",
+              "rounded-md py-1 font-medium transition-[background-color,color,box-shadow] duration-150",
+              active ? "bg-card text-neutral-900 shadow-control ring-1 ring-neutral-200/70 dark:ring-white/10" : "text-neutral-500 hover:text-neutral-900",
             )}
           >
             {t(s === "work" ? "nav.work" : "nav.admin")}
@@ -128,11 +128,11 @@ function SearchButton({ onOpen }: { onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="mx-1 mb-4 flex h-8 items-center gap-2 rounded-md border border-neutral-200 bg-card px-2.5 text-left text-sm text-neutral-500 transition hover:border-neutral-300 hover:text-neutral-800"
+      className="mx-1 mb-3 flex h-8 items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50/60 px-2.5 text-left text-sm text-neutral-500 transition-colors hover:border-neutral-300 hover:bg-card hover:text-neutral-800 dark:border-white/10"
     >
       <Search size={14} />
       <span className="flex-1 truncate">{t("nav.search")}</span>
-      <kbd className="rounded border border-neutral-200 px-1 font-sans text-[11px] text-neutral-400">{mac ? "⌘K" : "Ctrl K"}</kbd>
+      <kbd className="rounded border border-neutral-200 bg-card px-1 text-[11px] leading-4 text-neutral-500 dark:border-white/10">{mac ? "⌘K" : "Ctrl K"}</kbd>
     </button>
   );
 }
@@ -148,16 +148,16 @@ function Sidebar({ onNavigate, onSearch }: { onNavigate: () => void; onSearch: (
   const L = useLabels();
   return (
     <div className="flex min-h-full flex-col px-3 py-4">
-      <Link to="/" className="flex items-center gap-2.5 px-3 pb-5" onClick={onNavigate}>
+      <Link to="/" className="mb-4 flex items-center gap-2.5 rounded-md px-3 py-1" onClick={onNavigate}>
         <WhaleMark size={30} className="shrink-0 text-brand-500" />
-        <span className="leading-tight">
+        <span className="min-w-0 leading-tight">
           <span className="block text-[15px] font-bold tracking-[-0.01em] text-neutral-900">dsh-ee</span>
-          <span className="block text-xs text-neutral-500">{settings.orgName}</span>
+          <span className="block truncate text-xs text-neutral-500">{settings.orgName}</span>
         </span>
       </Link>
       <SearchButton onOpen={onSearch} />
       <SpaceSwitch onNavigate={onNavigate} />
-      <div className="flex flex-col gap-6 pb-6">
+      <div className="flex flex-col gap-5 pb-6">
         {loading && <div className="px-3 text-sm text-neutral-500">{t("shell.loadingMenus")}</div>}
         {error && (
           <button type="button" onClick={() => void reload()} className="px-3 text-left text-sm text-red-700 hover:underline">
@@ -168,7 +168,7 @@ function Sidebar({ onNavigate, onSearch }: { onNavigate: () => void; onSearch: (
           n.kind === "group" ? (
             n.children.length ? (
               <div key={n.id}>
-                <div className="px-3 pb-1.5 text-xs font-semibold tracking-wide text-neutral-400">{menuTitle(n)}</div>
+                <div className="px-3 pb-1.5 text-xs font-semibold tracking-[0.04em] text-neutral-500/80">{menuTitle(n)}</div>
                 <nav className="flex flex-col gap-0.5">
                   {n.children
                     .map((c) => (
@@ -184,7 +184,7 @@ function Sidebar({ onNavigate, onSearch }: { onNavigate: () => void; onSearch: (
           ),
         )}
       </div>
-      <div className="mt-auto flex items-center justify-between border-t border-neutral-200/70 px-3 pt-4">
+      <div className="mt-auto flex items-center justify-between border-t border-neutral-200/70 px-3 pt-3 dark:border-white/[0.07]">
         <LangSwitch />
         <ThemeToggle />
       </div>
@@ -193,9 +193,9 @@ function Sidebar({ onNavigate, onSearch }: { onNavigate: () => void; onSearch: (
           <Link
             to="/account"
             onClick={onNavigate}
-            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 py-1.5 text-sm hover:bg-neutral-100/70"
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-neutral-100"
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#73c8ff] via-brand-500 to-[#6d5dfc] text-xs font-semibold text-white">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#73c8ff] via-brand-500 to-[#6d5dfc] text-xs font-semibold text-white shadow-control">
               {(user.display_name || user.username).slice(0, 1).toUpperCase()}
             </span>
             <span className="min-w-0 leading-tight">
@@ -210,7 +210,7 @@ function Sidebar({ onNavigate, onSearch }: { onNavigate: () => void; onSearch: (
               type="button"
               aria-label={t("shell.logout")}
               onClick={() => void logout()}
-              className="rounded-md p-2 text-neutral-400 hover:bg-neutral-100/70 hover:text-neutral-900"
+              className="rounded-md p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
             >
               <LogOut size={16} />
             </button>
@@ -239,46 +239,47 @@ export function AppLayout() {
   }, [pathname]);
 
   return (
-    <div className="min-h-screen bg-neutral-50 lg:flex">
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 overflow-y-auto border-r border-neutral-200/70 bg-card lg:block">
+    <div className="app-canvas min-h-screen bg-neutral-50 lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 overflow-y-auto border-r border-neutral-200/80 bg-card lg:block dark:border-white/[0.07]">
         <Sidebar onNavigate={() => {}} onSearch={() => setSearching(true)} />
       </aside>
 
-      <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-neutral-200/70 bg-card/90 px-4 backdrop-blur lg:hidden">
+      <header className="sticky top-0 z-30 flex h-12 items-center gap-2.5 border-b border-neutral-200/80 bg-card/90 px-3 backdrop-blur lg:hidden dark:border-white/[0.07]">
         <button
           type="button"
           aria-label={open ? t("shell.closeNav") : t("shell.openNav")}
           onClick={() => setOpen((v) => !v)}
-          className="-ml-1 rounded-md p-1.5 text-neutral-700 hover:bg-neutral-100"
+          className="rounded-md p-1.5 text-neutral-700 transition-colors hover:bg-neutral-100"
         >
           {open ? <X size={20} /> : <MenuGlyph size={20} />}
         </button>
+        <WhaleMark size={22} className="shrink-0 text-brand-500" />
         <span className="text-sm font-bold text-neutral-900">dsh-ee</span>
-        <span className="text-sm text-neutral-500">{settings.orgName}</span>
-        <button type="button" aria-label={t("nav.search")} onClick={() => setSearching(true)} className="ml-auto rounded-md p-1.5 text-neutral-600 hover:bg-neutral-100">
+        <span className="min-w-0 truncate text-sm text-neutral-500">{settings.orgName}</span>
+        <button type="button" aria-label={t("nav.search")} onClick={() => setSearching(true)} className="ml-auto shrink-0 rounded-md p-1.5 text-neutral-600 transition-colors hover:bg-neutral-100">
           <Search size={18} />
         </button>
       </header>
       <CommandPalette open={searching} onOpenChange={setSearching} />
       {open && (
-        <div className="fixed inset-x-0 top-12 bottom-0 z-20 overflow-y-auto bg-card lg:hidden">
+        <div className="fixed inset-x-0 top-12 bottom-0 z-20 animate-in overflow-y-auto bg-card duration-150 fade-in-0 slide-in-from-top-1 lg:hidden">
           <Sidebar onNavigate={() => setOpen(false)} onSearch={() => { setOpen(false); setSearching(true); }} />
         </div>
       )}
 
       <div className="min-w-0 flex-1">
-        <main className="mx-auto max-w-[1240px] px-4 py-6 sm:px-8 lg:py-8">
+        <main className="mx-auto max-w-[1240px] px-4 py-6 sm:px-8 lg:px-10 lg:py-9">
           {user?.limited && (
-            <div role="status" className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm text-neutral-800">
-              <span>{t(user.reauth ? "shell.limited.admin" : "shell.limited.employee")}</span>
-              <Link className="font-medium text-brand-600 underline-offset-2 hover:underline" to={`/login?reauth=1&next=${encodeURIComponent(pathname + search)}`}>
+            <Notice role="status" className="mb-5">
+              <span className="mr-3">{t(user.reauth ? "shell.limited.admin" : "shell.limited.employee")}</span>
+              <Link className="font-medium whitespace-nowrap text-brand-600 underline-offset-2 hover:underline dark:text-brand-300" to={`/login?reauth=1&next=${encodeURIComponent(pathname + search)}`}>
                 {t("shell.limited.action")}
               </Link>
-            </div>
+            </Notice>
           )}
           <Outlet />
         </main>
-        <footer className="mx-auto max-w-[1240px] px-4 pb-8 text-xs text-neutral-500 sm:px-8" />
+        <footer className="mx-auto max-w-[1240px] px-4 pb-8 text-xs text-neutral-500 sm:px-8 lg:px-10" />
       </div>
     </div>
   );

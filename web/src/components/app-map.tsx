@@ -285,13 +285,13 @@ export function AppMap({ a, deps, bySlug }: { a: HubAsset; deps?: AppDep[]; bySl
           <p className="text-sm text-neutral-500">{t("appMap.noOps")}</p>
         ) : (
           <div className="overflow-x-auto rounded-md border border-neutral-200">
-            <table className="w-full text-sm">
-              <thead className="bg-neutral-50 text-left text-xs text-neutral-500 dark:bg-neutral-700/30">
+            <table className="tbl">
+              <thead>
                 <tr>
-                  <th className="px-3 py-2 font-medium">{t("appMap.col.target")}</th>
-                  <th className="px-3 py-2 font-medium">{t("appMap.col.where")}</th>
-                  <th className="px-3 py-2 font-medium">{t("appMap.col.can")}</th>
-                  <th className="px-3 py-2 font-medium">{t("appMap.col.how")}</th>
+                  <th className="px-3 py-2">{t("appMap.col.target")}</th>
+                  <th className="px-3 py-2">{t("appMap.col.where")}</th>
+                  <th className="px-3 py-2">{t("appMap.col.can")}</th>
+                  <th className="px-3 py-2">{t("appMap.col.how")}</th>
                 </tr>
               </thead>
               <tbody>

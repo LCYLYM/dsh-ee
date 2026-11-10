@@ -9,7 +9,7 @@ import { scopeSummary } from "../lib/hub";
 import { LoadState, ErrorNote } from "../components/api-ui";
 import { ScopeEditor } from "../components/scope-editor";
 import { useScopeOptions } from "../components/scope-dialog";
-import { Badge, Button, Card, CardHeader, cx, Field, inputCls, PageHeader, ToggleRow } from "../components/ui";
+import { Badge, Button, Card, CardHeader, cx, Field, inputCls, PageHeader, ToggleRow, Empty, cardHover } from "../components/ui";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { Snippet } from "../components/kb-access";
 
@@ -132,17 +132,17 @@ function QASettings({ value, onSaved }: { value: KBQASettings; onSaved: () => vo
 /** 检索记录表：我的、某个库的都用它。 */
 export function QueryTable({ items, showUser, empty, bases }: { items: KBQuery[]; showUser?: boolean; empty: string; bases?: Map<number, string> }) {
   const { t } = useTranslation();
-  if (items.length === 0) return <p className="px-5 py-8 text-center text-sm text-neutral-600">{empty}</p>;
+  if (items.length === 0) return <Empty>{empty}</Empty>;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="tbl">
         <thead>
           <tr className="border-b border-neutral-100 text-left text-xs text-neutral-500">
-            <th className="px-5 py-2 font-normal">{t("knowledge.colTime")}</th>
-            {showUser && <th className="px-3 py-2 font-normal">{t("knowledge.colUser")}</th>}
-            <th className="px-3 py-2 font-normal">{t("knowledge.colTool")}</th>
-            <th className="px-3 py-2 font-normal">{t("knowledge.colQuery")}</th>
-            <th className="px-5 py-2 text-right font-normal">{t("knowledge.colHits")}</th>
+            <th className="px-5 py-2">{t("knowledge.colTime")}</th>
+            {showUser && <th className="px-3 py-2">{t("knowledge.colUser")}</th>}
+            <th className="px-3 py-2">{t("knowledge.colTool")}</th>
+            <th className="px-3 py-2">{t("knowledge.colQuery")}</th>
+            <th className="px-5 py-2 text-right">{t("knowledge.colHits")}</th>
           </tr>
         </thead>
         <tbody>
@@ -354,7 +354,7 @@ export default function Knowledge() {
             <FirstRun onCreate={() => setCreating(true)} />
           ) : (
             <Card>
-              <p className="px-5 py-10 text-center text-sm text-neutral-600">{t("knowledge.empty")}</p>
+              <Empty>{t("knowledge.empty")}</Empty>
             </Card>
           )
         ) : (
@@ -362,7 +362,7 @@ export default function Knowledge() {
             {items.some((b) => b.readable && b.docs > 0) && <KnowledgeSearch qaTitle={list.data?.qa?.qaTitle || t("knowledge.qaName")} />}
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {items.map((b) => (
-                <Card key={b.id} className="relative flex h-full flex-col p-5 transition hover:border-neutral-300">
+                <Card key={b.id} className={cx("relative flex h-full flex-col p-5", cardHover)}>
                   <div className="flex items-start gap-3">
                     <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300">
                       <BookOpen size={18} aria-hidden />

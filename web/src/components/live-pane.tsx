@@ -208,12 +208,12 @@ export function LivePane({
   return (
     <div data-app-web={mode === "web" ? "" : undefined} data-live-preview={mode === "preview" ? "" : undefined} className="space-y-3">
       {notice && (
-        <div role="status" className="mx-3.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-neutral-800">
+        <div role="status" className="mx-3.5 rounded-md border border-brand-200/80 bg-brand-50/70 px-3.5 py-2.5 text-sm leading-6 text-neutral-800 dark:border-brand-400/25 dark:bg-brand-500/10">
           {notice}
           {handoff && (
             <>
               <code className="mt-1 block overflow-x-auto rounded bg-card px-2 py-1 font-mono text-xs whitespace-pre-wrap">{handoff}</code>
-              {mode === "web" && <a href="dsh://open" className="mt-1 inline-block font-medium text-brand-600 hover:underline">{t("appWeb.openDSH")}</a>}
+              {mode === "web" && <a href="dsh://open" className="mt-1 inline-block font-medium text-brand-600 hover:underline dark:text-brand-300">{t("appWeb.openDSH")}</a>}
             </>
           )}
         </div>

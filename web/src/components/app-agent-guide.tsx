@@ -93,7 +93,7 @@ export function AppAgentGuide({ onManual }: { onManual: () => void }) {
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]" data-app-agent-guide>
       <div className="space-y-4">
-        <div className="flex gap-3 rounded-lg border border-brand-200 bg-brand-50/60 px-4 py-3 text-sm text-neutral-800 dark:border-brand-400/30 dark:bg-brand-400/10 dark:text-neutral-200">
+        <div className="flex gap-3 rounded-lg border border-brand-200/80 bg-brand-50/70 px-4 py-3 text-sm leading-6 text-neutral-800 dark:border-brand-400/25 dark:bg-brand-500/10">
           <Sparkles size={18} className="mt-0.5 shrink-0 text-brand-600 dark:text-brand-300" />
           <p>{t("appAgent.intro")}</p>
         </div>

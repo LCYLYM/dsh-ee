@@ -64,12 +64,13 @@ export function Combobox({
           role="combobox"
           aria-expanded={open}
           aria-label={ariaLabel}
-          className={cx(inputBase, "flex w-full items-center justify-between gap-2 text-left", className)}
+          // 调用处给了宽度（w-48 之类）就不再撑满，否则两个宽度类同时生效、谁赢看样式表顺序
+          className={cx(inputBase, "flex items-center justify-between gap-2 text-left", !/(^|\s)(max-sm:)?w-/.test(className ?? "") && "w-full", className)}
         >
           <span className={cx("min-w-0 truncate", !current && !(allowEmpty && value === "") && "text-neutral-500")}>
             {current ? current.label : allowEmpty && value === "" && emptyLabel ? emptyLabel : (placeholder ?? t("pickers.choose"))}
           </span>
-          <ChevronsUpDown size={14} className="shrink-0 text-neutral-500" />
+          <ChevronsUpDown size={14} className="shrink-0 text-neutral-400" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-(--radix-popover-trigger-width) min-w-64 p-0" align="start">
@@ -184,7 +185,7 @@ export function DatePicker({
           aria-label={t("pickers.clear")}
           title={t("pickers.clear")}
           onClick={() => onChange("")}
-          className="rounded-md p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+          className="rounded-md p-2 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
         >
           <X size={14} />
         </button>
