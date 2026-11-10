@@ -2,6 +2,8 @@ import { useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTM
 import { Check, CircleAlert, CircleCheck, Copy, Eye, EyeOff, Inbox, Info, Loader2, Star, TriangleAlert, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Tip } from "@/components/tip";
+import { copyText } from "@/lib/clipboard";
+import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 export function cx(...xs: (string | false | null | undefined)[]) {
@@ -177,6 +179,7 @@ export function tabCls(active: boolean) {
 export function CopyBox({ text, label, wrap }: { text: string; label?: string; wrap?: boolean }) {
   const [done, setDone] = useState(false);
   const { t } = useTranslation();
+  const { notify } = useStore();
   return (
     <div className="group on-dark relative rounded-lg bg-neutral-900 text-neutral-100 shadow-card ring-1 ring-white/5 ring-inset">
       {label && <div className="border-b border-white/10 px-4 py-1.5 text-xs text-neutral-400">{label}</div>}
@@ -185,8 +188,8 @@ export function CopyBox({ text, label, wrap }: { text: string; label?: string; w
       <button
         type="button"
         aria-label={t("common.copy")}
-        onClick={() => {
-          void navigator.clipboard?.writeText(text);
+        onClick={async () => {
+          if (!(await copyText(text))) return notify(t("common.copyFailed"));
           setDone(true);
           setTimeout(() => setDone(false), 1200);
         }}

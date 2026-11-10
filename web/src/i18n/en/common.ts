@@ -20,6 +20,7 @@ export default {
     enabled: "Enabled",
     copy: "Copy",
     copied: "Copied",
+    copyFailed: "Copy failed — select the text manually",
     none: "—",
     all: "All",
     search: "Search",

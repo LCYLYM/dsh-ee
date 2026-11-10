@@ -18,6 +18,7 @@ export default {
     enabled: "启用",
     copy: "复制",
     copied: "已复制",
+    copyFailed: "复制失败，请手动选择文本",
     none: "—",
     all: "全部",
     search: "搜索",
