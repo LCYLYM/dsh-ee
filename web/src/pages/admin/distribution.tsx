@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, PackageOpen } from "lucide-react";
 import { Trans, useTranslation } from "react-i18next";
 import { api, formatBytes, formatTime } from "../../lib/api";
 import { useApi } from "../../lib/use-api";
 import { useStore } from "../../lib/store";
 import type { DshRelease, DshTarget } from "../../lib/types";
-import { Badge, Button, Card, PageHeader, ToggleRow, Notice } from "../../components/ui";
+import { Badge, Button, Card, PageHeader, ToggleRow, Notice, Empty } from "../../components/ui";
 import { LoadState } from "../../components/api-ui";
 import { PageLink } from "../../lib/menus";
 
@@ -13,7 +13,7 @@ function ReleaseTable({ target, title, rows, busy, act }: { target: DshTarget; t
   const { t } = useTranslation();
   return (
     <Card className="overflow-hidden">
-      <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">{title}</div>
+      <div className="border-b border-neutral-100 px-5 py-3 text-[15px] leading-6 font-semibold text-neutral-900">{title}</div>
       <div className="overflow-x-auto">
         <table className="tbl">
           <thead>
@@ -60,7 +60,7 @@ function ReleaseTable({ target, title, rows, busy, act }: { target: DshTarget; t
               );
             })}
             {!rows.some((r) => r.target === target) && (
-              <tr><td colSpan={5} className="px-5 py-8 text-center text-neutral-500">{t("distributionAdmin.empty")}</td></tr>
+              <tr><td colSpan={5}><Empty compact icon={PackageOpen}>{t("distributionAdmin.empty")}</Empty></td></tr>
             )}
           </tbody>
         </table>

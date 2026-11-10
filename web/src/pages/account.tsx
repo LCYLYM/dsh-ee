@@ -71,13 +71,13 @@ export default function Account() {
 
       {user.auth_source !== "local" ? (
         <Card className="mt-4 p-5">
-          <h2 className="text-base font-medium text-neutral-900">{t("account.changePassword")}</h2>
+          <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("account.changePassword")}</h2>
           <p className="mt-2 text-sm text-neutral-600">{user.auth_source === "oidc" ? t("ssoLogin.oidcManaged") : t("account.ldapManaged")}</p>
         </Card>
       ) : (
         <Card className="mt-4 p-5">
           <form onSubmit={submit} className="space-y-4">
-            <h2 className="text-base font-medium text-neutral-900">{t("account.changePassword")}</h2>
+            <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("account.changePassword")}</h2>
             <Field label={t("account.currentPassword")}>
               <PasswordInput label={t("account.currentPassword")} className={inputCls} autoComplete="current-password" required value={oldPw} onChange={(e) => setOldPw(e.target.value)} />
             </Field>

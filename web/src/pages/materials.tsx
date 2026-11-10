@@ -119,7 +119,7 @@ export default function Materials() {
           <div className="mt-4">
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
               <div>
-                <h2 className="text-base font-medium text-neutral-900">{t("materials.plugins")}</h2>
+                <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("materials.plugins")}</h2>
                 <p className="text-sm text-neutral-600">{t("materials.advancedHint")}</p>
               </div>
               <PageLink page="publish" className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">

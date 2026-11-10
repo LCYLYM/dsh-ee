@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowUp, Clock, Folder, LayoutGrid, Plus, Puzzle } from "lucide-react";
+import { ArrowUp, Clock, Folder, LayoutGrid, Plus, Puzzle, ChevronRight } from "lucide-react";
 import { api } from "../../lib/api";
 import { useStore } from "../../lib/store";
 import type { BrandColor, BrandColorKey, BrandLogoShape, Settings } from "../../lib/types";
@@ -245,8 +245,8 @@ function TokensEditor({ brand, set }: { brand: Brand; set: (patch: Partial<Brand
     }
   };
   return (
-    <details className="rounded-lg border border-neutral-200 px-4 py-3" open={Object.keys(brand.theme.tokens).length > 0}>
-      <summary className="cursor-pointer text-sm font-medium text-neutral-700">{t("brandAdmin.advanced")}</summary>
+    <details className="group rounded-lg border border-neutral-200 px-4 py-3" open={Object.keys(brand.theme.tokens).length > 0}>
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-neutral-700 select-none [&::-webkit-details-marker]:hidden"><ChevronRight size={14} aria-hidden className="text-neutral-400 transition-transform group-open:rotate-90" />{t("brandAdmin.advanced")}</summary>
       <p className="mt-2 text-xs text-neutral-500">{t("brandAdmin.advancedDesc")}</p>
       <textarea
         aria-label={t("brandAdmin.advanced")}
@@ -353,7 +353,7 @@ export default function BrandSettings() {
                 onClick={() => set({ theme: { ...brand.theme, preset: p.id, colors: structuredClone(p.colors) } })}
                 className={cx(
                   "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition",
-                  active ? "border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100" : "border-neutral-200 text-neutral-700 hover:border-neutral-400",
+                  active ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 text-neutral-700 hover:border-neutral-400",
                 )}
               >
                 <span className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10" style={{ background: colorOf(p.colors, "accent", "light") }} />

@@ -61,7 +61,7 @@ export default function Templates() {
     <div>
       <PageHeader title={t("templates.title")} desc={t("templates.desc")} />
       <LoadState loading={hub.loading && !hub.data} error={hub.data ? null : hub.error} onRetry={hub.reload}>
-        <h2 className="mb-3 text-base font-medium text-neutral-900">{t("templates.templates")}</h2>
+        <h2 className="mb-3 text-neutral-900 text-[15px] leading-6 font-semibold">{t("templates.templates")}</h2>
         {templates.length === 0 ? (
           <Card className="mb-8"><Empty>{t("templates.templatesEmpty")}</Empty></Card>
         ) : (
@@ -71,7 +71,7 @@ export default function Templates() {
             ))}
           </div>
         )}
-        <h2 className="mb-3 text-base font-medium text-neutral-900">{t("templates.company")}</h2>
+        <h2 className="mb-3 text-neutral-900 text-[15px] leading-6 font-semibold">{t("templates.company")}</h2>
         {company.length === 0 ? (
           <Card><Empty>{t("templates.companyEmpty")}</Empty></Card>
         ) : (

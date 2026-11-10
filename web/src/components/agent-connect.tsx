@@ -98,7 +98,7 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
     <div className="space-y-5">
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-medium text-neutral-900">{t("getStarted.step1")}</h3>
+          <h3 className="text-sm font-semibold text-neutral-900">{t("getStarted.step1")}</h3>
           <Segmented<Path>
             value={path}
             onChange={setPath}
@@ -135,7 +135,7 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
       </section>
 
       <section className="space-y-3 border-t border-neutral-100 pt-4">
-        <h3 className="text-sm font-medium text-neutral-900">{t("getStarted.step2")}</h3>
+        <h3 className="text-sm font-semibold text-neutral-900">{t("getStarted.step2")}</h3>
         {expired ? (
           <div className="flex flex-wrap items-center gap-3 text-sm text-amber-800 dark:text-amber-200">
             {t("getStarted.expired")}
@@ -176,7 +176,7 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
 
       {admin && connected && (
         <section className="space-y-3 border-t border-neutral-100 pt-4">
-          <h3 className="text-sm font-medium text-neutral-900">{t("getStarted.step3Admin")}</h3>
+          <h3 className="text-sm font-semibold text-neutral-900">{t("getStarted.step3Admin")}</h3>
           {status?.admin_live ? (
             <Done text={t("getStarted.adminOn")} />
           ) : (
@@ -197,7 +197,7 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
 
       {connected && (!admin || status?.admin_live) && (
         <section className="space-y-3 border-t border-neutral-100 pt-4">
-          <h3 className="text-sm font-medium text-neutral-900">{t(admin ? "getStarted.step4Admin" : "getStarted.step3")}</h3>
+          <h3 className="text-sm font-semibold text-neutral-900">{t(admin ? "getStarted.step4Admin" : "getStarted.step3")}</h3>
           <p className="text-sm text-neutral-600">{t(admin ? "getStarted.nextDescAdmin" : "getStarted.nextDesc")}</p>
           <CopyBox text={info.next_prompt} wrap />
         </section>

@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Blocks } from "lucide-react";
 import { categoryLabel } from "../../lib/catalog";
 import { api, formatBytes, formatTime, type CatalogPlugin, type PackageVersion, type ReviewAction } from "../../lib/api";
 import { useApi, useAction } from "../../lib/use-api";
@@ -7,7 +7,7 @@ import { useScoring, useStore } from "../../lib/store";
 import type { PluginStatus } from "../../lib/types";
 import { StatusBadge } from "../../components/status";
 import { LoadState } from "../../components/api-ui";
-import { Badge, Button, Card, cx, inputBase, PageHeader, PluginIcon, Segmented } from "../../components/ui";
+import { Badge, Button, Card, cx, inputBase, PageHeader, PluginIcon, Segmented, Empty } from "../../components/ui";
 import { ScopeDialog } from "../../components/scope-dialog";
 import { allScope } from "../../lib/hub";
 import { useTranslation } from "react-i18next";
@@ -82,8 +82,8 @@ export default function AdminPlugins() {
             <tbody className="divide-y divide-neutral-100">
               {list.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-10 text-center text-neutral-500">
-                    {t("registry.plugins.empty")}
+                  <td colSpan={10}>
+                    <Empty icon={Blocks}>{t("registry.plugins.empty")}</Empty>
                   </td>
                 </tr>
               )}

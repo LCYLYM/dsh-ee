@@ -148,11 +148,11 @@ function AssetReview({ q }: { q: ReturnType<typeof useApi<AssetReviewItem[]>> })
                   {t("reviewAssets.submittedBy", { name: current.publisher_name || current.publisher || "—", department: current.department || "—" })}
                 </span>
               </div>
-              <h3 className="mb-2 text-sm font-semibold text-neutral-800">{t("reviewAssets.current")}</h3>
+              <h3 className="mb-2 text-sm font-semibold text-neutral-900">{t("reviewAssets.current")}</h3>
               <SpecView spec={current.spec} />
               {current.previous && (
                 <>
-                  <h3 className="mt-6 mb-2 text-sm font-semibold text-neutral-800">
+                  <h3 className="mt-6 mb-2 text-sm font-semibold text-neutral-900">
                     {t("reviewAssets.previous")} · {t("reviewAssets.compare", { n: current.previous_version })}
                   </h3>
                   <div className="opacity-75">
@@ -247,7 +247,7 @@ function ScopeReview({ q }: { q: ReturnType<typeof useApi<ScopeReviewItem[]>> })
                   <dd className="font-medium text-neutral-900">{scopeSummary(t, current.requested, opts.roleName)}</dd>
                 </div>
               </dl>
-              <h3 className="mb-2 text-sm font-semibold text-neutral-800">{t("reviewAssets.previous")}</h3>
+              <h3 className="mb-2 text-sm font-semibold text-neutral-900">{t("reviewAssets.previous")}</h3>
               <SpecView spec={current.spec} />
               <p className="mt-4 text-xs text-neutral-500">{t("scopeReview.hint")}</p>
               <div className="mt-4">
@@ -357,7 +357,7 @@ function PluginReview({ q }: { q: ReturnType<typeof useApi<ReviewItem[]>> }) {
                 </div>
                 {current.package.description && <p className="mt-4 text-sm text-neutral-600">{current.package.description}</p>}
 
-                <h3 className="mt-6 mb-2 text-sm font-semibold text-neutral-800">{t("review.autoChecks")}</h3>
+                <h3 className="mt-6 mb-2 text-sm font-semibold text-neutral-900">{t("review.autoChecks")}</h3>
                 <ScanList items={current.scan} />
 
                 <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">

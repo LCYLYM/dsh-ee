@@ -8,6 +8,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Calendar } from "@/components/shadcn/calendar";
 import { isZh } from "@/i18n";
 import { cx, inputBase } from "./ui";
+import { cn } from "@/lib/utils";
 
 export interface ComboOption {
   value: string;
@@ -64,8 +65,8 @@ export function Combobox({
           role="combobox"
           aria-expanded={open}
           aria-label={ariaLabel}
-          // 调用处给了宽度（w-48 之类）就不再撑满，否则两个宽度类同时生效、谁赢看样式表顺序
-          className={cx(inputBase, "flex items-center justify-between gap-2 text-left", !/(^|\s)(max-sm:)?w-/.test(className ?? "") && "w-full", className)}
+          // cn 合并冲突的类：调用处给了 w-48 之类的宽度就盖过默认的 w-full
+          className={cn(inputBase, "flex w-full items-center justify-between gap-2 text-left", className)}
         >
           <span className={cx("min-w-0 truncate", !current && !(allowEmpty && value === "") && "text-neutral-500")}>
             {current ? current.label : allowEmpty && value === "" && emptyLabel ? emptyLabel : (placeholder ?? t("pickers.choose"))}

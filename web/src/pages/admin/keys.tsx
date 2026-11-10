@@ -72,7 +72,7 @@ export default function AdminTokens() {
   return (
     <div>
       <PageHeader title={t("pages.admin-keys")} desc={t("tokens.adminDesc")} actions={<Button size="sm" onClick={() => setIssuing((v) => !v)}>{issuing ? t("common.close") : t("tokens.issue")}</Button>} />
-      {issued && <Card className="mb-4 p-5"><h2 className="mb-2 font-medium">{t("tokens.issuedTitle")}</h2><p className="mb-3 text-sm text-neutral-600">{t("tokens.issuedHint")}</p><CopyBox text={issued} /></Card>}
+      {issued && <Card className="mb-4 p-5"><h2 className="mb-2 text-[15px] leading-6 font-semibold text-neutral-900">{t("tokens.issuedTitle")}</h2><p className="mb-3 text-sm text-neutral-600">{t("tokens.issuedHint")}</p><CopyBox text={issued} /></Card>}
       {issuing && (
         <Card className="mb-4"><CardHeader title={t("tokens.issue")} />
           <form onSubmit={submit} className="space-y-4 px-5 pb-5">

@@ -207,7 +207,7 @@ export function UploadDialog({ kb, open, onOpenChange, onDone, initial, initialF
               }}
               className={cx(
                 "rounded-lg border-2 border-dashed px-4 py-6 text-center transition",
-                dragging ? "border-brand-400 bg-brand-50/60 dark:bg-brand-500/10" : "border-neutral-200 dark:border-neutral-700",
+                dragging ? "border-brand-400 bg-brand-50/60 dark:bg-brand-500/10" : "border-neutral-200",
               )}
             >
               <Upload size={20} className="mx-auto mb-2 text-neutral-400" aria-hidden />
@@ -226,7 +226,7 @@ export function UploadDialog({ kb, open, onOpenChange, onDone, initial, initialF
             </div>
           )}
           {rows.length > 0 && (
-            <ul className="max-h-[46vh] divide-y divide-neutral-100 overflow-auto rounded-lg border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+            <ul className="max-h-[46vh] divide-y divide-neutral-100 overflow-auto rounded-lg border border-neutral-200">
               {rows.map((r, i) => (
                 <li key={`${r.dir}/${r.file.name}/${i}`} className="px-3 py-2.5 text-sm">
                   <div className="flex items-start justify-between gap-3">

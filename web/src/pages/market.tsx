@@ -327,7 +327,7 @@ export default function Hub() {
           {tab === "all" && plugins.length > 0 && (
             <div className="mt-8">
               <div className="mb-3 flex items-baseline justify-between">
-                <h2 className="text-base font-medium text-neutral-900">{t("hub.tabs.plugin")}</h2>
+                <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("hub.tabs.plugin")}</h2>
                 <button type="button" onClick={() => setTab("plugin")} className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
                   {t("hub.viewAllPlugins", { count: plugins.length })}
                 </button>

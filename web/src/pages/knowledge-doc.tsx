@@ -351,7 +351,7 @@ export default function KnowledgeDoc() {
             </Link>
             <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{d.doc.title}</h1>
+                <h1 className="text-2xl text-neutral-900 leading-8 font-bold tracking-[-0.02em]">{d.doc.title}</h1>
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-neutral-600">
                   {d.doc.folder && <Badge>{d.doc.folder}</Badge>}
                   <span>{t("kdoc.meta", { version: d.doc.version, lines: d.doc.lines })}</span>
@@ -430,7 +430,7 @@ export default function KnowledgeDoc() {
                       </div>
                       <div className="min-w-0">
                         <div className="mb-1 text-xs font-medium text-neutral-500">{t("kdoc.editPreview")}</div>
-                        <div className="h-[64vh] overflow-auto rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
+                        <div className="h-[64vh] overflow-auto rounded-md border border-neutral-200 p-4">
                           <KBReader markdown={draft} format={d.format} highlight={null} />
                         </div>
                       </div>

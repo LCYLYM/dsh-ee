@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router";
-import { AlertTriangle, CheckCircle2, UploadCloud, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, UploadCloud, XCircle, PackageOpen } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api, formatBytes, type PackageCheck } from "../lib/api";
 import { ScanList } from "../components/scan-list";
@@ -8,7 +8,7 @@ import { useApi, useAction } from "../lib/use-api";
 import { StatusBadge } from "../components/status";
 import { pluginPath } from "../components/plugin-card";
 import { LoadState } from "../components/api-ui";
-import { Button, Card, CopyBox, cx, Field, inputCls, PageHeader, Segmented } from "../components/ui";
+import { Button, Card, CopyBox, cx, Field, inputCls, PageHeader, Segmented, Empty } from "../components/ui";
 import { PageLink } from "../lib/menus";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -66,10 +66,10 @@ export default function Publish() {
         </div>
 
         <Card className="h-fit">
-          <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">{t("publish.mine")}</div>
+          <div className="border-b border-neutral-100 px-5 py-3 text-[15px] leading-6 font-semibold text-neutral-900">{t("publish.mine")}</div>
           <LoadState loading={mine.loading && !mine.data} error={mine.error} onRetry={mine.reload}>
             {(mine.data ?? []).length === 0 ? (
-              <div className="p-5 text-sm text-neutral-500">{t("publish.noneYet")}</div>
+              <Empty compact icon={PackageOpen}>{t("publish.noneYet")}</Empty>
             ) : (
               <ul className="divide-y divide-neutral-100">
                 {(mine.data ?? []).map((p) => (

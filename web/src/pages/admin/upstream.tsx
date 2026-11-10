@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FileArchive, Loader2, PackageOpen, RefreshCw, ShieldCheck, WifiOff } from "lucide-react";
+import { FileArchive, Loader2, PackageOpen, RefreshCw, ShieldCheck, WifiOff, CloudOff, TriangleAlert } from "lucide-react";
 import { categoryIds, categoryLabel } from "../../lib/catalog";
 import { useScoring, useStore } from "../../lib/store";
 import { api, formatBytes, formatTime, type ImportResult, type SyncJob } from "../../lib/api";
 import { useApi, useAction } from "../../lib/use-api";
 import { LoadState } from "../../components/api-ui";
 import { StatusBadge } from "../../components/status";
-import { Badge, Button, Card, cx, Field, inputCls, PageHeader, Segmented, Toggle, buttonCls } from "../../components/ui";
+import { Badge, Button, Card, cx, Field, inputCls, PageHeader, Segmented, Toggle, buttonCls, Empty } from "../../components/ui";
 import { useTranslation } from "react-i18next";
 import { DatePicker } from "@/components/pickers";
 
@@ -235,8 +235,10 @@ function Online() {
 
         <LoadState loading={feed.loading && !feed.data} error={feed.error} onRetry={feed.reload}>
           {feed.data?.disabled || feed.data?.error ? (
-            <Card className="p-8 text-center text-sm text-neutral-600">
-              {feed.data.disabled ? t("registry.upstream.feedDisabled") : t("registry.upstream.feedError", { msg: feed.data.error })}
+            <Card>
+              <Empty icon={feed.data.disabled ? CloudOff : TriangleAlert}>
+                {feed.data.disabled ? t("registry.upstream.feedDisabled") : t("registry.upstream.feedError", { msg: feed.data.error })}
+              </Empty>
             </Card>
           ) : (
             <Card className="overflow-x-auto">
@@ -343,7 +345,7 @@ function JobHistory({ jobs, onPick, kinds }: { jobs: SyncJob[]; onPick: (j: Sync
   if (list.length === 0) return null;
   return (
     <Card>
-      <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">{t("upstreamAdmin.history")}</div>
+      <div className="border-b border-neutral-100 px-5 py-3 text-[15px] leading-6 font-semibold text-neutral-900">{t("upstreamAdmin.history")}</div>
       <div className="overflow-x-auto"><table className="tbl">
         <thead>
           <tr>

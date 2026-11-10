@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { BookOpen, Download, ExternalLink, FolderPlus, MessageSquare, Plus, Search, Upload } from "lucide-react";
+import { BookOpen, Download, ExternalLink, FolderPlus, MessageSquare, Plus, Search, Upload, SearchX, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, formatTime, type KBase, type KBQASettings, type KBQuery, type KBSearchResult, type Scope } from "../lib/api";
 import { useAction, useApi } from "../lib/use-api";
@@ -224,21 +224,21 @@ function KnowledgeSearch({ qaTitle }: { qaTitle: string }) {
           void search();
         }}
       >
-        <div className="relative min-w-0 flex-1">
+        <div className="relative min-w-0 flex-1 basis-full sm:basis-64">
           <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-neutral-400" aria-hidden />
           <input
             ref={ref}
-            className={cx(inputCls, "h-11 pl-9 text-base")}
+            className={cx(inputCls, "h-10 pl-9 text-[15px]")}
             value={query}
             placeholder={t("knowledge.searchPlaceholder")}
             aria-label={t("knowledge.searchPlaceholder")}
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <Button type="submit" className="h-11" disabled={busy || !query.trim()}>
+        <Button type="submit" size="lg" disabled={busy || !query.trim()}>
           {t("knowledge.searchSubmit")}
         </Button>
-        <Button type="button" variant="secondary" className="h-11" disabled={!query.trim()} onClick={() => void askInDSH()}>
+        <Button type="button" variant="secondary" size="lg" className="min-w-0 flex-1 sm:flex-none" disabled={!query.trim()} onClick={() => void askInDSH()}>
           <MessageSquare size={15} /> {t("knowledge.askInDSH", { name: qaTitle })}
         </Button>
       </form>
@@ -252,7 +252,7 @@ function KnowledgeSearch({ qaTitle }: { qaTitle: string }) {
       {result && (
         <div className="mt-4 border-t border-neutral-100 pt-4">
           {groups.size === 0 && named.length === 0 ? (
-            <p className="text-sm text-neutral-600">{t("knowledge.searchNoHit")}</p>
+            <Empty compact icon={SearchX}>{t("knowledge.searchNoHit")}</Empty>
           ) : (
             <ul className="space-y-3">
               {named.map((d) => (
@@ -301,7 +301,7 @@ function FirstRun({ onCreate }: { onCreate: () => void }) {
       <h2 className="text-lg font-semibold text-neutral-900">{t("knowledge.guide.title")}</h2>
       <ol className="mt-4 grid gap-4 md:grid-cols-3">
         {steps.map((s, i) => (
-          <li key={i} className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+          <li key={i} className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-neutral-900">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-200">{i + 1}</span>
               <s.icon size={15} className="text-neutral-500" aria-hidden />
@@ -418,8 +418,8 @@ export default function Knowledge() {
       </Card>
       <Card className="mt-6">
         <details className="group">
-          <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-neutral-900 select-none">
-            <span className="mr-1 inline-block transition group-open:rotate-90">▸</span>
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-5 py-3.5 text-sm font-semibold text-neutral-900 select-none [&::-webkit-details-marker]:hidden">
+            <ChevronRight size={15} aria-hidden className="text-neutral-400 transition-transform group-open:rotate-90" />
             {t("knowledge.myQueries")}
           </summary>
           <LoadState loading={mine.loading && !mine.data} error={mine.data ? null : mine.error} onRetry={mine.reload}>

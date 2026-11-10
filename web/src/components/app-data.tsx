@@ -226,7 +226,7 @@ export function AppDataPanel({ slug }: { slug: string }) {
   if (info.error || (info.data && info.data.tables.length === 0)) return null;
   return (
     <section className="space-y-3">
-      <h2 className="font-medium text-neutral-900">{t("appData.title")}</h2>
+      <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("appData.title")}</h2>
       <p className="text-sm text-neutral-600">{t("appData.desc")}</p>
       <LoadState loading={info.loading && !info.data} error={null} onRetry={info.reload}>
         {info.data?.tables.map((tb) => <TableData key={tb.name} slug={slug} table={tb} admin={info.data!.admin} onChanged={info.reload} />)}

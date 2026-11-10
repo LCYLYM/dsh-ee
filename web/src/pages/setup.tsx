@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Info, KeyRound } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { useStore } from "../lib/store";
 import { useAuth } from "../lib/auth";
 import { api, formatTime } from "../lib/api";
@@ -35,7 +35,7 @@ export default function Setup() {
       {ci && ci.enabled && (
         <Card className="mt-6 p-5">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-semibold text-neutral-900">{t("setupConnect.title")}</h2>
+            <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("setupConnect.title")}</h2>
             {ci.ready ? <Badge tone="green">{t("setupConnect.ready", { pkg: ci.package, version: ci.version })}</Badge> : <Badge tone="amber">{t("hub.notLiveBadge")}</Badge>}
           </div>
           <p className="mt-1 text-sm text-neutral-600">{ci.ready ? t("setupConnect.desc", { pkg: ci.package }) : t("setupConnect.notReady")}</p>
@@ -54,7 +54,7 @@ export default function Setup() {
       )}
 
       <Card className="mt-6 p-5 text-sm text-neutral-700">
-        <h2 className="mb-2 font-medium text-neutral-900">{t("setup.deviceLoginTitle")}</h2>
+        <h2 className="mb-2 text-neutral-900 text-[15px] leading-6 font-semibold">{t("setup.deviceLoginTitle")}</h2>
         <p>{t("setup.deviceLoginDesc")}</p>
         <div className="mt-2 font-mono text-xs text-neutral-600">/ee-login · /ee-status</div>
       </Card>

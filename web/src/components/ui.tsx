@@ -2,6 +2,7 @@ import { useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTM
 import { Check, CircleAlert, CircleCheck, Copy, Eye, EyeOff, Inbox, Info, Loader2, Star, TriangleAlert, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Tip } from "@/components/tip";
+import { cn } from "@/lib/utils";
 
 export function cx(...xs: (string | false | null | undefined)[]) {
   return xs.filter(Boolean).join(" ");
@@ -18,7 +19,7 @@ const buttonSizes: Record<Size, string> = {
   lg: "h-10 px-5 text-sm",
 };
 const buttonVariants: Record<Variant, string> = {
-  primary: "bg-brand-500 text-white shadow-primary hover:bg-brand-600 active:bg-brand-700",
+  primary: "bg-brand-500 text-white shadow-primary hover:bg-brand-600 active:bg-brand-600",
   secondary:
     "border border-neutral-200 bg-card text-neutral-800 shadow-control hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-900 dark:border-white/10 dark:hover:border-white/20",
   ghost: "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900",
@@ -28,7 +29,8 @@ const buttonVariants: Record<Variant, string> = {
 
 /** 按钮的类名：给 <Link> / <a> 这类不是 <button> 的元素套同一套按钮样式。 */
 export function buttonCls(variant: Variant = "primary", size: Size = "md", className?: string) {
-  return cx(buttonBase, buttonSizes[size], buttonVariants[variant], className);
+  // cn 会合并冲突的 Tailwind 类：调用处传的 h-7、rounded-full、w-full 能稳定盖过默认值
+  return cn(buttonBase, buttonSizes[size], buttonVariants[variant], className);
 }
 
 export function Button({
@@ -65,7 +67,7 @@ export function Badge({ tone = "slate", children }: { tone?: Tone; children: Rea
 
 export function Card({ className, children, ...rest }: { className?: string; children: ReactNode } & Omit<HTMLAttributes<HTMLDivElement>, "className" | "children">) {
   return (
-    <div {...rest} className={cx("rounded-lg border border-neutral-200/80 bg-card shadow-card dark:border-white/[0.07]", className)}>
+    <div {...rest} className={cn("rounded-lg border border-neutral-200/80 bg-card shadow-card dark:border-white/[0.07]", className)}>
       {children}
     </div>
   );
@@ -243,7 +245,7 @@ export function Empty({
 }
 
 const noticeTones = {
-  info: "border-brand-200/80 bg-brand-50/70 text-neutral-800 dark:border-brand-400/25 dark:bg-brand-500/10 dark:text-neutral-800 [&>svg]:text-brand-500 dark:[&>svg]:text-brand-300",
+  info: "border-brand-200/80 bg-brand-50/70 text-neutral-800 dark:border-brand-400/25 dark:bg-brand-500/10 [&>svg]:text-brand-500 dark:[&>svg]:text-brand-300",
   success: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/25 dark:bg-emerald-500/10 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300",
   warn: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-400/25 dark:bg-amber-500/10 dark:text-amber-200 [&>svg]:text-amber-600 dark:[&>svg]:text-amber-300",
   danger: "border-red-200 bg-red-50 text-red-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-300 [&>svg]:text-red-600 dark:[&>svg]:text-red-300",
@@ -260,7 +262,7 @@ export function Notice({
 }: { tone?: keyof typeof noticeTones; icon?: boolean; className?: string; children: ReactNode } & Omit<HTMLAttributes<HTMLDivElement>, "className" | "children">) {
   const Icon = noticeIcons[tone];
   return (
-    <div {...rest} className={cx("flex gap-2.5 rounded-md border px-3.5 py-2.5 text-sm leading-6", noticeTones[tone], className)}>
+    <div {...rest} className={cn("flex gap-2.5 rounded-md border px-3.5 py-2.5 text-sm leading-6", noticeTones[tone], className)}>
       {icon && <Icon size={16} aria-hidden className="mt-1 shrink-0" />}
       <div className="min-w-0 flex-1">{children}</div>
     </div>

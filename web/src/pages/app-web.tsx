@@ -7,7 +7,7 @@ import { useApi } from "../lib/use-api";
 import { useAuth } from "../lib/auth";
 import { LoadState } from "../components/api-ui";
 import { AppDataPanel } from "../components/app-data";
-import { Card, cx, Notice, Empty, tabCls } from "../components/ui";
+import { Card, Notice, Empty, tabCls } from "../components/ui";
 import { WhaleMark } from "../components/whale-mark";
 import { LivePane } from "../components/live-pane";
 import type { WorkbenchPane } from "../lib/workbench-render";

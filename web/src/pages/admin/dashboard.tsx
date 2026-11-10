@@ -34,7 +34,7 @@ function ChainPanel({
 }) {
   return (
     <Card className="flex flex-col p-5">
-      <h2 className="text-base font-medium text-neutral-900">{step}</h2>
+      <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{step}</h2>
       <div className="mt-3 flex items-baseline gap-1.5">
         <span className="text-3xl font-medium tracking-tight text-neutral-900 tabular-nums">{lead}</span>
         <span className="text-sm text-neutral-600">{unit}</span>

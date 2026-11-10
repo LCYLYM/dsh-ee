@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Copy, Plus } from "lucide-react";
+import { Copy, Plus, LayoutGrid } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, type HubAsset, type Scope } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -11,7 +11,7 @@ import { PageLink, useMenus } from "../lib/menus";
 import { ImportAppButton } from "../components/app-import";
 import { LoadState } from "../components/api-ui";
 import { ScopeDialog, useScopeOptions } from "../components/scope-dialog";
-import { Badge, Button, Card, PageHeader, Segmented, buttonCls } from "../components/ui";
+import { Badge, Button, Card, PageHeader, Segmented, buttonCls, Empty } from "../components/ui";
 
 const STATE_TONE: Record<BuildState, "green" | "brand" | "amber" | "red" | "slate"> = {
   self: "slate",
@@ -77,7 +77,7 @@ function Row({ a, roleName, onShare }: { a: HubAsset; roleName: (id: number) => 
             void navigator.clipboard?.writeText(`/${a.slug}`);
             notify(t("apps.copied", { slug: a.slug }));
           }}
-          className="rounded-md p-1.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-700/50"
+          className="rounded-md p-1.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
         >
           <Copy size={14} />
         </button>
@@ -133,18 +133,25 @@ export default function Build() {
       </div>
       <LoadState loading={hub.loading && !hub.data} error={hub.data ? null : hub.error} onRetry={hub.reload}>
         {list.length === 0 ? (
-          <Card className="px-5 py-10 text-center text-sm text-neutral-600">
-            <p>{tab === "apps" ? t("build.empty") : t("build.emptyOthers")}</p>
-            {tab === "apps" && can("registry.publish") && (
-              <div className="mt-4 flex justify-center gap-2">
-                <PageLink page="templates" className={buttonCls("secondary")}>
-                  {t("build.fromTemplate")}
-                </PageLink>
-                <PageLink page="app-new" className={buttonCls("primary")}>
-                  {t("build.newApp")}
-                </PageLink>
-              </div>
-            )}
+          <Card>
+            <Empty
+              icon={LayoutGrid}
+              action={
+                tab === "apps" &&
+                can("registry.publish") && (
+                  <>
+                    <PageLink page="templates" className={buttonCls("secondary")}>
+                      {t("build.fromTemplate")}
+                    </PageLink>
+                    <PageLink page="app-new" className={buttonCls("primary")}>
+                      {t("build.newApp")}
+                    </PageLink>
+                  </>
+                )
+              }
+            >
+              <p>{tab === "apps" ? t("build.empty") : t("build.emptyOthers")}</p>
+            </Empty>
           </Card>
         ) : (
           <Card>

@@ -65,7 +65,7 @@ function MultiPick({ label, values, options, onChange }: { label: string; values
 function Section({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <Card className="space-y-5 p-6">
-      {title && <h2 className="font-semibold text-neutral-900">{title}</h2>}
+      {title && <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{title}</h2>}
       {children}
     </Card>
   );

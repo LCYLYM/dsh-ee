@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { api, formatTime } from "../../lib/api";
@@ -87,8 +88,8 @@ export default function ConnectSettings() {
         </Button>
       </div>
       {status.data?.patch && (
-        <details className="text-sm">
-          <summary className="cursor-pointer text-neutral-600 hover:text-neutral-900">{t("connectAdmin.viewPatch")}</summary>
+        <details className="group text-sm">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-neutral-600 select-none hover:text-neutral-900 [&::-webkit-details-marker]:hidden"><ChevronRight size={14} aria-hidden className="text-neutral-400 transition-transform group-open:rotate-90" />{t("connectAdmin.viewPatch")}</summary>
           <pre className="mt-2 max-h-80 overflow-auto rounded-md bg-neutral-50 p-3 font-mono text-xs whitespace-pre text-neutral-800">{status.data.patch}</pre>
         </details>
       )}

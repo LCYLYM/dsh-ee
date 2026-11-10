@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, FilePlus, MoreHorizontal, Sparkles, Upload } from "lucide-react";
+import { ArrowLeft, FilePlus, MoreHorizontal, Sparkles, Upload, ChevronRight } from "lucide-react";
 import { api, formatTime, type KBase, type KBMaintainers, type KBSearchResult, type Scope } from "../lib/api";
 import { useAction, useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
@@ -266,7 +266,7 @@ function QueriesTab({ kb, onUpload, onChanged }: { kb: KBase; onUpload: () => vo
   const items = (q.data ?? []).filter((x) => !zero || (x.tool === "search" && x.hits === 0));
   const days = gaps.data?.days ?? 30;
   return (
-    <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+    <div className="divide-y divide-neutral-100">
       <section className="px-5 py-4">
         <h3 className="text-sm font-semibold text-neutral-900">{t("kbase.gapsTitle", { days })}</h3>
         <p className="mt-0.5 text-sm text-neutral-600">{t("kbase.gapsHint")}</p>
@@ -276,7 +276,7 @@ function QueriesTab({ kb, onUpload, onChanged }: { kb: KBase; onUpload: () => vo
           ) : (
             <ul className="mt-3 space-y-2">
               {gaps.data?.gaps.map((g) => (
-                <li key={g.key} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-neutral-200 px-3 py-2 dark:border-neutral-800">
+                <li key={g.key} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-neutral-200 px-3 py-2">
                   <div className="min-w-0">
                     <div className="font-medium text-neutral-900">{g.query}</div>
                     <div className="text-xs text-neutral-500">{t("kbase.gapCount", { count: g.count, users: g.users, time: formatTime(g.last_at) })}</div>
@@ -331,8 +331,8 @@ function QueriesTab({ kb, onUpload, onChanged }: { kb: KBase; onUpload: () => vo
         )}
       </section>
       <details className="group">
-        <summary className="cursor-pointer list-none px-5 py-3 text-sm font-semibold text-neutral-900 select-none">
-          <span className="mr-1 inline-block transition group-open:rotate-90">▸</span>
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-5 py-3.5 text-sm font-semibold text-neutral-900 select-none [&::-webkit-details-marker]:hidden">
+          <ChevronRight size={15} aria-hidden className="text-neutral-400 transition-transform group-open:rotate-90" />
           {t("kbase.logTitle")}
         </summary>
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-2">
@@ -385,7 +385,7 @@ export default function KnowledgeBase() {
             <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{kb.title}</h1>
+                  <h1 className="text-2xl text-neutral-900 leading-8 font-bold tracking-[-0.02em]">{kb.title}</h1>
                   <span className="font-mono text-sm text-neutral-500">{kb.slug}</span>
                   {!kb.readable && <Badge tone="amber">{t("knowledge.notReadable")}</Badge>}
                 </div>

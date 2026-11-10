@@ -28,7 +28,7 @@ export default function GetStarted() {
       <div className="mx-auto max-w-3xl px-5 py-10">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-neutral-900">{t("getStarted.title", { org: settings.orgName || "dsh-ee" })}</h1>
+            <h1 className="text-2xl text-neutral-900 leading-8 font-bold tracking-[-0.02em]">{t("getStarted.title", { org: settings.orgName || "dsh-ee" })}</h1>
             <p className="mt-1 text-sm text-neutral-600">{t("getStarted.subtitle")}</p>
           </div>
           {!connected && (

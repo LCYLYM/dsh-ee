@@ -100,7 +100,7 @@ export function AppDepsCard({ app, deps, onChanged }: { app: { slug: string; tit
   return (
     <Card className="p-5" data-app-deps>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="font-medium text-neutral-900">{t("requests.depsTitle")}</h2>
+        <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("requests.depsTitle")}</h2>
         {missing.length > 1 && (
           <Button size="sm" variant="secondary" className="ml-auto" disabled={busy} onClick={requestAll}>
             {t("requests.requestAll", { count: missing.length })}

@@ -13,7 +13,7 @@ export function Section({ id, title, desc, children }: { id?: string; title: str
   return (
     <Card id={id} className="scroll-mt-6 p-6">
       <div className="mb-5">
-        <h2 className="font-semibold text-neutral-900">{title}</h2>
+        <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{title}</h2>
         {desc && <p className="mt-0.5 text-sm text-neutral-500">{desc}</p>}
       </div>
       <div className="space-y-5">{children}</div>
