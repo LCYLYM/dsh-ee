@@ -61,7 +61,7 @@ func TestSetupScripts(t *testing.T) {
 	code, body := admin.do("POST", "/api/admin/connect/publish", map[string]bool{"force": true}, nil)
 	expect(t, "发布接入插件", code, 200, body)
 	sh := getScript(t, ts.URL, "/setup.sh")
-	for _, want := range []string{"node -e", "/api/device/code", "/api/device/token", "--token", "DSH_EE_SETUP_INTERACTIVE", "token.pending", `if [ "$DEVICE_LOGIN" -eq 0 ]`, "${PENDING_FILE}，", "${ENV_FILE}（"} {
+	for _, want := range []string{"node -e", "/api/device/code", "/api/device/token", "--token", "DSH_EE_SETUP_INTERACTIVE", "token.pending", `if [ "$DEVICE_LOGIN" -eq 0 ]`, "${PENDING_FILE}，", "${ENV_FILE}（", "令牌格式不对", `PROFILES="${DSH_PROFILES:-`} {
 		if !strings.Contains(sh, want) {
 			t.Errorf("setup.sh 缺少 %q", want)
 		}
@@ -78,7 +78,7 @@ func TestSetupScripts(t *testing.T) {
 	}
 
 	ps := getScript(t, ts.URL, "/setup.ps1")
-	for _, want := range []string{"param([string]$Token)", "Invoke-RestMethod", "Start-Process", "icacls $Pending", "token.pending", "Setup-DshEE\n"} {
+	for _, want := range []string{"param([string]$Token)", "Invoke-RestMethod", "Start-Process", "icacls $Pending", "token.pending", "Setup-DshEE\n", "$Token -notmatch", "$Profiles = @(", "Get-Content $EnvFile -Encoding UTF8", "Get-Content $NpmrcFile -Encoding UTF8"} {
 		if !strings.Contains(ps, want) {
 			t.Errorf("setup.ps1 缺少 %q", want)
 		}

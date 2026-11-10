@@ -182,12 +182,20 @@ if [ "$DEVICE_LOGIN" -eq 1 ]; then
   node -e ` + shellQuote(setupDeviceJS) + `
   TOKEN=$(cat "$PENDING_FILE")
 fi
+case "$TOKEN" in
+  *[!A-Za-z0-9._~-]*) echo "令牌格式不对" >&2; exit 1 ;;
+esac
 if ! check_token; then
   echo "✘ 令牌无效或连不上 dsh-ee，请检查后重试" >&2
   exit 1
 fi
 echo "✔ 令牌有效"
-for profile in ${DSH_PROFILES:-` + connectProfile + `}; do
+PROFILES="${DSH_PROFILES:-` + connectProfile + `}"
+if [ -z "$(printf '%s' "$PROFILES" | tr -d '[:space:]')" ]; then
+  echo "DSH_PROFILES 不能为空" >&2
+  exit 1
+fi
+for profile in $PROFILES; do
   write_profile_npmrc "$DSH_DIR/profiles/$profile"
 done
 if [ "${DSH_EE_GLOBAL_NPMRC:-}" = "1" ]; then
@@ -274,11 +282,14 @@ function Setup-DshEE {
     $Token = $login.access_token
     Write-Host "✔ 已登录 $($login.user.username)（$($login.user.department)）"
   }
+  if ($Token -notmatch '^[A-Za-z0-9._~-]+$') { Write-Error '令牌格式不对'; return }
   try { $me = Invoke-RestMethod -Uri "$Base/api/dsh/whoami" -Headers @{ Authorization = "Bearer $Token" } }
   catch { Write-Error '令牌无效或连不上 dsh-ee'; return }
   Write-Host "令牌有效，当前账号：$($me.username)"
   $Scopes = @(` + strings.Join(sc, ", ") + `)
-  $Profiles = if ($env:DSH_PROFILES) { $env:DSH_PROFILES -split '\s+' | Where-Object { $_ } } else { @('` + connectProfile + `') }
+  $rawProfiles = if ($env:DSH_PROFILES) { $env:DSH_PROFILES } else { '` + connectProfile + `' }
+  $Profiles = @($rawProfiles -split '\s+' | Where-Object { $_ })
+  if ($Profiles.Count -eq 0) { Write-Error 'DSH_PROFILES 不能为空'; return }
   foreach ($ProfileName in $Profiles) {
     # 只写 DSH profile 目录的 .npmrc（DSH 跑 pnpm 时的工作目录），不动 ~/.npmrc
     $ProfileDir = Join-Path (Join-Path $DshDir 'profiles') $ProfileName
@@ -286,7 +297,7 @@ function Setup-DshEE {
     New-Item -ItemType Directory -Force -Path $ProfileDir | Out-Null
     $drop = @('registry', $AuthKey) + ($Scopes | ForEach-Object { "${_}:registry" })
     $lines = @()
-    if (Test-Path $NpmrcFile) { $lines = @(Get-Content $NpmrcFile | Where-Object { $drop -notcontains ($_ -split '=', 2)[0] }) }
+    if (Test-Path $NpmrcFile) { $lines = @(Get-Content $NpmrcFile -Encoding UTF8 | Where-Object { $drop -notcontains ($_ -split '=', 2)[0] }) }
     $lines += "registry=$Registry"
     foreach ($scope in $Scopes) { $lines += "${scope}:registry=$Registry" }
     $lines += "$AuthKey=$Token"
@@ -375,7 +386,12 @@ if [ -z "$DSH_CMD" ]; then
   echo "  dsh plugin --profile ` + connectProfile + ` add $CONNECT_PKG" >&2
   exit 1
 fi
-for profile in ${DSH_PROFILES:-` + connectProfile + `}; do
+PROFILES="${DSH_PROFILES:-` + connectProfile + `}"
+if [ -z "$(printf '%s' "$PROFILES" | tr -d '[:space:]')" ]; then
+  echo "DSH_PROFILES 不能为空" >&2
+  exit 1
+fi
+for profile in $PROFILES; do
   $DSH_CMD plugin --profile "$profile" add "$CONNECT_PKG@latest"
   echo "✔ 已在 DSH 的 $profile profile 里装好 $CONNECT_PKG"
 done
@@ -392,7 +408,7 @@ func setupEnvPowerShell() string {
   if (-not $DeviceLogin) {
     New-Item -ItemType Directory -Force -Path $DshDir | Out-Null
     $lines = @()
-    if (Test-Path $EnvFile) { $lines = @(Get-Content $EnvFile | Where-Object { $_ -notmatch '^` + connectTokenEnv + `=' }) }
+    if (Test-Path $EnvFile) { $lines = @(Get-Content $EnvFile -Encoding UTF8 | Where-Object { $_ -notmatch '^` + connectTokenEnv + `=' }) }
     $lines += "` + connectTokenEnv + `=$Token"
     # .NET 默认写无 BOM 的 UTF-8；Set-Content -Encoding utf8 在 PowerShell 5 会加 BOM，
     # Node 的 process.loadEnvFile 会把 BOM 当成变量名的一部分，DSHEE_TOKEN 就读不到。
