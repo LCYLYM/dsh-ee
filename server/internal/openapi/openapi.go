@@ -278,6 +278,21 @@ func nonEmpty(xs ...string) []string {
 	return out
 }
 
+// checkPathValue 拦下会把请求改到别的接口上的路径参数：空值让 /customers/{id} 变成 /customers/（列表接口）；
+// 「.」「..」会被上游或它前面的代理折叠掉（/customers/../notes 变成 /notes）。管理员按接口开放工具，
+// 模型给的参数不能让一个工具打到另一个接口上。「/」会被转义成 %2F，有的上游会先解码再路由，所以分段后一起查。
+func checkPathValue(name, v string) error {
+	if v == "" {
+		return fmt.Errorf("路径参数 %s 不能为空", name)
+	}
+	for _, seg := range strings.FieldsFunc(v, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if seg == "." || seg == ".." {
+			return fmt.Errorf("路径参数 %s 不能是「.」或「..」", name)
+		}
+	}
+	return nil
+}
+
 // Call 按工具参数发请求。返回状态码与响应体（最多 limit 字节）。
 func Call(ctx context.Context, hc *http.Client, baseURL string, op Operation, args map[string]any, header http.Header, limit int64) (int, []byte, error) {
 	path := op.Path
@@ -292,6 +307,9 @@ func Call(ctx context.Context, hc *http.Client, baseURL string, op Operation, ar
 		}
 		s := scalar(v)
 		if p.In == "path" {
+			if err := checkPathValue(p.Name, s); err != nil {
+				return 0, nil, err
+			}
 			path = strings.ReplaceAll(path, "{"+p.Name+"}", url.PathEscape(s))
 		} else {
 			q.Set(p.Name, s)

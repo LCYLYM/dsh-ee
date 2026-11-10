@@ -113,4 +113,14 @@ func TestCall(t *testing.T) {
 	if _, _, err := Call(context.Background(), ts.Client(), ts.URL, op, map[string]any{}, nil, 10); err == nil {
 		t.Fatal("缺少必填的路径参数应报错")
 	}
+	// 路径参数为空或带「..」会把请求改到别的接口上，不能发出去
+	got = nil
+	for _, bad := range []string{"", ".", "..", "../admin", `..\admin`, "a/../../admin"} {
+		if _, _, err := Call(context.Background(), ts.Client(), ts.URL, op, map[string]any{"id": bad}, nil, 10); err == nil {
+			t.Fatalf("路径参数 %q 应报错，实际请求了 %s", bad, got.URL.EscapedPath())
+		}
+	}
+	if got != nil {
+		t.Fatalf("不合法的路径参数不应发出请求：%s", got.URL)
+	}
 }
