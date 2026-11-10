@@ -8,7 +8,7 @@ import { useLabels } from "../../lib/labels";
 import { DataTable, columnHelper, type DataColumn } from "@/components/data-table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/shadcn/tooltip";
-import { KeyRound, MoreHorizontal, ShieldCheck, UserCheck, UserX } from "lucide-react";
+import { KeyRound, MoreHorizontal, ShieldCheck, Unlink, UserCheck, UserX } from "lucide-react";
 import { ErrorNote, LoadState } from "../../components/api-ui";
 import { Badge, Button, Card, CardHeader, cx, Field, inputBase, inputCls, PageHeader, Segmented } from "../../components/ui";
 import { useTranslation } from "react-i18next";
@@ -268,6 +268,16 @@ export default function AdminUsers() {
                     }}
                   >
                     <KeyRound /> {t("users.resetPassword")}
+                  </DropdownMenuItem>
+                )}
+                {canManage && u.auth_source === "oidc" && u.external_dn && (
+                  <DropdownMenuItem
+                    onSelect={async () => {
+                      if (!(await confirm({ kind: "unbind", description: t("users.unbindConfirm", { name: u.username }) }))) return;
+                      void patch(u, { unbind_identity: true }, t("users.unboundMsg", { name: u.username }));
+                    }}
+                  >
+                    <Unlink /> {t("users.unbindIdentity")}
                   </DropdownMenuItem>
                 )}
                 {canManage && !self && (

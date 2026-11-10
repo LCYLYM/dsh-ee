@@ -1319,7 +1319,7 @@ export const api = {
     account_type?: "human" | "bot";
     owner_id?: number;
   }) => request<User>("POST", "/api/admin/users", u),
-  updateUser: (id: number, patch: Partial<{ display_name: string; department: string; disabled: boolean; password: string }>) =>
+  updateUser: (id: number, patch: Partial<{ display_name: string; department: string; disabled: boolean; password: string; unbind_identity: boolean }>) =>
     request<User>("PATCH", `/api/admin/users/${id}`, patch),
   setUserRoles: (id: number, role_ids: number[]) =>
     request<{ roles: RoleRef[] }>("PUT", `/api/admin/users/${id}/roles`, { role_ids }).then((r) => r.roles),

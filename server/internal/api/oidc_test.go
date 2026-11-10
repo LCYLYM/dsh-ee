@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"math/big"
@@ -72,7 +73,8 @@ func newFakeIdP(t *testing.T) *fakeIdP {
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_grant"})
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]string{"id_token": f.sign(g.claims), "access_token": "at-" + g.claims["sub"].(string), "token_type": "Bearer"})
+		sub, _ := g.claims["sub"].(string)
+		_ = json.NewEncoder(w).Encode(map[string]string{"id_token": f.sign(g.claims), "access_token": "at-" + sub, "token_type": "Bearer"})
 	})
 	mux.HandleFunc("GET /userinfo", func(w http.ResponseWriter, r *http.Request) {
 		// 部门只在 userinfo 里给
@@ -258,6 +260,33 @@ func TestOIDCLogin(t *testing.T) {
 	idp.forge = false
 	fail("nonce 不对", map[string]any{"sub": "u-5", "preferred_username": "x.w", "nonce": "other"}, nil, "nonce")
 	fail("IdP 返回错误", map[string]any{"sub": "u-6", "preferred_username": "x.v"}, func(q url.Values) { q.Set("error", "access_denied") }, "access_denied")
+
+	// ---- 账号认的是 sub：用户名相同、sub 不同的人登不进别人的账号 ----
+	fail("用户名相同、sub 不同", map[string]any{"sub": "u-other", "preferred_username": "lin.na@partner.example", "name": "冒名"}, nil, "另一个")
+	fail("没有 sub", map[string]any{"preferred_username": "no.sub"}, nil, "sub")
+	code, body = emp.do("GET", "/api/auth/me", nil, nil)
+	expect(t, "原主人的会话不受影响", code, 200, body)
+	if !strings.Contains(string(body), "林娜（销售）") {
+		t.Fatalf("资料不应被别人的声明改掉：%s", body)
+	}
+	lin := decodeAs[struct{ ID int64 }](t, body).ID
+	if loc := idp.login(t, newClient(t, ts.URL), map[string]any{"sub": "u-1", "preferred_username": "lin.na"}, nil); loc != "/build" {
+		t.Fatalf("原主人应照常登录：%s", loc)
+	}
+	// IdP 里重建了账号（sub 变了）：管理员解除绑定后由新的 sub 重新绑定，旧会话下线
+	code, body = admin.do("PATCH", fmt.Sprintf("/api/admin/users/%d", lin), map[string]any{"unbind_identity": true}, nil)
+	expect(t, "解除身份绑定", code, 200, body)
+	if code, _ := emp.do("GET", "/api/auth/me", nil, nil); code != 401 {
+		t.Fatal("解除绑定后旧会话应下线")
+	}
+	if loc := idp.login(t, newClient(t, ts.URL), map[string]any{"sub": "u-1b", "preferred_username": "lin.na"}, nil); loc != "/build" {
+		t.Fatalf("解除绑定后新的 sub 应能登录并绑定：%s", loc)
+	}
+	fail("重新绑定后的旧 sub", map[string]any{"sub": "u-1", "preferred_username": "lin.na"}, nil, "另一个")
+	code, body = admin.do("GET", "/api/auth/me", nil, nil)
+	expect(t, "管理员 me", code, 200, body)
+	code, body = admin.do("PATCH", fmt.Sprintf("/api/admin/users/%d", decodeAs[struct{ ID int64 }](t, body).ID), map[string]any{"unbind_identity": true}, nil)
+	expect(t, "本地账号没有可解除的绑定", code, 400, body)
 
 	// 关掉自动建号：没预先建好的账号不能登录；管理员预建的 OIDC 账号可以
 	cfg["autoCreate"] = false

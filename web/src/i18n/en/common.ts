@@ -93,6 +93,7 @@ export default {
     disable: { title: "Disable?", action: "Disable" },
     reset: { title: "Restore defaults?", action: "Restore defaults" },
     restore: { title: "Restore?", action: "Restore" },
+    unbind: { title: "Unbind?", action: "Unbind" },
   },
   api: {
     unreachable: "Can't reach the server. Make sure dsh-ee server is running",

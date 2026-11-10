@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/shadcn/alert-dialog";
 
-export type ConfirmKind = "delete" | "revoke" | "disable" | "reset" | "restore";
+export type ConfirmKind = "delete" | "revoke" | "disable" | "reset" | "restore" | "unbind";
 
 export interface ConfirmOptions {
   /** 决定标题与确认按钮的文字。 */
