@@ -1,0 +1,23 @@
+name: windows
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  setup-windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      # 只跑不依赖数据库的 Windows 运行时用例：真正执行 setup.ps1 写 .env 的那段。
+      - run: go test ./internal/api -run "TestSetupEnvPowerShell$" -count=1 -v
+        working-directory: server
