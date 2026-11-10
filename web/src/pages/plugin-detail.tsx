@@ -1,12 +1,12 @@
 import { useParams } from "react-router";
-import { ArrowLeft, Building2, CheckCircle2, ExternalLink } from "lucide-react";
+import { ArrowLeft, Building2, CheckCircle2, ExternalLink, SearchX } from "lucide-react";
 import { categoryLabel } from "../lib/catalog";
 import { api, formatBytes, formatTime, toPlugin } from "../lib/api";
 import { useApi } from "../lib/use-api";
 import { useScoring } from "../lib/store";
 import { LoadState } from "../components/api-ui";
 import { ScanList } from "../components/scan-list";
-import { Badge, Card, CopyBox, PluginIcon, ScoreBadge } from "../components/ui";
+import { Badge, Card, CopyBox, PluginIcon, ScoreBadge, Empty, buttonCls, backLinkCls } from "../components/ui";
 import { PageLink } from "../lib/menus";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -24,11 +24,17 @@ function Loader({ name }: { name: string }) {
 
   if (error && !d) {
     return (
-      <Card className="p-12 text-center">
-        <p className="text-neutral-600">{t("pluginDetail.notFound")}</p>
-        <PageLink page="market" className="mt-4 inline-block text-sm text-brand-600 hover:underline">
-          {t("pluginDetail.backToMarket")}
-        </PageLink>
+      <Card>
+        <Empty
+          icon={SearchX}
+          action={
+            <PageLink page="market" className={buttonCls("secondary", "sm")}>
+              {t("pluginDetail.backToMarket")}
+            </PageLink>
+          }
+        >
+          {t("pluginDetail.notFound")}
+        </Empty>
       </Card>
     );
   }
@@ -47,7 +53,7 @@ function Detail({ d, core, scoringUpstream }: { d: NonNullable<Awaited<ReturnTyp
   const deps = Object.entries(d.dependencies ?? {});
   return (
     <div>
-      <PageLink page="market" className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-800">
+      <PageLink page="market" className={backLinkCls}>
         <ArrowLeft size={14} /> {t("pluginDetail.market")}
       </PageLink>
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -56,7 +62,7 @@ function Detail({ d, core, scoringUpstream }: { d: NonNullable<Awaited<ReturnTyp
             <div className="flex gap-4">
               <PluginIcon name={p.name} icon={p.icon} size={64} />
               <div className="min-w-0">
-                <h1 className="text-2xl font-semibold text-neutral-900">{p.title}</h1>
+                <h1 className="text-2xl text-neutral-900 leading-8 font-bold tracking-[-0.02em]">{p.title}</h1>
                 <div className="mt-0.5 font-mono text-sm text-neutral-500">{p.name}</div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {p.origin === "internal" ? (
@@ -80,7 +86,7 @@ function Detail({ d, core, scoringUpstream }: { d: NonNullable<Awaited<ReturnTyp
           </Card>
 
           <Card className="p-6">
-            <h2 className="mb-4 font-semibold text-neutral-900">{t("pluginDetail.install")}</h2>
+            <h2 className="mb-4 text-neutral-900 text-[15px] leading-6 font-semibold">{t("pluginDetail.install")}</h2>
             <div className="space-y-3">
               <CopyBox label={t("pluginDetail.runInDsh")} text={`dsh plugin add ${p.name}`} />
               <CopyBox label={t("registry.detail.npmInstall")} text={`pnpm add ${p.name}@${p.version}`} />
@@ -88,7 +94,7 @@ function Detail({ d, core, scoringUpstream }: { d: NonNullable<Awaited<ReturnTyp
                 <Trans
                   i18nKey="pluginDetail.discoverHint"
                   values={{ title: p.title }}
-                  components={{ link: <PageLink page="setup" className="text-brand-600 hover:underline" /> }}
+                  components={{ link: <PageLink page="setup" className="text-brand-600 dark:text-brand-300 hover:underline" /> }}
                 />
               </p>
               {core && d.engines?.dsh && <p className="text-sm text-neutral-500">{t("registry.detail.engines", { range: d.engines.dsh, version: core })}</p>}
@@ -96,19 +102,19 @@ function Detail({ d, core, scoringUpstream }: { d: NonNullable<Awaited<ReturnTyp
           </Card>
 
           <Card className="p-6">
-            <h2 className="mb-4 font-semibold text-neutral-900">{t("pluginDetail.securityChecks")}</h2>
+            <h2 className="mb-4 text-neutral-900 text-[15px] leading-6 font-semibold">{t("pluginDetail.securityChecks")}</h2>
             <ScanList items={d.scan} />
           </Card>
 
           {d.readme && (
             <Card className="p-6">
-              <h2 className="mb-4 font-semibold text-neutral-900">{t("registry.detail.readme")}</h2>
+              <h2 className="mb-4 text-neutral-900 text-[15px] leading-6 font-semibold">{t("registry.detail.readme")}</h2>
               <pre className="max-h-[32rem] overflow-auto text-sm whitespace-pre-wrap text-neutral-700">{d.readme}</pre>
             </Card>
           )}
 
           <Card className="p-6">
-            <h2 className="mb-3 font-semibold text-neutral-900">{t("registry.detail.versions")}</h2>
+            <h2 className="mb-3 text-neutral-900 text-[15px] leading-6 font-semibold">{t("registry.detail.versions")}</h2>
             <ul className="divide-y divide-neutral-100 text-sm">
               {d.versions.map((v) => (
                 <li key={v.version} className="flex items-center justify-between py-2">
@@ -174,12 +180,12 @@ function Detail({ d, core, scoringUpstream }: { d: NonNullable<Awaited<ReturnTyp
           {(p.repository || p.homepage) && (
             <Card className="space-y-2 p-4">
               {p.repository && (
-                <a href={p.repository} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-sm text-brand-600 hover:underline">
+                <a href={p.repository} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-sm text-brand-600 dark:text-brand-300 hover:underline">
                   <ExternalLink size={14} /> {t("pluginDetail.repo")}
                 </a>
               )}
               {p.homepage && (
-                <a href={p.homepage} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-sm text-brand-600 hover:underline">
+                <a href={p.homepage} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-sm text-brand-600 dark:text-brand-300 hover:underline">
                   <ExternalLink size={14} /> {t("registry.detail.homepage")}
                 </a>
               )}

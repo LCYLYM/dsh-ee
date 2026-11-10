@@ -66,7 +66,7 @@ export function ImageCropDialog({ file, busy, onDone, onCancel }: {
 
   return (
     <Dialog open={!!file} onOpenChange={(open) => { if (!open) onCancel(); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t("brandAdmin.cropTitle")}</DialogTitle>
           <DialogDescription>{t("brandAdmin.cropHint")}</DialogDescription>
@@ -88,7 +88,7 @@ export function ImageCropDialog({ file, busy, onDone, onCancel }: {
         </div>
         <div className="flex items-center gap-3">
           <span className="shrink-0 text-xs text-neutral-500">{t("brandAdmin.cropZoom")}</span>
-          <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="w-full accent-neutral-800 dark:accent-neutral-200" />
+          <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="w-full accent-neutral-800" />
         </div>
         {err && <p className="text-sm text-red-600">{err}</p>}
         <DialogFooter>

@@ -5,10 +5,10 @@ import { api, formatTime, type DataParam, type DataResult, type DataSet, type Da
 import { useAction, useApi } from "../lib/use-api";
 import { useConfirm } from "../lib/confirm";
 import { scopeSummary } from "../lib/hub";
-import { LoadState } from "./api-ui";
+import { ErrorNote, LoadState } from "./api-ui";
 import { ScopeEditor } from "./scope-editor";
 import { useScopeOptions } from "./scope-dialog";
-import { Badge, Button, Card, CardHeader, cx, Field, inputCls } from "./ui";
+import { Badge, Button, Card, CardHeader, cx, Field, inputCls, Notice } from "./ui";
 
 const textareaCls = "w-full rounded-md border border-neutral-300 bg-card px-3 py-2 font-mono text-xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
 
@@ -18,10 +18,10 @@ function ResultTable({ result }: { result: DataResult }) {
   if (result.items.length === 0) return <p className="py-3 text-sm text-neutral-500">{t("dataHub.noRows")}</p>;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-xs">
+      <table className="tbl tbl-compact">
         <thead>
           <tr className="border-b border-neutral-200 text-left text-neutral-500">
-            {result.columns.map((c) => <th key={c} className="px-2 py-1 font-medium whitespace-nowrap">{c}</th>)}
+            {result.columns.map((c) => <th key={c} className="px-2 py-1 whitespace-nowrap">{c}</th>)}
           </tr>
         </thead>
         <tbody>
@@ -164,7 +164,7 @@ function DataSetEditor({ initial, autoParams, onDone, onCancel }: { initial?: Da
         ))}
       </div>
       {result && <ResultTable result={result} />}
-      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
       <div className="flex gap-2">
         <Button type="submit" disabled={busy}>{t("dataHub.saveDataset")}</Button>
         <Button type="button" variant="secondary" onClick={onCancel}>{t("dataHub.cancel")}</Button>
@@ -215,8 +215,8 @@ export function DataHubPanel() {
       ) : d ? (
         <div className="space-y-5">
           <p className="text-sm text-neutral-600">{t("dataHub.desc", { db: d.database })}</p>
-          {d.read_error && <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{d.read_error}</p>}
-          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+          {d.read_error && <Notice tone="warn" role="alert">{d.read_error}</Notice>}
+          {error && <ErrorNote>{error}</ErrorNote>}
 
           <Card>
             <CardHeader title={t("dataHub.tables")} />
@@ -234,7 +234,7 @@ export function DataHubPanel() {
                         <Badge>{t("dataHub.rows", { count: x.row_count })}</Badge>
                         <span className="text-xs text-neutral-500">{formatTime(x.updated_at)}</span>
                         <span className="ml-auto flex gap-2">
-                          <button type="button" aria-label={t("dataHub.preview")} className="text-neutral-500 hover:text-brand-600" onClick={() => void showPreview(x.name)}><Eye size={15} /></button>
+                          <button type="button" aria-label={t("dataHub.preview")} className="text-neutral-500 hover:text-brand-600 dark:hover:text-brand-200" onClick={() => void showPreview(x.name)}><Eye size={15} /></button>
                           <button type="button" aria-label={t("dataHub.drop")} className="text-neutral-500 hover:text-red-600" onClick={() => void dropTable(x)}><Trash2 size={15} /></button>
                         </span>
                       </div>
@@ -274,7 +274,7 @@ export function DataHubPanel() {
                         <span className="text-sm text-neutral-700">{x.title}</span>
                         <span className="text-xs text-neutral-500">{scopeSummary(t, x.scope, opts.roleName)}</span>
                         <span className="ml-auto flex gap-2">
-                          <button type="button" aria-label={t("dataHub.edit")} className="text-neutral-500 hover:text-brand-600" onClick={() => setEditing(x)}><Pencil size={15} /></button>
+                          <button type="button" aria-label={t("dataHub.edit")} className="text-neutral-500 hover:text-brand-600 dark:hover:text-brand-200" onClick={() => setEditing(x)}><Pencil size={15} /></button>
                           <button type="button" aria-label={t("dataHub.drop")} className="text-neutral-500 hover:text-red-600" onClick={() => void dropSet(x)}><Trash2 size={15} /></button>
                         </span>
                       </div>

@@ -16,11 +16,11 @@ function NumTable({ head, rows, empty }: { head: string[]; rows: { key: string; 
   if (rows.length === 0) return <p className="px-5 pb-5 text-sm text-neutral-600">{empty}</p>;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="text-left text-xs text-neutral-600">
+      <table className="tbl">
+        <thead>
           <tr>
             {head.map((h, i) => (
-              <th key={h} className={i === 0 ? "px-5 py-2 font-normal" : "px-5 py-2 text-right font-normal"}>
+              <th key={h} className={i === 0 ? "px-5 py-2" : "px-5 py-2 text-right"}>
                 {h}
               </th>
             ))}

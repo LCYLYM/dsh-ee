@@ -76,7 +76,7 @@ function Node({ icon, kind, title, to, aside, children, tone }: { icon: ReactNod
           <div className="text-[11px] text-neutral-500">{kind}</div>
           <div className="truncate text-sm font-medium text-neutral-900">
             {to ? (
-              <Link to={to} className="hover:text-brand-600 hover:underline">{title}</Link>
+              <Link to={to} className="hover:text-brand-600 dark:hover:text-brand-200 hover:underline">{title}</Link>
             ) : (
               title
             )}
@@ -91,7 +91,7 @@ function Node({ icon, kind, title, to, aside, children, tone }: { icon: ReactNod
 
 function Arrow() {
   return (
-    <div className="hidden items-center justify-center text-neutral-300 lg:flex dark:text-neutral-600" aria-hidden>
+    <div className="hidden items-center justify-center text-neutral-300 lg:flex" aria-hidden>
       <ArrowRight size={20} />
     </div>
   );
@@ -169,7 +169,7 @@ export function AppMap({ a, deps, bySlug }: { a: HubAsset; deps?: AppDep[]; bySl
   return (
     <Card className="p-5" data-app-map>
       <div className="mb-4">
-        <h2 className="font-medium text-neutral-900">{t("appMap.title")}</h2>
+        <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("appMap.title")}</h2>
         <p className="mt-1 text-sm text-neutral-600">{t("appMap.desc")}</p>
         <div className="mt-3 flex flex-wrap gap-1.5">
           <Badge>{t("appMap.summary.systems", { count: conns.length })}</Badge>
@@ -223,7 +223,7 @@ export function AppMap({ a, deps, bySlug }: { a: HubAsset; deps?: AppDep[]; bySl
             <Node key={tb.name} icon={<Table2 size={15} />} kind={t("appMap.ownTable")} title={tb.title} aside={<Badge>{visibility(tb.visibility)}</Badge>}>
               <div className="flex flex-wrap gap-1">
                 {tb.fields.filter((f) => !f.hidden).map((f) => (
-                  <span key={f.name} className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-700 dark:bg-neutral-700/40 dark:text-neutral-200">{f.title}</span>
+                  <span key={f.name} className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-700">{f.title}</span>
                 ))}
               </div>
             </Node>
@@ -263,7 +263,7 @@ export function AppMap({ a, deps, bySlug }: { a: HubAsset; deps?: AppDep[]; bySl
                   const wt = writesTable(w);
                   return (
                     <li key={i} className="text-xs">
-                      <span className="mr-1 rounded bg-neutral-100 px-1 text-[10px] text-neutral-600 dark:bg-neutral-700/40 dark:text-neutral-300">{t(`appWorkbench.widget.${w.type}`)}</span>
+                      <span className="mr-1 rounded bg-neutral-100 px-1 text-[10px] text-neutral-600">{t(`appWorkbench.widget.${w.type}`)}</span>
                       <span className="text-neutral-800">{w.title || ""}</span>
                       {src && <span className="ml-1 text-neutral-500">· {t("appMap.from", { source: src })}</span>}
                       {wt && <span className="ml-1 text-amber-700 dark:text-amber-300">· {t("appMap.writesTo", { table: tables.find((x) => x.name === wt)?.title ?? wt })}</span>}
@@ -279,24 +279,24 @@ export function AppMap({ a, deps, bySlug }: { a: HubAsset; deps?: AppDep[]; bySl
       </div>
 
       <div className="mt-6">
-        <h3 className="text-sm font-medium text-neutral-900">{t("appMap.opsTitle")}</h3>
+        <h3 className="text-sm font-semibold text-neutral-900">{t("appMap.opsTitle")}</h3>
         <p className="mt-0.5 mb-2 text-xs text-neutral-600">{t("appMap.opsDesc")}</p>
         {ops.length === 0 ? (
           <p className="text-sm text-neutral-500">{t("appMap.noOps")}</p>
         ) : (
           <div className="overflow-x-auto rounded-md border border-neutral-200">
-            <table className="w-full text-sm">
-              <thead className="bg-neutral-50 text-left text-xs text-neutral-500 dark:bg-neutral-700/30">
+            <table className="tbl">
+              <thead>
                 <tr>
-                  <th className="px-3 py-2 font-medium">{t("appMap.col.target")}</th>
-                  <th className="px-3 py-2 font-medium">{t("appMap.col.where")}</th>
-                  <th className="px-3 py-2 font-medium">{t("appMap.col.can")}</th>
-                  <th className="px-3 py-2 font-medium">{t("appMap.col.how")}</th>
+                  <th className="px-3 py-2">{t("appMap.col.target")}</th>
+                  <th className="px-3 py-2">{t("appMap.col.where")}</th>
+                  <th className="px-3 py-2">{t("appMap.col.can")}</th>
+                  <th className="px-3 py-2">{t("appMap.col.how")}</th>
                 </tr>
               </thead>
               <tbody>
                 {ops.map((o) => (
-                  <tr key={o.key} className="border-t border-neutral-100 dark:border-neutral-700/60">
+                  <tr key={o.key} className="border-t border-neutral-100">
                     <td className="px-3 py-2 text-neutral-900">{o.target}</td>
                     <td className="px-3 py-2 text-neutral-700">{o.where}</td>
                     <td className="px-3 py-2">

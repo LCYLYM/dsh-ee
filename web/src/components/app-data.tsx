@@ -142,7 +142,7 @@ function TableData({ slug, table, admin, onChanged }: { slug: string; table: App
       <CardHeader
         title={<span>{table.title} <span className="font-normal text-neutral-500">· {t(`appData.visibility.${table.visibility ?? "own"}`)}</span></span>}
         aside={admin ? (
-          <a href={api.appExportUrl(slug, table.name)} className="inline-flex items-center gap-1 text-sm text-brand-600 hover:underline">
+          <a href={api.appExportUrl(slug, table.name)} className="inline-flex items-center gap-1 text-sm text-brand-600 dark:text-brand-300 hover:underline">
             <Download size={14} />{t("appData.export")}
           </a>
         ) : undefined}
@@ -154,12 +154,12 @@ function TableData({ slug, table, admin, onChanged }: { slug: string; table: App
             <p className="py-4 text-center text-sm text-neutral-500">{t("appData.noRows")}</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="tbl">
                 <thead>
                   <tr className="border-b border-neutral-200 text-left text-xs text-neutral-500">
-                    {fields.map((f) => <th key={f.name} className="px-2 py-1.5 font-medium whitespace-nowrap">{f.title}</th>)}
-                    {ownerColumn && <th className="px-2 py-1.5 font-medium whitespace-nowrap">{t("appData.owner")}</th>}
-                    <th className="px-2 py-1.5 font-medium whitespace-nowrap">{t("appData.createdAt")}</th>
+                    {fields.map((f) => <th key={f.name} className="px-2 py-1.5 whitespace-nowrap">{f.title}</th>)}
+                    {ownerColumn && <th className="px-2 py-1.5 whitespace-nowrap">{t("appData.owner")}</th>}
+                    <th className="px-2 py-1.5 whitespace-nowrap">{t("appData.createdAt")}</th>
                     <th />
                   </tr>
                 </thead>
@@ -180,7 +180,7 @@ function TableData({ slug, table, admin, onChanged }: { slug: string; table: App
                         {canDelete(r) && (
                           <span className="inline-flex gap-2">
                             {editable.length > 0 && (
-                              <button type="button" aria-label={t("appData.edit")} className="text-neutral-400 hover:text-brand-600" disabled={busy} onClick={() => startEdit(r)}>
+                              <button type="button" aria-label={t("appData.edit")} className="text-neutral-400 hover:text-brand-600 dark:hover:text-brand-200" disabled={busy} onClick={() => startEdit(r)}>
                                 <Pencil size={14} />
                               </button>
                             )}
@@ -226,7 +226,7 @@ export function AppDataPanel({ slug }: { slug: string }) {
   if (info.error || (info.data && info.data.tables.length === 0)) return null;
   return (
     <section className="space-y-3">
-      <h2 className="font-medium text-neutral-900">{t("appData.title")}</h2>
+      <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("appData.title")}</h2>
       <p className="text-sm text-neutral-600">{t("appData.desc")}</p>
       <LoadState loading={info.loading && !info.data} error={null} onRetry={info.reload}>
         {info.data?.tables.map((tb) => <TableData key={tb.name} slug={slug} table={tb} admin={info.data!.admin} onChanged={info.reload} />)}

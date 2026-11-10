@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { BookOpen, Download, ExternalLink, FolderPlus, MessageSquare, Plus, Search, Upload } from "lucide-react";
+import { BookOpen, Download, ExternalLink, FolderPlus, MessageSquare, Plus, Search, Upload, SearchX, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, formatTime, type KBase, type KBQASettings, type KBQuery, type KBSearchResult, type Scope } from "../lib/api";
 import { useAction, useApi } from "../lib/use-api";
@@ -9,7 +9,7 @@ import { scopeSummary } from "../lib/hub";
 import { LoadState, ErrorNote } from "../components/api-ui";
 import { ScopeEditor } from "../components/scope-editor";
 import { useScopeOptions } from "../components/scope-dialog";
-import { Badge, Button, Card, CardHeader, cx, Field, inputCls, PageHeader, ToggleRow } from "../components/ui";
+import { Badge, Button, Card, CardHeader, cx, Field, inputCls, PageHeader, ToggleRow, Empty, cardHover } from "../components/ui";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { Snippet } from "../components/kb-access";
 
@@ -36,7 +36,7 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpen
   }, [open]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{t("knowledge.createForm.title")}</DialogTitle>
         </DialogHeader>
@@ -132,17 +132,17 @@ function QASettings({ value, onSaved }: { value: KBQASettings; onSaved: () => vo
 /** 检索记录表：我的、某个库的都用它。 */
 export function QueryTable({ items, showUser, empty, bases }: { items: KBQuery[]; showUser?: boolean; empty: string; bases?: Map<number, string> }) {
   const { t } = useTranslation();
-  if (items.length === 0) return <p className="px-5 py-8 text-center text-sm text-neutral-600">{empty}</p>;
+  if (items.length === 0) return <Empty>{empty}</Empty>;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="tbl">
         <thead>
           <tr className="border-b border-neutral-100 text-left text-xs text-neutral-500">
-            <th className="px-5 py-2 font-normal">{t("knowledge.colTime")}</th>
-            {showUser && <th className="px-3 py-2 font-normal">{t("knowledge.colUser")}</th>}
-            <th className="px-3 py-2 font-normal">{t("knowledge.colTool")}</th>
-            <th className="px-3 py-2 font-normal">{t("knowledge.colQuery")}</th>
-            <th className="px-5 py-2 text-right font-normal">{t("knowledge.colHits")}</th>
+            <th className="px-5 py-2">{t("knowledge.colTime")}</th>
+            {showUser && <th className="px-3 py-2">{t("knowledge.colUser")}</th>}
+            <th className="px-3 py-2">{t("knowledge.colTool")}</th>
+            <th className="px-3 py-2">{t("knowledge.colQuery")}</th>
+            <th className="px-5 py-2 text-right">{t("knowledge.colHits")}</th>
           </tr>
         </thead>
         <tbody>
@@ -224,21 +224,21 @@ function KnowledgeSearch({ qaTitle }: { qaTitle: string }) {
           void search();
         }}
       >
-        <div className="relative min-w-0 flex-1">
+        <div className="relative min-w-0 flex-1 basis-full sm:basis-64">
           <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-neutral-400" aria-hidden />
           <input
             ref={ref}
-            className={cx(inputCls, "h-11 pl-9 text-base")}
+            className={cx(inputCls, "h-10 pl-9 text-[15px]")}
             value={query}
             placeholder={t("knowledge.searchPlaceholder")}
             aria-label={t("knowledge.searchPlaceholder")}
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <Button type="submit" className="h-11" disabled={busy || !query.trim()}>
+        <Button type="submit" size="lg" disabled={busy || !query.trim()}>
           {t("knowledge.searchSubmit")}
         </Button>
-        <Button type="button" variant="secondary" className="h-11" disabled={!query.trim()} onClick={() => void askInDSH()}>
+        <Button type="button" variant="secondary" size="lg" className="min-w-0 flex-1 sm:flex-none" disabled={!query.trim()} onClick={() => void askInDSH()}>
           <MessageSquare size={15} /> {t("knowledge.askInDSH", { name: qaTitle })}
         </Button>
       </form>
@@ -252,7 +252,7 @@ function KnowledgeSearch({ qaTitle }: { qaTitle: string }) {
       {result && (
         <div className="mt-4 border-t border-neutral-100 pt-4">
           {groups.size === 0 && named.length === 0 ? (
-            <p className="text-sm text-neutral-600">{t("knowledge.searchNoHit")}</p>
+            <Empty compact icon={SearchX}>{t("knowledge.searchNoHit")}</Empty>
           ) : (
             <ul className="space-y-3">
               {named.map((d) => (
@@ -301,7 +301,7 @@ function FirstRun({ onCreate }: { onCreate: () => void }) {
       <h2 className="text-lg font-semibold text-neutral-900">{t("knowledge.guide.title")}</h2>
       <ol className="mt-4 grid gap-4 md:grid-cols-3">
         {steps.map((s, i) => (
-          <li key={i} className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+          <li key={i} className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-neutral-900">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-200">{i + 1}</span>
               <s.icon size={15} className="text-neutral-500" aria-hidden />
@@ -354,7 +354,7 @@ export default function Knowledge() {
             <FirstRun onCreate={() => setCreating(true)} />
           ) : (
             <Card>
-              <p className="px-5 py-10 text-center text-sm text-neutral-600">{t("knowledge.empty")}</p>
+              <Empty>{t("knowledge.empty")}</Empty>
             </Card>
           )
         ) : (
@@ -362,7 +362,7 @@ export default function Knowledge() {
             {items.some((b) => b.readable && b.docs > 0) && <KnowledgeSearch qaTitle={list.data?.qa?.qaTitle || t("knowledge.qaName")} />}
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {items.map((b) => (
-                <Card key={b.id} className="relative flex h-full flex-col p-5 transition hover:border-neutral-300">
+                <Card key={b.id} className={cx("relative flex h-full flex-col p-5", cardHover)}>
                   <div className="flex items-start gap-3">
                     <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300">
                       <BookOpen size={18} aria-hidden />
@@ -386,7 +386,7 @@ export default function Knowledge() {
                       <ul className="mt-1 space-y-0.5">
                         {b.recent!.map((d) => (
                           <li key={d.id} className="flex items-center justify-between gap-2 text-sm">
-                            <Link to={kdocPath(d.id)} className="relative z-10 min-w-0 truncate text-neutral-800 hover:text-brand-600 hover:underline">
+                            <Link to={kdocPath(d.id)} className="relative z-10 min-w-0 truncate text-neutral-800 hover:text-brand-600 dark:hover:text-brand-200 hover:underline">
                               {d.title}
                             </Link>
                             <span className="shrink-0 text-xs text-neutral-400">{formatTime(d.updated_at).slice(0, 10)}</span>
@@ -418,8 +418,8 @@ export default function Knowledge() {
       </Card>
       <Card className="mt-6">
         <details className="group">
-          <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-neutral-900 select-none">
-            <span className="mr-1 inline-block transition group-open:rotate-90">▸</span>
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-5 py-3.5 text-sm font-semibold text-neutral-900 select-none [&::-webkit-details-marker]:hidden">
+            <ChevronRight size={15} aria-hidden className="text-neutral-400 transition-transform group-open:rotate-90" />
             {t("knowledge.myQueries")}
           </summary>
           <LoadState loading={mine.loading && !mine.data} error={mine.data ? null : mine.error} onRetry={mine.reload}>

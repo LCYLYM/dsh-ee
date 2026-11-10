@@ -7,7 +7,7 @@ import { useApi } from "../lib/use-api";
 import { assetPath } from "../lib/hub";
 import { useMenus } from "../lib/menus";
 import { LoadState } from "../components/api-ui";
-import { Badge, Button, Card, PageHeader } from "../components/ui";
+import { Badge, Button, Card, PageHeader, Empty } from "../components/ui";
 
 function TemplateCard({ a, onCopy }: { a: HubAsset; onCopy: () => void }) {
   const { t } = useTranslation();
@@ -19,7 +19,7 @@ function TemplateCard({ a, onCopy }: { a: HubAsset; onCopy: () => void }) {
           {a.spec.icon ? <span className="text-xl leading-none">{a.spec.icon}</span> : <span className="text-base font-semibold">{letter}</span>}
         </span>
         <div className="min-w-0">
-          <Link to={assetPath(a.id)} className="block truncate font-medium text-neutral-900 hover:text-brand-600">
+          <Link to={assetPath(a.id)} className="block truncate font-medium text-neutral-900 hover:text-brand-600 dark:hover:text-brand-200">
             {a.spec.title}
           </Link>
           <div className="truncate text-xs text-neutral-500">{[a.owner_name || a.owner, a.department].filter(Boolean).join(" · ")}</div>
@@ -61,9 +61,9 @@ export default function Templates() {
     <div>
       <PageHeader title={t("templates.title")} desc={t("templates.desc")} />
       <LoadState loading={hub.loading && !hub.data} error={hub.data ? null : hub.error} onRetry={hub.reload}>
-        <h2 className="mb-3 text-base font-medium text-neutral-900">{t("templates.templates")}</h2>
+        <h2 className="mb-3 text-neutral-900 text-[15px] leading-6 font-semibold">{t("templates.templates")}</h2>
         {templates.length === 0 ? (
-          <Card className="mb-8 px-5 py-8 text-center text-sm text-neutral-600">{t("templates.templatesEmpty")}</Card>
+          <Card className="mb-8"><Empty>{t("templates.templatesEmpty")}</Empty></Card>
         ) : (
           <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {templates.map((a) => (
@@ -71,9 +71,9 @@ export default function Templates() {
             ))}
           </div>
         )}
-        <h2 className="mb-3 text-base font-medium text-neutral-900">{t("templates.company")}</h2>
+        <h2 className="mb-3 text-neutral-900 text-[15px] leading-6 font-semibold">{t("templates.company")}</h2>
         {company.length === 0 ? (
-          <Card className="px-5 py-8 text-center text-sm text-neutral-600">{t("templates.companyEmpty")}</Card>
+          <Card><Empty>{t("templates.companyEmpty")}</Empty></Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {company.map((a) => (

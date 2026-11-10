@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { api, formatTime, type GetStarted, type GetStartedStatus } from "../lib/api";
 import { useAction } from "../lib/use-api";
 import { PageLink } from "../lib/menus";
-import { Button, CopyBox, cx, inputCls, PasswordInput, Segmented } from "./ui";
+import { Button, CopyBox, cx, inputCls, PasswordInput, Segmented, Notice, Spinner } from "./ui";
 
 type Path = "prompt" | "manual";
 
@@ -82,7 +82,7 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
   if (!info) {
     return (
       <div className="space-y-3 text-sm">
-        {error ? <div className="rounded-md bg-red-50 px-3 py-2 text-red-700">{error}</div> : <div className="text-neutral-500">{t("common.loading")}</div>}
+        {error ? <Notice tone="danger">{error}</Notice> : <div role="status" className="flex items-center gap-2 text-neutral-500"><Spinner className="text-neutral-400" />{t("common.loading")}</div>}
         {error && (
           <Button variant="secondary" disabled={busy} onClick={() => void issue()}>
             {t("getStarted.retry")}
@@ -98,7 +98,7 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
     <div className="space-y-5">
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-medium text-neutral-900">{t("getStarted.step1")}</h3>
+          <h3 className="text-sm font-semibold text-neutral-900">{t("getStarted.step1")}</h3>
           <Segmented<Path>
             value={path}
             onChange={setPath}
@@ -135,7 +135,7 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
       </section>
 
       <section className="space-y-3 border-t border-neutral-100 pt-4">
-        <h3 className="text-sm font-medium text-neutral-900">{t("getStarted.step2")}</h3>
+        <h3 className="text-sm font-semibold text-neutral-900">{t("getStarted.step2")}</h3>
         {expired ? (
           <div className="flex flex-wrap items-center gap-3 text-sm text-amber-800 dark:text-amber-200">
             {t("getStarted.expired")}
@@ -149,7 +149,7 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
             {t("getStarted.waiting", { code: info.code, time: formatTime(info.expires_at) })}
           </div>
         ) : stage === "pending" ? (
-          <div className="space-y-3 rounded-md border border-brand-200 bg-brand-50 px-4 py-3 text-sm dark:border-brand-400/40 dark:bg-brand-400/10">
+          <div className="space-y-3 rounded-md border border-brand-200/80 bg-brand-50/70 px-4 py-3 text-sm dark:border-brand-400/25 dark:bg-brand-500/10">
             <div className="text-neutral-900">{t("getStarted.pending", { client: status?.client_name || "DSH", os: status?.client_os ?? "", ip: status?.client_ip ?? "" })}</div>
             <div className="font-mono text-lg tracking-widest text-neutral-900">{status?.user_code}</div>
             <div className="text-xs text-neutral-600">{t("getStarted.pendingHint")}</div>
@@ -176,7 +176,7 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
 
       {admin && connected && (
         <section className="space-y-3 border-t border-neutral-100 pt-4">
-          <h3 className="text-sm font-medium text-neutral-900">{t("getStarted.step3Admin")}</h3>
+          <h3 className="text-sm font-semibold text-neutral-900">{t("getStarted.step3Admin")}</h3>
           {status?.admin_live ? (
             <Done text={t("getStarted.adminOn")} />
           ) : (
@@ -197,13 +197,13 @@ export function AgentConnect({ admin, onConnected }: { admin: boolean; onConnect
 
       {connected && (!admin || status?.admin_live) && (
         <section className="space-y-3 border-t border-neutral-100 pt-4">
-          <h3 className="text-sm font-medium text-neutral-900">{t(admin ? "getStarted.step4Admin" : "getStarted.step3")}</h3>
+          <h3 className="text-sm font-semibold text-neutral-900">{t(admin ? "getStarted.step4Admin" : "getStarted.step3")}</h3>
           <p className="text-sm text-neutral-600">{t(admin ? "getStarted.nextDescAdmin" : "getStarted.nextDesc")}</p>
           <CopyBox text={info.next_prompt} wrap />
         </section>
       )}
 
-      {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-400/10 dark:text-red-300">{error}</div>}
+      {error && <Notice tone="danger">{error}</Notice>}
     </div>
   );
 }

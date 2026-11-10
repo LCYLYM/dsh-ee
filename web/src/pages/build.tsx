@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Copy, Plus } from "lucide-react";
+import { Copy, Plus, LayoutGrid } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, type HubAsset, type Scope } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -11,7 +11,7 @@ import { PageLink, useMenus } from "../lib/menus";
 import { ImportAppButton } from "../components/app-import";
 import { LoadState } from "../components/api-ui";
 import { ScopeDialog, useScopeOptions } from "../components/scope-dialog";
-import { Badge, Button, Card, PageHeader, Segmented } from "../components/ui";
+import { Badge, Button, Card, PageHeader, Segmented, buttonCls, Empty } from "../components/ui";
 
 const STATE_TONE: Record<BuildState, "green" | "brand" | "amber" | "red" | "slate"> = {
   self: "slate",
@@ -44,13 +44,14 @@ function Row({ a, roleName, onShare }: { a: HubAsset; roleName: (id: number) => 
   const navigate = useNavigate();
   const Icon = KIND_ICONS[a.kind];
   return (
-    <li className="flex flex-wrap items-center gap-4 border-t border-neutral-100 px-5 py-4 first:border-t-0">
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-neutral-100 px-5 py-4 first:border-t-0">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-400/15 dark:text-brand-200">
         {a.kind === "app" && a.spec.icon ? <span className="text-xl leading-none">{a.spec.icon}</span> : <Icon size={18} />}
       </span>
-      <div className="min-w-0 flex-1">
+      {/* basis：窄屏放不下时，右边的操作按钮整组换到下一行，而不是把标题挤成一列字 */}
+      <div className="min-w-0 flex-1 basis-52">
         <div className="flex flex-wrap items-center gap-2">
-          <Link to={assetPath(a.id)} className="font-medium text-neutral-900 hover:text-brand-600">
+          <Link to={assetPath(a.id)} className="font-medium text-neutral-900 hover:text-brand-600 dark:hover:text-brand-200">
             {a.spec.title}
           </Link>
           <span className="font-mono text-xs text-neutral-500">/{a.slug}</span>
@@ -62,7 +63,7 @@ function Row({ a, roleName, onShare }: { a: HubAsset; roleName: (id: number) => 
         {!a.pending_scope && a.scope_note && <div className="mt-1 text-xs text-red-700">{t("build.shareRejected", { note: a.scope_note })}</div>}
       </div>
       <span className="hidden shrink-0 text-sm text-neutral-600 tabular-nums md:block">{t("build.uses", { uses: a.uses, users: a.users })}</span>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2 max-sm:pl-14">
         <Button size="sm" variant="secondary" onClick={() => navigate(`/assets/${a.id}/edit`)}>
           {t("build.edit")}
         </Button>
@@ -77,7 +78,7 @@ function Row({ a, roleName, onShare }: { a: HubAsset; roleName: (id: number) => 
             void navigator.clipboard?.writeText(`/${a.slug}`);
             notify(t("apps.copied", { slug: a.slug }));
           }}
-          className="rounded-md p-1.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-700/50"
+          className="rounded-md p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
         >
           <Copy size={14} />
         </button>
@@ -133,18 +134,25 @@ export default function Build() {
       </div>
       <LoadState loading={hub.loading && !hub.data} error={hub.data ? null : hub.error} onRetry={hub.reload}>
         {list.length === 0 ? (
-          <Card className="px-5 py-10 text-center text-sm text-neutral-600">
-            <p>{tab === "apps" ? t("build.empty") : t("build.emptyOthers")}</p>
-            {tab === "apps" && can("registry.publish") && (
-              <div className="mt-4 flex justify-center gap-2">
-                <PageLink page="templates" className="inline-flex h-9 items-center rounded-md border border-neutral-200 px-3 text-sm font-semibold text-neutral-800 shadow-card hover:bg-neutral-50">
-                  {t("build.fromTemplate")}
-                </PageLink>
-                <PageLink page="app-new" className="inline-flex h-9 items-center rounded-md bg-brand-500 px-3 text-sm font-semibold text-white shadow-card hover:bg-brand-600">
-                  {t("build.newApp")}
-                </PageLink>
-              </div>
-            )}
+          <Card>
+            <Empty
+              icon={LayoutGrid}
+              action={
+                tab === "apps" &&
+                can("registry.publish") && (
+                  <>
+                    <PageLink page="templates" className={buttonCls("secondary")}>
+                      {t("build.fromTemplate")}
+                    </PageLink>
+                    <PageLink page="app-new" className={buttonCls("primary")}>
+                      {t("build.newApp")}
+                    </PageLink>
+                  </>
+                )
+              }
+            >
+              <p>{tab === "apps" ? t("build.empty") : t("build.emptyOthers")}</p>
+            </Empty>
           </Card>
         ) : (
           <Card>

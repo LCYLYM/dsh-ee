@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowUp, Clock, Folder, LayoutGrid, Plus, Puzzle } from "lucide-react";
+import { ArrowUp, Clock, Folder, LayoutGrid, Plus, Puzzle, ChevronRight } from "lucide-react";
 import { api } from "../../lib/api";
 import { useStore } from "../../lib/store";
 import type { BrandColor, BrandColorKey, BrandLogoShape, Settings } from "../../lib/types";
@@ -245,8 +245,8 @@ function TokensEditor({ brand, set }: { brand: Brand; set: (patch: Partial<Brand
     }
   };
   return (
-    <details className="rounded-lg border border-neutral-200 px-4 py-3" open={Object.keys(brand.theme.tokens).length > 0}>
-      <summary className="cursor-pointer text-sm font-medium text-neutral-700">{t("brandAdmin.advanced")}</summary>
+    <details className="group rounded-lg border border-neutral-200 px-4 py-3" open={Object.keys(brand.theme.tokens).length > 0}>
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-neutral-700 select-none [&::-webkit-details-marker]:hidden"><ChevronRight size={14} aria-hidden className="text-neutral-400 transition-transform group-open:rotate-90" />{t("brandAdmin.advanced")}</summary>
       <p className="mt-2 text-xs text-neutral-500">{t("brandAdmin.advancedDesc")}</p>
       <textarea
         aria-label={t("brandAdmin.advanced")}
@@ -315,12 +315,12 @@ export default function BrandSettings() {
         <div className="flex h-16 w-16 items-center justify-center">
           <LogoMark brand={brand} fallbackName={brand.name || s.orgName || "DSH"} size={64} />
         </div>
-        <div className="space-y-3">
+        <div className="min-w-0 flex-1 basis-56 space-y-3">
           <Field label={t("brandAdmin.logo")} hint={t("brandAdmin.logoHint")}>
             <input aria-label={t("brandAdmin.logo")} type="file" accept="image/*" disabled={busy} onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
           </Field>
           <ImageCropDialog file={cropFile} busy={busy} onDone={(f) => void upload(f)} onCancel={() => setCropFile(null)} />
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <span className="text-sm font-medium text-neutral-700">{t("brandAdmin.logoShape")}</span>
             <Segmented<BrandLogoShape>
               value={brand.logoShape || "circle"}
@@ -353,7 +353,7 @@ export default function BrandSettings() {
                 onClick={() => set({ theme: { ...brand.theme, preset: p.id, colors: structuredClone(p.colors) } })}
                 className={cx(
                   "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition",
-                  active ? "border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100" : "border-neutral-200 text-neutral-700 hover:border-neutral-400",
+                  active ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 text-neutral-700 hover:border-neutral-400",
                 )}
               >
                 <span className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10" style={{ background: colorOf(p.colors, "accent", "light") }} />

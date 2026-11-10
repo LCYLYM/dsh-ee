@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, FilePlus, MoreHorizontal, Sparkles, Upload } from "lucide-react";
+import { ArrowLeft, FilePlus, MoreHorizontal, Sparkles, Upload, ChevronRight } from "lucide-react";
 import { api, formatTime, type KBase, type KBMaintainers, type KBSearchResult, type Scope } from "../lib/api";
 import { useAction, useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
@@ -11,7 +11,7 @@ import { LoadState, ErrorNote } from "../components/api-ui";
 import { ScopeEditor } from "../components/scope-editor";
 import { useScopeOptions } from "../components/scope-dialog";
 import { MaintainersEditor, Snippet } from "../components/kb-access";
-import { Badge, Button, Card, cx, Field, inputBase, inputCls, Segmented, Toggle } from "../components/ui";
+import { Badge, Button, Card, cx, Field, inputBase, inputCls, Segmented, Toggle, Notice, backLinkCls } from "../components/ui";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { kdocPath, QueryTable } from "./knowledge";
@@ -40,7 +40,7 @@ function NewDocDialog({ kb, open, onOpenChange, onCreated }: { kb: KBase; open: 
   }, [open]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t("kbase.newDocTitle")}</DialogTitle>
         </DialogHeader>
@@ -147,7 +147,7 @@ function AccessDialog({ kb, open, onOpenChange, onSaved }: { kb: KBase; open: bo
   }, [open, kb]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{t("kbase.accessTitle")}</DialogTitle>
           <DialogDescription>{kb.title}</DialogDescription>
@@ -266,17 +266,17 @@ function QueriesTab({ kb, onUpload, onChanged }: { kb: KBase; onUpload: () => vo
   const items = (q.data ?? []).filter((x) => !zero || (x.tool === "search" && x.hits === 0));
   const days = gaps.data?.days ?? 30;
   return (
-    <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+    <div className="divide-y divide-neutral-100">
       <section className="px-5 py-4">
         <h3 className="text-sm font-semibold text-neutral-900">{t("kbase.gapsTitle", { days })}</h3>
         <p className="mt-0.5 text-sm text-neutral-600">{t("kbase.gapsHint")}</p>
         <LoadState loading={gaps.loading && !gaps.data} error={gaps.data ? null : gaps.error} onRetry={gaps.reload}>
           {gaps.data && gaps.data.gaps.length === 0 ? (
-            <p className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200">{t("kbase.gapsEmpty", { days })}</p>
+            <Notice tone="success" className="mt-3">{t("kbase.gapsEmpty", { days })}</Notice>
           ) : (
             <ul className="mt-3 space-y-2">
               {gaps.data?.gaps.map((g) => (
-                <li key={g.key} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-neutral-200 px-3 py-2 dark:border-neutral-800">
+                <li key={g.key} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-neutral-200 px-3 py-2">
                   <div className="min-w-0">
                     <div className="font-medium text-neutral-900">{g.query}</div>
                     <div className="text-xs text-neutral-500">{t("kbase.gapCount", { count: g.count, users: g.users, time: formatTime(g.last_at) })}</div>
@@ -331,8 +331,8 @@ function QueriesTab({ kb, onUpload, onChanged }: { kb: KBase; onUpload: () => vo
         )}
       </section>
       <details className="group">
-        <summary className="cursor-pointer list-none px-5 py-3 text-sm font-semibold text-neutral-900 select-none">
-          <span className="mr-1 inline-block transition group-open:rotate-90">▸</span>
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-5 py-3.5 text-sm font-semibold text-neutral-900 select-none [&::-webkit-details-marker]:hidden">
+          <ChevronRight size={15} aria-hidden className="text-neutral-400 transition-transform group-open:rotate-90" />
           {t("kbase.logTitle")}
         </summary>
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-2">
@@ -376,7 +376,7 @@ export default function KnowledgeBase() {
 
   return (
     <div>
-      <Link to="/knowledge" className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
+      <Link to="/knowledge" className={backLinkCls}>
         <ArrowLeft size={14} /> {t("kbase.back")}
       </Link>
       <LoadState loading={detail.loading && !detail.data} error={detail.data ? null : detail.error} onRetry={detail.reload}>
@@ -385,7 +385,7 @@ export default function KnowledgeBase() {
             <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{kb.title}</h1>
+                  <h1 className="text-2xl text-neutral-900 leading-8 font-bold tracking-[-0.02em]">{kb.title}</h1>
                   <span className="font-mono text-sm text-neutral-500">{kb.slug}</span>
                   {!kb.readable && <Badge tone="amber">{t("knowledge.notReadable")}</Badge>}
                 </div>
@@ -404,14 +404,14 @@ export default function KnowledgeBase() {
                   </div>
                 </dl>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
               {kb.readable && can("registry.publish") && (
                 <Button variant="secondary" onClick={() => navigate(`${pathOf("app-new")}?knowledge=${encodeURIComponent(kb.slug)}`)}>
                   <Sparkles size={15} /> {t("studio.makeAppFromKB")}
                 </Button>
               )}
               {kb.can_edit && (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button onClick={() => setDialog("upload")}>
                     <Upload size={15} /> {t("kbase.upload")}
                   </Button>
@@ -454,7 +454,7 @@ export default function KnowledgeBase() {
               </div>
             </div>
             {kb.readable && kb.docs > 0 && can("registry.publish") && (detail.data?.used_by?.length ?? 0) === 0 && (
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-100 bg-brand-50/60 px-4 py-3 dark:border-brand-500/20 dark:bg-brand-500/10">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-200/80 bg-brand-50/70 px-4 py-3 dark:border-brand-400/25 dark:bg-brand-500/10">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-neutral-900">{t("kbase.noAppTitle")}</div>
                   <p className="text-sm text-neutral-600">{t("kbase.noAppHint")}</p>

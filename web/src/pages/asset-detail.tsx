@@ -16,7 +16,7 @@ import { AppMap } from "../components/app-map";
 import { AppDepsCard } from "../components/access-requests";
 import { UsedByCard } from "../components/used-by";
 import { ScopeDialog, useScopeOptions } from "../components/scope-dialog";
-import { Badge, Button, Card, CardHeader, cx, inputCls, Toggle } from "../components/ui";
+import { Badge, Button, Card, CardHeader, cx, inputCls, Toggle, Empty, backLinkCls } from "../components/ui";
 import { statusBadge } from "../components/status";
 import { PageLink, useMenus } from "../lib/menus";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
@@ -162,7 +162,7 @@ function AssetDetail() {
   if (!a) {
     return (
       <LoadState loading={detail.loading} error={detail.error} onRetry={detail.reload}>
-        <Card className="p-12 text-center text-sm text-neutral-600">{t("asset.notFound")}</Card>
+        <Card><Empty>{t("asset.notFound")}</Empty></Card>
       </LoadState>
     );
   }
@@ -198,7 +198,7 @@ function AssetDetail() {
 
   return (
     <div className="max-w-5xl">
-      <PageLink page={a.kind === "app" ? (owns ? "build" : "apps") : "materials"} className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
+      <PageLink page={a.kind === "app" ? (owns ? "build" : "apps") : "materials"} className={backLinkCls}>
         <ArrowLeft size={14} /> {t("asset.back")}
       </PageLink>
 
@@ -206,8 +206,8 @@ function AssetDetail() {
         <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-700">
           {a.kind === "app" && a.spec.icon ? <span className="text-3xl">{a.spec.icon}</span> : <Icon size={28} strokeWidth={1.5} />}
         </span>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{a.spec.title}</h1>
+        <div className="min-w-0 flex-1 basis-60">
+          <h1 className="text-2xl text-neutral-900 leading-8 font-bold tracking-[-0.02em]">{a.spec.title}</h1>
           <div className="font-mono text-sm text-neutral-500">{a.kind === "connection" ? a.slug : `/${a.slug}`}</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             <Badge>{t(`assetKinds.${a.kind}`)}</Badge>
@@ -221,7 +221,7 @@ function AssetDetail() {
           </div>
           <p className="mt-3 text-sm text-neutral-700">{a.spec.description}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {a.available && a.delivery === "optional" && (
             <Button variant={a.subscribed ? "secondary" : "primary"} disabled={busy} onClick={toggleSub}>
               {a.subscribed ? t("hub.disable") : t("hub.enable")}
@@ -304,7 +304,7 @@ function AssetDetail() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 space-y-4">
           <Card className="p-5">
-            <h2 className="mb-2 flex items-center gap-2 font-medium text-neutral-900">
+            <h2 className="mb-2 flex items-center gap-2 text-neutral-900 text-[15px] leading-6 font-semibold">
               <Terminal size={16} /> {t("asset.howToUse")}
             </h2>
             <p className="text-sm text-neutral-700">{dshHow(t, a, server)}</p>
@@ -318,7 +318,7 @@ function AssetDetail() {
 
           {(a.kind === "skill" || a.kind === "prompt") && (
             <Card className="p-5">
-              <h2 className="mb-3 font-medium text-neutral-900">{t("asset.content")}</h2>
+              <h2 className="mb-3 text-neutral-900 text-[15px] leading-6 font-semibold">{t("asset.content")}</h2>
               {a.spec.when_to_use && (
                 <p className="mb-3 text-sm text-neutral-700">
                   <span className="text-neutral-500">{t("asset.whenToUse")}：</span>
@@ -334,18 +334,18 @@ function AssetDetail() {
               <AppMap a={a} deps={d.deps} bySlug={bySlug} />
               {(a.spec.highlights?.length ?? 0) > 0 && (
                 <Card className="p-5">
-                  <h2 className="mb-3 font-medium text-neutral-900">{t("asset.highlights")}</h2>
+                  <h2 className="mb-3 text-neutral-900 text-[15px] leading-6 font-semibold">{t("asset.highlights")}</h2>
                   <ul className="list-disc space-y-1 pl-5 text-sm text-neutral-700">
                     {a.spec.highlights!.map((h) => <li key={h}>{h}</li>)}
                   </ul>
                 </Card>
               )}
               <Card className="p-5">
-                <h2 className="mb-3 font-medium text-neutral-900">{t("asset.persona")}</h2>
+                <h2 className="mb-3 text-neutral-900 text-[15px] leading-6 font-semibold">{t("asset.persona")}</h2>
                 <Body text={a.spec.persona} />
                 {(a.spec.starters?.length ?? 0) > 0 && (
                   <>
-                    <h3 className="mt-5 mb-2 text-sm font-medium text-neutral-800">{t("asset.starters")}</h3>
+                    <h3 className="mt-5 mb-2 text-sm font-semibold text-neutral-900">{t("asset.starters")}</h3>
                     <ul className="list-disc space-y-1 pl-5 text-sm text-neutral-700">
                       {a.spec.starters!.map((s) => (
                         <li key={s}>{s}</li>
@@ -358,7 +358,7 @@ function AssetDetail() {
                 <AppDepsCard app={{ slug: a.slug, title: a.spec.title }} deps={d.deps} onChanged={() => { detail.reload(); hub.reload(); }} />
               ) : (
                 <Card className="p-5">
-                  <h2 className="mb-3 font-medium text-neutral-900">{t("asset.dependsOn")}</h2>
+                  <h2 className="mb-3 text-neutral-900 text-[15px] leading-6 font-semibold">{t("asset.dependsOn")}</h2>
                   <ul className="space-y-2">
                     {depList(a.spec.skills, "skill")}
                     {depList(a.spec.connections, "connection")}
@@ -377,10 +377,10 @@ function AssetDetail() {
               {a.live_version > 0 && a.spec.workbench && (
                 <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
                   <div>
-                    <h2 className="font-medium text-neutral-900">{t("appWeb.toggle")}</h2>
+                    <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("appWeb.toggle")}</h2>
                     <p className="mt-1 text-sm text-neutral-600">{a.spec.web ? `/a/${a.slug}` : t("appWeb.previewOnly")}</p>
                   </div>
-                  <Link to={`/a/${a.slug}`} className="text-sm font-medium text-brand-600 hover:underline">{t("appWeb.open")} →</Link>
+                  <Link to={`/a/${a.slug}`} className="text-sm font-medium text-brand-600 dark:text-brand-300 hover:underline">{t("appWeb.open")} →</Link>
                 </Card>
               )}
               {(a.spec.tables?.length ?? 0) > 0 && a.live_version > 0 && <AppDataPanel slug={a.slug} />}
@@ -452,7 +452,7 @@ function AssetDetail() {
               {d.calls.length === 0 ? (
                 <p className="px-5 pb-5 text-sm text-neutral-600">{t("asset.noCalls")}</p>
               ) : (
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto"><table className="tbl">
                   <tbody>
                     {d.calls.map((c, i) => (
                       <tr key={i} className="border-t border-neutral-100">
@@ -467,7 +467,7 @@ function AssetDetail() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               )}
             </Card>
           )}

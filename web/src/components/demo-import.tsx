@@ -11,7 +11,7 @@ import { Badge, Button, CopyBox } from "./ui";
 function NextSteps({ guide }: { guide: DemoGuideStep[] }) {
   const { t } = useTranslation();
   return (
-    <div className="mt-4 rounded-md border border-brand-100 bg-brand-50/50 p-3 dark:border-brand-400/20 dark:bg-brand-400/10">
+    <div className="mt-4 rounded-md border border-brand-200/80 bg-brand-50/70 p-3.5 dark:border-brand-400/25 dark:bg-brand-500/10">
       <p className="font-medium text-neutral-900">{t("demo.tryIt")}</p>
       <ol className="mt-1 list-decimal space-y-1 pl-5 text-neutral-700">
         <li>{t("demo.next1")}</li>
@@ -112,7 +112,7 @@ export function DemoImportStep({ done, onImported }: { done: boolean; onImported
         )}
       </div>
       {asking && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3.5 dark:border-amber-400/25 dark:bg-amber-500/10">
           <p className="text-neutral-800">{t("demo.confirm")}</p>
           <div className="mt-3 flex gap-2">
             <Button size="sm" onClick={() => void run()}>{t("demo.import")}</Button>

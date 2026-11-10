@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Blocks } from "lucide-react";
 import { categoryLabel } from "../../lib/catalog";
 import { api, formatBytes, formatTime, type CatalogPlugin, type PackageVersion, type ReviewAction } from "../../lib/api";
 import { useApi, useAction } from "../../lib/use-api";
@@ -7,7 +7,7 @@ import { useScoring, useStore } from "../../lib/store";
 import type { PluginStatus } from "../../lib/types";
 import { StatusBadge } from "../../components/status";
 import { LoadState } from "../../components/api-ui";
-import { Badge, Button, Card, cx, inputBase, PageHeader, PluginIcon, Segmented } from "../../components/ui";
+import { Badge, Button, Card, cx, inputBase, PageHeader, PluginIcon, Segmented, Empty } from "../../components/ui";
 import { ScopeDialog } from "../../components/scope-dialog";
 import { allScope } from "../../lib/hub";
 import { useTranslation } from "react-i18next";
@@ -64,26 +64,26 @@ export default function AdminPlugins() {
       </div>
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
         <Card className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 text-left text-xs text-neutral-500">
+          <table className="tbl max-sm:min-w-[44rem]">
+            <thead>
               <tr>
                 <th className="w-8 px-2 py-2.5" />
-                <th className="px-4 py-2.5 font-normal">{t("pluginsAdmin.colPlugin")}</th>
-                <th className="px-4 py-2.5 font-normal">{t("pluginsAdmin.colSource")}</th>
-                <th className="px-4 py-2.5 font-normal">{t("pluginsAdmin.colCategory")}</th>
-                <th className="px-4 py-2.5 font-normal">{t("pluginsAdmin.colVersion")}</th>
-                <th className="px-4 py-2.5 text-right font-normal">{t("pluginsAdmin.colInstalls")}</th>
-                {scoring.upstream && <th className="px-4 py-2.5 text-right font-normal">{t("pluginsAdmin.colScore")}</th>}
-                <th className="px-4 py-2.5 font-normal">{t("pluginsAdmin.colSize")}</th>
-                <th className="px-4 py-2.5 font-normal">{t("pluginsAdmin.colStatus")}</th>
+                <th className="px-4 py-2.5">{t("pluginsAdmin.colPlugin")}</th>
+                <th className="px-4 py-2.5">{t("pluginsAdmin.colSource")}</th>
+                <th className="px-4 py-2.5">{t("pluginsAdmin.colCategory")}</th>
+                <th className="px-4 py-2.5">{t("pluginsAdmin.colVersion")}</th>
+                <th className="px-4 py-2.5 text-right">{t("pluginsAdmin.colInstalls")}</th>
+                {scoring.upstream && <th className="px-4 py-2.5 text-right">{t("pluginsAdmin.colScore")}</th>}
+                <th className="px-4 py-2.5">{t("pluginsAdmin.colSize")}</th>
+                <th className="px-4 py-2.5">{t("pluginsAdmin.colStatus")}</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {list.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-10 text-center text-neutral-500">
-                    {t("registry.plugins.empty")}
+                  <td colSpan={10}>
+                    <div className="tbl-empty"><Empty icon={Blocks}>{t("registry.plugins.empty")}</Empty></div>
                   </td>
                 </tr>
               )}
@@ -204,14 +204,14 @@ function Versions({ plugin, busy, onYank, onRestore }: { plugin: CatalogPlugin; 
   const { data, loading, error, reload } = useApi(() => api.adminPackage(plugin.name));
   return (
     <LoadState loading={loading && !data} error={error} onRetry={reload}>
-      <table className="w-full text-xs">
-        <thead className="text-left text-neutral-500">
+      <div className="overflow-x-auto"><table className="tbl tbl-compact">
+        <thead>
           <tr>
-            <th className="py-1 pr-4 font-normal">{t("pluginsAdmin.colVersion")}</th>
-            <th className="py-1 pr-4 font-normal">{t("pluginsAdmin.colStatus")}</th>
-            <th className="py-1 pr-4 font-normal">{t("registry.plugins.publisher")}</th>
-            <th className="py-1 pr-4 font-normal">{t("registry.plugins.created")}</th>
-            <th className="py-1 pr-4 font-normal">{t("registry.plugins.note")}</th>
+            <th className="py-1 pr-4">{t("pluginsAdmin.colVersion")}</th>
+            <th className="py-1 pr-4">{t("pluginsAdmin.colStatus")}</th>
+            <th className="py-1 pr-4">{t("registry.plugins.publisher")}</th>
+            <th className="py-1 pr-4">{t("registry.plugins.created")}</th>
+            <th className="py-1 pr-4">{t("registry.plugins.note")}</th>
             <th />
           </tr>
         </thead>
@@ -245,7 +245,7 @@ function Versions({ plugin, busy, onYank, onRestore }: { plugin: CatalogPlugin; 
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </LoadState>
   );
 }

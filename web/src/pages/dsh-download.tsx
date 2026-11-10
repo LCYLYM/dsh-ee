@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Apple, CheckCircle2, Download, Monitor, RefreshCw, ShieldCheck, Terminal } from "lucide-react";
+import { Apple, CheckCircle2, Download, Monitor, RefreshCw, ShieldCheck, Terminal, PackageOpen } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, formatBytes, formatTime } from "../lib/api";
 import { useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
 import type { DshClient, DshRelease, DshTarget } from "../lib/types";
-import { Badge, Card, CopyBox, PageHeader } from "../components/ui";
+import { Badge, Card, CopyBox, PageHeader, Empty, buttonCls } from "../components/ui";
 import { LoadState } from "../components/api-ui";
 import { PageLink } from "../lib/menus";
 
@@ -38,7 +38,7 @@ function DownloadRow({ release, title }: { release: DshRelease; title: string })
         </div>
         <div className="mt-1 text-xs text-neutral-500">{release.verified ? t("download.officialVerified") : t("download.unverifiedDmg")}</div>
       </div>
-      <a href={release.download_url} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-brand-500 px-4 text-sm font-semibold text-white shadow-card hover:bg-brand-600">
+      <a href={release.download_url} className={buttonCls("primary")}>
         <Download size={14} /> {t("download.download")}
       </a>
     </div>
@@ -88,7 +88,7 @@ export default function DshDownload() {
   const releases = data?.releases ?? [];
   const rows = releases.filter((r) => targets.includes(r.target));
 
-  if (data && !data.enabled) return <Card className="p-12 text-center text-sm text-neutral-500">{t("download.disabled")}</Card>;
+  if (data && !data.enabled) return <Card><Empty>{t("download.disabled")}</Empty></Card>;
 
   return (
     <div>
@@ -96,9 +96,8 @@ export default function DshDownload() {
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
         <div className="space-y-6">
           {!isMac && !isWindows ? (
-            <Card className="p-12 text-center">
-              <Monitor className="mx-auto mb-3 text-neutral-400" size={28} />
-              <p className="text-sm text-neutral-500">{t("download.otherPlatform")}</p>
+            <Card>
+              <Empty icon={Monitor}>{t("download.otherPlatform")}</Empty>
             </Card>
           ) : (
             <>
@@ -106,13 +105,13 @@ export default function DshDownload() {
                 <div className="flex items-start gap-3 px-5 py-5">
                   {isMac ? <Apple className="mt-0.5 text-neutral-700" size={22} /> : <Monitor className="mt-0.5 text-neutral-700" size={22} />}
                   <div>
-                    <h2 className="font-semibold text-neutral-900">{t("download.stepDownload")}</h2>
+                    <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("download.stepDownload")}</h2>
                     <p className="mt-1 text-sm text-neutral-500">{isMac ? t("download.unzip") : t("download.winInstall")}</p>
                     {isMac && arch === "unknown" && <p className="mt-1 text-sm text-neutral-500">{t("download.chooseChip")}</p>}
                   </div>
                 </div>
                 {rows.map((r) => <DownloadRow key={r.id} release={r} title={t(`download.target.${r.target}`)} />)}
-                {!rows.length && <div className="border-t border-neutral-100 px-5 py-8 text-center text-sm text-neutral-500">{t("download.empty")}</div>}
+                {!rows.length && <div className="border-t border-neutral-100"><Empty compact icon={PackageOpen}>{t("download.empty")}</Empty></div>}
                 <div className="flex items-center gap-2 border-t border-neutral-100 bg-neutral-50 px-5 py-3 text-xs text-neutral-500">
                   <ShieldCheck size={14} /> {t("download.hashNote")}
                 </div>
@@ -121,7 +120,7 @@ export default function DshDownload() {
               <Card className="flex items-start gap-3 p-5">
                 <CheckCircle2 className="mt-0.5 text-neutral-700" size={22} />
                 <div>
-                  <h2 className="font-semibold text-neutral-900">{t("download.stepOpen")}</h2>
+                  <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("download.stepOpen")}</h2>
                   <p className="mt-1 text-sm text-neutral-500">{isMac ? t("download.openDesc") : t("download.winQuitDesc")}</p>
                 </div>
               </Card>
@@ -130,7 +129,7 @@ export default function DshDownload() {
                 <div className="mb-3 flex items-start gap-3">
                   <Terminal className="mt-0.5 text-neutral-700" size={22} />
                   <div>
-                    <h2 className="font-semibold text-neutral-900">{t("download.stepCommand")}</h2>
+                    <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("download.stepCommand")}</h2>
                     <p className="mt-1 text-sm text-neutral-500">{t("download.commandDesc")}</p>
                   </div>
                 </div>
@@ -141,14 +140,14 @@ export default function DshDownload() {
                 <div className="flex items-start gap-3">
                   <RefreshCw className={`mt-0.5 ${connected ? "text-emerald-600" : "text-neutral-700"}`} size={22} />
                   <div>
-                    <h2 className="font-semibold text-neutral-900">{t("download.stepReconnect")}</h2>
+                    <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("download.stepReconnect")}</h2>
                     {connected ? (
                       <p className="mt-1 text-sm font-medium text-emerald-700">
                         {t("download.connected", { device: connected.client_name || t("download.defaultDevice"), version: connected.last_client.replace("dsh-connect/", "") })}
                       </p>
                     ) : timedOut ? (
                       <p className="mt-1 text-sm text-neutral-500">
-                        {t("download.notDetected")} <PageLink page="setup" className="text-brand-600 hover:underline">{t("download.connectGuide")}</PageLink>
+                        {t("download.notDetected")} <PageLink page="setup" className="text-brand-600 dark:text-brand-300 hover:underline">{t("download.connectGuide")}</PageLink>
                       </p>
                     ) : (
                       <p className="mt-1 text-sm text-neutral-500">{t("download.waiting")}</p>

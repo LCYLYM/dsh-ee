@@ -303,6 +303,10 @@ svg .scene-fade { animation-name: scene-fade-in; }
   --shadow-lp-sm: var(--lp-shadow-sm);
   --shadow-card: var(--app-shadow);
   --shadow-card-lg: var(--app-shadow-lg);
+  --shadow-control: var(--app-shadow-control);
+  --shadow-primary: var(--app-shadow-primary);
+  --shadow-pop: var(--app-shadow-pop);
+  --shadow-modal: var(--app-shadow-modal);
 }
 
 @theme inline {
@@ -381,9 +385,22 @@ svg .scene-fade { animation-name: scene-fade-in; }
   --sidebar-accent-foreground: #0a2540;
   --sidebar-border: #e3e8ee;
   --sidebar-ring: #4d6bfe;
-  /* 卡片的 Stripe 式双层柔和阴影 */
+  /* 层级阴影（Stripe 式的蓝灰双层柔和阴影），由低到高：
+     control 按钮与输入框 → card 卡片 → card-lg 悬停抬起 → pop 下拉与气泡 → modal 弹窗 */
+  --app-shadow-control: 0 1px 1px rgba(10, 37, 64, 0.05), 0 1px 3px -1px rgba(50, 50, 93, 0.1);
+  --app-shadow-primary: 0 1px 1px rgba(10, 37, 64, 0.14), 0 2px 5px rgba(77, 107, 254, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.14);
   --app-shadow: 0 2px 5px -1px rgba(50, 50, 93, 0.08), 0 1px 3px -1px rgba(0, 0, 0, 0.06);
   --app-shadow-lg: 0 13px 27px -5px rgba(50, 50, 93, 0.18), 0 8px 16px -8px rgba(0, 0, 0, 0.18);
+  --app-shadow-pop: 0 0 0 1px rgba(10, 37, 64, 0.06), 0 5px 15px rgba(50, 50, 93, 0.1), 0 15px 35px -5px rgba(50, 50, 93, 0.16);
+  --app-shadow-modal: 0 0 0 1px rgba(10, 37, 64, 0.05), 0 30px 60px -12px rgba(50, 50, 93, 0.25), 0 18px 36px -18px rgba(0, 0, 0, 0.3);
+  /* 遮罩、提示条、表头底色 */
+  --app-overlay: rgba(10, 37, 64, 0.4);
+  --app-toast-bg: #0a2540;
+  --app-toast-fg: #ffffff;
+  --app-toast-border: transparent;
+  --app-thead: #f8fafc;
+  --app-row-hover: #f8fafd;
+  --app-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%236b7c93' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4.5 6.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E");
 }
 
 .dark {
@@ -418,8 +435,19 @@ svg .scene-fade { animation-name: scene-fade-in; }
   --sidebar-accent-foreground: #f6f9fc;
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #7e94fa;
+  --app-shadow-control: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --app-shadow-primary: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(77, 107, 254, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   --app-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
   --app-shadow-lg: 0 13px 27px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --app-shadow-pop: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 12px 32px -6px rgba(0, 0, 0, 0.6);
+  --app-shadow-modal: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 30px 60px -12px rgba(0, 0, 0, 0.7);
+  --app-overlay: rgba(3, 8, 18, 0.62);
+  --app-toast-bg: #1c2a42;
+  --app-toast-fg: #f6f9fc;
+  --app-toast-border: rgba(255, 255, 255, 0.1);
+  --app-thead: rgba(255, 255, 255, 0.025);
+  --app-row-hover: rgba(255, 255, 255, 0.025);
+  --app-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%238193a8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4.5 6.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E");
 }
 
 /* 深色桥接：界面里有大量固定的 neutral-* 色阶（约 800 处），
@@ -427,9 +455,10 @@ svg .scene-fade { animation-name: scene-fade-in; }
    不用逐个页面改 class。数值与上面的 --background / --card / --foreground 对齐，色相是落地页深色那套海军蓝。 */
 .dark {
   --color-neutral-50: #0b1424;
-  --color-neutral-100: #111d33;
-  --color-neutral-200: #1c2a42;
-  --color-neutral-300: #2a3b57;
+  /* 100 比卡片色（#111d33）亮一档：卡片上的小标签、悬停底色、行分隔线才看得出来 */
+  --color-neutral-100: #18253d;
+  --color-neutral-200: #22314b;
+  --color-neutral-300: #30425f;
   --color-neutral-400: #4a5d7a;
   --color-neutral-500: #8193a8;
   --color-neutral-600: #a3b3c4;
@@ -449,6 +478,37 @@ svg .scene-fade { animation-name: scene-fade-in; }
   --color-stone-800: #d9e2eb;
   --color-stone-900: #eef3f8;
   --color-stone-950: #f6f9fc;
+}
+
+/* 语义色的深色桥接：页面里有不少只写了浅色那一半的 bg-red-50 / text-amber-700 之类，
+   在深色下把「浅底」换成半透明的同色、把「深字」换成同色系的浅字，保证对比度。
+   已经写了 dark: 变体的地方不受影响（它们用的是 300–500 档与带透明度的写法）。 */
+.dark {
+  --color-brand-50: rgb(77 107 254 / 0.14);
+  --color-brand-100: rgb(77 107 254 / 0.24);
+  --color-brand-700: #a5b8fc;
+  --color-brand-800: #c7d5fe;
+  --color-red-50: rgb(239 68 68 / 0.13);
+  --color-red-100: rgb(239 68 68 / 0.22);
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-red-900: #fecaca;
+  --color-amber-50: rgb(245 158 11 / 0.13);
+  --color-amber-100: rgb(245 158 11 / 0.22);
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fde68a;
+  --color-orange-50: rgb(249 115 22 / 0.13);
+  --color-orange-700: #fdba74;
+  --color-emerald-50: rgb(16 185 129 / 0.13);
+  --color-emerald-100: rgb(16 185 129 / 0.22);
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+  --color-emerald-900: #a7f3d0;
+  --color-green-50: rgb(34 197 94 / 0.13);
+  --color-green-700: #86efac;
+  --color-blue-50: rgb(59 130 246 / 0.14);
+  --color-blue-700: #93c5fd;
 }
 
 /* 刻意反色（深底浅字）的区块——终端预览、代码块、落地页的深色章节——
@@ -481,13 +541,186 @@ svg .scene-fade { animation-name: scene-fade-in; }
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-neutral-300) transparent;
   }
   body {
     @apply bg-background text-foreground;
+    text-rendering: optimizeLegibility;
   }
   html {
     @apply font-sans;
+    -webkit-text-size-adjust: 100%;
   }
+  ::selection {
+    background: color-mix(in srgb, var(--color-brand-500) 22%, transparent);
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+  /* 可点的东西一律手型；禁用时是禁止 */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="switch"]:not(:disabled),
+  summary,
+  label:has(> input[type="checkbox"], > input[type="radio"]) {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  /* 键盘焦点：统一的品牌色描边；输入框有自己的光环（见 ui.tsx 的 inputBase） */
+  :where(a, button, summary, [role="button"], [role="tab"], [role="switch"], [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  :where(a, button, summary):focus-visible {
+    border-radius: 0.375rem;
+  }
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"] {
+    accent-color: var(--color-brand-500);
+  }
+  kbd {
+    font-family: inherit;
+  }
+  /* 原生文件选择框：「选择文件」做成次要按钮的样子，文件名是旁边的灰字 */
+  input[type="file"] {
+    max-width: 100%;
+    font-size: 0.875rem;
+    color: var(--color-neutral-600);
+  }
+  input[type="file"]::file-selector-button {
+    height: 2rem;
+    margin-right: 0.75rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--color-neutral-200);
+    border-radius: 0.375rem;
+    background: var(--card);
+    color: var(--color-neutral-800);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    box-shadow: var(--app-shadow-control);
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+  input[type="file"]:not(:disabled)::file-selector-button:hover {
+    border-color: var(--color-neutral-300);
+    background: var(--color-neutral-50);
+  }
+  input[type="file"]:disabled::file-selector-button {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  /* 网格的子项默认 min-width:auto，里面有长代码或表格时会把整页撑出横向滚动 */
+  :where(.grid) > * {
+    min-width: 0;
+  }
+  /* 横向滚动容器要成为定位上下文：里面 sr-only 之类的绝对定位元素才会跟着被裁掉，不会把整页撑宽 */
+  :where(.overflow-x-auto) {
+    position: relative;
+  }
+}
+
+/* 原生下拉框：去掉系统外观，换成和输入框一致的细箭头。
+   不放进 @layer：右内边距要压过 px-* 工具类，否则文字会盖住箭头。 */
+select:not([multiple]) {
+  appearance: none;
+  background-image: var(--app-select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 1rem;
+  padding-right: 1.875rem;
+}
+
+@layer components {
+  /* 数据表：页面里的 <table className="tbl">，表头是一条浅底色带，行之间细分隔线，悬停整行着色。
+     单元格的内边距与对齐仍由各处的工具类决定。 */
+  .tbl {
+    width: 100%;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    border-collapse: collapse;
+  }
+  .tbl thead th {
+    text-align: left;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    color: var(--color-neutral-500);
+    background: var(--app-thead);
+    border-top: 1px solid var(--color-neutral-200);
+    border-bottom: 1px solid var(--color-neutral-200);
+  }
+  .tbl tbody tr {
+    border-top: 1px solid var(--color-neutral-100);
+    transition: background-color 0.12s ease;
+  }
+  .tbl tbody tr:first-child {
+    border-top: 0;
+  }
+  .tbl tbody tr:not(:has(> td[colspan])):hover {
+    background: var(--app-row-hover);
+  }
+  .tbl td {
+    color: var(--color-neutral-700);
+  }
+  /* 第一列通常是名称：窄屏下别被挤成一个字一行（勾选框、展开箭头那种窄列除外） */
+  .tbl tbody td:first-child:not([colspan]):not(:has(> input, > button)) {
+    min-width: 7rem;
+  }
+  /* 表格里的空状态：表格比屏幕宽时也居中在可见区域里 */
+  .tbl-empty {
+    position: sticky;
+    left: 0;
+    max-width: calc(100vw - 2rem);
+  }
+  /* 紧凑版：嵌在展开行或卡片里的小表 */
+  .tbl-compact {
+    font-size: 0.8125rem;
+  }
+  .tbl-compact thead th {
+    background: transparent;
+    border-top: 0;
+  }
+
+  /* 加载骨架：一条缓慢扫过的高光 */
+  .skeleton {
+    border-radius: 0.375rem;
+    background: linear-gradient(90deg, var(--color-neutral-100) 0%, var(--color-neutral-200) 45%, var(--color-neutral-100) 90%);
+    background-size: 200% 100%;
+    animation: skeleton 1.4s ease-in-out infinite;
+  }
+  @keyframes skeleton {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+  }
+
+  /* 工作台与管理后台的画布：浅灰底，右上角一抹很淡的品牌色光晕，呼应落地页首屏 */
+  .app-canvas {
+    background-image: radial-gradient(900px 420px at 100% -80px, color-mix(in srgb, var(--color-brand-500) 7%, transparent), transparent 70%);
+    background-repeat: no-repeat;
+  }
+
+  /* 登录等独立页面的背景：浅底上一条斜切的品牌渐变色带 */
+  .auth-bg {
+    background:
+      radial-gradient(60% 50% at 85% 0%, color-mix(in srgb, var(--color-brand-500) 14%, transparent), transparent 70%),
+      radial-gradient(45% 40% at 0% 100%, color-mix(in srgb, #8b5cf6 10%, transparent), transparent 70%),
+      var(--color-neutral-50);
+  }
+  .auth-stripe {
+    background: linear-gradient(100deg, #73c8ff 0%, #4d6bfe 38%, #6d5dfc 68%, #ffb088 100%);
+    transform: skewY(-8deg);
+    transform-origin: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
 }
 
 @keyframes onboarding-reveal {

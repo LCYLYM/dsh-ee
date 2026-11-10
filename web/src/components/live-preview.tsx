@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import type { WorkbenchPane } from "../lib/workbench-render";
 import { LivePane, type LoadSource, type SourceResult } from "./live-pane";
 import { parseWorkbench } from "./workbench-editor";
-import { Button, Card, cx } from "./ui";
+import { Button, Card, cx, Empty } from "./ui";
 
 /**
  * 编辑器右边的实时预览（M5）：按还没保存的工作台配置渲染，和 DSH 右侧栏、网页版是同一套渲染；
@@ -56,7 +56,7 @@ export function LivePreview({ text, app, title, icon }: { text: string; app: str
       {parsed.error ? (
         <Card className="p-4 text-sm text-red-700">{parsed.error === "panes" ? t("appWorkbench.needPanes") : t("appWorkbench.badJson", { error: parsed.error })}</Card>
       ) : panes.length === 0 ? (
-        <Card className="p-6 text-center text-sm text-neutral-500">{t("studio.noWorkbench")}</Card>
+        <Card><Empty>{t("studio.noWorkbench")}</Empty></Card>
       ) : (
         <>
           {panes.length > 1 && (

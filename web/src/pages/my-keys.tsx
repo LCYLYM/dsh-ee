@@ -7,7 +7,7 @@ import { useStore } from "../lib/store";
 import { useAuth } from "../lib/auth";
 import { useConfirm } from "@/lib/confirm";
 import { ErrorNote, LoadState } from "../components/api-ui";
-import { Badge, Button, Card, CardHeader, CopyBox, Field, inputCls, PageHeader, PasswordInput } from "../components/ui";
+import { Badge, Button, Card, CardHeader, CopyBox, Field, inputCls, PageHeader, PasswordInput, Empty } from "../components/ui";
 
 const scopeOptions: TokenScope[] = ["models", "registry:read", "registry:publish", "hub", "connections", "agent"];
 
@@ -100,7 +100,7 @@ export default function MyTokens() {
         desc={t("tokens.myDesc")}
         actions={settings.connect.allowManualTokens && <Button size="sm" onClick={() => setCreating((v) => !v)}>{creating ? t("common.close") : t("tokens.create")}</Button>}
       />
-      {issued && <Card className="mb-4 p-5"><h2 className="mb-2 font-medium">{t("tokens.issuedTitle")}</h2><p className="mb-3 text-sm text-neutral-600">{t("tokens.issuedHint")}</p><CopyBox text={issued} /></Card>}
+      {issued && <Card className="mb-4 p-5"><h2 className="mb-2 text-[15px] leading-6 font-semibold text-neutral-900">{t("tokens.issuedTitle")}</h2><p className="mb-3 text-sm text-neutral-600">{t("tokens.issuedHint")}</p><CopyBox text={issued} /></Card>}
       {creating && (
         <Card className="mb-4"><CardHeader title={t("tokens.create")} />
           <form onSubmit={submit} className="space-y-4 px-5 pb-5">
@@ -138,8 +138,8 @@ export default function MyTokens() {
         <CardHeader title={t("tokens.list")} aside={data ? t("tokens.count", { count: data.length }) : undefined} />
         <LoadState loading={loading && !data} error={error} onRetry={reload}>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs text-neutral-600"><tr><th className="px-5 py-2 font-normal">{t("tokens.name")}</th><th className="px-5 py-2 font-normal">{t("tokens.source")}</th><th className="px-5 py-2 font-normal">{t("tokens.scopesTitle")}</th><th className="px-5 py-2 text-right font-normal">{t("tokens.usage")}</th><th className="px-5 py-2 text-right font-normal">{t("tokens.lastUsed")}</th><th className="px-5 py-2 font-normal">{t("tokens.status")}</th><th className="px-5 py-2" /></tr></thead>
+            <table className="tbl max-sm:min-w-[40rem]">
+              <thead><tr><th className="px-5 py-2">{t("tokens.name")}</th><th className="px-5 py-2">{t("tokens.source")}</th><th className="px-5 py-2">{t("tokens.scopesTitle")}</th><th className="px-5 py-2 text-right">{t("tokens.usage")}</th><th className="px-5 py-2 text-right">{t("tokens.lastUsed")}</th><th className="px-5 py-2">{t("tokens.status")}</th><th className="px-5 py-2" /></tr></thead>
               <tbody>
                 {(data ?? []).map((token) => {
                   const state = stateOf(token);
@@ -160,7 +160,7 @@ export default function MyTokens() {
                 })}
               </tbody>
             </table>
-            {data?.length === 0 && <p className="px-5 pb-6 text-sm text-neutral-600">{t("tokens.empty")}</p>}
+            {data?.length === 0 && <Empty compact>{t("tokens.empty")}</Empty>}
           </div>
         </LoadState>
       </Card>

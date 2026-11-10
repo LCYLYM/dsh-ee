@@ -11,7 +11,7 @@ import { ErrorNote, LoadState } from "../components/api-ui";
 import { ScopeEditor } from "../components/scope-editor";
 import { useScopeOptions } from "../components/scope-dialog";
 import { Combobox } from "../components/pickers";
-import { Badge, Button, Card, cx, Field, inputBase, inputCls, PageHeader, PasswordInput, Segmented, ToggleRow } from "../components/ui";
+import { Badge, Button, Card, cx, Field, inputBase, inputCls, PageHeader, PasswordInput, Segmented, ToggleRow, Notice, backLinkCls } from "../components/ui";
 import { PageLink } from "../lib/menus";
 import { parseWorkbench, WorkbenchField, workbenchText } from "../components/workbench-editor";
 import { parseTables, TablesField, tablesText as tablesToText } from "../components/app-data";
@@ -65,7 +65,7 @@ function MultiPick({ label, values, options, onChange }: { label: string; values
 function Section({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <Card className="space-y-5 p-6">
-      {title && <h2 className="font-semibold text-neutral-900">{title}</h2>}
+      {title && <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{title}</h2>}
       {children}
     </Card>
   );
@@ -196,7 +196,7 @@ export function AppNew() {
       <AssetEditorRoute forceKind="app" tabs={tabs} />
     </div>
     <div hidden={mode !== "agent"} className="max-w-[1400px]">
-      <PageLink page="build" className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
+      <PageLink page="build" className={backLinkCls}>
         <ArrowLeft size={14} /> {t("asset.back")}
       </PageLink>
       <PageHeader title={t("editor.newApp")} desc={t("hub.tabHints.app")} actions={<AppWindow size={28} strokeWidth={1.4} className="text-neutral-400" />} />
@@ -375,16 +375,16 @@ function AssetEditor({ forceKind, tabs }: { forceKind?: AssetKind; tabs?: ReactN
 
   return (
     <div className={kind === "app" ? "max-w-[1400px]" : "max-w-3xl"}>
-      <PageLink page={kind === "app" ? "build" : "materials"} className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
+      <PageLink page={kind === "app" ? "build" : "materials"} className={backLinkCls}>
         <ArrowLeft size={14} /> {t("asset.back")}
       </PageLink>
       <PageHeader title={title} desc={t(`hub.tabHints.${kind}`)} actions={<Icon size={28} strokeWidth={1.4} className="text-neutral-400" />} />
       {!editing && tabs}
       {(draft.data?.notes.length ?? 0) > 0 && (
-        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <Notice tone="warn" className="mb-4">
           <div className="font-medium">{t("studio.draftNotes")}</div>
           <ul className="mt-1 list-disc pl-5">{draft.data!.notes.map((n) => <li key={n}>{n}</li>)}</ul>
-        </div>
+        </Notice>
       )}
 
       <div className={kind === "app" ? "grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)]" : ""}>

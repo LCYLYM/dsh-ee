@@ -24,8 +24,8 @@ import {
   type RowData,
   type SortingState,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { cx, inputBase } from "./ui";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Inbox, SearchX } from "lucide-react";
+import { cx, inputBase, Empty } from "./ui";
 
 const features = tableFeatures({
   rowSortingFeature,
@@ -138,12 +138,12 @@ export function DataTable<T extends RowData>({
       )}
 
       {total === 0 ? (
-        <p className="px-5 pb-6 text-sm text-neutral-600">{data.length === 0 ? emptyText : (noMatchText ?? emptyText)}</p>
+        <Empty compact icon={data.length === 0 ? Inbox : SearchX}>{data.length === 0 ? emptyText : (noMatchText ?? emptyText)}</Empty>
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs text-neutral-600">
+            <table className="tbl">
+              <thead>
                 {table.getHeaderGroups().map((hg) => (
                   <tr key={hg.id}>
                     {hg.headers.map((h) => {
@@ -154,14 +154,14 @@ export function DataTable<T extends RowData>({
                         <th
                           key={h.id}
                           aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : undefined}
-                          className={cx("px-5 py-2 font-normal", right(id) && "text-right", mobileHidden(id))}
+                          className={cx("px-5 py-2.5", right(id) && "text-right", mobileHidden(id))}
                         >
                           {h.column.getCanSort() ? (
                             <button
                               type="button"
                               onClick={h.column.getToggleSortingHandler()}
                               className={cx(
-                                "inline-flex items-center gap-1 hover:text-neutral-900",
+                                "inline-flex items-center gap-1 rounded font-semibold transition-colors hover:text-neutral-900",
                                 right(id) && "flex-row-reverse",
                                 sorted && "text-neutral-900",
                               )}
@@ -172,7 +172,7 @@ export function DataTable<T extends RowData>({
                               ) : sorted === "desc" ? (
                                 <ArrowDown size={12} />
                               ) : (
-                                <ArrowUpDown size={12} className="opacity-40" />
+                                <ArrowUpDown size={12} className="opacity-35" />
                               )}
                             </button>
                           ) : (
@@ -213,7 +213,7 @@ export function DataTable<T extends RowData>({
             </table>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-3 text-sm text-neutral-600">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200/80 px-5 py-2.5 text-[13px] text-neutral-600 dark:border-white/[0.07]">
             <span className="tabular-nums">{t("table.range", { from, to, total })}</span>
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-2">
@@ -237,7 +237,7 @@ export function DataTable<T extends RowData>({
                   title={t("table.prev")}
                   disabled={pageIndex === 0}
                   onClick={() => setPagination((p) => ({ ...p, pageIndex: Math.max(0, pageIndex - 1) }))}
-                  className="rounded-md p-1.5 hover:bg-neutral-100 disabled:opacity-30"
+                  className="rounded-md p-1.5 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-30 disabled:hover:bg-transparent"
                 >
                   <ChevronLeft size={16} />
                 </button>
@@ -250,7 +250,7 @@ export function DataTable<T extends RowData>({
                   title={t("table.next")}
                   disabled={pageIndex >= pageCount - 1}
                   onClick={() => setPagination((p) => ({ ...p, pageIndex: Math.min(pageCount - 1, pageIndex + 1) }))}
-                  className="rounded-md p-1.5 hover:bg-neutral-100 disabled:opacity-30"
+                  className="rounded-md p-1.5 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-30 disabled:hover:bg-transparent"
                 >
                   <ChevronRight size={16} />
                 </button>

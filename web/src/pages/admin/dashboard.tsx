@@ -12,7 +12,7 @@ import { platformLabel } from "../../lib/labels";
 import { BarList, DailyBars } from "../../components/charts";
 import { pluginPath } from "../../components/plugin-card";
 import { LoadState } from "../../components/api-ui";
-import { Badge, Card, CardHeader, PageHeader, Segmented } from "../../components/ui";
+import { Badge, Card, CardHeader, PageHeader, Segmented, buttonCls } from "../../components/ui";
 import { PageLink } from "../../lib/menus";
 import { useTranslation } from "react-i18next";
 
@@ -34,7 +34,7 @@ function ChainPanel({
 }) {
   return (
     <Card className="flex flex-col p-5">
-      <h2 className="text-base font-medium text-neutral-900">{step}</h2>
+      <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{step}</h2>
       <div className="mt-3 flex items-baseline gap-1.5">
         <span className="text-3xl font-medium tracking-tight text-neutral-900 tabular-nums">{lead}</span>
         <span className="text-sm text-neutral-600">{unit}</span>
@@ -89,7 +89,7 @@ export default function AdminDashboard() {
           <Link
             to="/report/monthly"
             target="_blank"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-300 bg-card px-3 text-sm font-medium text-neutral-800 shadow-card hover:bg-neutral-50"
+            className={buttonCls("secondary")}
           >
             <FileText size={15} /> {t("report.export")}
           </Link>
@@ -202,13 +202,13 @@ export default function AdminDashboard() {
             <p className="px-5 pb-5 text-sm text-neutral-600">{t("dashboard.noInstalls")}</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs text-neutral-600">
+              <table className="tbl">
+                <thead>
                   <tr>
-                    <th className="px-5 py-2 font-normal">{t("dashboard.colName")}</th>
-                    <th className="px-5 py-2 font-normal max-sm:hidden">{t("dashboard.colSource")}</th>
-                    <th className="px-5 py-2 text-right font-normal">{t("dashboard.colInstalls")}</th>
-                    <th className="px-5 py-2 text-right font-normal">{t("dashboard.colUsers")}</th>
+                    <th className="px-5 py-2">{t("dashboard.colName")}</th>
+                    <th className="px-5 py-2 max-sm:hidden">{t("dashboard.colSource")}</th>
+                    <th className="px-5 py-2 text-right">{t("dashboard.colInstalls")}</th>
+                    <th className="px-5 py-2 text-right">{t("dashboard.colUsers")}</th>
                   </tr>
                 </thead>
                 <tbody>

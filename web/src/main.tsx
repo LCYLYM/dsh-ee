@@ -30,12 +30,28 @@ import GetStarted from "./pages/get-started";
 import Report from "./pages/report";
 import { useApi } from "./lib/use-api";
 import { useTranslation } from "react-i18next";
+import { Compass } from "lucide-react";
+import { Spinner } from "./components/ui";
 
 function Status({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
-    <div className="py-24 text-center">
-      <h1 className="text-2xl font-semibold text-neutral-900">{title}</h1>
-      {children && <p className="mt-2 text-sm text-neutral-600">{children}</p>}
+    <div className="flex flex-col items-center px-6 py-24 text-center">
+      <span aria-hidden className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-400 ring-1 ring-neutral-200/70 ring-inset">
+        <Compass size={22} strokeWidth={1.6} />
+      </span>
+      <h1 className="text-2xl leading-8 font-bold tracking-[-0.02em] text-neutral-900">{title}</h1>
+      {children && <p className="mt-2 max-w-md text-sm leading-6 text-neutral-600">{children}</p>}
+    </div>
+  );
+}
+
+/** 整页加载中：菜单、清单还没回来时的占位。 */
+function PageLoading() {
+  const { t } = useTranslation();
+  return (
+    <div role="status" className="flex items-center justify-center gap-2 py-24 text-sm text-neutral-500">
+      <Spinner size={18} className="text-neutral-400" />
+      {t("common.loading")}
     </div>
   );
 }
@@ -56,7 +72,7 @@ function Start() {
     welcome.reload();
   }, [setup.reload, welcome.reload]);
   // 只有第一次加载显示加载中；之后的刷新不能卸掉清单页（上面有进行中的 Agent 接入）
-  if (loading || (!setup.data && setup.loading) || (!welcome.data && welcome.loading)) return <Status title={t("common.loading")} />;
+  if (loading || (!setup.data && setup.loading) || (!welcome.data && welcome.loading)) return <PageLoading />;
   if (!homePath) return <Status title={t("shell.noPages")}>{t("shell.noPagesHint")}</Status>;
   // /go?setup=1：必做项都完成后，管理员也能回来看清单（例如导入示例内容）
   const forced = new URLSearchParams(window.location.search).has("setup");
@@ -75,8 +91,7 @@ function ConnectionBySlug() {
   const [params] = useSearchParams();
   const app = params.get("app") ?? "";
   const hub = useApi(api.hub);
-  const { t } = useTranslation();
-  if (hub.loading && !hub.data) return <Status title={t("common.loading")} />;
+  if (hub.loading && !hub.data) return <PageLoading />;
   if (slug === "kb") {
     const a = hub.data?.assets.find((x) => x.kind === "app" && x.slug === app);
     return <Navigate to={a ? `/assets/${a.id}` : "/knowledge"} replace />;
@@ -89,15 +104,14 @@ function ConnectionBySlug() {
 function NotFound() {
   const { loading } = useMenus();
   const { t } = useTranslation();
-  if (loading) return <Status title={t("common.loading")} />;
+  if (loading) return <PageLoading />;
   return <Status title={t("shell.notFound")}>{t("shell.notFoundHint")}</Status>;
 }
 
 /** 旧链接等菜单加载完再跳，避免落到默认路由。 */
 function LegacyPage({ pageKey }: { pageKey: PageKey }) {
   const { pathOf, loading } = useMenus();
-  const { t } = useTranslation();
-  if (loading) return <Status title={t("common.loading")} />;
+  if (loading) return <PageLoading />;
   return <Navigate to={pathOf(pageKey)} replace />;
 }
 
@@ -108,8 +122,7 @@ function LegacyPage({ pageKey }: { pageKey: PageKey }) {
 function LegacyHub() {
   const { pathOf, loading } = useMenus();
   const [params] = useSearchParams();
-  const { t } = useTranslation();
-  if (loading) return <Status title={t("common.loading")} />;
+  if (loading) return <PageLoading />;
   const tab = params.get("tab");
   if (tab === "plugin") return <Navigate to={`${pathOf("materials")}?advanced=1`} replace />;
   if (tab === "skill" || tab === "prompt" || tab === "connection") return <Navigate to={`${pathOf("materials")}?tab=${tab}`} replace />;

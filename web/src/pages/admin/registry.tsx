@@ -1,3 +1,4 @@
+import { KeyRound } from "lucide-react";
 import { useState } from "react";
 import { useStore } from "../../lib/store";
 import type { Settings } from "../../lib/types";
@@ -5,7 +6,7 @@ import { api, formatBytes, formatTime } from "../../lib/api";
 import { useApi, useAction } from "../../lib/use-api";
 import { useConfirm } from "../../lib/confirm";
 import { LoadState } from "../../components/api-ui";
-import { Badge, Button, Card, CardHeader, CopyBox, cx, Field, inputBase, inputCls, PageHeader, Segmented, Stat, StatStrip, Toggle } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, CopyBox, cx, Field, inputBase, inputCls, PageHeader, Segmented, Stat, StatStrip, Toggle, Empty } from "../../components/ui";
 import { Trans, useTranslation } from "react-i18next";
 import { PageLink } from "../../lib/menus";
 
@@ -93,12 +94,12 @@ export default function AdminRegistry() {
       <Card className="mt-4">
         <CardHeader title={t("registryAdmin.routes")} aside={t("registryAdmin.routesOrder")} />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs text-neutral-600">
+          <table className="tbl max-sm:min-w-[36rem]">
+            <thead>
               <tr>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colPackage")}</th>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colTarget")}</th>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colRule")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colPackage")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colTarget")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colRule")}</th>
                 <th className="px-5 py-2" />
               </tr>
             </thead>
@@ -144,7 +145,7 @@ export default function AdminRegistry() {
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <h2 className="text-base font-medium text-neutral-900">{t("registryAdmin.upstream")}</h2>
+          <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("registryAdmin.upstream")}</h2>
           <div className="mt-4 space-y-5">
             <Field label={t("registryAdmin.npmUpstream")} hint={offline ? t("registryAdmin.offlineHint") : undefined}>
               <div className="flex flex-col gap-2">
@@ -183,7 +184,7 @@ export default function AdminRegistry() {
         </Card>
 
         <Card className="p-5">
-          <h2 className="text-base font-medium text-neutral-900">{t("registryAdmin.clientConfig")}</h2>
+          <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("registryAdmin.clientConfig")}</h2>
           <p className="mt-1 text-sm text-neutral-600">
             <Trans i18nKey="registryAdmin.clientConfigDesc" components={{ link: <PageLink page="setup" className="mx-1 font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200" /> }} />
           </p>
@@ -217,22 +218,22 @@ function TokensCard({ requireToken, onRequireToken }: { requireToken: boolean; o
       </div>
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs text-neutral-600">
+          <table className="tbl max-sm:min-w-[36rem]">
+            <thead>
               <tr>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colName")}</th>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colOwner")}</th>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colAccess")}</th>
-                <th className="px-5 py-2 text-right font-normal">{t("registryAdmin.colCreated")}</th>
-                <th className="px-5 py-2 text-right font-normal">{t("registryAdmin.colLastUsed")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colName")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colOwner")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colAccess")}</th>
+                <th className="px-5 py-2 text-right">{t("registryAdmin.colCreated")}</th>
+                <th className="px-5 py-2 text-right">{t("registryAdmin.colLastUsed")}</th>
                 <th className="px-5 py-2" />
               </tr>
             </thead>
             <tbody>
               {(data ?? []).length === 0 && (
                 <tr className="border-t border-neutral-100">
-                  <td colSpan={6} className="px-5 py-6 text-center text-neutral-500">
-                    {t("registry.admin.noTokens")}
+                  <td colSpan={6}>
+                    <div className="tbl-empty"><Empty compact icon={KeyRound}>{t("registry.admin.noTokens")}</Empty></div>
                   </td>
                 </tr>
               )}

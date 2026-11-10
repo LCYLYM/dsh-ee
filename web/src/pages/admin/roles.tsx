@@ -126,7 +126,7 @@ function RoleEditor({ role, permissions, onSaved, onDeleted }: { role: Role; per
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-4">
         <div>
-          <h2 className="text-base font-medium text-neutral-900">{L.role(role)}</h2>
+          <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{L.role(role)}</h2>
           <div className="font-mono text-xs text-neutral-500">{role.code}</div>
         </div>
         <div className="flex gap-2">

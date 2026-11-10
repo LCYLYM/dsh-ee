@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Info, KeyRound } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { useStore } from "../lib/store";
 import { useAuth } from "../lib/auth";
 import { api, formatTime } from "../lib/api";
 import { useApi, useAction } from "../lib/use-api";
 import { useConfirm } from "../lib/confirm";
 import { LoadState } from "../components/api-ui";
-import { Badge, Button, Card, CardHeader, CopyBox, cx, inputBase, PageHeader, Segmented } from "../components/ui";
+import { Badge, Button, Card, CardHeader, CopyBox, cx, inputBase, PageHeader, Segmented, Notice } from "../components/ui";
 import { useTranslation } from "react-i18next";
 
 type Mode = "unix" | "windows" | "manual";
@@ -35,7 +35,7 @@ export default function Setup() {
       {ci && ci.enabled && (
         <Card className="mt-6 p-5">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-semibold text-neutral-900">{t("setupConnect.title")}</h2>
+            <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("setupConnect.title")}</h2>
             {ci.ready ? <Badge tone="green">{t("setupConnect.ready", { pkg: ci.package, version: ci.version })}</Badge> : <Badge tone="amber">{t("hub.notLiveBadge")}</Badge>}
           </div>
           <p className="mt-1 text-sm text-neutral-600">{ci.ready ? t("setupConnect.desc", { pkg: ci.package }) : t("setupConnect.notReady")}</p>
@@ -54,7 +54,7 @@ export default function Setup() {
       )}
 
       <Card className="mt-6 p-5 text-sm text-neutral-700">
-        <h2 className="mb-2 font-medium text-neutral-900">{t("setup.deviceLoginTitle")}</h2>
+        <h2 className="mb-2 text-neutral-900 text-[15px] leading-6 font-semibold">{t("setup.deviceLoginTitle")}</h2>
         <p>{t("setup.deviceLoginDesc")}</p>
         <div className="mt-2 font-mono text-xs text-neutral-600">/ee-login · /ee-status</div>
       </Card>
@@ -116,10 +116,7 @@ export default function Setup() {
         )}
       </div>
 
-      <Card className="mt-8 flex gap-3 border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-        <Info size={18} className="mt-0.5 shrink-0" />
-        <div>{t("setup.coexist")}</div>
-      </Card>
+      <Notice tone="warn" className="mt-8">{t("setup.coexist")}</Notice>
     </div>
   );
 }
@@ -158,13 +155,13 @@ function Tokens({ onCreated }: { onCreated: (token: string) => void }) {
       <p className="px-5 text-sm text-neutral-600">{t("setup.tokenDesc")}</p>
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
         {(data ?? []).length > 0 && (
-          <table className="mt-3 w-full text-sm">
-            <thead className="text-left text-xs text-neutral-600">
+          <div className="overflow-x-auto"><table className="tbl mt-3 max-sm:min-w-[32rem]">
+            <thead>
               <tr>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colName")}</th>
-                <th className="px-5 py-2 font-normal">{t("registryAdmin.colAccess")}</th>
-                <th className="px-5 py-2 font-normal">{t("registry.setup.prefix")}</th>
-                <th className="px-5 py-2 text-right font-normal">{t("registryAdmin.colLastUsed")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colName")}</th>
+                <th className="px-5 py-2">{t("registryAdmin.colAccess")}</th>
+                <th className="px-5 py-2">{t("registry.setup.prefix")}</th>
+                <th className="px-5 py-2 text-right">{t("registryAdmin.colLastUsed")}</th>
                 <th className="px-5 py-2" />
               </tr>
             </thead>
@@ -195,7 +192,7 @@ function Tokens({ onCreated }: { onCreated: (token: string) => void }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </LoadState>
       <div className="mt-3 border-t border-neutral-100 px-5 py-4">

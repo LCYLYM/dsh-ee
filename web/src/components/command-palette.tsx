@@ -56,8 +56,9 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                 value={`page ${m.id} ${title}`}
                 keywords={[group, desc(m.page_key), m.path, PAGE_META[m.page_key]?.title ?? ""]}
                 onSelect={() => go(m.path)}
+                className="[&>svg:last-child]:hidden"
               >
-                <MenuIcon name={m.icon} className="text-neutral-500" />
+                <MenuIcon name={m.icon} className="text-neutral-400" />
                 <span className="truncate">{title}</span>
                 <span className="ml-auto truncate pl-3 text-xs text-neutral-500">{group}</span>
               </CommandItem>
@@ -70,8 +71,8 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             const pageTitle = it.page === "account" ? "" : t(`pages.${it.page}` as never);
             const to = (it.page === "account" ? "/account" : pathOf(it.page)) + (it.page === "account" ? "" : `#${it.id}`);
             return (
-              <CommandItem key={it.id} value={`setting ${it.id} ${title}`} keywords={[...it.keywords, pageTitle]} onSelect={() => go(to)}>
-                <Settings2 size={16} strokeWidth={1.6} className="text-neutral-500" />
+              <CommandItem key={it.id} value={`setting ${it.id} ${title}`} keywords={[...it.keywords, pageTitle]} onSelect={() => go(to)} className="[&>svg:last-child]:hidden">
+                <Settings2 size={16} strokeWidth={1.6} className="text-neutral-400" />
                 <span className="truncate">{title}</span>
                 <span className="ml-auto truncate pl-3 text-xs text-neutral-500">{pageTitle}</span>
               </CommandItem>

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, Folder, FolderOpen } from "lucide-react";
+import { ChevronRight, Folder, FolderOpen, SearchX, FileText } from "lucide-react";
 import { api, formatTime, type KBase, type KBHit, type KDoc } from "../lib/api";
 import { useStore } from "../lib/store";
 import { useConfirm } from "../lib/confirm";
-import { Badge, Button, cx, Field, inputBase, inputCls, Segmented } from "./ui";
+import { Badge, Button, cx, Field, inputBase, inputCls, Segmented, Empty } from "./ui";
 import { Snippet } from "./kb-access";
 import { convertWarns } from "./kb-convert";
 import { ErrorNote } from "./api-ui";
@@ -211,7 +211,7 @@ export function DocList({ kb, docs, folder, setFolder, onChanged }: { kb: KBase;
 
   return (
     <div className="grid md:grid-cols-[220px_1fr]">
-      <nav aria-label={t("kdocs.folders")} className="border-b border-neutral-100 p-3 md:border-r md:border-b-0 dark:border-neutral-800">
+      <nav aria-label={t("kdocs.folders")} className="border-b border-neutral-100 p-3 md:border-r md:border-b-0">
         <ul className="space-y-0.5">
           <li>
             <button
@@ -273,14 +273,14 @@ export function DocList({ kb, docs, folder, setFolder, onChanged }: { kb: KBase;
           )}
         </div>
         {shown.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-neutral-600">
+          <Empty icon={q ? SearchX : FileText}>
             {q ? t("kdocs.noMatch") : kb.can_edit && docs.length === 0 ? t("kbase.docsEmptyEdit") : t("kbase.docsEmpty")}
-          </p>
+          </Empty>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="tbl max-sm:min-w-[34rem]">
               <thead>
-                <tr className="border-y border-neutral-100 text-left text-xs text-neutral-500 dark:border-neutral-800">
+                <tr className="border-y border-neutral-100 text-left text-xs text-neutral-500">
                   {kb.can_edit && (
                     <th className="w-8 py-2 pl-5">
                       <input
@@ -291,23 +291,23 @@ export function DocList({ kb, docs, folder, setFolder, onChanged }: { kb: KBase;
                       />
                     </th>
                   )}
-                  <th className={cx("py-2 pr-3 font-normal", kb.can_edit ? "pl-2" : "pl-5")}>{t("kbase.colTitle")}</th>
-                  <th className="px-3 py-2 text-right font-normal">{t("kbase.colLines")}</th>
-                  <th className="px-3 py-2 text-right font-normal">{t("kbase.colVersion")}</th>
-                  <th className="px-5 py-2 font-normal">{t("kbase.colUpdated")}</th>
+                  <th className={cx("py-2 pr-3", kb.can_edit ? "pl-2" : "pl-5")}>{t("kbase.colTitle")}</th>
+                  <th className="px-3 py-2 text-right">{t("kbase.colLines")}</th>
+                  <th className="px-3 py-2 text-right">{t("kbase.colVersion")}</th>
+                  <th className="px-5 py-2">{t("kbase.colUpdated")}</th>
                 </tr>
               </thead>
               <tbody>
                 {shown.map((d) => {
                   const hit = mode === "content" ? hits?.get(d.id) : undefined;
                   return (
-                    <tr key={d.id} className={cx("border-b border-neutral-50 last:border-0 dark:border-neutral-800/60", selected.has(d.id) && "bg-brand-50/40 dark:bg-brand-500/5")}>
+                    <tr key={d.id} className={cx("border-b border-neutral-50 last:border-0", selected.has(d.id) && "bg-brand-50/40 dark:bg-brand-500/5")}>
                       {kb.can_edit && (
                         <td className="py-2 pl-5 align-top">
                           <input type="checkbox" className="mt-1.5" aria-label={t("kdocs.select", { title: d.title })} checked={selected.has(d.id)} onChange={() => toggle(d.id)} />
                         </td>
                       )}
-                      <td className={cx("py-2 pr-3", kb.can_edit ? "pl-2" : "pl-5")}>
+                      <td className={cx("min-w-44 py-2 pr-3", kb.can_edit ? "pl-2" : "pl-5")}>
                         <div className="flex items-start gap-2.5">
                           <FileBadge doc={d} />
                           <div className="min-w-0">

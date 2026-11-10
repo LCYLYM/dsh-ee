@@ -247,7 +247,7 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
           return (
             <li key={step.id} className={`onboarding-step group relative grid gap-4 border-b border-neutral-200/90 py-6 sm:grid-cols-[2.5rem_1fr] ${current ? "bg-brand-50/60 dark:bg-brand-500/10" : ""}`} style={{ animationDelay: `${120 + index * 45}ms` }}>
               <div className="relative flex pt-1 sm:justify-center">
-                <span className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold ${step.done ? "border-brand-500 bg-brand-500 text-white" : current ? "border-brand-500 bg-card text-brand-600" : "border-neutral-300 bg-card text-neutral-400"}`}>
+                <span className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold ${step.done ? "border-brand-500 bg-brand-500 text-white" : current ? "border-brand-500 bg-card text-brand-600 dark:text-brand-300" : "border-neutral-300 bg-card text-neutral-400"}`}>
                   {step.done ? <Check size={14} strokeWidth={2} /> : index + 1}
                 </span>
                 {index < status.steps.length - 1 && <span className="absolute bottom-[-1.75rem] top-7 hidden w-px bg-neutral-200 sm:block" aria-hidden="true" />}
@@ -269,7 +269,7 @@ export default function Onboarding({ status, reload }: { status: SetupStatus; re
                     step.id === "connect" ? (
                       <Button size="sm" disabled={busy} onClick={publish}>{busy ? t("onboarding.publishing") : t("onboarding.publish")}</Button>
                     ) : step.optional ? (
-                      pageForStep[step.id] ? <PageLink page={pageForStep[step.id]} className="inline-flex h-8 items-center gap-2 rounded-md border border-neutral-200 bg-card px-3 font-semibold shadow-card text-sm text-neutral-600 transition hover:border-brand-300 hover:text-brand-600 active:scale-[.98]">{t("onboarding.handle")} <ArrowRight size={13} /></PageLink> : null
+                      pageForStep[step.id] ? <PageLink page={pageForStep[step.id]} className="inline-flex h-8 items-center gap-2 rounded-md border border-neutral-200 bg-card px-3 font-semibold shadow-card text-sm text-neutral-600 transition hover:border-brand-300 hover:text-brand-600 dark:hover:text-brand-200 active:scale-[.98]">{t("onboarding.handle")} <ArrowRight size={13} /></PageLink> : null
                     ) : (
                       <Button size="sm" variant="secondary" onClick={() => setEditing(step)}>{t("onboarding.handle")} <ArrowRight size={13} /></Button>
                     )

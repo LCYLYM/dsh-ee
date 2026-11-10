@@ -1,7 +1,8 @@
 /** 接真实接口的页面共用的小组件：加载 / 出错状态、key 状态、用量条。 */
 import type { ReactNode } from "react";
 import { formatTokens, keyState, type ApiKey } from "../lib/api";
-import { Badge, Button, cx } from "./ui";
+import { CircleAlert } from "lucide-react";
+import { Badge, Button, cx, Notice, Spinner } from "./ui";
 import { useTranslation } from "react-i18next";
 import { Tip } from "@/components/tip";
 
@@ -9,23 +10,35 @@ export function LoadState({ loading, error, onRetry, children }: { loading: bool
   const { t } = useTranslation();
   if (error) {
     return (
-      <div className="flex flex-wrap items-center gap-3 px-5 py-8 text-sm text-red-800">
-        <span>{t("common.loadFailed", { error })}</span>
-        <Button variant="secondary" size="sm" onClick={onRetry}>
-          {t("common.retry")}
-        </Button>
+      <div className="px-5 py-6">
+        <Notice tone="danger">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <span className="min-w-0 break-words">{t("common.loadFailed", { error })}</span>
+            <Button variant="secondary" size="sm" onClick={onRetry}>
+              {t("common.retry")}
+            </Button>
+          </div>
+        </Notice>
       </div>
     );
   }
-  if (loading) return <div className="px-5 py-8 text-sm text-neutral-600">{t("common.loading")}</div>;
+  if (loading) {
+    return (
+      <div role="status" className="flex items-center gap-2 px-5 py-8 text-sm text-neutral-500">
+        <Spinner className="text-neutral-400" />
+        {t("common.loading")}
+      </div>
+    );
+  }
   return children;
 }
 
 export function ErrorNote({ children }: { children: ReactNode }) {
   if (!children) return null;
   return (
-    <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-500/15 dark:text-red-300">
-      {children}
+    <p role="alert" className="flex gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-300">
+      <CircleAlert size={16} aria-hidden className="mt-1 shrink-0 text-red-600 dark:text-red-300" />
+      <span className="min-w-0 flex-1 break-words">{children}</span>
     </p>
   );
 }
@@ -66,7 +79,7 @@ export function QuotaBar({ used, limit }: { used: number; limit: number | null }
         {formatTokens(used)}
         <span className="text-neutral-500"> / {formatTokens(limit)}</span>
       </div>
-      <div className="mt-1 h-1.5 rounded-full bg-neutral-100">
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-100">
         <div
           className={cx("h-full rounded-full", over || pct >= 90 ? "bg-red-600" : pct >= 70 ? "bg-amber-500" : "bg-brand-500")}
           style={{ width: `${pct}%` }}

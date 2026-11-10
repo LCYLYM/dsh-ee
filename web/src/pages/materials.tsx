@@ -8,7 +8,7 @@ import { useApi } from "../lib/use-api";
 import { KIND_ICONS } from "../lib/hub";
 import { PageLink, useMenus } from "../lib/menus";
 import { LoadState } from "../components/api-ui";
-import { Button, Card, cx, PageHeader } from "../components/ui";
+import { Button, Card, cx, PageHeader, Empty, tabListCls, tabCls } from "../components/ui";
 import { AssetsGrid, PluginsTab } from "./market";
 
 type Tab = "knowledge" | "connection" | "skill" | "prompt";
@@ -25,7 +25,7 @@ function KnowledgeTab() {
   return (
     <LoadState loading={kb.loading && !kb.data} error={kb.data ? null : kb.error} onRetry={kb.reload}>
       {bases.length === 0 ? (
-        <Card className="p-12 text-center text-sm text-neutral-600">{t("materials.kbEmpty")}</Card>
+        <Card><Empty>{t("materials.kbEmpty")}</Empty></Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {bases.map((b) => (
@@ -82,7 +82,7 @@ export default function Materials() {
           )
         }
       />
-      <div role="tablist" className="mb-2 flex flex-wrap gap-1 border-b border-neutral-200">
+      <div role="tablist" className={cx(tabListCls, "mb-3")}>
         {TABS.map((k) => {
           const Icon = k === "knowledge" ? BookOpen : KIND_ICONS[k as AssetKind];
           return (
@@ -92,10 +92,7 @@ export default function Materials() {
               type="button"
               aria-selected={tab === k}
               onClick={() => setTab(k)}
-              className={cx(
-                "-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm",
-                tab === k ? "border-neutral-900 font-medium text-neutral-900" : "border-transparent text-neutral-600 hover:text-neutral-900",
-              )}
+              className={tabCls(tab === k)}
             >
               <Icon size={15} strokeWidth={1.6} />
               {t(`materials.tabs.${k}`)}
@@ -122,7 +119,7 @@ export default function Materials() {
           <div className="mt-4">
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
               <div>
-                <h2 className="text-base font-medium text-neutral-900">{t("materials.plugins")}</h2>
+                <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("materials.plugins")}</h2>
                 <p className="text-sm text-neutral-600">{t("materials.advancedHint")}</p>
               </div>
               <PageLink page="publish" className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">

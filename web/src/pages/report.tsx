@@ -130,7 +130,7 @@ function ReportBody({ d }: { d: MonthlyReport }) {
         {r.apps.length === 0 ? (
           <p className="text-sm text-neutral-600">{t("report.appsEmpty")}</p>
         ) : (
-          <table className="w-full">
+          <div className="overflow-x-auto"><table className="w-full">
             <thead>
               <tr>
                 <th className={th}>{t("report.colApp")}</th>
@@ -151,7 +151,7 @@ function ReportBody({ d }: { d: MonthlyReport }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
         {r.capabilities.length > 0 && (
           <div className="mt-4">
@@ -165,7 +165,7 @@ function ReportBody({ d }: { d: MonthlyReport }) {
         {r.questions.length === 0 ? (
           <p className="text-sm text-neutral-600">{t("report.questionsEmpty")}</p>
         ) : (
-          <table className="w-full">
+          <div className="overflow-x-auto"><table className="w-full">
             <thead>
               <tr>
                 <th className={th}>{t("report.colQuestion")}</th>
@@ -184,12 +184,12 @@ function ReportBody({ d }: { d: MonthlyReport }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Block>
 
       <Block title={t("report.departments")}>
-        <table className="w-full">
+        <div className="overflow-x-auto"><table className="w-full">
           <thead>
             <tr>
               <th className={th}>{t("report.colDepartment")}</th>
@@ -210,7 +210,7 @@ function ReportBody({ d }: { d: MonthlyReport }) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Block>
 
       <Block title={t("report.usage")}>

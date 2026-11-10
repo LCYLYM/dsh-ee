@@ -9,7 +9,7 @@ import { useApi, useAction } from "../../lib/use-api";
 import { useScoring, useStore } from "../../lib/store";
 import { LoadState } from "../../components/api-ui";
 import { ScanList, scanWarnings } from "../../components/scan-list";
-import { Badge, Button, Card, cx, inputCls, PageHeader, PluginIcon, ScoreBadge, Segmented } from "../../components/ui";
+import { Badge, Button, Card, cx, inputCls, PageHeader, PluginIcon, ScoreBadge, Segmented, Empty } from "../../components/ui";
 import { useTranslation } from "react-i18next";
 
 function ago(iso: string) {
@@ -109,7 +109,7 @@ function AssetReview({ q }: { q: ReturnType<typeof useApi<AssetReviewItem[]>> })
   return (
     <LoadState loading={q.loading && !q.data} error={q.error} onRetry={q.reload}>
       {queue.length === 0 ? (
-        <Card className="p-12 text-center text-sm text-neutral-500">{t("reviewAssets.empty")}</Card>
+        <Card><Empty>{t("reviewAssets.empty")}</Empty></Card>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
           <Card className="h-fit divide-y divide-neutral-100">
@@ -148,11 +148,11 @@ function AssetReview({ q }: { q: ReturnType<typeof useApi<AssetReviewItem[]>> })
                   {t("reviewAssets.submittedBy", { name: current.publisher_name || current.publisher || "—", department: current.department || "—" })}
                 </span>
               </div>
-              <h3 className="mb-2 text-sm font-semibold text-neutral-800">{t("reviewAssets.current")}</h3>
+              <h3 className="mb-2 text-sm font-semibold text-neutral-900">{t("reviewAssets.current")}</h3>
               <SpecView spec={current.spec} />
               {current.previous && (
                 <>
-                  <h3 className="mt-6 mb-2 text-sm font-semibold text-neutral-800">
+                  <h3 className="mt-6 mb-2 text-sm font-semibold text-neutral-900">
                     {t("reviewAssets.previous")} · {t("reviewAssets.compare", { n: current.previous_version })}
                   </h3>
                   <div className="opacity-75">
@@ -204,7 +204,7 @@ function ScopeReview({ q }: { q: ReturnType<typeof useApi<ScopeReviewItem[]>> })
   return (
     <LoadState loading={q.loading && !q.data} error={q.error} onRetry={q.reload}>
       {queue.length === 0 ? (
-        <Card className="p-12 text-center text-sm text-neutral-500">{t("scopeReview.empty")}</Card>
+        <Card><Empty>{t("scopeReview.empty")}</Empty></Card>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
           <Card className="h-fit divide-y divide-neutral-100">
@@ -247,7 +247,7 @@ function ScopeReview({ q }: { q: ReturnType<typeof useApi<ScopeReviewItem[]>> })
                   <dd className="font-medium text-neutral-900">{scopeSummary(t, current.requested, opts.roleName)}</dd>
                 </div>
               </dl>
-              <h3 className="mb-2 text-sm font-semibold text-neutral-800">{t("reviewAssets.previous")}</h3>
+              <h3 className="mb-2 text-sm font-semibold text-neutral-900">{t("reviewAssets.previous")}</h3>
               <SpecView spec={current.spec} />
               <p className="mt-4 text-xs text-neutral-500">{t("scopeReview.hint")}</p>
               <div className="mt-4">
@@ -296,7 +296,7 @@ function PluginReview({ q }: { q: ReturnType<typeof useApi<ReviewItem[]>> }) {
     <div>
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
         {queue.length === 0 ? (
-          <Card className="p-12 text-center text-sm text-neutral-500">{t("review.empty")}</Card>
+          <Card><Empty>{t("review.empty")}</Empty></Card>
         ) : (
           <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
             <Card className="h-fit divide-y divide-neutral-100">
@@ -357,7 +357,7 @@ function PluginReview({ q }: { q: ReturnType<typeof useApi<ReviewItem[]>> }) {
                 </div>
                 {current.package.description && <p className="mt-4 text-sm text-neutral-600">{current.package.description}</p>}
 
-                <h3 className="mt-6 mb-2 text-sm font-semibold text-neutral-800">{t("review.autoChecks")}</h3>
+                <h3 className="mt-6 mb-2 text-sm font-semibold text-neutral-900">{t("review.autoChecks")}</h3>
                 <ScanList items={current.scan} />
 
                 <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
@@ -370,7 +370,7 @@ function PluginReview({ q }: { q: ReturnType<typeof useApi<ReviewItem[]>> }) {
                   <span>
                     {formatBytes(current.size)} · <span className="font-mono">{current.integrity.slice(0, 24)}…</span>
                   </span>
-                  <a href={api.tarballUrl(current.name, current.version)} className="inline-flex items-center gap-1 text-brand-600 hover:underline">
+                  <a href={api.tarballUrl(current.name, current.version)} className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-300 hover:underline">
                     <Download size={12} /> {t("registry.review.downloadTarball")}
                   </a>
                 </div>

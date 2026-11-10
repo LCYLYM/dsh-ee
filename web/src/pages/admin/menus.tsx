@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowDown, ArrowUp, ExternalLink } from "lucide-react";
+import { ArrowDown, ArrowUp, ExternalLink, MousePointerClick } from "lucide-react";
 import { api, type Menu, type MenuInput, type MenuKind, type Permission } from "../../lib/api";
 import { useStore } from "../../lib/store";
 import { useAction, useApi } from "../../lib/use-api";
@@ -8,7 +8,7 @@ import { PAGE_META, type PageKey } from "../../lib/page-meta";
 import { useLabels } from "../../lib/labels";
 import { ICONS, MenuIcon } from "../../lib/icons";
 import { ErrorNote, LoadState } from "../../components/api-ui";
-import { Badge, Button, Card, CardHeader, cx, Field, inputCls, PageHeader, Segmented, Toggle } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, cx, Field, inputCls, PageHeader, Segmented, Toggle, Empty } from "../../components/ui";
 import { useTranslation } from "react-i18next";
 import { useConfirm } from "@/lib/confirm";
 import { Combobox } from "@/components/pickers";
@@ -383,7 +383,7 @@ export default function AdminMenus() {
                 }}
               />
             ) : (
-              <Card className="px-5 py-8 text-sm text-neutral-600">{t("menusAdmin.pickHint")}</Card>
+              <Card><Empty icon={MousePointerClick}>{t("menusAdmin.pickHint")}</Empty></Card>
             )}
           </div>
         </div>

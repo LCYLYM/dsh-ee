@@ -8,6 +8,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Calendar } from "@/components/shadcn/calendar";
 import { isZh } from "@/i18n";
 import { cx, inputBase } from "./ui";
+import { cn } from "@/lib/utils";
 
 export interface ComboOption {
   value: string;
@@ -64,12 +65,13 @@ export function Combobox({
           role="combobox"
           aria-expanded={open}
           aria-label={ariaLabel}
-          className={cx(inputBase, "flex w-full items-center justify-between gap-2 text-left", className)}
+          // cn 合并冲突的类：调用处给了 w-48 之类的宽度就盖过默认的 w-full
+          className={cn(inputBase, "flex w-full items-center justify-between gap-2 text-left", className)}
         >
           <span className={cx("min-w-0 truncate", !current && !(allowEmpty && value === "") && "text-neutral-500")}>
             {current ? current.label : allowEmpty && value === "" && emptyLabel ? emptyLabel : (placeholder ?? t("pickers.choose"))}
           </span>
-          <ChevronsUpDown size={14} className="shrink-0 text-neutral-500" />
+          <ChevronsUpDown size={14} className="shrink-0 text-neutral-400" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-(--radix-popover-trigger-width) min-w-64 p-0" align="start">
@@ -184,7 +186,7 @@ export function DatePicker({
           aria-label={t("pickers.clear")}
           title={t("pickers.clear")}
           onClick={() => onChange("")}
-          className="rounded-md p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+          className="rounded-md p-2 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
         >
           <X size={14} />
         </button>

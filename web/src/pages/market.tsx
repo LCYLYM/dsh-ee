@@ -11,7 +11,7 @@ import { ASSET_KINDS, KIND_ICONS } from "../lib/hub";
 import { PluginCard } from "../components/plugin-card";
 import { AssetCard } from "../components/asset-card";
 import { LoadState } from "../components/api-ui";
-import { Button, Card, cx, inputBase, PageHeader, Segmented } from "../components/ui";
+import { Button, Card, cx, inputBase, PageHeader, Segmented, Empty, Spinner, buttonCls, tabListCls, tabCls } from "../components/ui";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import { PageLink, useMenus } from "../lib/menus";
 import { Trans, useTranslation } from "react-i18next";
@@ -127,7 +127,7 @@ export function PluginsTab({ limit }: { limit?: number }) {
 
       <div className="mb-3 text-sm text-neutral-600">{t("market.count", { count: list.length })}</div>
       {pluginsLoading && plugins.length === 0 ? (
-        <Card className="p-12 text-center text-sm text-neutral-600">{t("common.loading")}</Card>
+        <Card className="flex justify-center"><div role="status" className="flex items-center gap-2 px-5 py-12 text-sm text-neutral-500"><Spinner className="text-neutral-400" />{t("common.loading")}</div></Card>
       ) : list.length === 0 ? (
         <Card className="p-12 text-center text-sm text-neutral-600">
           <Trans i18nKey="market.empty" components={{ link: <PageLink page="publish" className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200" /> }} />
@@ -196,7 +196,7 @@ export function AssetsGrid({
         <span className="text-sm text-neutral-600 sm:ml-auto">{t("hub.count", { count: list.length })}</span>
       </div>
       {list.length === 0 ? (
-        <Card className="p-12 text-center text-sm text-neutral-600">{assets.length === 0 ? t("hub.empty") : t("hub.emptyFiltered")}</Card>
+        <Card><Empty>{assets.length === 0 ? t("hub.empty") : t("hub.emptyFiltered")}</Empty></Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {list.map((a) => (
@@ -231,11 +231,11 @@ export default function Hub() {
         desc={t("hub.desc")}
         actions={
           <>
-            <PageLink page="setup" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-300 bg-card px-3 text-sm text-neutral-800 hover:bg-neutral-50">
+            <PageLink page="setup" className={buttonCls("secondary")}>
               <Terminal size={15} /> {t("market.setupGuide")}
             </PageLink>
             {settings.distribution.enabled && recommendedCore && (
-              <PageLink page="dsh-download" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-300 bg-card px-3 text-sm text-neutral-800 hover:bg-neutral-50">
+              <PageLink page="dsh-download" className={buttonCls("secondary")}>
                 <Download size={15} /> {t("market.downloadDsh", { version: recommendedCore.version })}
               </PageLink>
             )}
@@ -278,10 +278,10 @@ export default function Hub() {
       />
 
       {banner && (
-        <Card className="mb-4 flex flex-wrap items-center gap-3 border-brand-100 bg-brand-50/60 px-4 py-3 text-sm">
+        <Card className="mb-4 flex flex-wrap items-center gap-3 border-brand-200/80 bg-brand-50/70 px-4 py-3 text-sm shadow-none dark:border-brand-400/25 dark:bg-brand-500/10">
           <span className="font-medium text-neutral-900">{t("hub.connectBanner")}</span>
           <span className="text-neutral-700">{t("hub.connectBannerHint")}</span>
-          <PageLink page="setup" className="font-medium text-brand-700 hover:underline">
+          <PageLink page="setup" className="font-medium text-brand-700 hover:underline dark:text-brand-300">
             {t("hub.connectBannerLink")}
           </PageLink>
           <button
@@ -298,7 +298,7 @@ export default function Hub() {
         </Card>
       )}
 
-      <div role="tablist" className="mb-2 flex flex-wrap gap-1 border-b border-neutral-200">
+      <div role="tablist" className={cx(tabListCls, "mb-3")}>
         {TABS.map((k) => {
           const Icon = k === "all" ? null : KIND_ICONS[k];
           return (
@@ -308,10 +308,7 @@ export default function Hub() {
               type="button"
               aria-selected={tab === k}
               onClick={() => setTab(k)}
-              className={cx(
-                "-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm",
-                tab === k ? "border-neutral-900 font-medium text-neutral-900" : "border-transparent text-neutral-600 hover:text-neutral-900",
-              )}
+              className={tabCls(tab === k)}
             >
               {Icon && <Icon size={15} strokeWidth={1.6} />}
               {t(`hub.tabs.${k}`)}
@@ -330,7 +327,7 @@ export default function Hub() {
           {tab === "all" && plugins.length > 0 && (
             <div className="mt-8">
               <div className="mb-3 flex items-baseline justify-between">
-                <h2 className="text-base font-medium text-neutral-900">{t("hub.tabs.plugin")}</h2>
+                <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("hub.tabs.plugin")}</h2>
                 <button type="button" onClick={() => setTab("plugin")} className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200">
                   {t("hub.viewAllPlugins", { count: plugins.length })}
                 </button>

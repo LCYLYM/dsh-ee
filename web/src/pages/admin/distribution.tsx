@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, PackageOpen } from "lucide-react";
 import { Trans, useTranslation } from "react-i18next";
 import { api, formatBytes, formatTime } from "../../lib/api";
 import { useApi } from "../../lib/use-api";
 import { useStore } from "../../lib/store";
 import type { DshRelease, DshTarget } from "../../lib/types";
-import { Badge, Button, Card, PageHeader, ToggleRow } from "../../components/ui";
+import { Badge, Button, Card, PageHeader, ToggleRow, Notice, Empty } from "../../components/ui";
 import { LoadState } from "../../components/api-ui";
 import { PageLink } from "../../lib/menus";
 
@@ -13,16 +13,16 @@ function ReleaseTable({ target, title, rows, busy, act }: { target: DshTarget; t
   const { t } = useTranslation();
   return (
     <Card className="overflow-hidden">
-      <div className="border-b border-neutral-100 px-5 py-3 font-medium text-neutral-800">{title}</div>
+      <div className="border-b border-neutral-100 px-5 py-3 text-[15px] leading-6 font-semibold text-neutral-900">{title}</div>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs text-neutral-500">
+        <table className="tbl max-sm:min-w-[34rem]">
+          <thead>
             <tr>
-              <th className="px-5 py-2 font-normal">{t("distributionAdmin.colRelease")}</th>
-              <th className="px-5 py-2 font-normal">{t("distributionAdmin.colDate")}</th>
-              <th className="px-5 py-2 font-normal">{t("distributionAdmin.colSize")}</th>
-              <th className="px-5 py-2 font-normal">{t("distributionAdmin.colState")}</th>
-              <th className="px-5 py-2 font-normal">{t("distributionAdmin.colActions")}</th>
+              <th className="px-5 py-2">{t("distributionAdmin.colRelease")}</th>
+              <th className="px-5 py-2">{t("distributionAdmin.colDate")}</th>
+              <th className="px-5 py-2">{t("distributionAdmin.colSize")}</th>
+              <th className="px-5 py-2">{t("distributionAdmin.colState")}</th>
+              <th className="px-5 py-2">{t("distributionAdmin.colActions")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
@@ -60,7 +60,7 @@ function ReleaseTable({ target, title, rows, busy, act }: { target: DshTarget; t
               );
             })}
             {!rows.some((r) => r.target === target) && (
-              <tr><td colSpan={5} className="px-5 py-8 text-center text-neutral-500">{t("distributionAdmin.empty")}</td></tr>
+              <tr><td colSpan={5}><div className="tbl-empty"><Empty compact icon={PackageOpen}>{t("distributionAdmin.empty")}</Empty></div></td></tr>
             )}
           </tbody>
         </table>
@@ -106,9 +106,9 @@ export default function AdminDistribution() {
         actions={<Button variant="secondary" onClick={async () => { await api.checkDshReleases(); notify(t("distributionAdmin.checkStarted")); }}><RefreshCw size={14} /> {t("distributionAdmin.checkOfficial")}</Button>}
       />
       {!settings.distribution.enabled && (
-        <Card className="mb-6 border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-          <Trans i18nKey="distributionAdmin.disabledNote" components={{ link: <PageLink page="admin-settings" suffix="#settings-distribution" className="mx-1 underline" /> }} />
-        </Card>
+        <Notice tone="warn" className="mb-6">
+          <Trans i18nKey="distributionAdmin.disabledNote" components={{ link: <PageLink page="admin-settings" suffix="#settings-distribution" className="mx-1 font-medium underline underline-offset-2" /> }} />
+        </Notice>
       )}
       <Card className="mb-6 grid gap-5 p-5 md:grid-cols-3">
         <label className="text-sm">

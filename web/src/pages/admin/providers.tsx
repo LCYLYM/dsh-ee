@@ -1,11 +1,11 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { CircleCheck, CircleAlert, CircleDashed } from "lucide-react";
+import { CircleCheck, CircleAlert, CircleDashed, Bot } from "lucide-react";
 import { api, formatTime, type CheckResult, type Model, type Provider } from "../../lib/api";
 import { useStore } from "../../lib/store";
 import { useAction, useApi } from "../../lib/use-api";
 import { ErrorNote, LoadState } from "../../components/api-ui";
 import zhLlm from "../../i18n/zh/llm-admin";
-import { Badge, Button, Card, CardHeader, cx, Field, inputBase, inputCls, PageHeader, PasswordInput, Toggle } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, cx, Field, inputBase, inputCls, PageHeader, PasswordInput, Toggle, Empty } from "../../components/ui";
 import { useTranslation } from "react-i18next";
 import { useConfirm } from "@/lib/confirm";
 import { Tip } from "@/components/tip";
@@ -311,7 +311,7 @@ function ProviderCard({ p, models, onChanged }: { p: Provider; models: Model[]; 
       <div className="flex flex-wrap items-start gap-4 px-5 pt-4 pb-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-medium text-neutral-900">{p.name}</h2>
+            <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{p.name}</h2>
             <Badge>{isVendor(p.vendor) ? t(`providers.vendors.${p.vendor}`) : p.vendor}</Badge>
             <span className="text-sm text-neutral-600">{t("providers.priorityOf", { n: p.priority })}</span>
             {!p.enabled && <Badge tone="amber">{t("providers.disabled")}</Badge>}
@@ -354,7 +354,7 @@ function ProviderCard({ p, models, onChanged }: { p: Provider; models: Model[]; 
       )}
       <div className="border-t border-neutral-100">
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-3 pb-2">
-          <h3 className="text-sm font-medium text-neutral-900">{t("providers.modelsCount", { count: models.length })}</h3>
+          <h3 className="text-sm font-semibold text-neutral-900">{t("providers.modelsCount", { count: models.length })}</h3>
           <Button variant="secondary" size="sm" disabled={busy} onClick={() => doCheck(true)}>
             {t("providers.importFromUpstream")}
           </Button>
@@ -366,13 +366,13 @@ function ProviderCard({ p, models, onChanged }: { p: Provider; models: Model[]; 
         )}
         {models.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs text-neutral-600">
+            <table className="tbl max-sm:min-w-[36rem]">
+              <thead>
                 <tr>
-                  <th className="px-5 py-2 font-normal">{t("providers.colPublic")}</th>
-                  <th className="px-5 py-2 font-normal">{t("providers.colUpstream")}</th>
-                  <th className="px-5 py-2 font-normal">{t("providers.colDisplay")}</th>
-                  <th className="px-5 py-2 font-normal">{t("providers.colEnabled")}</th>
+                  <th className="px-5 py-2">{t("providers.colPublic")}</th>
+                  <th className="px-5 py-2">{t("providers.colUpstream")}</th>
+                  <th className="px-5 py-2">{t("providers.colDisplay")}</th>
+                  <th className="px-5 py-2">{t("providers.colEnabled")}</th>
                   <th className="px-5 py-2" />
                 </tr>
               </thead>
@@ -415,11 +415,11 @@ function Routing({ providers, models }: { providers: Provider[]; models: Model[]
     <Card className="mb-4">
       <CardHeader title={t("providers.available")} aside={t("providers.availableCount", { count: rows.length })} />
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs text-neutral-600">
+        <table className="tbl max-sm:min-w-[36rem]">
+          <thead>
             <tr>
-              <th className="px-5 py-2 font-normal">{t("providers.colModel")}</th>
-              <th className="px-5 py-2 font-normal">{t("providers.colRoutes")}</th>
+              <th className="px-5 py-2">{t("providers.colModel")}</th>
+              <th className="px-5 py-2">{t("providers.colRoutes")}</th>
             </tr>
           </thead>
           <tbody>
@@ -485,8 +485,8 @@ export default function AdminProviders() {
       <LoadState loading={(providers.loading && !providers.data) || (models.loading && !models.data)} error={providers.error ?? models.error} onRetry={reload}>
         <Routing providers={providers.data ?? []} models={models.data ?? []} />
         {providers.data?.length === 0 && !creating && (
-          <Card className="px-5 py-10 text-center text-sm text-neutral-600">
-            {t("providers.empty")}
+          <Card>
+            <Empty icon={Bot}>{t("providers.empty")}</Empty>
           </Card>
         )}
         <div className="space-y-4">
