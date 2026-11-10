@@ -48,13 +48,16 @@ export class McpBridge {
 
   constructor(private ctx: DshContext, private config: PluginConfig, private http: HttpClient) {}
 
-  private async rpc(method: string, params?: unknown, timeoutMs = 30_000): Promise<any> {
+  private async rpc(method: string, params?: unknown, timeoutMs = 30_000, retried = false): Promise<any> {
     const headers: Record<string, string> = { "content-type": "application/json", accept: "application/json, text/event-stream" };
     if (this.session) headers["Mcp-Session-Id"] = this.session;
     const response = await this.http.fetch("/mcp", { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) }, timeoutMs);
     if (response.status === 404) {
+      // 会话过期时 dsh-ee 返回 404；清掉会话重试一次即可。一直 404 说明地址/代理不对，
+      // 再递归下去会以网络速度无限重发，必须停。
       this.session = "";
-      return this.rpc(method, params, timeoutMs);
+      if (retried) throw new Error(`MCP ${method} HTTP 404`);
+      return this.rpc(method, params, timeoutMs, true);
     }
     if (!response.ok) throw new Error(`MCP ${method} HTTP ${response.status}`);
     this.session = response.headers.get("mcp-session-id") || this.session;
@@ -138,9 +141,9 @@ export class McpBridge {
   }
 
   async sync(): Promise<void> {
-    if (!this.session) await this.rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "dsh-ee-connect", version: this.config.version } });
     let result: any;
     try {
+      if (!this.session) await this.rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "dsh-ee-connect", version: this.config.version } });
       result = await this.rpc("tools/list");
     } catch (error) {
       this.status.error = error instanceof Error ? error.message : String(error);
