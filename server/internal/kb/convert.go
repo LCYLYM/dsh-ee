@@ -27,6 +27,17 @@ var ErrUnsupported = errors.New("只支持 PDF、Word（.docx）、Excel（.xlsx
 // ErrNoText 表示文件里抽不出文字（多半是扫描件）。
 var ErrNoText = errors.New("这个文件里没有可以提取的文字，可能是扫描件；扫描件暂不支持")
 
+// Word、PPT 转换时输出的上限。maxDocxXML 那些管的是输入，管不住输出：横向合并的格子、补齐表格、纵向合并时抄上一格、
+// 同一页幻灯片被反复引用，都能让 1 KB 的文件转出几个 GB；接口等转完才查正文有没有超过 8 MB，来不及。
+const (
+	// 正文最多多少字节（攒在表格里还没写出去的字也按这个数）：接口上限的两倍，正常文件碰不到
+	maxOutput = 16 << 20
+	// 一份文件里的表格一共最多多少格。每张表按「行数 × 最宽一行」算，因为写成 Markdown 时短的行要补齐
+	maxTableCells = 2000000
+)
+
+var errTooBig = errors.New("转换出来的正文太大，请拆成几个文件再上传")
+
 // Converted 是转换结果。
 type Converted struct {
 	Title    string
@@ -289,8 +300,12 @@ func docxBody(doc []byte, st docxStyleInfo, num *numbering, info *Info) (string,
 		cell strings.Builder
 		// 当前单元格：横向合并几列；纵向合并（1 开始合并、2 接着上一行）
 		span, vmerge int
+		// 最宽一行有几格；补齐以后一共几格（已经记进 cells）
+		width, cells int
 	}
 	var tables []*table
+	// 所有表格一共多少格；往单元格里写了多少字节（抄下来的合并格也算，嵌套表格每套一层整张重写一遍、再算一遍）
+	cells, tableBytes := 0, 0
 	inText, inNumPr := false, false
 	writePara := func(p *docxPara) {
 		// 先算编号：空段落在 Word 里也会占掉一个号
@@ -328,6 +343,7 @@ func docxBody(doc []byte, st docxStyleInfo, num *numbering, info *Info) (string,
 				t.cell.WriteString(" ")
 			}
 			t.cell.WriteString(prefixed)
+			tableBytes += len(prefixed)
 			return
 		}
 		level := st.headings[p.style]
@@ -430,10 +446,14 @@ func docxBody(doc []byte, st docxStyleInfo, num *numbering, info *Info) (string,
 					// 纵向合并的格子：把上面那格的内容抄下来，这一行单独看也是完整的
 					if col := len(tb.row); tb.vmerge == 2 && text == "" && len(tb.rows) > 0 && col < len(tb.rows[len(tb.rows)-1]) {
 						text = tb.rows[len(tb.rows)-1][col]
+						tableBytes += len(text)
 					}
-					tb.row = append(tb.row, text)
+					// 跟 Excel 一样最多收 maxSheetCols 列（Word 自己最多 63 列），多出来的不要
+					if len(tb.row) < maxSheetCols {
+						tb.row = append(tb.row, text)
+					}
 					// 横向合并：补上空格子，列才对得齐
-					for i := 1; i < tb.span; i++ {
+					for i := 1; i < tb.span && len(tb.row) < maxSheetCols; i++ {
 						tb.row = append(tb.row, "")
 					}
 					tb.cell.Reset()
@@ -442,7 +462,11 @@ func docxBody(doc []byte, st docxStyleInfo, num *numbering, info *Info) (string,
 				if n := len(tables); n > 0 {
 					tb := tables[n-1]
 					tb.rows = append(tb.rows, tb.row)
+					tb.width = max(tb.width, len(tb.row))
 					tb.row = nil
+					total := len(tb.rows) * tb.width
+					cells += total - tb.cells
+					tb.cells = total
 				}
 			case "tbl":
 				n := len(tables)
@@ -456,12 +480,16 @@ func docxBody(doc []byte, st docxStyleInfo, num *numbering, info *Info) (string,
 					// 嵌套表格：压成一行文字放进外层单元格
 					outer := tables[len(tables)-1]
 					outer.cell.WriteString(strings.ReplaceAll(md, "\n", " "))
+					tableBytes += len(md)
 				} else {
 					out.WriteString(md + "\n")
 					if md != "" {
 						info.Tables++
 					}
 				}
+			}
+			if cells > maxTableCells || tableBytes > maxOutput || out.Len() > maxOutput {
+				return "", "", errTooBig
 			}
 		case xml.CharData:
 			if inText && para != nil {
