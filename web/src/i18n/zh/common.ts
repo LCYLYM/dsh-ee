@@ -36,6 +36,12 @@ export default {
     },
     demo: "这是公开的演示站，所有人共用一个账号，别填真实的密钥或数据。",
     demoReset: "这是公开的演示站，所有人共用一个账号，数据{{reset}}重置一次，别填真实的密钥或数据。",
+    demoPersona: {
+      you: "演示站：你现在是{{name}}（{{dept}} · {{title}}）。",
+      tryInDsh: "网页上看到的是应用的工作台；接上 DSH 后输入 /{{app}}，问「{{q}}」。",
+      switch: "换个人",
+      workbench: "我的工作台",
+    },
     demoNext: {
       left: "下次重置：还剩 {{left}}（{{time}}）",
       hm: "{{h}} 小时 {{m}} 分",

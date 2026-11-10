@@ -76,6 +76,34 @@ func TestDemoSite(t *testing.T) {
 		}
 	}
 
+	// 一键以示例员工身份体验：只认示例员工，拿到的是员工自己的会话
+	code, body = anon.do("GET", "/api/auth/methods", nil, nil)
+	personas := decodeAs[struct {
+		Demo struct {
+			Personas []struct{ Username, App, Try string }
+		}
+	}](t, body).Demo.Personas
+	if len(personas) == 0 || personas[0].App == "" || personas[0].Try == "" {
+		t.Fatalf("登录页应给出场景卡片：%s", body)
+	}
+	visitor := newClient(t, ts.URL)
+	code, body = visitor.do("POST", "/api/auth/demo-login", map[string]string{"username": "admin"}, nil)
+	expect(t, "一键登录管理员", code, 400, body)
+	code, body = visitor.do("POST", "/api/auth/demo-login", map[string]string{"username": personas[0].Username}, nil)
+	expect(t, "一键以示例员工登录", code, 200, body)
+	code, body = visitor.do("GET", "/api/auth/me", nil, nil)
+	expect(t, "示例员工的会话", code, 200, body)
+	if me := decodeAs[struct {
+		Username string
+		IsSuper  bool `json:"is_super"`
+	}](t, body); me.Username != personas[0].Username || me.IsSuper {
+		t.Fatalf("应以示例员工身份登录：%s", body)
+	}
+	code, body = visitor.do("GET", "/api/me/apps/"+personas[0].App+"/web", nil, nil)
+	if code == 404 {
+		t.Fatalf("示例员工应能打开 %s 的网页版：%s", personas[0].App, body)
+	}
+
 	// 试连别的地址：哪怕同在本机、只是端口不同，也被拦在拨号这一步
 	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("演示站不应访问到外部地址")

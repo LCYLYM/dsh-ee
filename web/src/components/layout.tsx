@@ -16,7 +16,7 @@ import { useTranslation } from "react-i18next";
 import { Tip } from "@/components/tip";
 import { CommandPalette, useHashFocus, useSearchShortcut } from "./command-palette";
 import { entryOf, rememberSpace, rememberedSpace, spaceOfPath, splitSpaces, type NavSpace } from "../lib/nav-space";
-import { DemoResetCountdown } from "./demo-reset";
+import { DemoBar } from "./demo-site";
 
 
 /** 个别页面在侧边栏上的附加状态（计数、已关闭、按设置隐藏），按 page_key 挂接。 */
@@ -273,19 +273,7 @@ export function AppLayout() {
 
       <div className="min-w-0 flex-1">
         <main className="mx-auto max-w-[1240px] px-4 py-6 sm:px-8 lg:px-10 lg:py-9">
-          {demo && (
-            <Notice role="status" className="mb-5">
-              {demo.reset ? t("shell.demoReset", { reset: demo.reset }) : t("shell.demo")}
-              {demo.next_reset && (
-                <>
-                  {" "}
-                  <span className="font-medium">
-                    <DemoResetCountdown at={demo.next_reset} />
-                  </span>
-                </>
-              )}
-            </Notice>
-          )}
+          {demo && <DemoBar demo={demo} className="mb-5" />}
           {user?.limited && (
             <Notice role="status" className="mb-5">
               <span className="mr-3">{t(user.reauth ? "shell.limited.admin" : "shell.limited.employee")}</span>

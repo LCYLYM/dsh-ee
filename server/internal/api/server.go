@@ -143,7 +143,7 @@ func (s *Server) newRegistry() *registry.Service {
 	s.opts.DataDir = dir
 	hc := s.opts.NpmUpstream
 	if hc == nil {
-		hc = &http.Client{Transport: s.opts.DemoSite.guard(&http.Transport{
+		hc = &http.Client{Transport: s.opts.DemoSite.guardNpm(&http.Transport{
 			Proxy:                 http.ProxyFromEnvironment,
 			ResponseHeaderTimeout: time.Minute,
 			IdleConnTimeout:       90 * time.Second,

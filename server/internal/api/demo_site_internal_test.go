@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/http"
@@ -74,5 +75,20 @@ func TestNextDemoReset(t *testing.T) {
 		if got := nextDemoReset(c.now, c.every); !got.Equal(c.want) {
 			t.Errorf("now=%s every=%s：得到 %s，应为 %s", c.now.Format("15:04"), c.every, got, c.want)
 		}
+	}
+}
+
+// npm 源的回源：只放行内置公共 registry 的 443，其余照旧只能连自己。
+func TestDemoGuardNpm(t *testing.T) {
+	d := &DemoSite{selfPort: "8095"}
+	tr := d.guardNpm(&http.Transport{})
+	ctx := context.Background()
+	for _, addr := range []string{"93.184.216.34:443", "169.254.169.254:80", "127.0.0.1:9999"} {
+		if _, err := tr.DialContext(ctx, "tcp", addr); !errors.Is(err, errDemoSiteDial) {
+			t.Fatalf("%s 应被拦下：%v", addr, err)
+		}
+	}
+	if (*DemoSite)(nil).guardNpm(tr) != tr {
+		t.Fatal("正常部署应原样返回")
 	}
 }

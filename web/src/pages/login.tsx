@@ -9,6 +9,8 @@ import { ErrorNote } from "../components/api-ui";
 import { LangSwitch } from "../components/lang-switch";
 import { ThemeToggle } from "../components/theme-toggle";
 import { DemoResetCountdown } from "../components/demo-reset";
+import { DemoConnectDsh, DemoPersonas } from "../components/demo-site";
+import type { DemoPersona } from "../lib/api";
 import { useTranslation } from "react-i18next";
 
 /** 只允许站内相对路径，防止 next 参数被拿来做开放重定向。 */
@@ -18,7 +20,7 @@ function safeNext(raw: string | null) {
 
 export default function Login() {
   const { t } = useTranslation();
-  const { user, loading, error: bootError, login } = useAuth();
+  const { user, loading, error: bootError, login, refresh } = useAuth();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const next = safeNext(params.get("next"));
@@ -26,6 +28,10 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 演示站：点了哪张场景卡片、登录后去哪
+  const [picking, setPicking] = useState<string | null>(null);
+  const [pickError, setPickError] = useState<string | null>(null);
+  const [dest, setDest] = useState<string | null>(null);
   const methods = useApi(api.authMethods);
   const ldap = !!methods.data?.ldap;
   const sso = methods.data?.oidc ?? null;
@@ -39,7 +45,23 @@ export default function Login() {
     if (reauth && user) setUsername((current) => current || user.username);
   }, [reauth, user]);
 
-  if (!loading && user && !reauth) return <Navigate to={next} replace />;
+  if (!loading && user && !reauth) return <Navigate to={dest ?? next} replace />;
+
+  const pick = async (p: DemoPersona) => {
+    setPicking(p.username);
+    setPickError(null);
+    try {
+      await api.demoLogin(p.username);
+      // 从设备授权等页面跳过来的（带 next），登录后回到原处；否则直接打开这个人常用的应用
+      setDest(params.get("next") ? next : `/a/${encodeURIComponent(p.app)}`);
+      await refresh();
+    } catch (err) {
+      setPickError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPicking(null);
+    }
+  };
+  const personas = demo?.personas ?? [];
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -62,6 +84,22 @@ export default function Login() {
         <WhaleMark size={36} />
         <span className="text-xl font-bold tracking-[-0.01em]">dsh-ee</span>
       </Link>
+      {personas.length > 0 && (
+        <section className="relative mb-10 w-full max-w-3xl">
+          <div className="mb-6 text-center text-white">
+            <h1 className="text-2xl leading-9 font-bold tracking-[-0.02em] sm:text-[28px]">{t("login.demo.heroTitle")}</h1>
+            <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-white/85">{t("login.demo.heroSubtitle")}</p>
+          </div>
+          {pickError && (
+            <div className="mb-3">
+              <ErrorNote>{pickError}</ErrorNote>
+            </div>
+          )}
+          <DemoPersonas personas={personas} busy={picking} onPick={pick} />
+          <DemoConnectDsh className="mt-3" />
+          <p className="mt-8 text-center text-sm font-medium text-neutral-600 dark:text-neutral-400">{t("login.demo.adminDivider")}</p>
+        </section>
+      )}
       <form onSubmit={submit} className="relative w-full max-w-[400px] rounded-xl bg-card p-7 shadow-modal sm:p-8">
         <h1 className="text-[22px] leading-7 font-bold tracking-[-0.02em] text-neutral-900">{t("login.title")}</h1>
         <p className="mt-1.5 text-sm leading-6 text-neutral-600">{ldap ? t("login.ldapHint") : t("login.subtitle")}</p>
