@@ -378,7 +378,7 @@ export function Field({ label, hint, children }: { label: string; hint?: ReactNo
 
 /** 不带宽度的输入框样式；需要定宽时用它，避免 w-full 与 w-40 这类类名互相覆盖。 */
 export const inputBase =
-  "h-9 rounded-md border border-neutral-300 bg-card px-3 text-sm text-neutral-900 shadow-control outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-neutral-400 hover:border-neutral-400/70 focus:border-brand-500 focus:ring-[3px] focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-500 disabled:shadow-none dark:border-white/15 dark:placeholder:text-neutral-500 dark:hover:border-white/25 dark:focus:border-brand-400";
+  "h-9 rounded-md border border-neutral-300 bg-card px-3 text-sm text-neutral-900 shadow-control outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-neutral-400 hover:border-neutral-400/70 focus:border-brand-500 focus:ring-[3px] focus:ring-brand-500/20 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-500 disabled:shadow-none dark:border-white/15 dark:placeholder:text-neutral-500 dark:hover:border-white/25 dark:focus:border-brand-400";
 
 export const inputCls = `${inputBase} w-full`;
 
