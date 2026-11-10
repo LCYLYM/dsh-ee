@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"mime"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -51,6 +52,8 @@ type Options struct {
 	// 数据中台（datahub.go）；为空表示没开，DataHubErr 说明原因
 	DataHub    *datahub.Hub
 	DataHubErr string
+	// 公开演示站；nil 表示正常部署。见 demo_site.go
+	DemoSite *DemoSite
 }
 
 type Server struct {
@@ -102,14 +105,21 @@ func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Serv
 	if opts.SessionTTL == 0 {
 		opts.SessionTTL = 7 * 24 * time.Hour
 	}
+	if opts.DemoSite != nil {
+		d := *opts.DemoSite
+		if _, port, err := net.SplitHostPort(opts.Addr); err == nil {
+			d.selfPort = port
+		}
+		opts.DemoSite = &d
+	}
 	up := opts.Upstream
 	if up == nil {
-		up = &http.Client{Transport: &http.Transport{
+		up = &http.Client{Transport: opts.DemoSite.guard(&http.Transport{
 			Proxy:                 http.ProxyFromEnvironment,
 			ResponseHeaderTimeout: 2 * time.Minute,
 			IdleConnTimeout:       90 * time.Second,
 			MaxIdleConnsPerHost:   32,
-		}}
+		})}
 	}
 	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), deviceCodeRate: newIPRate(deviceCodePerMinute), deviceTokenRate: newIPRate(deviceTokenPerMinute), upstream: up, connectKick: make(chan struct{}, 1), elevationKick: make(chan struct{}, 1)}
 	s.kb.ix = kb.NewIndex()
@@ -133,12 +143,12 @@ func (s *Server) newRegistry() *registry.Service {
 	s.opts.DataDir = dir
 	hc := s.opts.NpmUpstream
 	if hc == nil {
-		hc = &http.Client{Transport: &http.Transport{
+		hc = &http.Client{Transport: s.opts.DemoSite.guard(&http.Transport{
 			Proxy:                 http.ProxyFromEnvironment,
 			ResponseHeaderTimeout: time.Minute,
 			IdleConnTimeout:       90 * time.Second,
 			MaxIdleConnsPerHost:   16,
-		}}
+		})}
 	}
 	ttl := s.opts.UpstreamTTL
 	if ttl == 0 {

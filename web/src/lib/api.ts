@@ -33,6 +33,13 @@ export interface User {
 }
 
 /** 当前登录用户：带有效权限。前端据此决定显示什么，后端每个接口仍会自行校验。 */
+/** 公开演示站的账号与重置周期；正常部署为 null。 */
+export interface DemoSite {
+  username: string;
+  password: string;
+  reset?: string;
+}
+
 export interface Me extends User {
   is_super: boolean;
   permissions: string[];
@@ -1349,7 +1356,7 @@ export const api = {
   revokeTokens: (input: { ids?: string[]; user_id?: number; client_name?: string; department?: string }) =>
     request<{ revoked: number }>("POST", "/api/admin/tokens/revoke", input),
 
-  authMethods: () => request<{ ldap: boolean; oidc: { name: string } | null }>("GET", "/api/auth/methods", undefined, { silent401: true }),
+  authMethods: () => request<{ ldap: boolean; oidc: { name: string } | null; demo: DemoSite | null }>("GET", "/api/auth/methods", undefined, { silent401: true }),
   oidc: () => request<OidcView>("GET", "/api/admin/auth/oidc"),
   saveOidc: (c: OidcInput) => request<OidcView>("PUT", "/api/admin/auth/oidc", c),
   testOidc: (c: OidcInput) => request<OidcTestResult>("POST", "/api/admin/auth/oidc/test", c),

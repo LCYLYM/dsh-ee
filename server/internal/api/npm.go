@@ -133,6 +133,9 @@ func (s *Server) handleNpm(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusServiceUnavailable, "npm 源没有初始化（数据目录不可写），请检查服务端日志")
 		return
 	}
+	if s.demoSiteNpmWrite(w, r) {
+		return
+	}
 	caller, err := s.npmAuth(r)
 	if errors.Is(err, errBadToken) {
 		writeErr(w, http.StatusUnauthorized, "npm 令牌无效或已吊销，请在 dsh-ee 的「接入指南」里重新生成")

@@ -35,6 +35,8 @@ export default {
       admin: "You opened this page from DSH and were signed in automatically with employee access only. Sign in with your password to use admin features.",
       action: "Sign in with password",
     },
+    demo: "This is a public demo shared by everyone. Don't enter real keys or data.",
+    demoReset: "This is a public demo shared by everyone, reset {{reset}}. Don't enter real keys or data.",
     language: "Language",
     theme: {
       label: "Theme: {{mode}}",

@@ -81,7 +81,7 @@ func (s *Server) oidcHTTP() *oidc.Client {
 	s.oidcOnce.Do(func() {
 		hc := s.opts.OIDCClient
 		if hc == nil {
-			hc = &http.Client{Timeout: 15 * time.Second, Transport: &http.Transport{Proxy: http.ProxyFromEnvironment}}
+			hc = &http.Client{Timeout: 15 * time.Second, Transport: s.opts.DemoSite.guard(&http.Transport{Proxy: http.ProxyFromEnvironment})}
 		}
 		s.oidcClient = oidc.NewClient(hc)
 	})

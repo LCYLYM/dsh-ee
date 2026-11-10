@@ -39,6 +39,10 @@ type Config struct {
 	DataDSN string
 	// 数据中台的只读账号（DSH_EE_DATA_READ_DSN）；不填时用 DataDSN 的账号自动建一个只有 SELECT 权限的账号。
 	DataReadDSN string
+	// 公开演示站（DSH_EE_DEMO_MODE）：登录页显示初始管理员账号，关掉改密码等会把别人锁在外面的操作，
+	// 对外请求只许连本机。DemoReset 是给访客看的重置周期说明，如「每 6 小时」。
+	DemoMode  bool
+	DemoReset string
 }
 
 func Load() (*Config, error) {
@@ -85,6 +89,17 @@ func Load() (*Config, error) {
 			return nil, fmt.Errorf("DSH_EE_COOKIE_SECURE: %w", err)
 		}
 		c.CookieSecure = b
+	}
+	if v := os.Getenv("DSH_EE_DEMO_MODE"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("DSH_EE_DEMO_MODE: %w", err)
+		}
+		c.DemoMode = b
+	}
+	c.DemoReset = strings.TrimSpace(os.Getenv("DSH_EE_DEMO_RESET"))
+	if c.DemoMode && c.BootstrapAdminPassword == "" {
+		return nil, errors.New("DSH_EE_DEMO_MODE 需要同时设置 DSH_EE_BOOTSTRAP_ADMIN_PASSWORD：登录页要把演示账号显示出来")
 	}
 	if v := os.Getenv("DSH_EE_SESSION_TTL"); v != "" {
 		d, err := time.ParseDuration(v)

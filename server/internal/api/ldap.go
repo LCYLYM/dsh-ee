@@ -313,7 +313,7 @@ func (s *Server) handleAuthMethods(w http.ResponseWriter, r *http.Request) {
 	if cfg, ok := s.oidcEnabled(r.Context()); ok {
 		sso = map[string]string{"name": cfg.Name}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ldap": s.ldapEnabled(r.Context()), "oidc": sso})
+	writeJSON(w, http.StatusOK, map[string]any{"ldap": s.ldapEnabled(r.Context()), "oidc": sso, "demo": s.demoSiteInfo()})
 }
 
 // ---- 登录 ----

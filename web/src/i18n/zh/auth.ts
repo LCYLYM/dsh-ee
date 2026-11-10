@@ -12,6 +12,12 @@ export default {
     ldapForgot: "域账号密码请在公司的账号系统里找回；本地账号忘记密码请联系管理员。",
     reauth: "你现在是从 DSH 自动登录的，只有员工权限。输入密码登录后可以使用全部功能。",
     handoffExpired: "从 DSH 打开的登录链接已失效（只能用一次，1 分钟内有效），请登录后继续。",
+    demo: {
+      title: "这是公开的演示站",
+      account: "用户名 {{username}} · 密码 {{password}}",
+      reset: "数据{{reset}}重置一次，随便试。",
+      fill: "填入演示账号",
+    },
   },
   account: {
     title: "账号",

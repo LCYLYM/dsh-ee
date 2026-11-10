@@ -38,11 +38,14 @@ func (r route) handler(s *Server) http.Handler {
 	case authAgent:
 		return s.requireAgent(r.inner(s))
 	}
-	return r.h
+	return r.inner(s)
 }
 
 // inner 是认证之后的处理链：权限点校验加处理函数。Agent 工具调用直接走这里。
 func (r route) inner(s *Server) http.Handler {
+	if s.opts.DemoSite != nil && demoSiteBlocked[r.pattern] {
+		return http.HandlerFunc(demoSiteRefuse)
+	}
 	if len(r.perms) > 0 {
 		return s.requirePerm(r.perms...)(r.h)
 	}

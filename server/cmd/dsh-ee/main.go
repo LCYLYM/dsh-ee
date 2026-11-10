@@ -94,6 +94,7 @@ func run(log *slog.Logger) error {
 		AdminModeUnit: cfg.AdminModeUnit,
 		DataHub:       dataHub,
 		DataHubErr:    dataErr,
+		DemoSite:      demoSite(cfg),
 	}, log)
 
 	go sweepSessions(ctx, st, log)
@@ -170,4 +171,12 @@ func sweepSessions(ctx context.Context, st *store.Store, log *slog.Logger) {
 			}
 		}
 	}
+}
+
+// demoSite 把配置里的演示站开关转成服务端选项；没开时返回 nil。
+func demoSite(cfg *config.Config) *api.DemoSite {
+	if !cfg.DemoMode {
+		return nil
+	}
+	return &api.DemoSite{Username: cfg.BootstrapAdmin, Password: cfg.BootstrapAdminPassword, Reset: cfg.DemoReset}
 }

@@ -9,7 +9,8 @@ import { LangSwitch } from "./lang-switch";
 import { ThemeToggle } from "./theme-toggle";
 import { useLabels } from "../lib/labels";
 import { MenuIcon } from "../lib/icons";
-import type { Menu } from "../lib/api";
+import { api, type Menu } from "../lib/api";
+import { useApi } from "../lib/use-api";
 import { cx, Notice } from "./ui";
 import { useTranslation } from "react-i18next";
 import { Tip } from "@/components/tip";
@@ -225,6 +226,8 @@ function Sidebar({ onNavigate, onSearch }: { onNavigate: () => void; onSearch: (
 export function AppLayout() {
   const { settings } = useStore();
   const { user } = useAuth();
+  // 公开演示站：每页顶上提醒共用账号、会重置
+  const demo = useApi(api.authMethods).data?.demo ?? null;
   const { search } = useLocation();
   const [open, setOpen] = useState(false);
   const { t } = useTranslation();
@@ -269,6 +272,11 @@ export function AppLayout() {
 
       <div className="min-w-0 flex-1">
         <main className="mx-auto max-w-[1240px] px-4 py-6 sm:px-8 lg:px-10 lg:py-9">
+          {demo && (
+            <Notice role="status" className="mb-5">
+              {demo.reset ? t("shell.demoReset", { reset: demo.reset }) : t("shell.demo")}
+            </Notice>
+          )}
           {user?.limited && (
             <Notice role="status" className="mb-5">
               <span className="mr-3">{t(user.reauth ? "shell.limited.admin" : "shell.limited.employee")}</span>

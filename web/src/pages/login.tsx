@@ -28,6 +28,7 @@ export default function Login() {
   const methods = useApi(api.authMethods);
   const ldap = !!methods.data?.ldap;
   const sso = methods.data?.oidc ?? null;
+  const demo = methods.data?.demo ?? null;
   // 企业统一登录失败时，回调把原因放在 oidc_error 里带回来
   const ssoError = params.get("oidc_error");
   // 从 DSH 自动登录的会话只带员工权限：带 reauth=1 进来时照常显示登录表单
@@ -66,6 +67,25 @@ export default function Login() {
         {(reauth || handoffExpired) && (
           <Notice role="status" className="mt-4">
             {t(reauth ? "login.reauth" : "login.handoffExpired")}
+          </Notice>
+        )}
+        {demo && (
+          <Notice role="status" className="mt-4">
+            <p className="font-medium">{t("login.demo.title")}</p>
+            <p className="mt-1 font-mono text-[13px]">{t("login.demo.account", { username: demo.username, password: demo.password })}</p>
+            {demo.reset && <p className="mt-1">{t("login.demo.reset", { reset: demo.reset })}</p>}
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="mt-2"
+              onClick={() => {
+                setUsername(demo.username);
+                setPassword(demo.password);
+              }}
+            >
+              {t("login.demo.fill")}
+            </Button>
           </Notice>
         )}
         {sso && (

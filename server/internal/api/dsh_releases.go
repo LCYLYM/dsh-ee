@@ -55,7 +55,7 @@ func (s *Server) initDshReleases() {
 	s.releaseKick = make(chan struct{}, 1)
 	s.releaseJobs = map[string]bool{}
 	s.releaseHTTP = &http.Client{
-		Transport: &http.Transport{Proxy: http.ProxyFromEnvironment, ResponseHeaderTimeout: time.Minute, IdleConnTimeout: 90 * time.Second},
+		Transport: s.opts.DemoSite.guard(&http.Transport{Proxy: http.ProxyFromEnvironment, ResponseHeaderTimeout: time.Minute, IdleConnTimeout: 90 * time.Second}),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if !s.releaseURLAllowed(req.URL.String()) {
 				return fmt.Errorf("拒绝重定向到非官方地址：%s", req.URL.Redacted())

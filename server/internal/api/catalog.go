@@ -823,7 +823,7 @@ func (s *Server) registryClient() *http.Client {
 	if s.opts.NpmUpstream != nil {
 		return s.opts.NpmUpstream
 	}
-	return &http.Client{Timeout: 15 * time.Second, Transport: &http.Transport{Proxy: http.ProxyFromEnvironment}}
+	return &http.Client{Timeout: 15 * time.Second, Transport: s.opts.DemoSite.guard(&http.Transport{Proxy: http.ProxyFromEnvironment})}
 }
 
 // ---- 上游预载 ----
