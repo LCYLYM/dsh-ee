@@ -167,7 +167,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	s.startWebSession(w, r, u)
+}
 
+// startWebSession 建网页会话、写 cookie，并返回和 /api/auth/me 一样的内容。密码登录与演示站的一键体验共用。
+func (s *Server) startWebSession(w http.ResponseWriter, r *http.Request, u *store.User) {
 	token := secret.Token()
 	if err := s.store.CreateSession(r.Context(), secret.Hash(token), u.ID, s.opts.SessionTTL); err != nil {
 		s.internalErr(w, r, err)

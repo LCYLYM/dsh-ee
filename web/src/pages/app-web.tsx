@@ -9,6 +9,7 @@ import { LoadState } from "../components/api-ui";
 import { AppDataPanel } from "../components/app-data";
 import { Card, Notice, Empty, tabCls } from "../components/ui";
 import { WhaleMark } from "../components/whale-mark";
+import { DemoBar } from "../components/demo-site";
 import { LivePane } from "../components/live-pane";
 import type { WorkbenchPane } from "../lib/workbench-render";
 
@@ -32,6 +33,7 @@ export default function AppWebPage() {
 function AppWeb({ app }: { app: WebApp }) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const demo = useApi(api.authMethods).data?.demo ?? null;
   const panes = (app.workbench?.panes ?? []).filter((p) => p.type === "panel");
   const tabs = [...panes.map((p) => ({ id: p.id, title: p.title })), ...(app.tables ? [{ id: "@data", title: t("appWeb.dataTab") }] : [])];
   const [tab, setTab] = useState(tabs[0]?.id ?? "@data");
@@ -74,6 +76,7 @@ function AppWeb({ app }: { app: WebApp }) {
         )}
       </header>
       <main className="mx-auto max-w-6xl px-2 py-4 sm:px-4 sm:py-6">
+        {demo && <DemoBar demo={demo} className="mx-2 mb-3 sm:mx-3.5" />}
         {!app.web && <Notice tone="warn" className="mx-2 mb-3 sm:mx-3.5">{t("appWeb.previewOnly")}</Notice>}
         {first && (app.description || (app.highlights?.length ?? 0) > 0) && (
           <section className="mx-2 mb-1 sm:mx-3.5">

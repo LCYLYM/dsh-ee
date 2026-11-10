@@ -89,6 +89,7 @@ func (s *Server) routes() []route {
 		pub("GET /api/auth/oidc/callback", s.handleOIDCCallback),
 		pub("GET /api/auth/handoff", s.handleAuthHandoff),
 		pub("POST /api/auth/login", s.handleLogin),
+		pub("POST /api/auth/demo-login", s.handleDemoLogin),
 		pub("POST /api/auth/logout", s.handleLogout),
 		usr("GET /api/auth/me", s.handleMe),
 		usr("POST /api/auth/password", s.handleChangePassword),

@@ -38,6 +38,12 @@ export default {
     },
     demo: "This is a public demo shared by everyone. Don't enter real keys or data.",
     demoReset: "This is a public demo shared by everyone, reset {{reset}}. Don't enter real keys or data.",
+    demoPersona: {
+      you: "Demo: you are {{name}} ({{dept}} · {{title}}).",
+      tryInDsh: "The web page shows the app's workbench. Connect DSH, type /{{app}} and ask \"{{q}}\".",
+      switch: "Switch person",
+      workbench: "My workbench",
+    },
     demoNext: {
       left: "Next reset in {{left}} ({{time}})",
       hm: "{{h}} h {{m}} min",

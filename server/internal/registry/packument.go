@@ -60,12 +60,18 @@ func (p *Packument) Encode(tarballBase string, abbreviated bool) ([]byte, error)
 			"shasum":    v.Shasum,
 			"tarball":   TarballURL(tarballBase, p.Name, v.Version),
 		}
-		// 保留上游 dist 里与地址无关的统计字段；签名与来源证明绑定上游 registry 的公钥，去掉
+		// 保留上游 dist 里与地址无关的字段。signatures 签的是「名字@版本:integrity」，和 tarball 地址无关，
+		// integrity 又是原样透传的，所以照样能用 npm 的公钥验过：corepack 经本源下载 pnpm 时要验这个，缺了就装不上。
+		// attestations 指向上游 registry 的地址，去掉。
 		if old, ok := v.Manifest["dist"].(map[string]any); ok {
 			for _, k := range []string{"fileCount", "unpackedSize"} {
 				if x, ok := old[k]; ok {
 					dist[k] = x
 				}
+			}
+			// 只在 integrity 和签名时的一致时带上，免得给别的内容配上不相干的签名
+			if x, ok := old["signatures"]; ok && v.Integrity != "" && old["integrity"] == v.Integrity {
+				dist["signatures"] = x
 			}
 		}
 		doc["dist"] = dist

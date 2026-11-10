@@ -159,7 +159,7 @@ func TestPackumentEncode(t *testing.T) {
 	p := &Packument{
 		Name: "@acme/x",
 		Versions: []Version{
-			{Version: "1.0.0", Manifest: map[string]any{"name": "@acme/x", "version": "1.0.0", "scripts": map[string]any{"install": "node-gyp rebuild"}, "_resolved": "https://registry.npmjs.org/x", "dist": map[string]any{"tarball": "https://registry.npmjs.org/x.tgz", "signatures": []any{"x"}, "unpackedSize": 10.0}}, Integrity: "sha512-a", Shasum: "b", Time: time.Unix(1700000000, 0)},
+			{Version: "1.0.0", Manifest: map[string]any{"name": "@acme/x", "version": "1.0.0", "scripts": map[string]any{"install": "node-gyp rebuild"}, "_resolved": "https://registry.npmjs.org/x", "dist": map[string]any{"tarball": "https://registry.npmjs.org/x.tgz", "integrity": "sha512-a", "signatures": []any{"x"}, "attestations": map[string]any{"url": "https://registry.npmjs.org/-/npm/v1/attestations/x"}, "unpackedSize": 10.0}}, Integrity: "sha512-a", Shasum: "b", Time: time.Unix(1700000000, 0)},
 			{Version: "2.0.0-beta.1", Manifest: map[string]any{"description": "d"}, Integrity: "sha512-c", Shasum: "d", Time: time.Unix(1700001000, 0)},
 		},
 		DistTags: map[string]string{"latest": "9.9.9", "beta": "2.0.0-beta.1"},
@@ -179,7 +179,7 @@ func TestPackumentEncode(t *testing.T) {
 	}
 	v1 := doc.Versions["1.0.0"]
 	dist := v1["dist"].(map[string]any)
-	if dist["tarball"] != "https://dsh.example/npm/@acme/x/-/x-1.0.0.tgz" || dist["signatures"] != nil || dist["unpackedSize"] != 10.0 || v1["_resolved"] != nil {
+	if dist["tarball"] != "https://dsh.example/npm/@acme/x/-/x-1.0.0.tgz" || dist["signatures"] == nil || dist["attestations"] != nil || dist["unpackedSize"] != 10.0 || v1["_resolved"] != nil {
 		t.Fatalf("dist 改写不对：%v / %v", dist, v1)
 	}
 	if doc.Time["created"] == "" || doc.Time["1.0.0"] == "" {
@@ -321,5 +321,21 @@ func TestReadTarball(t *testing.T) {
 	}
 	if _, err := ReadTarball(bytes.NewReader(tgz(t, map[string]string{"package/a.js": "x"})), "", 10, nil); err != ErrNoPackageJSON {
 		t.Fatalf("没有 package.json 应报错：%v", err)
+	}
+}
+
+// integrity 和上游签名时的不一致（内容换过）就不带签名。
+func TestPackumentSignatureMismatch(t *testing.T) {
+	p := &Packument{Name: "x", Versions: []Version{{Version: "1.0.0", Manifest: map[string]any{"dist": map[string]any{"integrity": "sha512-old", "signatures": []any{"x"}}}, Integrity: "sha512-new", Shasum: "b", Time: time.Unix(1700000000, 0)}}}
+	full, err := p.Encode("https://dsh.example/npm", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Versions map[string]map[string]any `json:"versions"`
+	}
+	_ = json.Unmarshal(full, &doc)
+	if dist := doc.Versions["1.0.0"]["dist"].(map[string]any); dist["signatures"] != nil {
+		t.Fatalf("integrity 不一致时不应带签名：%v", dist)
 	}
 }

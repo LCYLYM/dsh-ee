@@ -2,22 +2,46 @@
 
 # dsh-ee
 
-**[DeepSeek Harness（DSH）](https://github.com/deepseek-ai/deepseek-harness) 企业私有部署平台**
+**让每位员工的 DSH 都认识你的公司**
 
-接入企业现有系统与知识，组装成带 AI 的微应用，审核授权后送到每位员工的 DSH 里运行。
+把 ERP、CRM、数仓和制度文档接进来，组装成 AI 微应用，审核授权后送到每位员工的 [DeepSeek Harness（DSH）](https://github.com/deepseek-ai/deepseek-harness)。<br>
+数据和凭据都留在你自己的服务器上，每一次调用都可以审计。
 
 [English](./README.md) · 简体中文
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 
-**在线演示：[demo.hikariming.com](https://demo.hikariming.com/)**
+### [→ 在线试一下，不用装任何东西](https://demo.hikariming.com/)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.zh-CN.png">
-  <img alt="dsh-ee：企业现有系统与资产接入 dsh-ee，组装成微应用，在员工本机的 DSH 里运行" src="docs/images/hero-light.zh-CN.png">
-</picture>
+<img alt="dsh-ee 介绍：员工在 DSH 里问一句，AI 查 CRM、引用产品资料给出答案；管理员在 dsh-ee 里接入系统、审核授权、查看调用记录" src="docs/images/intro.zh-CN.gif" width="820">
 
 </div>
+
+## 在线试一下
+
+打开 [demo.hikariming.com](https://demo.hikariming.com/)，选一位示例公司「星河科技」的员工就能进去，不用注册：
+
+- **周航 · 客户经理**：在「客户拜访简报」里看自己负责的客户、哪些快到期、谁该去拜访了
+- **陈一 · 费用会计**：在「出差报销助手」里核对报销单，找出住宿超标、发票重复的单子
+- **郑小雨 · 新员工**：在「新人入职助手」里看第一周要做的事
+- **刘洋 · IT 主管**：在「IT 服务台」里看积压的工单和常见故障
+
+也可以用管理员账号登录（登录页上有），看看系统是怎么接入、应用是怎么审核授权的，每次调用又是怎么记下来的。
+
+**已经装了 DSH？** 在终端运行 `curl -fsSL https://demo.hikariming.com/setup.sh | sh`（Windows 用 `irm https://demo.hikariming.com/setup.ps1 | iex`），在浏览器里选一位员工确认登录，然后在 DSH 里输入 `/customer-brief`，问一句「给华东精密制造生成一份拜访简报」。演示站不提供模型，DSH 用的是你自己配好的模型。
+
+## 三个场景
+
+| 谁 | 在 DSH 里问 | AI 做了什么 |
+|---|---|---|
+| 客户经理 | 「华东精密制造下周续约，我要注意什么？」 | 调 CRM 查到合同 21 天后到期、75 天没有拜访；查产品资料确认续约最多 9 折，再低要销售总监审批 |
+| 费用会计 | 「本月报销单里有没有异常？」 | 调差旅系统列出 4 张异常单，按差旅制度逐条说明哪里超标 |
+| 新员工 | 「VPN 连不上，提示证书错误」 | 先按 IT 排障手册一步步排查，解决不了再帮你在工单系统里建单（建单前先让你确认） |
+
+## 适合谁
+
+- **适合**：已经让员工用、或者准备让员工用 DeepSeek / DSH 的公司（几十人到几千人都可以），想让 AI 用上公司自己的系统和知识，同时担心数据外泄、权限失控、出了问题查不到。
+- **不适合**：个人使用；只想要一个网页聊天框；不打算让员工在自己电脑上装 DSH。
 
 ## 为什么是 dsh-ee
 
@@ -46,6 +70,11 @@ dsh-ee 本身不跑 AI：**推理与工具调用都在员工本机的 DSH 里**�
 - **信创友好**：单个 Go 静态二进制（linux/amd64、arm64），数据库用 OceanBase 或 TiDB，支持完全离线部署。
 
 ## 架构
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.zh-CN.png">
+  <img alt="dsh-ee：企业现有系统与资产接入 dsh-ee，组装成微应用，在员工本机的 DSH 里运行" src="docs/images/hero-light.zh-CN.png">
+</picture>
 
 ```mermaid
 flowchart LR

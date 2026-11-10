@@ -1,0 +1,20 @@
+{
+  "name": "dsh-ee-promo",
+  "private": true,
+  "description": "dsh-ee 介绍视频（Remotion）。不进主构建。",
+  "scripts": {
+    "studio": "remotion studio",
+    "render:zh": "remotion render src/index.ts intro-zh out/intro-zh.mp4",
+    "render:en": "remotion render src/index.ts intro-en out/intro-en.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.542",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.542"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}

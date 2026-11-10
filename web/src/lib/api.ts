@@ -40,6 +40,18 @@ export interface DemoSite {
   reset?: string;
   /** 下次重置的时间点（RFC 3339）；服务端没配重置间隔时没有 */
   next_reset?: string;
+  /** 登录页的场景卡片：以哪位示例员工的身份、打开哪个应用、问什么 */
+  personas?: DemoPersona[];
+}
+
+export interface DemoPersona {
+  username: string;
+  display_name: string;
+  department: string;
+  title: string;
+  app: string;
+  app_title: string;
+  try: string;
 }
 
 export interface Me extends User {
@@ -1268,6 +1280,8 @@ export interface KBUploadResult {
 }
 
 export const api = {
+  /** 演示站：一键以示例员工的身份登录 */
+  demoLogin: (username: string) => request<Me>("POST", "/api/auth/demo-login", { username }),
   login: (username: string, password: string) =>
     request<User>("POST", "/api/auth/login", { username, password }, { silent401: true }),
   logout: () => request<void>("POST", "/api/auth/logout"),

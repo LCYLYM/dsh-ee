@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"syscall"
 	"time"
+
+	"github.com/hikariming/dsh-ee/server/internal/store"
 )
 
 // 公开演示站（DSH_EE_DEMO_MODE）：所有访客共用初始管理员账号，数据由 deploy/demo 的脚本定期清空重来。
@@ -101,12 +104,40 @@ func (d *DemoSite) guard(t *http.Transport) *http.Transport {
 	return t
 }
 
+// demoNpmHosts 是演示站 npm 源可以回源的地址：只有内置的两个公共 registry（按主机名，不认访客改的自定义上游）。
+// DSH 装接入插件时 pnpm 可能要经 npm 源下载自己的指定版本（@pnpm/exe），回源被拦就装不上。
+// npm 发布在演示站本来就关掉了，这里放开的只是公共包的只读转发。
+var demoNpmHosts = map[string]bool{
+	"registry.npmjs.org":     true,
+	"registry.npmmirror.com": true,
+	"cdn.npmmirror.com":      true,
+}
+
+// guardNpm 和 guard 一样只许连自己，另外放行 demoNpmHosts 的 443 端口。正常部署（d 为 nil）原样返回。
+func (d *DemoSite) guardNpm(t *http.Transport) *http.Transport {
+	if d == nil {
+		return t
+	}
+	t = d.guard(t)
+	guarded := t.DialContext
+	open := &net.Dialer{Timeout: 10 * time.Second}
+	t.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if host, port, err := net.SplitHostPort(addr); err == nil && port == "443" && demoNpmHosts[strings.ToLower(host)] {
+			return open.DialContext(ctx, network, addr)
+		}
+		return guarded(ctx, network, addr)
+	}
+	return t
+}
+
 type demoSiteInfo struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Reset    string `json:"reset,omitempty"`
 	// 下次重置的时间点；没配 ResetEvery 时不给
 	NextReset *time.Time `json:"next_reset,omitempty"`
+	// 登录页上的场景卡片：以哪位示例员工的身份、打开哪个应用、问什么
+	Personas []demoGuideStep `json:"personas"`
 }
 
 // nextDemoReset 按 cron「0 */N * * *」的规律算下次重置：从当地零点起每隔 every 一次，到第二天零点重新对齐。
@@ -127,10 +158,58 @@ func (s *Server) demoSiteInfo() *demoSiteInfo {
 	if d == nil {
 		return nil
 	}
-	info := &demoSiteInfo{Username: d.Username, Password: d.Password, Reset: d.Reset}
+	info := &demoSiteInfo{Username: d.Username, Password: d.Password, Reset: d.Reset, Personas: demoGuide()}
 	if d.ResetEvery > 0 {
 		next := nextDemoReset(time.Now(), d.ResetEvery)
 		info.NextReset = &next
 	}
 	return info
+}
+
+// handleDemoLogin：演示站上一键以示例员工的身份登录，不用输密码。
+// 只认示例公司的员工账号；访客本来就能用共享的管理员账号登录，这里没有多给权限，只是省掉找密码这一步。
+// 正常部署不开放（404）。
+func (s *Server) handleDemoLogin(w http.ResponseWriter, r *http.Request) {
+	if s.opts.DemoSite == nil {
+		writeErr(w, http.StatusNotFound, "not found")
+		return
+	}
+	var req struct {
+		Username string `json:"username"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	name := strings.ToLower(strings.TrimSpace(req.Username))
+	if !isDemoUser(name) {
+		writeErr(w, http.StatusBadRequest, "只能用示例公司员工的身份体验")
+		return
+	}
+	u, err := s.store.GetUserByUsername(r.Context(), name)
+	if notFound(err) {
+		writeErr(w, http.StatusNotFound, "示例数据正在重置，请过一分钟再试")
+		return
+	}
+	if err != nil {
+		s.internalErr(w, r, err)
+		return
+	}
+	if u.Disabled || u.AccountType != store.AccountHuman {
+		writeErr(w, http.StatusForbidden, "这个示例账号已停用")
+		return
+	}
+	if err := s.store.TouchLogin(r.Context(), u.ID); err != nil {
+		s.log.Warn("记录登录时间失败", "err", err)
+	}
+	s.auditAs(r, u, auditLogin, u.Username, map[string]any{"via": "demo"})
+	s.startWebSession(w, r, u)
+}
+
+func isDemoUser(name string) bool {
+	for _, u := range demoUsers {
+		if u.Username == name {
+			return true
+		}
+	}
+	return false
 }

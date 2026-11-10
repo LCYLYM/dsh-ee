@@ -2,23 +2,49 @@
 
 # dsh-ee
 
-**Self-hosted enterprise platform for [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness)**
+**Your company, inside every employee's Harness**
 
-Connect your existing systems and company knowledge, assemble them into AI micro-apps,
-and ship them, reviewed and permissioned, to every employee's DSH.
+Connect your ERP, CRM, data warehouse and policy docs, assemble them into AI micro-apps,<br>
+and ship them, reviewed and permissioned, to every employee's [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness).<br>
+Data and credentials stay on your own server, and every call can be audited.
 
 English · [简体中文](./README.zh-CN.md)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 
-**Live demo: [demo.hikariming.com](https://demo.hikariming.com/)**
+### [→ Try the live demo, nothing to install](https://demo.hikariming.com/)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
-  <img alt="dsh-ee: existing systems and company assets flow into dsh-ee, get assembled into micro-apps, and run in each employee's DSH" src="docs/images/hero-light.png">
-</picture>
+<img alt="dsh-ee intro: an employee asks in DSH, the AI checks the CRM and cites the product docs; the admin connects systems, grants access and reviews the call log in dsh-ee" src="docs/images/intro.gif" width="820">
 
 </div>
+
+## Try it
+
+Open [demo.hikariming.com](https://demo.hikariming.com/) and pick an employee of the sample company, Xinghe Tech. No sign-up needed:
+
+- **Zhou Hang, account manager**: see the customers he owns, which contracts are about to expire and who needs a visit, in *Customer visit brief*
+- **Chen Yi, expense accountant**: check expense claims and spot over-limit hotels and duplicate invoices in *Travel expense assistant*
+- **Zheng Xiaoyu, new hire**: see what to do in the first week in *Onboarding buddy*
+- **Liu Yang, IT lead**: see the ticket backlog and common issues in *IT service desk*
+
+You can also sign in as the admin (the account is on the sign-in page) to see how systems are connected, how apps are reviewed and permissioned, and how every call is logged.
+
+The sample company's data is in Chinese.
+
+**Already have DSH?** Run `curl -fsSL https://demo.hikariming.com/setup.sh | sh` (on Windows, `irm https://demo.hikariming.com/setup.ps1 | iex`), pick an employee in the browser to approve the sign-in, then type `/customer-brief` in DSH and ask for a visit brief on 华东精密制造. The demo doesn't provide a model: DSH uses the one you've already set up.
+
+## Three scenarios
+
+| Who | Asks in DSH | What the AI does |
+|---|---|---|
+| Account manager | "Huadong Precision renews next week. What should I watch out for?" | Calls the CRM: the contract ends in 21 days and there's been no visit in 75 days. Checks the product docs: renewals get at most 10% off, and anything more needs the sales director's approval |
+| Expense accountant | "Any problems in this month's expense claims?" | Calls the travel system, lists the 4 flagged claims, and explains each one against the travel policy |
+| New hire | "VPN won't connect, it says certificate error" | Walks through the IT troubleshooting guide step by step, and if that doesn't fix it, files a ticket (after asking you to confirm) |
+
+## Who it's for
+
+- **For**: companies, from dozens to thousands of people, whose employees use or will use DeepSeek / DSH, that want the AI to work with their own systems and knowledge, and that worry about data leaks, uncontrolled access and calls nobody can trace.
+- **Not for**: personal use; teams that only want a chat page in the browser; companies that don't plan to have employees install DSH on their computers.
 
 ## Why dsh-ee
 
@@ -47,6 +73,11 @@ dsh-ee is not an AI runtime. **Inference and tool calls run in each employee's l
 - **Runs on domestic infrastructure**: a single static Go binary for linux/amd64 and arm64. Runs on OceanBase or TiDB and works fully offline.
 
 ## Architecture
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
+  <img alt="dsh-ee: existing systems and company assets flow into dsh-ee, get assembled into micro-apps, and run in each employee's DSH" src="docs/images/hero-light.png">
+</picture>
 
 ```mermaid
 flowchart LR
