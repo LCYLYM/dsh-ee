@@ -55,7 +55,11 @@ func getScript(t *testing.T, base, path string) string {
 }
 
 func TestSetupScripts(t *testing.T) {
-	ts, _ := setupScriptServer(t)
+	ts, admin := setupScriptServer(t)
+	// 先发布接入插件：只有 pkg 非空时 setup.ps1 才会走“装好插件”的收尾分支，
+	// $Base/hub 的提示和 CONNECT_PKG 相关断言都在这条分支上。
+	code, body := admin.do("POST", "/api/admin/connect/publish", map[string]bool{"force": true}, nil)
+	expect(t, "发布接入插件", code, 200, body)
 	sh := getScript(t, ts.URL, "/setup.sh")
 	for _, want := range []string{"node -e", "/api/device/code", "/api/device/token", "--token", "DSH_EE_SETUP_INTERACTIVE", "token.pending", `if [ "$DEVICE_LOGIN" -eq 0 ]`, "${PENDING_FILE}，", "${ENV_FILE}（"} {
 		if !strings.Contains(sh, want) {
@@ -78,6 +82,20 @@ func TestSetupScripts(t *testing.T) {
 		if !strings.Contains(ps, want) {
 			t.Errorf("setup.ps1 缺少 %q", want)
 		}
+	}
+	// Windows PowerShell 5 的 Set-Content -Encoding utf8 会写 BOM；Node 的 process.loadEnvFile
+	// 会把 BOM 算进变量名，导致 .env 里的 DSHEE_TOKEN 读不到。
+	if strings.Contains(ps, "Set-Content -Path $EnvFile") {
+		t.Error("setup.ps1 写 .env 不能用 Set-Content -Encoding utf8（PowerShell 5 会加 BOM）")
+	}
+	if !strings.Contains(ps, "[System.IO.File]::WriteAllLines($EnvFile") {
+		t.Error("setup.ps1 写 .env 应该用 [System.IO.File]::WriteAllLines，避免 BOM")
+	}
+	if !strings.Contains(ps, "icacls $EnvFile") {
+		t.Error("setup.ps1 写 .env 后应该收紧 ACL，和 .npmrc / token.pending 一致")
+	}
+	if !strings.Contains(ps, `Write-Host "以后在 $Base/hub`) {
+		t.Error("setup.ps1 的收尾提示应该用双引号，否则 $Base 不会展开")
 	}
 }
 
