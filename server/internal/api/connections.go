@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/hikariming/dsh-ee/server/internal/mcp"
 	"github.com/hikariming/dsh-ee/server/internal/openapi"
@@ -245,7 +246,7 @@ func (s *Server) doConnectionCall(ctx context.Context, a *store.Asset, t *store.
 			s.dropConnClient(a.ID)
 			return nil, err
 		}
-		return res, nil
+		return limitMCPResult(res, connResultLimit), nil
 	case "openapi":
 		var op openapi.Operation
 		if err := json.Unmarshal(t.Operation, &op); err != nil {
@@ -281,6 +282,61 @@ func (s *Server) doConnectionCall(ctx context.Context, a *store.Asset, t *store.
 		return mcp.TextResult(text, false), nil
 	}
 	return nil, errors.New("未知的连接类型")
+}
+
+// limitMCPResult 让 MCP 连接的结果与 OpenAPI 连接一样受 connResultLimit 约束。
+// 上游一次返回几 MB（整张表、整份日志）会直接撑爆模型上下文或白烧 token，
+// 所以超长时文字块按剩余额度截断，非文字块（如 base64 图片）和 structuredContent 丢弃，
+// 末尾提示模型缩小查询范围；isError 原样保留。
+func limitMCPResult(raw json.RawMessage, limit int) json.RawMessage {
+	if len(raw) <= limit {
+		return raw
+	}
+	var r struct {
+		Content []map[string]any `json:"content"`
+		IsError bool             `json:"isError"`
+	}
+	if err := json.Unmarshal(raw, &r); err != nil {
+		return mcp.TextResult("结果过长且无法解析，已丢弃；请缩小查询范围后重试", true)
+	}
+	var b strings.Builder
+	left := limit
+	dropped := 0
+	for _, c := range r.Content {
+		text, ok := c["text"].(string)
+		if c["type"] != "text" || !ok {
+			dropped++
+			continue
+		}
+		if left <= 0 {
+			break
+		}
+		if b.Len() > 0 {
+			b.WriteString("\n")
+		}
+		if len(text) > left {
+			text = cutUTF8(text, left)
+		}
+		b.WriteString(text)
+		left -= len(text)
+	}
+	note := fmt.Sprintf("\n…（结果过长，只保留前 %d KB", limit>>10)
+	if dropped > 0 {
+		note += fmt.Sprintf("，另有 %d 个非文字内容未返回", dropped)
+	}
+	note += "；请缩小查询范围或分页后再查）"
+	return mcp.TextResult(b.String()+note, r.IsError)
+}
+
+// cutUTF8 截到不超过 n 字节，且不切断多字节字符。
+func cutUTF8(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
 }
 
 // ---- 管理接口 ----
