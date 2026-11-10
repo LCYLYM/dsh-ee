@@ -822,6 +822,8 @@ func (s *Server) handleMCPStream(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-s.streamsDone:
+			return
 		case <-ping.C:
 			_, _ = io.WriteString(w, ": ping\n\n")
 		case <-ch:

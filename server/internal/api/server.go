@@ -69,6 +69,9 @@ type Server struct {
 	settings        settingsCache
 	// 能力目录变化的通知（DSH 的 MCP 长连接据此刷新工具）
 	hub hubBroker
+	// 停机时关闭，让 /mcp 事件流自己结束
+	streamsDone chan struct{}
+	streamsOnce sync.Once
 	// 上游 MCP 连接的缓存，按资产 id
 	conns connClients
 	// 示例内容里演示差旅系统的内存数据
@@ -121,13 +124,20 @@ func New(st *store.Store, box *secret.Box, opts Options, log *slog.Logger) *Serv
 			MaxIdleConnsPerHost:   32,
 		})}
 	}
-	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), deviceCodeRate: newIPRate(deviceCodePerMinute), deviceTokenRate: newIPRate(deviceTokenPerMinute), upstream: up, connectKick: make(chan struct{}, 1), elevationKick: make(chan struct{}, 1)}
+	s := &Server{store: st, box: box, opts: opts, log: log, limiter: newLoginLimiter(), deviceCodeRate: newIPRate(deviceCodePerMinute), deviceTokenRate: newIPRate(deviceTokenPerMinute), upstream: up, connectKick: make(chan struct{}, 1), elevationKick: make(chan struct{}, 1), streamsDone: make(chan struct{})}
 	s.kb.ix = kb.NewIndex()
 	s.initDshReleases()
 	s.registry = s.newRegistry()
 	s.routeTable = s.routes()
 	s.agentTools = buildAgentTools(s.routeTable)
 	return s
+}
+
+// CloseStreams 结束所有 /mcp 事件流，交给 http.Server.RegisterOnShutdown。
+// Shutdown 只等连接空闲、不取消请求，而事件流不会自己结束：只要有一台 DSH 在线，
+// 每次重启都要等满超时，最后还以超时错误退出。DSH 断线后会自己重连。
+func (s *Server) CloseStreams() {
+	s.streamsOnce.Do(func() { close(s.streamsDone) })
 }
 
 // newRegistry 初始化 npm 源。数据目录建不了时 npm 相关接口返回 503，其余功能不受影响。

@@ -107,6 +107,7 @@ func run(log *slog.Logger) error {
 		IdleTimeout:       120 * time.Second,
 		// 不设 WriteTimeout：流式回答可能持续数分钟
 	}
+	httpSrv.RegisterOnShutdown(srv.CloseStreams)
 	errCh := make(chan error, 1)
 	go func() {
 		log.Info("dsh-ee 已启动", "addr", cfg.Addr, "version", version)
