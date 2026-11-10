@@ -267,7 +267,15 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("X-Accel-Buffering", "no")
 		w.WriteHeader(resp.StatusCode)
-		usage = relaySSE(w, resp.Body)
+		var streamed int
+		usage, streamed = relaySSE(w, resp.Body)
+		// 客户端点了停止或网络断开时，上游放在最后一块的 usage 收不到，但上游照样按已生成的计费。
+		// 这时按请求和已转发的内容估一个数记账，免得这次调用记成 0、月度额度形同虚设。
+		if usage.PromptTokens == 0 && usage.CompletionTokens == 0 && usage.TotalTokens == 0 {
+			usage = tokenUsage{PromptTokens: estimateTokens(raw), CompletionTokens: streamed}
+			s.log.Warn("stream ended without usage, recorded estimate", "provider", p.Name, "model", model,
+				"prompt_tokens", usage.PromptTokens, "completion_tokens", usage.CompletionTokens)
+		}
 	} else {
 		data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 		if err != nil {
@@ -288,15 +296,17 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 }
 
 // relaySSE 逐行转发上游的 SSE，每个事件结束就 flush，同时从 data 行里捞出 usage。
-func relaySSE(w http.ResponseWriter, body io.Reader) tokenUsage {
+// 第二个返回值是按已转发的增量内容估出的输出 token 数，上游没给 usage 时用来兜底。
+func relaySSE(w http.ResponseWriter, body io.Reader) (tokenUsage, int) {
 	var usage tokenUsage
+	streamed := 0
 	flusher, _ := w.(http.Flusher)
 	br := bufio.NewReaderSize(body, 64<<10)
 	for {
 		line, err := br.ReadBytes('\n')
 		if len(line) > 0 {
 			if _, werr := w.Write(line); werr != nil {
-				return usage // 客户端断开
+				return usage, streamed // 客户端断开
 			}
 			trimmed := bytes.TrimSpace(line)
 			if len(trimmed) == 0 {
@@ -306,11 +316,12 @@ func relaySSE(w http.ResponseWriter, body io.Reader) tokenUsage {
 			} else if payload, ok := bytes.CutPrefix(trimmed, []byte("data:")); ok {
 				payload = bytes.TrimSpace(payload)
 				if !bytes.Equal(payload, []byte("[DONE]")) {
-					var chunk struct {
-						Usage *tokenUsage `json:"usage"`
-					}
-					if json.Unmarshal(payload, &chunk) == nil && chunk.Usage != nil {
-						usage = *chunk.Usage
+					var chunk streamChunk
+					if json.Unmarshal(payload, &chunk) == nil {
+						if chunk.Usage != nil {
+							usage = *chunk.Usage
+						}
+						streamed += chunk.deltaTokens()
 					}
 				}
 			}
@@ -319,9 +330,55 @@ func relaySSE(w http.ResponseWriter, body io.Reader) tokenUsage {
 			if flusher != nil {
 				flusher.Flush()
 			}
-			return usage
+			return usage, streamed
 		}
 	}
+}
+
+// streamChunk 只取记账要用的字段：usage，以及增量里会计费的文字（正文、思考、工具参数）。
+type streamChunk struct {
+	Usage   *tokenUsage `json:"usage"`
+	Choices []struct {
+		Delta struct {
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
+			ToolCalls        []struct {
+				Function struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
+		} `json:"delta"`
+	} `json:"choices"`
+}
+
+func (c *streamChunk) deltaTokens() int {
+	n := 0
+	for _, ch := range c.Choices {
+		d := ch.Delta
+		n += estimateTokens([]byte(d.Content)) + estimateTokens([]byte(d.ReasoningContent))
+		for _, tc := range d.ToolCalls {
+			n += estimateTokens([]byte(tc.Function.Name)) + estimateTokens([]byte(tc.Function.Arguments))
+		}
+	}
+	return n
+}
+
+// estimateTokens 粗估 token 数，只在上游没给 usage 时兜底用：
+// ASCII 约 4 个字符一个 token，其余（中日韩等）按一个字符一个 token，宁可略多不少。
+func estimateTokens(b []byte) int {
+	if len(b) == 0 {
+		return 0
+	}
+	ascii, other := 0, 0
+	for _, r := range string(b) {
+		if r < 0x80 {
+			ascii++
+		} else {
+			other++
+		}
+	}
+	return (ascii+3)/4 + other
 }
 
 // recordUsage 在响应写完后记账；客户端提前断开也要记，所以脱离请求的取消信号。
