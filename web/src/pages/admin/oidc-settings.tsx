@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { copyText } from "../../lib/clipboard";
 import { Check, Copy, Plus, X } from "lucide-react";
 import { api, type OidcConfig, type OidcTestResult, type OidcView } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -126,8 +127,8 @@ export default function OidcSettings() {
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => {
-                void navigator.clipboard?.writeText(saved.redirectUri);
+              onClick={async () => {
+                if (!(await copyText(saved.redirectUri))) return notify(t("common.copyFailed"));
                 notify(t("oidcAdmin.copied"));
               }}
             >

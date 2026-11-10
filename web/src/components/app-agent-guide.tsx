@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
+import { copyText } from "../lib/clipboard";
 import { Check, Copy, ExternalLink, Lightbulb, Repeat, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
 import { useApi } from "../lib/use-api";
@@ -78,9 +79,9 @@ export function AppAgentGuide({ onManual }: { onManual: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [what, users, conns, kbs, tables, web, connOptions, kbOptions, t]);
 
-  const copy = () => {
+  const copy = async () => {
     if (!prompt) return;
-    void navigator.clipboard?.writeText(prompt);
+    if (!(await copyText(prompt))) return notify(t("common.copyFailed"));
     setCopied(true);
     notify(t("appAgent.copied"));
     setTimeout(() => setCopied(false), 1500);

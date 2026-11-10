@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Copy, Plus, LayoutGrid } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { copyText } from "../lib/clipboard";
 import { api, type HubAsset, type Scope } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useStore } from "../lib/store";
@@ -74,8 +75,8 @@ function Row({ a, roleName, onShare }: { a: HubAsset; roleName: (id: number) => 
           type="button"
           title={t("build.useInDsh", { slug: a.slug })}
           aria-label={t("apps.copyCommand", { slug: a.slug })}
-          onClick={() => {
-            void navigator.clipboard?.writeText(`/${a.slug}`);
+          onClick={async () => {
+            if (!(await copyText(`/${a.slug}`))) return notify(t("common.copyFailed"));
             notify(t("apps.copied", { slug: a.slug }));
           }}
           className="rounded-md p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"

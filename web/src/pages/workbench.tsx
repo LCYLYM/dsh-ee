@@ -14,6 +14,7 @@ import { BuildStateBadge } from "./build";
 import { AccessRequestsCard } from "../components/access-requests";
 import { PageLink } from "../lib/menus";
 import { useTranslation } from "react-i18next";
+import { copyText } from "../lib/clipboard";
 
 /** 指标值还没拿到（加载中 / 接口失败）时显示的内容。 */
 const noValue = "—";
@@ -52,8 +53,8 @@ export default function Workbench() {
   const quota = myKeys?.quota;
   const byName = (n: string) => plugins.find((p) => p.name === n);
 
-  const copyInstall = (name: string) => {
-    void navigator.clipboard?.writeText(`dsh plugin add ${name}`);
+  const copyInstall = async (name: string) => {
+    if (!(await copyText(`dsh plugin add ${name}`))) return notify(t("common.copyFailed"));
     notify(t("workbench.copiedInstall", { name }));
   };
 
@@ -132,8 +133,8 @@ export default function Workbench() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(`/${m.slug}`);
+                  onClick={async () => {
+                    if (!(await copyText(`/${m.slug}`))) return notify(t("common.copyFailed"));
                     notify(t("apps.copied", { slug: m.slug }));
                   }}
                 >
