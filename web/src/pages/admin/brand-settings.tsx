@@ -315,12 +315,12 @@ export default function BrandSettings() {
         <div className="flex h-16 w-16 items-center justify-center">
           <LogoMark brand={brand} fallbackName={brand.name || s.orgName || "DSH"} size={64} />
         </div>
-        <div className="space-y-3">
+        <div className="min-w-0 flex-1 basis-56 space-y-3">
           <Field label={t("brandAdmin.logo")} hint={t("brandAdmin.logoHint")}>
             <input aria-label={t("brandAdmin.logo")} type="file" accept="image/*" disabled={busy} onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
           </Field>
           <ImageCropDialog file={cropFile} busy={busy} onDone={(f) => void upload(f)} onCancel={() => setCropFile(null)} />
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <span className="text-sm font-medium text-neutral-700">{t("brandAdmin.logoShape")}</span>
             <Segmented<BrandLogoShape>
               value={brand.logoShape || "circle"}

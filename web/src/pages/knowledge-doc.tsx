@@ -7,7 +7,7 @@ import { useAction, useApi } from "../lib/use-api";
 import { useStore } from "../lib/store";
 import { useConfirm } from "../lib/confirm";
 import { LoadState, ErrorNote } from "../components/api-ui";
-import { Badge, Button, Card, CardHeader, cx, Field, inputCls, Segmented, Notice } from "../components/ui";
+import { Badge, Button, Card, CardHeader, cx, Field, inputCls, Segmented, Notice, backLinkCls } from "../components/ui";
 import { KBReader } from "../components/kb-reader";
 import { ConvertNotes, convertLines } from "../components/kb-convert";
 import { KB_ACCEPT } from "../components/kb-upload";
@@ -346,7 +346,7 @@ export default function KnowledgeDoc() {
       <LoadState loading={detail.loading && !detail.data} error={detail.data ? null : detail.error} onRetry={detail.reload}>
         {d && (
           <>
-            <Link to={kbPath(d.kb.id)} className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
+            <Link to={kbPath(d.kb.id)} className={backLinkCls}>
               <ArrowLeft size={14} /> {t("kdoc.back", { title: d.kb.title })}
             </Link>
             <div className="mb-5 flex flex-wrap items-start justify-between gap-4">

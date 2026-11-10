@@ -106,7 +106,7 @@ export default function AdminTokens() {
           <input aria-label={t("tokens.departmentFilter")} className={inputBase} value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} placeholder={t("tokens.departmentFilter")} />
         </div>
         <LoadState loading={loading && !data} error={error} onRetry={reload}>
-          <div className="overflow-x-auto"><table className="tbl">
+          <div className="overflow-x-auto"><table className="tbl max-sm:min-w-[44rem]">
             <thead><tr><th className="px-5 py-2">{t("tokens.name")}</th><th className="px-5 py-2">{t("tokens.owner")}</th><th className="px-5 py-2">{t("tokens.source")}</th><th className="px-5 py-2">{t("tokens.scopesTitle")}</th><th className="px-5 py-2 text-right">{t("tokens.usage")}</th><th className="px-5 py-2 text-right">{t("tokens.lastUsed")}</th><th className="px-5 py-2">{t("tokens.status")}</th></tr></thead>
             <tbody>{list.map((token) => {
               const revoked = !!token.revoked_at;

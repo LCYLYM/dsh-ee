@@ -142,7 +142,7 @@ function TableData({ slug, table, admin, onChanged }: { slug: string; table: App
       <CardHeader
         title={<span>{table.title} <span className="font-normal text-neutral-500">· {t(`appData.visibility.${table.visibility ?? "own"}`)}</span></span>}
         aside={admin ? (
-          <a href={api.appExportUrl(slug, table.name)} className="inline-flex items-center gap-1 text-sm text-brand-600 hover:underline">
+          <a href={api.appExportUrl(slug, table.name)} className="inline-flex items-center gap-1 text-sm text-brand-600 dark:text-brand-300 hover:underline">
             <Download size={14} />{t("appData.export")}
           </a>
         ) : undefined}
@@ -180,7 +180,7 @@ function TableData({ slug, table, admin, onChanged }: { slug: string; table: App
                         {canDelete(r) && (
                           <span className="inline-flex gap-2">
                             {editable.length > 0 && (
-                              <button type="button" aria-label={t("appData.edit")} className="text-neutral-400 hover:text-brand-600" disabled={busy} onClick={() => startEdit(r)}>
+                              <button type="button" aria-label={t("appData.edit")} className="text-neutral-400 hover:text-brand-600 dark:hover:text-brand-200" disabled={busy} onClick={() => startEdit(r)}>
                                 <Pencil size={14} />
                               </button>
                             )}

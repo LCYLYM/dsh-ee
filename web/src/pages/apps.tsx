@@ -39,7 +39,7 @@ function AppCard({ a, bySlug, busy, onToggle }: { a: HubAsset; bySlug: Map<strin
       <div className="flex gap-3">
         <AppIcon icon={a.spec.icon} title={a.spec.title} />
         <div className="min-w-0">
-          <Link to={assetPath(a.id)} className="block truncate font-medium text-neutral-900 hover:text-brand-600">
+          <Link to={assetPath(a.id)} className="block truncate font-medium text-neutral-900 hover:text-brand-600 dark:hover:text-brand-200">
             {a.spec.title}
           </Link>
           <div className="truncate font-mono text-xs text-neutral-500">/{a.slug}</div>
@@ -63,23 +63,25 @@ function AppCard({ a, bySlug, busy, onToggle }: { a: HubAsset; bySlug: Map<strin
               <Link
                 key={d.key}
                 to={d.to}
-                className="max-w-full truncate rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-700 hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-400/15 dark:hover:text-brand-200"
+                className="max-w-full truncate rounded-[5px] bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-700 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-400/15 dark:hover:text-brand-200"
               >
                 {d.label}
               </Link>
             ) : (
-              <span key={d.key} className="max-w-full truncate rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500">
+              <span key={d.key} className="max-w-full truncate rounded-[5px] bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500">
                 {d.label}
               </span>
             ),
           )}
         </div>
       )}
-      <div className="mt-auto flex items-center justify-between gap-2 border-t border-neutral-100 pt-3 text-xs text-neutral-600">
+      {/* 垫片：内容再满，底部信息栏上方也留出一档间距 */}
+      <div aria-hidden className="min-h-3 flex-1" />
+      <div className="flex items-center justify-between gap-2 border-t border-neutral-100 pt-3 text-xs text-neutral-600">
         <span className="min-w-0 truncate">{t("apps.meta", { owner: a.owner_name || a.owner || "—", department: a.department || "—", uses: a.uses })}</span>
         <div className="flex shrink-0 items-center gap-2">
           {a.spec.web && a.available && (
-            <Link to={`/a/${a.slug}`} className="font-medium text-brand-600 hover:underline">{t("appWeb.short")}</Link>
+            <Link to={`/a/${a.slug}`} className="font-medium text-brand-600 dark:text-brand-300 hover:underline">{t("appWeb.short")}</Link>
           )}
           {a.available && a.delivery === "optional" && (
             <Button size="sm" variant={a.subscribed ? "secondary" : "primary"} disabled={busy} onClick={() => onToggle(a)}>
@@ -93,7 +95,7 @@ function AppCard({ a, bySlug, busy, onToggle }: { a: HubAsset; bySlug: Map<strin
               void navigator.clipboard?.writeText(`/${a.slug}`);
               notify(t("apps.copied", { slug: a.slug }));
             }}
-            className="rounded-md p-1.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
+            className="rounded-md p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
           >
             <Copy size={14} />
           </button>

@@ -11,7 +11,7 @@ import { LoadState, ErrorNote } from "../components/api-ui";
 import { ScopeEditor } from "../components/scope-editor";
 import { useScopeOptions } from "../components/scope-dialog";
 import { MaintainersEditor, Snippet } from "../components/kb-access";
-import { Badge, Button, Card, cx, Field, inputBase, inputCls, Segmented, Toggle, Notice } from "../components/ui";
+import { Badge, Button, Card, cx, Field, inputBase, inputCls, Segmented, Toggle, Notice, backLinkCls } from "../components/ui";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { kdocPath, QueryTable } from "./knowledge";
@@ -40,7 +40,7 @@ function NewDocDialog({ kb, open, onOpenChange, onCreated }: { kb: KBase; open: 
   }, [open]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t("kbase.newDocTitle")}</DialogTitle>
         </DialogHeader>
@@ -147,7 +147,7 @@ function AccessDialog({ kb, open, onOpenChange, onSaved }: { kb: KBase; open: bo
   }, [open, kb]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{t("kbase.accessTitle")}</DialogTitle>
           <DialogDescription>{kb.title}</DialogDescription>
@@ -376,7 +376,7 @@ export default function KnowledgeBase() {
 
   return (
     <div>
-      <Link to="/knowledge" className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
+      <Link to="/knowledge" className={backLinkCls}>
         <ArrowLeft size={14} /> {t("kbase.back")}
       </Link>
       <LoadState loading={detail.loading && !detail.data} error={detail.data ? null : detail.error} onRetry={detail.reload}>

@@ -76,7 +76,7 @@ function Node({ icon, kind, title, to, aside, children, tone }: { icon: ReactNod
           <div className="text-[11px] text-neutral-500">{kind}</div>
           <div className="truncate text-sm font-medium text-neutral-900">
             {to ? (
-              <Link to={to} className="hover:text-brand-600 hover:underline">{title}</Link>
+              <Link to={to} className="hover:text-brand-600 dark:hover:text-brand-200 hover:underline">{title}</Link>
             ) : (
               title
             )}

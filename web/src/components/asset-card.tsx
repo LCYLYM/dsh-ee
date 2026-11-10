@@ -46,7 +46,7 @@ export function AssetCard({ a, busy, onToggle }: { a: HubAsset; busy?: boolean; 
           <Activity size={12} /> {t("hub.uses", { count: a.uses })}
         </span>
         {a.kind === "app" && a.spec.web && a.available && (
-          <Link to={`/a/${a.slug}`} className="shrink-0 font-medium text-brand-600 hover:underline">{t("appWeb.short")}</Link>
+          <Link to={`/a/${a.slug}`} className="shrink-0 font-medium text-brand-600 dark:text-brand-300 hover:underline">{t("appWeb.short")}</Link>
         )}
         {canToggle && (
           <Button size="sm" variant={a.subscribed ? "secondary" : "primary"} disabled={busy} onClick={() => onToggle(a)} className="h-7 px-2.5 text-xs">

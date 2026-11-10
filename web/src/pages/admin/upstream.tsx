@@ -242,7 +242,7 @@ function Online() {
             </Card>
           ) : (
             <Card className="overflow-x-auto">
-              <table className="tbl">
+              <table className="tbl max-sm:min-w-[36rem]">
                 <thead>
                   <tr>
                     <th className="w-10 px-4 py-2.5" />
@@ -346,7 +346,7 @@ function JobHistory({ jobs, onPick, kinds }: { jobs: SyncJob[]; onPick: (j: Sync
   return (
     <Card>
       <div className="border-b border-neutral-100 px-5 py-3 text-[15px] leading-6 font-semibold text-neutral-900">{t("upstreamAdmin.history")}</div>
-      <div className="overflow-x-auto"><table className="tbl">
+      <div className="overflow-x-auto"><table className="tbl max-sm:min-w-[36rem]">
         <thead>
           <tr>
             <th className="px-5 py-2">{t("registry.jobs.colKind")}</th>

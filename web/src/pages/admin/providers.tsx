@@ -366,7 +366,7 @@ function ProviderCard({ p, models, onChanged }: { p: Provider; models: Model[]; 
         )}
         {models.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="tbl">
+            <table className="tbl max-sm:min-w-[36rem]">
               <thead>
                 <tr>
                   <th className="px-5 py-2">{t("providers.colPublic")}</th>
@@ -415,7 +415,7 @@ function Routing({ providers, models }: { providers: Provider[]; models: Model[]
     <Card className="mb-4">
       <CardHeader title={t("providers.available")} aside={t("providers.availableCount", { count: rows.length })} />
       <div className="overflow-x-auto">
-        <table className="tbl">
+        <table className="tbl max-sm:min-w-[36rem]">
           <thead>
             <tr>
               <th className="px-5 py-2">{t("providers.colModel")}</th>

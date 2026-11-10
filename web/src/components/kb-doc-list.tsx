@@ -278,7 +278,7 @@ export function DocList({ kb, docs, folder, setFolder, onChanged }: { kb: KBase;
           </Empty>
         ) : (
           <div className="overflow-x-auto">
-            <table className="tbl">
+            <table className="tbl max-sm:min-w-[34rem]">
               <thead>
                 <tr className="border-y border-neutral-100 text-left text-xs text-neutral-500">
                   {kb.can_edit && (
@@ -307,7 +307,7 @@ export function DocList({ kb, docs, folder, setFolder, onChanged }: { kb: KBase;
                           <input type="checkbox" className="mt-1.5" aria-label={t("kdocs.select", { title: d.title })} checked={selected.has(d.id)} onChange={() => toggle(d.id)} />
                         </td>
                       )}
-                      <td className={cx("py-2 pr-3", kb.can_edit ? "pl-2" : "pl-5")}>
+                      <td className={cx("min-w-44 py-2 pr-3", kb.can_edit ? "pl-2" : "pl-5")}>
                         <div className="flex items-start gap-2.5">
                           <FileBadge doc={d} />
                           <div className="min-w-0">

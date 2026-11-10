@@ -156,7 +156,7 @@ export function AppAgentGuide({ onManual }: { onManual: () => void }) {
           )}
           <p className="text-xs text-neutral-500">
             {t("appAgent.manualHint")}{" "}
-            <button type="button" onClick={onManual} className="text-brand-600 hover:underline">{t("appAgent.tabManual")} →</button>
+            <button type="button" onClick={onManual} className="text-brand-600 dark:text-brand-300 hover:underline">{t("appAgent.tabManual")} →</button>
           </p>
         </Card>
       </div>
@@ -174,8 +174,8 @@ export function AppAgentGuide({ onManual }: { onManual: () => void }) {
           </ol>
           <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-neutral-100 pt-3 text-sm">
             <span className="text-neutral-600">{t("appAgent.notReady")}</span>
-            <Link to="/get-started" className="font-medium text-brand-600 hover:underline">{t("appAgent.goSetup")} →</Link>
-            <PageLink page="build" className="font-medium text-brand-600 hover:underline">{t("appAgent.goBuild")} →</PageLink>
+            <Link to="/get-started" className="font-medium text-brand-600 dark:text-brand-300 hover:underline">{t("appAgent.goSetup")} →</Link>
+            <PageLink page="build" className="font-medium text-brand-600 dark:text-brand-300 hover:underline">{t("appAgent.goBuild")} →</PageLink>
           </div>
         </Card>
         <Card className="p-5">

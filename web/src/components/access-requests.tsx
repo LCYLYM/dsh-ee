@@ -183,7 +183,7 @@ function RequestRow({ q, review, onResolve, busy }: { q: AccessRequest; review?:
         {q.app_title ? (
           <>
             {t("requests.forAppShort")}
-            <Link to={`/a/${q.app_slug}`} className="text-brand-600 hover:underline">
+            <Link to={`/a/${q.app_slug}`} className="text-brand-600 dark:text-brand-300 hover:underline">
               {q.app_title}
             </Link>
             {" · "}

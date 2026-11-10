@@ -73,6 +73,9 @@ export function Card({ className, children, ...rest }: { className?: string; chi
   );
 }
 
+/** 详情页左上角的「← 返回某某」链接。 */
+export const backLinkCls = "mb-4 inline-flex items-center gap-1 rounded text-[13px] font-medium text-neutral-500 transition-colors hover:text-neutral-900";
+
 /** 可点的卡片（列表里的应用、知识库、插件）：悬停时抬起一点并加深边框。 */
 export const cardHover =
   "transition-[box-shadow,border-color,transform] duration-200 hover:-translate-y-px hover:border-neutral-300 hover:shadow-card-lg dark:hover:border-white/15";

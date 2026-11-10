@@ -6,7 +6,7 @@ import { useApi } from "../lib/use-api";
 import { useScoring } from "../lib/store";
 import { LoadState } from "../components/api-ui";
 import { ScanList } from "../components/scan-list";
-import { Badge, Card, CopyBox, PluginIcon, ScoreBadge, Empty, buttonCls } from "../components/ui";
+import { Badge, Card, CopyBox, PluginIcon, ScoreBadge, Empty, buttonCls, backLinkCls } from "../components/ui";
 import { PageLink } from "../lib/menus";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -53,7 +53,7 @@ function Detail({ d, core, scoringUpstream }: { d: NonNullable<Awaited<ReturnTyp
   const deps = Object.entries(d.dependencies ?? {});
   return (
     <div>
-      <PageLink page="market" className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-800">
+      <PageLink page="market" className={backLinkCls}>
         <ArrowLeft size={14} /> {t("pluginDetail.market")}
       </PageLink>
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -94,7 +94,7 @@ function Detail({ d, core, scoringUpstream }: { d: NonNullable<Awaited<ReturnTyp
                 <Trans
                   i18nKey="pluginDetail.discoverHint"
                   values={{ title: p.title }}
-                  components={{ link: <PageLink page="setup" className="text-brand-600 hover:underline" /> }}
+                  components={{ link: <PageLink page="setup" className="text-brand-600 dark:text-brand-300 hover:underline" /> }}
                 />
               </p>
               {core && d.engines?.dsh && <p className="text-sm text-neutral-500">{t("registry.detail.engines", { range: d.engines.dsh, version: core })}</p>}
@@ -180,12 +180,12 @@ function Detail({ d, core, scoringUpstream }: { d: NonNullable<Awaited<ReturnTyp
           {(p.repository || p.homepage) && (
             <Card className="space-y-2 p-4">
               {p.repository && (
-                <a href={p.repository} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-sm text-brand-600 hover:underline">
+                <a href={p.repository} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-sm text-brand-600 dark:text-brand-300 hover:underline">
                   <ExternalLink size={14} /> {t("pluginDetail.repo")}
                 </a>
               )}
               {p.homepage && (
-                <a href={p.homepage} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-sm text-brand-600 hover:underline">
+                <a href={p.homepage} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-sm text-brand-600 dark:text-brand-300 hover:underline">
                   <ExternalLink size={14} /> {t("registry.detail.homepage")}
                 </a>
               )}

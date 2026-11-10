@@ -234,7 +234,7 @@ export function DataHubPanel() {
                         <Badge>{t("dataHub.rows", { count: x.row_count })}</Badge>
                         <span className="text-xs text-neutral-500">{formatTime(x.updated_at)}</span>
                         <span className="ml-auto flex gap-2">
-                          <button type="button" aria-label={t("dataHub.preview")} className="text-neutral-500 hover:text-brand-600" onClick={() => void showPreview(x.name)}><Eye size={15} /></button>
+                          <button type="button" aria-label={t("dataHub.preview")} className="text-neutral-500 hover:text-brand-600 dark:hover:text-brand-200" onClick={() => void showPreview(x.name)}><Eye size={15} /></button>
                           <button type="button" aria-label={t("dataHub.drop")} className="text-neutral-500 hover:text-red-600" onClick={() => void dropTable(x)}><Trash2 size={15} /></button>
                         </span>
                       </div>
@@ -274,7 +274,7 @@ export function DataHubPanel() {
                         <span className="text-sm text-neutral-700">{x.title}</span>
                         <span className="text-xs text-neutral-500">{scopeSummary(t, x.scope, opts.roleName)}</span>
                         <span className="ml-auto flex gap-2">
-                          <button type="button" aria-label={t("dataHub.edit")} className="text-neutral-500 hover:text-brand-600" onClick={() => setEditing(x)}><Pencil size={15} /></button>
+                          <button type="button" aria-label={t("dataHub.edit")} className="text-neutral-500 hover:text-brand-600 dark:hover:text-brand-200" onClick={() => setEditing(x)}><Pencil size={15} /></button>
                           <button type="button" aria-label={t("dataHub.drop")} className="text-neutral-500 hover:text-red-600" onClick={() => void dropSet(x)}><Trash2 size={15} /></button>
                         </span>
                       </div>

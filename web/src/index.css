@@ -586,6 +586,34 @@ svg .scene-fade { animation-name: scene-fade-in; }
   kbd {
     font-family: inherit;
   }
+  /* 原生文件选择框：「选择文件」做成次要按钮的样子，文件名是旁边的灰字 */
+  input[type="file"] {
+    max-width: 100%;
+    font-size: 0.875rem;
+    color: var(--color-neutral-600);
+  }
+  input[type="file"]::file-selector-button {
+    height: 2rem;
+    margin-right: 0.75rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--color-neutral-200);
+    border-radius: 0.375rem;
+    background: var(--card);
+    color: var(--color-neutral-800);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    box-shadow: var(--app-shadow-control);
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+  input[type="file"]:not(:disabled)::file-selector-button:hover {
+    border-color: var(--color-neutral-300);
+    background: var(--color-neutral-50);
+  }
+  input[type="file"]:disabled::file-selector-button {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
   /* 网格的子项默认 min-width:auto，里面有长代码或表格时会把整页撑出横向滚动 */
   :where(.grid) > * {
     min-width: 0;
@@ -640,6 +668,16 @@ select:not([multiple]) {
   }
   .tbl td {
     color: var(--color-neutral-700);
+  }
+  /* 第一列通常是名称：窄屏下别被挤成一个字一行（勾选框、展开箭头那种窄列除外） */
+  .tbl tbody td:first-child:not([colspan]):not(:has(> input, > button)) {
+    min-width: 7rem;
+  }
+  /* 表格里的空状态：表格比屏幕宽时也居中在可见区域里 */
+  .tbl-empty {
+    position: sticky;
+    left: 0;
+    max-width: calc(100vw - 2rem);
   }
   /* 紧凑版：嵌在展开行或卡片里的小表 */
   .tbl-compact {

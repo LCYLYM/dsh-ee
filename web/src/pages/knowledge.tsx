@@ -36,7 +36,7 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpen
   }, [open]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{t("knowledge.createForm.title")}</DialogTitle>
         </DialogHeader>
@@ -386,7 +386,7 @@ export default function Knowledge() {
                       <ul className="mt-1 space-y-0.5">
                         {b.recent!.map((d) => (
                           <li key={d.id} className="flex items-center justify-between gap-2 text-sm">
-                            <Link to={kdocPath(d.id)} className="relative z-10 min-w-0 truncate text-neutral-800 hover:text-brand-600 hover:underline">
+                            <Link to={kdocPath(d.id)} className="relative z-10 min-w-0 truncate text-neutral-800 hover:text-brand-600 dark:hover:text-brand-200 hover:underline">
                               {d.title}
                             </Link>
                             <span className="shrink-0 text-xs text-neutral-400">{formatTime(d.updated_at).slice(0, 10)}</span>

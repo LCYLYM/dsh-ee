@@ -370,7 +370,7 @@ function PluginReview({ q }: { q: ReturnType<typeof useApi<ReviewItem[]>> }) {
                   <span>
                     {formatBytes(current.size)} · <span className="font-mono">{current.integrity.slice(0, 24)}…</span>
                   </span>
-                  <a href={api.tarballUrl(current.name, current.version)} className="inline-flex items-center gap-1 text-brand-600 hover:underline">
+                  <a href={api.tarballUrl(current.name, current.version)} className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-300 hover:underline">
                     <Download size={12} /> {t("registry.review.downloadTarball")}
                   </a>
                 </div>

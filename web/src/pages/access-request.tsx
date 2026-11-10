@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { api, formatTime } from "../lib/api";
 import { useAction, useApi } from "../lib/use-api";
 import { ErrorNote, LoadState } from "../components/api-ui";
-import { Badge, Button, Card, cx, inputCls, Notice } from "../components/ui";
+import { Badge, Button, Card, cx, inputCls, Notice, backLinkCls } from "../components/ui";
 import { PageLink } from "../lib/menus";
 
 /**
@@ -33,7 +33,7 @@ export default function AccessRequestPage() {
 
   return (
     <div className="max-w-xl">
-      <PageLink page="workbench" className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
+      <PageLink page="workbench" className={backLinkCls}>
         <ArrowLeft size={14} /> {t("requests.back")}
       </PageLink>
       <LoadState loading={target.loading && !d} error={target.error} onRetry={target.reload}>

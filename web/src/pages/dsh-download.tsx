@@ -147,7 +147,7 @@ export default function DshDownload() {
                       </p>
                     ) : timedOut ? (
                       <p className="mt-1 text-sm text-neutral-500">
-                        {t("download.notDetected")} <PageLink page="setup" className="text-brand-600 hover:underline">{t("download.connectGuide")}</PageLink>
+                        {t("download.notDetected")} <PageLink page="setup" className="text-brand-600 dark:text-brand-300 hover:underline">{t("download.connectGuide")}</PageLink>
                       </p>
                     ) : (
                       <p className="mt-1 text-sm text-neutral-500">{t("download.waiting")}</p>

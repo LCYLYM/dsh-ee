@@ -84,7 +84,7 @@ export default function AdminAudit() {
             <Empty>{t("auditLog.empty")}</Empty>
           ) : (
             <div className="overflow-x-auto">
-              <table className="tbl">
+              <table className="tbl max-sm:min-w-[48rem]">
                 <thead>
                   <tr>
                     <th className="px-5 py-2.5 whitespace-nowrap">{t("auditLog.colTime")}</th>

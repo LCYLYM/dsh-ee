@@ -138,7 +138,7 @@ export default function MyTokens() {
         <CardHeader title={t("tokens.list")} aside={data ? t("tokens.count", { count: data.length }) : undefined} />
         <LoadState loading={loading && !data} error={error} onRetry={reload}>
           <div className="overflow-x-auto">
-            <table className="tbl">
+            <table className="tbl max-sm:min-w-[40rem]">
               <thead><tr><th className="px-5 py-2">{t("tokens.name")}</th><th className="px-5 py-2">{t("tokens.source")}</th><th className="px-5 py-2">{t("tokens.scopesTitle")}</th><th className="px-5 py-2 text-right">{t("tokens.usage")}</th><th className="px-5 py-2 text-right">{t("tokens.lastUsed")}</th><th className="px-5 py-2">{t("tokens.status")}</th><th className="px-5 py-2" /></tr></thead>
               <tbody>
                 {(data ?? []).map((token) => {

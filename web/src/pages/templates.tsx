@@ -19,7 +19,7 @@ function TemplateCard({ a, onCopy }: { a: HubAsset; onCopy: () => void }) {
           {a.spec.icon ? <span className="text-xl leading-none">{a.spec.icon}</span> : <span className="text-base font-semibold">{letter}</span>}
         </span>
         <div className="min-w-0">
-          <Link to={assetPath(a.id)} className="block truncate font-medium text-neutral-900 hover:text-brand-600">
+          <Link to={assetPath(a.id)} className="block truncate font-medium text-neutral-900 hover:text-brand-600 dark:hover:text-brand-200">
             {a.spec.title}
           </Link>
           <div className="truncate text-xs text-neutral-500">{[a.owner_name || a.owner, a.department].filter(Boolean).join(" · ")}</div>

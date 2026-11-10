@@ -16,7 +16,7 @@ import { AppMap } from "../components/app-map";
 import { AppDepsCard } from "../components/access-requests";
 import { UsedByCard } from "../components/used-by";
 import { ScopeDialog, useScopeOptions } from "../components/scope-dialog";
-import { Badge, Button, Card, CardHeader, cx, inputCls, Toggle, Empty } from "../components/ui";
+import { Badge, Button, Card, CardHeader, cx, inputCls, Toggle, Empty, backLinkCls } from "../components/ui";
 import { statusBadge } from "../components/status";
 import { PageLink, useMenus } from "../lib/menus";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
@@ -198,7 +198,7 @@ function AssetDetail() {
 
   return (
     <div className="max-w-5xl">
-      <PageLink page={a.kind === "app" ? (owns ? "build" : "apps") : "materials"} className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
+      <PageLink page={a.kind === "app" ? (owns ? "build" : "apps") : "materials"} className={backLinkCls}>
         <ArrowLeft size={14} /> {t("asset.back")}
       </PageLink>
 
@@ -206,7 +206,7 @@ function AssetDetail() {
         <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-700">
           {a.kind === "app" && a.spec.icon ? <span className="text-3xl">{a.spec.icon}</span> : <Icon size={28} strokeWidth={1.5} />}
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-60">
           <h1 className="text-2xl text-neutral-900 leading-8 font-bold tracking-[-0.02em]">{a.spec.title}</h1>
           <div className="font-mono text-sm text-neutral-500">{a.kind === "connection" ? a.slug : `/${a.slug}`}</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -380,7 +380,7 @@ function AssetDetail() {
                     <h2 className="text-neutral-900 text-[15px] leading-6 font-semibold">{t("appWeb.toggle")}</h2>
                     <p className="mt-1 text-sm text-neutral-600">{a.spec.web ? `/a/${a.slug}` : t("appWeb.previewOnly")}</p>
                   </div>
-                  <Link to={`/a/${a.slug}`} className="text-sm font-medium text-brand-600 hover:underline">{t("appWeb.open")} →</Link>
+                  <Link to={`/a/${a.slug}`} className="text-sm font-medium text-brand-600 dark:text-brand-300 hover:underline">{t("appWeb.open")} →</Link>
                 </Card>
               )}
               {(a.spec.tables?.length ?? 0) > 0 && a.live_version > 0 && <AppDataPanel slug={a.slug} />}

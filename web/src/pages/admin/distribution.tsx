@@ -15,7 +15,7 @@ function ReleaseTable({ target, title, rows, busy, act }: { target: DshTarget; t
     <Card className="overflow-hidden">
       <div className="border-b border-neutral-100 px-5 py-3 text-[15px] leading-6 font-semibold text-neutral-900">{title}</div>
       <div className="overflow-x-auto">
-        <table className="tbl">
+        <table className="tbl max-sm:min-w-[34rem]">
           <thead>
             <tr>
               <th className="px-5 py-2">{t("distributionAdmin.colRelease")}</th>
@@ -60,7 +60,7 @@ function ReleaseTable({ target, title, rows, busy, act }: { target: DshTarget; t
               );
             })}
             {!rows.some((r) => r.target === target) && (
-              <tr><td colSpan={5}><Empty compact icon={PackageOpen}>{t("distributionAdmin.empty")}</Empty></td></tr>
+              <tr><td colSpan={5}><div className="tbl-empty"><Empty compact icon={PackageOpen}>{t("distributionAdmin.empty")}</Empty></div></td></tr>
             )}
           </tbody>
         </table>

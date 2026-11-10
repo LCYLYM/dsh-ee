@@ -94,7 +94,7 @@ export default function AdminRegistry() {
       <Card className="mt-4">
         <CardHeader title={t("registryAdmin.routes")} aside={t("registryAdmin.routesOrder")} />
         <div className="overflow-x-auto">
-          <table className="tbl">
+          <table className="tbl max-sm:min-w-[36rem]">
             <thead>
               <tr>
                 <th className="px-5 py-2">{t("registryAdmin.colPackage")}</th>
@@ -218,7 +218,7 @@ function TokensCard({ requireToken, onRequireToken }: { requireToken: boolean; o
       </div>
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
         <div className="overflow-x-auto">
-          <table className="tbl">
+          <table className="tbl max-sm:min-w-[36rem]">
             <thead>
               <tr>
                 <th className="px-5 py-2">{t("registryAdmin.colName")}</th>
@@ -233,7 +233,7 @@ function TokensCard({ requireToken, onRequireToken }: { requireToken: boolean; o
               {(data ?? []).length === 0 && (
                 <tr className="border-t border-neutral-100">
                   <td colSpan={6}>
-                    <Empty compact icon={KeyRound}>{t("registry.admin.noTokens")}</Empty>
+                    <div className="tbl-empty"><Empty compact icon={KeyRound}>{t("registry.admin.noTokens")}</Empty></div>
                   </td>
                 </tr>
               )}

@@ -155,7 +155,7 @@ function Tokens({ onCreated }: { onCreated: (token: string) => void }) {
       <p className="px-5 text-sm text-neutral-600">{t("setup.tokenDesc")}</p>
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
         {(data ?? []).length > 0 && (
-          <div className="overflow-x-auto"><table className="tbl mt-3">
+          <div className="overflow-x-auto"><table className="tbl mt-3 max-sm:min-w-[32rem]">
             <thead>
               <tr>
                 <th className="px-5 py-2">{t("registryAdmin.colName")}</th>

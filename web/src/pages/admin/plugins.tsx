@@ -64,7 +64,7 @@ export default function AdminPlugins() {
       </div>
       <LoadState loading={loading && !data} error={error} onRetry={reload}>
         <Card className="overflow-x-auto">
-          <table className="tbl">
+          <table className="tbl max-sm:min-w-[44rem]">
             <thead>
               <tr>
                 <th className="w-8 px-2 py-2.5" />
@@ -83,7 +83,7 @@ export default function AdminPlugins() {
               {list.length === 0 && (
                 <tr>
                   <td colSpan={10}>
-                    <Empty icon={Blocks}>{t("registry.plugins.empty")}</Empty>
+                    <div className="tbl-empty"><Empty icon={Blocks}>{t("registry.plugins.empty")}</Empty></div>
                   </td>
                 </tr>
               )}

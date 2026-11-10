@@ -66,7 +66,7 @@ export function ImageCropDialog({ file, busy, onDone, onCancel }: {
 
   return (
     <Dialog open={!!file} onOpenChange={(open) => { if (!open) onCancel(); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t("brandAdmin.cropTitle")}</DialogTitle>
           <DialogDescription>{t("brandAdmin.cropHint")}</DialogDescription>

@@ -75,7 +75,7 @@ export default function Publish() {
                 {(mine.data ?? []).map((p) => (
                   <li key={p.name} className="px-5 py-3 text-sm">
                     {p.status === "published" ? (
-                      <Link to={pluginPath(p.name)} className="font-medium text-neutral-800 hover:text-brand-600">
+                      <Link to={pluginPath(p.name)} className="font-medium text-neutral-800 hover:text-brand-600 dark:hover:text-brand-200">
                         {p.title || p.name}
                       </Link>
                     ) : (

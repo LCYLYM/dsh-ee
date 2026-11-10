@@ -61,7 +61,7 @@ export default function AdminConnections() {
             <Empty>{t("connections.empty")}</Empty>
           ) : (
             <div className="overflow-x-auto">
-              <table className="tbl">
+              <table className="tbl max-sm:min-w-[36rem]">
                 <thead>
                   <tr>
                     <th className="px-5 py-2.5">{t("connections.colName")}</th>
