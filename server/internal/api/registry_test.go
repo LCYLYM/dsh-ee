@@ -670,4 +670,35 @@ func TestRegistry(t *testing.T) {
 			t.Fatalf("审核队列里应有依赖带进来的插件：%s", body)
 		}
 	})
+
+	t.Run("整包恢复不带出被驳回和没审过的版本", func(t *testing.T) {
+		review := func(what, version, action, note string) {
+			t.Helper()
+			code, body := admin.do("POST", "/api/admin/review", map[string]string{"name": "@acme/yank", "version": version, "action": action, "note": note}, nil)
+			expect(t, what, code, 200, body)
+		}
+		for _, v := range []string{"1.0.0", "1.1.0", "1.2.0"} {
+			pkg := pluginPkg("@acme/yank", v, nil)
+			code, body := anon.do("PUT", "/npm/@acme%2fyank", publishBody("@acme/yank", v, makeTgz(t, pkg, bundleFile), pkg, ""), npm(pubTok))
+			expect(t, "发布 "+v, code, 201, body)
+		}
+		review("通过 1.0.0", "1.0.0", "approve", "")
+		review("驳回 1.1.0", "1.1.0", "reject", "有安装脚本")
+		// 1.2.0 还没审。整包下架再整包恢复：只有上过架的 1.0.0 回来
+		review("下架整个包", "", "unpublish", "先停用")
+		review("恢复整个包", "", "restore", "")
+		code, body := anon.do("GET", "/npm/@acme%2fyank", nil, npm(readTok))
+		expect(t, "恢复后的 packument", code, 200, body)
+		if p := decodeAs[packument](t, body); len(p.Versions) != 1 || p.DistTags["latest"] != "1.0.0" {
+			t.Fatalf("整包恢复后只应有 1.0.0：versions=%d latest=%s", len(p.Versions), p.DistTags["latest"])
+		}
+		code, body = admin.do("POST", "/api/admin/review", map[string]string{"name": "@acme/yank", "action": "restore"}, nil)
+		expect(t, "没有上过架又待恢复的版本了", code, 409, body)
+		// 没上过架的版本要逐个恢复，那是对这一个版本的决定
+		review("单独恢复 1.2.0", "1.2.0", "restore", "")
+		code, body = anon.do("GET", "/npm/@acme%2fyank", nil, npm(readTok))
+		if p := decodeAs[packument](t, body); len(p.Versions) != 2 {
+			t.Fatalf("单独恢复的 1.2.0 应上架：%s", body)
+		}
+	})
 }

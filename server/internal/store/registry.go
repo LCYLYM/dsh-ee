@@ -419,7 +419,8 @@ func (s *Store) SetVersionDeprecated(ctx context.Context, name, version string, 
 
 // SetVersionStatus 把处于 from 状态之一的版本改成 to，并记下审核人与意见。
 // version 为空时作用于整个包。返回改动的行数。
-func (s *Store) SetVersionStatus(ctx context.Context, name, version string, from []string, to string, reviewer int64, note string) (int64, error) {
+// wasLive 为 true 时只动上过架的版本（published_at 只在真正上架时写入）。
+func (s *Store) SetVersionStatus(ctx context.Context, name, version string, from []string, to string, reviewer int64, note string, wasLive bool) (int64, error) {
 	t := now()
 	q := `UPDATE npm_versions SET status = ?, reviewed_by = ?, reviewed_at = ?, review_note = ?,
 	        published_at = CASE WHEN ? = 'published' AND published_at IS NULL THEN ? ELSE published_at END
@@ -431,6 +432,9 @@ func (s *Store) SetVersionStatus(ctx context.Context, name, version string, from
 	if version != "" {
 		q += " AND version = ?"
 		args = append(args, version)
+	}
+	if wasLive {
+		q += " AND published_at IS NOT NULL"
 	}
 	res, err := s.db.ExecContext(ctx, q, args...)
 	if err != nil {

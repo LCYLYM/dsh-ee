@@ -709,9 +709,15 @@ func (s *Service) Review(ctx context.Context, reviewer int64, name, version, act
 	if version == "" && (action == "approve" || action == "reject") {
 		return 0, errf(400, "审核要指定版本")
 	}
-	n, err := s.store.SetVersionStatus(ctx, name, version, from, to, reviewer, truncateRunes(note, 1000))
+	// 整包恢复只恢复上过架的版本。否则被驳回的、还没审就随整包下架的版本会跟着一起上架，
+	// latest 也会指到没人审过的版本上；这些版本要逐个恢复，那是对这一个版本的决定。
+	wasLive := action == "restore" && version == ""
+	n, err := s.store.SetVersionStatus(ctx, name, version, from, to, reviewer, truncateRunes(note, 1000), wasLive)
 	if err != nil {
 		return 0, err
+	}
+	if n == 0 && wasLive {
+		return 0, errf(409, "这个包没有上过架的版本可以恢复；被驳回或没审过的版本请逐个恢复")
 	}
 	if n == 0 {
 		return 0, errf(409, "没有处于可%s状态的版本", map[string]string{"approve": "通过", "reject": "驳回", "unpublish": "下架", "restore": "恢复"}[action])
