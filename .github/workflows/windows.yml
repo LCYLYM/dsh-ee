@@ -19,5 +19,5 @@ jobs:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
       # 只跑不依赖数据库的 Windows 运行时用例：真正执行 setup.ps1 写 .env 的那段。
-      - run: go test ./internal/api -run "TestSetupEnvPowerShell$" -count=1 -v
+      - run: go test ./internal/api -run "TestSetup(EnvPowerShell|TokenArgPowerShell)$" -count=1 -v
         working-directory: server

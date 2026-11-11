@@ -49,3 +49,32 @@ func TestSetupEnvPowerShell(t *testing.T) {
 		t.Fatalf("令牌应被替换且只出现一次：%q", got)
 	}
 }
+
+// TestSetupTokenArgPowerShell：`powershell -File setup.ps1 -Token x` 的参数只在脚本级
+// $args 里；要真的传进 Setup-DshEE，而不是让脚本自己提示“请使用 -Token”又回到设备登录。
+func TestSetupTokenArgPowerShell(t *testing.T) {
+	dir := t.TempDir()
+	scriptFile := filepath.Join(dir, "token-arg-test.ps1")
+	script := setupTokenArgPowerShell() + "Write-Host \"TOKEN=[$tokenArg]\"\n"
+	if err := os.WriteFile(scriptFile, []byte(script), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run := func(args ...string) string {
+		t.Helper()
+		cmdArgs := append([]string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptFile}, args...)
+		out, err := exec.Command("powershell.exe", cmdArgs...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("powershell: %v\n%s", err, out)
+		}
+		return string(out)
+	}
+	if out := run("-Token", "tok-abc"); !strings.Contains(out, "TOKEN=[tok-abc]") {
+		t.Fatalf("空格形式 -Token 没有传进去：%s", out)
+	}
+	if out := run("-Token=tok-def"); !strings.Contains(out, "TOKEN=[tok-def]") {
+		t.Fatalf("等号形式 -Token= 没有传进去：%s", out)
+	}
+	if out := run("-Other", "x"); !strings.Contains(out, "TOKEN=[]") {
+		t.Fatalf("没有 -Token 时应为空：%s", out)
+	}
+}

@@ -78,7 +78,7 @@ func TestSetupScripts(t *testing.T) {
 	}
 
 	ps := getScript(t, ts.URL, "/setup.ps1")
-	for _, want := range []string{"param([string]$Token)", "Invoke-RestMethod", "Start-Process", "icacls $Pending", "token.pending", "Setup-DshEE\n", "$Token -notmatch", "$Profiles = @(", "Get-Content $EnvFile -Encoding UTF8", "Get-Content $NpmrcFile -Encoding UTF8"} {
+	for _, want := range []string{"param([string]$Token)", "Invoke-RestMethod", "Start-Process", "icacls $Pending", "token.pending", "Setup-DshEE -Token $tokenArg\n", "$arg -like '-Token=*'", "$Token -notmatch", "$Profiles = @(", "Get-Content $EnvFile -Encoding UTF8", "Get-Content $NpmrcFile -Encoding UTF8"} {
 		if !strings.Contains(ps, want) {
 			t.Errorf("setup.ps1 缺少 %q", want)
 		}
