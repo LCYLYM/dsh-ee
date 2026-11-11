@@ -71,6 +71,11 @@ func TestWebLinkHandoff(t *testing.T) {
 	if code, _ := link("ee_at_nope", "/knowledge"); code != 401 {
 		t.Fatalf("无效令牌应 401，得到 %d", code)
 	}
+	// 没有 agent 范围的令牌（只调模型、读目录用的）换不了网页会话：会话带整套员工权限，比令牌本身大
+	f.token(t, emp.ID, "ee_at_homodel", []string{rbac.ScopeModels, rbac.ScopeHub, rbac.ScopeConnections}, nil, nil)
+	if code, raw := link("ee_at_homodel", "/knowledge"); code != 403 {
+		t.Fatalf("没有 agent 范围的令牌不应换到网页登录链接：%d %s", code, raw)
+	}
 
 	// 正常流程：跳到目标页，会话只带员工权限
 	code, raw := link("ee_at_hoemp", "/knowledge/docs/1?v=2#L3")

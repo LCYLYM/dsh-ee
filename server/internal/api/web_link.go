@@ -16,7 +16,8 @@ import (
 // 接入插件凭设备令牌换一个一次性 code（只放内存，60 秒有效，用一次即作废），浏览器打开
 // /api/auth/handoff?code=… 时换成网页会话再跳到目标页。这样换来的会话标记为 limited：
 // 只带员工权限，不能确认设备登录、不能生成接入码和令牌；管理功能要输入密码重新登录。
-// 拿到设备令牌的人本来就能以员工身份调接口，换成网页会话不会多出任何权限。
+// 带 agent 范围的设备令牌本来就能以员工身份调接口，换成网页会话不会多出任何权限；
+// 不带 agent 范围的令牌换不了。
 
 const webLinkTTL = 60 * time.Second
 
@@ -95,6 +96,13 @@ func (s *Server) handleDshWebLink(w http.ResponseWriter, r *http.Request) {
 	}
 	if p.User.AccountType != "human" {
 		writeErr(w, http.StatusForbidden, "机器人账号不能登录网页")
+		return
+	}
+	// 换来的会话带 agent 范围的整套员工权限（发布、写知识库、填应用数据）。只调模型、读目录的令牌
+	// （API key、接入令牌、不带 agent 的设备令牌）本身做不了这些，不能靠换会话多出权限来。
+	// 接入插件换不到时会打开原链接，员工在浏览器里登录一次即可。
+	if !p.Scopes.Has(rbac.ScopeAgent) {
+		writeErr(w, http.StatusForbidden, "这个令牌不能免登录打开网页，请在浏览器里登录")
 		return
 	}
 	var req struct {
