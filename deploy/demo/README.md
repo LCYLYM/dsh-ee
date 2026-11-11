@@ -15,6 +15,9 @@
 - 建应用、知识库、数据中台、管理模式这些照常可用，重置以后就清掉了。
 - 设了 `DSH_EE_DEMO_VIDEO_DIR` 时，首页首屏播放这个目录里的 `intro-zh.mp4` / `intro-en.mp4`（按界面语言挑），
   由 dsh-ee 直接从磁盘读，不打进二进制。视频怎么生成、怎么压缩见 [promo/README.md](../../promo/README.md)。
+- 设了 `DSH_EE_DEMO_STATS_FILE`（`demo.sh` 默认设成 `logs/stats.jsonl`）时，访客点场景卡片、打开应用的网页版、
+  用自己的 DSH 接入成功，各往这个文件追加一行：时间、动作、对象（示例员工的用户名或应用名）。
+  不记 IP、浏览器或别的访客信息；重置不清这个文件。`demo.sh stats` 按天汇总。
 
 被关掉的接口在 `server/internal/api/demo_site.go` 的 `demoSiteBlocked` 里。
 

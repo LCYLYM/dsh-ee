@@ -48,6 +48,8 @@ type Config struct {
 	// DemoVideoDir：放介绍视频 intro-zh.mp4、intro-en.mp4 的目录，演示站首页播放；空则不显示。
 	// 视频不打进二进制，免得每个部署都背着它。
 	DemoVideoDir string
+	// DemoStatsFile：演示站的访问统计追加到这个文件（每行一个 JSON）；空则不记。
+	DemoStatsFile string
 }
 
 func Load() (*Config, error) {
@@ -104,6 +106,7 @@ func Load() (*Config, error) {
 	}
 	c.DemoReset = strings.TrimSpace(os.Getenv("DSH_EE_DEMO_RESET"))
 	c.DemoVideoDir = strings.TrimSpace(os.Getenv("DSH_EE_DEMO_VIDEO_DIR"))
+	c.DemoStatsFile = strings.TrimSpace(os.Getenv("DSH_EE_DEMO_STATS_FILE"))
 	if v := os.Getenv("DSH_EE_DEMO_RESET_EVERY"); v != "" {
 		d, err := time.ParseDuration(v)
 		if err != nil {

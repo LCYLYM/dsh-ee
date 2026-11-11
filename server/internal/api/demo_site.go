@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -31,6 +32,8 @@ type DemoSite struct {
 	ResetEvery time.Duration
 	// 介绍视频所在目录（intro-zh.mp4、intro-en.mp4），首页播放；空则不显示
 	VideoDir string
+	// 访问统计追加到这个文件，每行一个 JSON；空则不记。放在数据目录和日志轮换之外，重置不清它
+	StatsFile string
 	// dsh-ee 自己监听的端口：对外请求只许连本机的这个端口（示例连接就是连自己）
 	selfPort string
 }
@@ -209,7 +212,27 @@ func (s *Server) handleDemoLogin(w http.ResponseWriter, r *http.Request) {
 		s.log.Warn("记录登录时间失败", "err", err)
 	}
 	s.auditAs(r, u, auditLogin, u.Username, map[string]any{"via": "demo"})
+	s.demoStat("persona", u.Username)
 	s.startWebSession(w, r, u)
+}
+
+// demoStat 记一次访客动作：点了场景卡片（persona）、打开了应用的网页版（app_open）、DSH 接入成功（dsh_connect）。
+// 只记时间、动作和对象（示例员工的用户名 / 应用名），不记 IP、浏览器或别的访客信息。
+// 数据库每次重置都清空、日志只留最近一份，所以单独追加到一个文件里。正常部署不记。
+func (s *Server) demoStat(event, what string) {
+	d := s.opts.DemoSite
+	if d == nil || d.StatsFile == "" {
+		return
+	}
+	line, _ := json.Marshal(map[string]string{"t": time.Now().UTC().Format(time.RFC3339), "event": event, "what": what})
+	// O_APPEND 下一次 Write 就是一整行，并发的请求不会写串
+	f, err := os.OpenFile(d.StatsFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		s.log.Warn("写演示站统计失败", "err", err)
+		return
+	}
+	defer f.Close()
+	_, _ = f.Write(append(line, '\n'))
 }
 
 func isDemoUser(name string) bool {

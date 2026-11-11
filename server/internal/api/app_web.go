@@ -60,6 +60,7 @@ func (s *Server) handleWebApp(w http.ResponseWriter, r *http.Request) {
 	if starters == nil {
 		starters = []string{}
 	}
+	s.demoStat("app_open", a.Slug)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"slug": a.Slug, "asset_id": a.ID, "title": sp.Title, "description": sp.Description, "icon": sp.Icon, "starters": starters, "highlights": sp.Highlights,
 		"workbench": sp.Workbench, "tables": len(sp.Tables) > 0, "web": sp.Web, "admin": admin,
