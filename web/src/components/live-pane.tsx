@@ -1,6 +1,7 @@
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
+import { copyText } from "../lib/clipboard";
 import { fillPrompt, panelView, rowWriteOf, type PanelHandlers, type WidgetState, type WorkbenchAction, type WorkbenchPane, type WorkbenchWidget } from "../lib/workbench-render";
 
 /**
@@ -98,12 +99,8 @@ export function LivePane({
       setHandoff(text);
       return;
     }
-    try {
-      await navigator.clipboard.writeText(full);
-      setNotice(t("appWeb.copied"));
-    } catch {
-      setNotice(t("appWeb.copyFailed"));
-    }
+    const copied = await copyText(full);
+    setNotice(t(copied ? "appWeb.copied" : "appWeb.copyFailed"));
     setHandoff(full);
   };
 
