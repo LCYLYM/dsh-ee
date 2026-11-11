@@ -342,6 +342,9 @@ type PublishDoc struct {
 }
 
 // Publisher 是发布者的身份与权限。
+// ConnectName 是 dsh-ee 生成的 DSH 接入插件在企业作用域下的包名。
+const ConnectName = "dsh-connect"
+
 type Publisher struct {
 	UserID   int64
 	Username string
@@ -372,6 +375,11 @@ func (s *Service) Publish(ctx context.Context, p Publisher, doc *PublishDoc) (*P
 	if !InScopes(name, scopes) {
 		return nil, errf(403, "只能发布到企业作用域（%s），包名要写成 %s/<名字>", strings.Join(scopes, "、"), set.Scope)
 	}
+	// 接入插件由 dsh-ee 自己生成并直接上架，每台电脑都装。员工抢先发一个同名的包就成了它的维护人，
+	// 之后还能改它的标签。
+	if strings.HasSuffix(name, "/"+ConnectName) && !p.AutoPublish {
+		return nil, errf(403, "%s 这个包名留给 dsh-ee 生成的 DSH 接入插件，请换一个名字", name)
+	}
 	if len(doc.Versions) != 1 || len(doc.Attachments) != 1 {
 		return nil, errf(400, "一次只能发布一个版本（versions 与 _attachments 各一个）")
 	}
@@ -392,7 +400,7 @@ func (s *Service) Publish(ctx context.Context, p Publisher, doc *PublishDoc) (*P
 		return nil, err
 	case pkg.Origin != store.OriginHosted:
 		return nil, errf(409, "%s 已经作为上游包镜像在本地，不能在企业作用域里发布同名包", name)
-	case pkg.OwnerID != nil && *pkg.OwnerID != p.UserID && !p.Manager && !p.AutoPublish:
+	case !ownedBy(pkg, p) && !p.Manager && !p.AutoPublish:
 		return nil, errf(403, "%s 由其他人维护，你不能发布新版本", name)
 	}
 	if _, err := s.store.GetVersion(ctx, name, version); err == nil {
@@ -613,10 +621,16 @@ func (s *Service) hostedForWrite(ctx context.Context, p Publisher, name string) 
 	if pkg.Origin != store.OriginHosted {
 		return nil, errf(403, "%s 不是企业托管的包", name)
 	}
-	if pkg.OwnerID != nil && *pkg.OwnerID != p.UserID && !p.Manager {
+	if !ownedBy(pkg, p) && !p.Manager {
 		return nil, errf(403, "%s 由其他人维护", name)
 	}
 	return pkg, nil
+}
+
+// ownedBy 报告包是不是 p 维护的。没有维护人的包（后台任务发布的接入插件）不属于任何员工，
+// 只有管理员能动：按「没人维护就谁都能发」处理的话，每台电脑都装的接入插件人人可改。
+func ownedBy(pkg *store.NpmPackage, p Publisher) bool {
+	return pkg.OwnerID != nil && *pkg.OwnerID == p.UserID
 }
 
 // SetDistTag 设置或删除（version 为空）一个 dist-tag。
