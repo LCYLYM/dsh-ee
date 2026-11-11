@@ -300,8 +300,9 @@ func roman(v int) string {
 }
 
 // letters：1 → A，26 → Z，27 → AA（Word 的写法是重复字母）。
+// 起始值是文件里写的，不设上限的话写个几十亿就要重复出几个 GB 的字母；超过 32767 的直接写数字。
 func letters(v int) string {
-	if v <= 0 {
+	if v <= 0 || v > 32767 {
 		return strconv.Itoa(v)
 	}
 	return strings.Repeat(string(rune('A'+(v-1)%26)), (v-1)/26+1)

@@ -60,10 +60,15 @@ func (n *xnode) all(name string, out *[]*xnode) {
 	}
 }
 
+// maxXNodes 是一个 XML 文件最多建多少个节点。压缩过的 XML 几 KB 就能有上百万个空元素，树比文件大得多；
+// 正常的一页幻灯片只有几百到几万个。
+const maxXNodes = 500000
+
 func parseXNode(data []byte) (*xnode, error) {
 	dec := xml.NewDecoder(bytes.NewReader(data))
 	root := &xnode{}
 	stack := []*xnode{root}
+	nodes := 0
 	for {
 		tok, err := dec.Token()
 		if err == io.EOF {
@@ -74,6 +79,9 @@ func parseXNode(data []byte) (*xnode, error) {
 		}
 		switch t := tok.(type) {
 		case xml.StartElement:
+			if nodes++; nodes > maxXNodes {
+				return nil, fmt.Errorf("元素超过 %d 个", maxXNodes)
+			}
 			n := &xnode{name: t.Name.Local, attrs: t.Attr}
 			top := stack[len(stack)-1]
 			top.kids = append(top.kids, n)
@@ -260,6 +268,9 @@ func pptRels(files map[string]*zip.File, relsPath, baseDir string) (map[string]s
 	return byID, byType
 }
 
+// maxSlides 是一份 PPT 最多收多少页。
+const maxSlides = 5000
+
 // convertPPTX 按页抽取：每页一节「## 第 N 页 标题」，文字框从上到下、从左到右，表格转成 Markdown 表格，备注放在最后。
 // 图片、图表、SmartArt 不收；隐藏的页跳过。
 func convertPPTX(data []byte) (*Converted, error) {
@@ -287,10 +298,18 @@ func convertPPTX(data []byte) (*Converted, error) {
 	if err := xml.Unmarshal(pdata, &p); err != nil {
 		return nil, errors.New(".pptx 内容解析失败：" + err.Error())
 	}
+	if len(p.Slides) > maxSlides {
+		return nil, fmt.Errorf("幻灯片超过 %d 页，请拆成几个文件再上传", maxSlides)
+	}
 	rels, _ := pptRels(files, "ppt/_rels/presentation.xml.rels", "ppt")
 	info := Info{Format: "pptx"}
 	var b strings.Builder
+	cells := 0
 	for i, s := range p.Slides {
+		// 同一页可以被引用很多次，每次都会再写一遍
+		if b.Len() > maxOutput {
+			return nil, errTooBig
+		}
 		slidePath := rels[s.RID]
 		f := files[slidePath]
 		if f == nil {
@@ -324,6 +343,13 @@ func convertPPTX(data []byte) (*Converted, error) {
 		b.WriteString(head + "\n\n")
 		for _, sh := range shapes {
 			if sh.table != nil {
+				width := 0
+				for _, r := range sh.table {
+					width = max(width, len(r))
+				}
+				if cells += len(sh.table) * width; cells > maxTableCells {
+					return nil, errTooBig
+				}
 				b.WriteString(markdownTable(sh.table) + "\n")
 				info.Tables++
 				continue
