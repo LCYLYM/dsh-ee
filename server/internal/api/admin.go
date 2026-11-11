@@ -165,6 +165,8 @@ type updateUserReq struct {
 	Department  *string `json:"department"`
 	Disabled    *bool   `json:"disabled"`
 	Password    *string `json:"password"`
+	// 解除 OIDC 账号绑定的 sub：统一登录里重建了账号时用，下次登录重新绑定
+	UnbindIdentity bool `json:"unbind_identity"`
 }
 
 func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -186,8 +188,8 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
-	// 不能动权限比自己大的人，否则禁用或重置密码就能变相夺权
-	if (req.Disabled != nil || req.Password != nil) && !outranks(currentAccess(r), target) {
+	// 不能动权限比自己大的人，否则禁用、重置密码或解除身份绑定就能变相夺权
+	if (req.Disabled != nil || req.Password != nil || req.UnbindIdentity) && !outranks(currentAccess(r), target) {
 		writeErr(w, http.StatusForbidden, "不能禁用或重置权限比自己大的用户")
 		return
 	}
@@ -213,6 +215,14 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 		p.PasswordHash = &hash
 	}
+	if req.UnbindIdentity {
+		if u, err := s.store.GetUser(r.Context(), id); err != nil || u.AuthSource != store.AuthOIDC {
+			writeErr(w, http.StatusBadRequest, "只有企业统一登录（OIDC）的账号有身份绑定可以解除")
+			return
+		}
+		none := ""
+		p.ExternalDN = &none
+	}
 	if err := s.store.UpdateUser(r.Context(), id, p); err != nil {
 		if notFound(err) {
 			writeErr(w, http.StatusNotFound, "用户不存在")
@@ -221,8 +231,8 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		s.internalErr(w, r, err)
 		return
 	}
-	// 禁用或重置密码后，踢掉该用户所有会话
-	if (req.Disabled != nil && *req.Disabled) || req.Password != nil {
+	// 禁用、重置密码或解除身份绑定后，踢掉该用户所有会话
+	if (req.Disabled != nil && *req.Disabled) || req.Password != nil || req.UnbindIdentity {
 		if err := s.store.DeleteUserSessions(r.Context(), id); err != nil {
 			s.internalErr(w, r, err)
 			return
@@ -239,6 +249,9 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Password != nil {
 		detail["password_reset"] = true
+	}
+	if req.UnbindIdentity {
+		detail["identity_unbound"] = true
 	}
 	if req.DisplayName != nil || req.Department != nil {
 		detail["profile"] = true

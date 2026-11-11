@@ -322,7 +322,7 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 func (s *Server) finishOIDCLogin(w http.ResponseWriter, r *http.Request, cfg *oidc.Config, id oidc.Identity, next string) {
 	u, err := s.provisionOIDC(r.Context(), cfg, id)
 	switch {
-	case errors.Is(err, errNotProvisioned), errors.Is(err, errBadCredentials), errors.Is(err, errOIDCConflict):
+	case errors.Is(err, errNotProvisioned), errors.Is(err, errBadCredentials), errors.Is(err, errOIDCConflict), errors.Is(err, errOIDCIdentity), errors.Is(err, errOIDCNoSubject):
 		s.auditAs(r, nil, auditLoginFailed, id.Username, map[string]any{"via": "oidc", "reason": err.Error()})
 		loginError(w, r, err.Error())
 		return
@@ -344,7 +344,11 @@ func (s *Server) finishOIDCLogin(w http.ResponseWriter, r *http.Request, cfg *oi
 	http.Redirect(w, r, next, http.StatusFound)
 }
 
-var errOIDCConflict = errors.New("dsh-ee 里已有同名的本地或 LDAP 账号，不能用企业统一登录；请联系管理员")
+var (
+	errOIDCConflict  = errors.New("dsh-ee 里已有同名的本地或 LDAP 账号，不能用企业统一登录；请联系管理员")
+	errOIDCIdentity  = errors.New("这个用户名在 dsh-ee 里已绑定另一个企业身份；如果是你的账号在统一登录里重建过，请联系管理员解除绑定")
+	errOIDCNoSubject = errors.New("企业统一登录没有返回用户标识（sub），不能登录；请联系管理员")
+)
 
 // oidcUsername 把声明里的用户名变成 dsh-ee 的用户名；邮箱形式的取 @ 前面一段。
 func oidcUsername(raw string) string {
@@ -363,6 +367,9 @@ func oidcUsername(raw string) string {
 // provisionOIDC 找到或建好账号，同步资料与映射的角色。规则与 LDAP 一致：
 // 本地账号、LDAP 账号与机器人不能借 OIDC 登录；没开自动建号时只有预先建好的 OIDC 账号能登录。
 func (s *Server) provisionOIDC(ctx context.Context, cfg *oidc.Config, id oidc.Identity) (*store.User, error) {
+	if id.Subject == "" {
+		return nil, errOIDCNoSubject
+	}
 	name := oidcUsername(id.Username)
 	if name == "" {
 		s.log.Warn("OIDC 声明里没有可用的用户名", "claim", cfg.UsernameClaim, "value", id.Username)
@@ -400,6 +407,12 @@ func (s *Server) provisionOIDC(ctx context.Context, cfg *oidc.Config, id oidc.Id
 			s.log.Info("OIDC 用户首次登录，已创建账号", "user", name, "roles", roles)
 			return s.store.GetUser(ctx, u.ID)
 		}
+	}
+	// 账号按用户名找，认的却是 sub：用户名声明会变也会重名（邮箱前缀在另一个域重名、工号回收再分配），
+	// 只按用户名认，后来的人会直接登进前一个人的账号。预先建好的账号还没有 sub，第一次登录时绑定。
+	if u.ExternalDN != "" && u.ExternalDN != id.Subject {
+		s.log.Warn("OIDC 用户名已绑定另一个 sub，拒绝登录", "user", name)
+		return nil, errOIDCIdentity
 	}
 	if u.Disabled {
 		return nil, errBadCredentials
