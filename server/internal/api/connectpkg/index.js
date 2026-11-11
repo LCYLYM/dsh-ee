@@ -520,13 +520,14 @@ var McpBridge = class {
   /** 服务端在 tools/list 里标了 readOnlyHint 的工具（服务端工具名）；工作台取数只能用它们 */
   readOnly = /* @__PURE__ */ new Set();
   status = { lastSyncAt: 0, tools: 0, error: "" };
-  async rpc(method, params, timeoutMs = 3e4) {
+  async rpc(method, params, timeoutMs = 3e4, retried = false) {
     const headers = { "content-type": "application/json", accept: "application/json, text/event-stream" };
     if (this.session) headers["Mcp-Session-Id"] = this.session;
     const response = await this.http.fetch("/mcp", { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) }, timeoutMs);
     if (response.status === 404) {
       this.session = "";
-      return this.rpc(method, params, timeoutMs);
+      if (retried) throw new Error(`MCP ${method} HTTP 404`);
+      return this.rpc(method, params, timeoutMs, true);
     }
     if (!response.ok) throw new Error(`MCP ${method} HTTP ${response.status}`);
     this.session = response.headers.get("mcp-session-id") || this.session;
@@ -602,9 +603,9 @@ ${canonArgs(args)}`, body.preview);
     });
   }
   async sync() {
-    if (!this.session) await this.rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "dsh-ee-connect", version: this.config.version } });
     let result;
     try {
+      if (!this.session) await this.rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "dsh-ee-connect", version: this.config.version } });
       result = await this.rpc("tools/list");
     } catch (error) {
       this.status.error = error instanceof Error ? error.message : String(error);

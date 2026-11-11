@@ -63,3 +63,21 @@ test("bridge survives an unreachable server at start and reconnects the event st
   assert.ok(registered.has("mcp__acme__lookup"), "重连后应补同步出工具");
   bridge.stop();
 });
+
+test("bridge gives up after one retry when /mcp always 404 and surfaces the error", async () => {
+  // 回归：/mcp 一直 404（地址/代理填错）时不能无限递归重发。
+  let posts = 0;
+  const http = {
+    async fetch(_path: string, init: RequestInit) {
+      if (!init.body) return new Response(null);
+      posts++;
+      return new Response("not found", { status: 404 });
+    },
+  };
+  const ctx = { tools: { register() { return () => undefined; } } };
+  const bridge = new McpBridge(ctx as any, normalizeConfig({ base: "http://localhost", serverName: "acme" }), http as any);
+  await bridge.start();
+  bridge.stop();
+  assert.equal(posts, 2, "initialize 原始请求 + 一次清会话重试");
+  assert.match(bridge.status.error, /404/);
+});
