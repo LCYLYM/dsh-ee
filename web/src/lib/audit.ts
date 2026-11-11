@@ -22,6 +22,11 @@ export const AUDIT_CATEGORIES = [
   "asset",
   "connection",
   "connect",
+  "brand",
+  "kb",
+  "app_data",
+  "data",
+  "dsh_release",
 ] as const;
 
 /** 动作名；没有翻译的新动作原样显示。 */
